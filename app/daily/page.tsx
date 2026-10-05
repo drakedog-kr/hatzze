@@ -20,7 +20,7 @@ import { NoteView } from "./NoteView";
  */
 
 /**
- * ⛔ **아직 안 연 화면이다.** 스위치는 `app/screen-flags.ts` 한 곳에 있다 — 사이드바·푸터·
+ * ⛔ **아직 안 연 화면이다.** 스위치는 `app/screen-flags.ts` 한 곳에 있다 — 사이드바·
  * 사이트맵·소식 띠가 같은 값을 읽으므로 여는 날 고칠 곳이 흩어지지 않는다.
  */
 const PUBLIC = DAILY_PUBLIC;

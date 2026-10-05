@@ -43,7 +43,8 @@ export const metadata: Metadata = {
 export default function NotFound() {
   return (
     <div style={{ maxWidth: DOC_WIDTH }}>
-      <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 700, letterSpacing: "0.08em", color: "var(--c-muted)" }}>404</p>
+      {/* 꼬리표는 500 — 곁줄은 굵게 하지 않는다(2026-10-05 점검). */}
+      <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, letterSpacing: "0.08em", color: "var(--c-muted)" }}>404</p>
       <h1 style={{ margin: "8px 0 0", fontSize: "var(--fs-24)", fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
         찾을 수 없는 주소입니다
       </h1>
@@ -52,7 +53,8 @@ export default function NotFound() {
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 22 }}>
         <Link href="/" className="hz-btn-soft" style={{ padding: "0 14px" }}>
-          <Icon name="home" style={{ fontSize: "var(--fs-18)" }} />
+          {/* 아이콘은 사이드바와 같은 것(AppShell 메뉴 정의) — 'home'이라 사이드바의 시장 브리핑과 달랐다. */}
+          <Icon name="monitoring" style={{ fontSize: "var(--fs-18)" }} />
           시장 브리핑
         </Link>
         <Link href="/kadera" className="hz-btn-soft" style={{ padding: "0 14px" }}>

@@ -11,7 +11,8 @@
   gap: 4px;
   padding: 0 4px 0 14px;
   background: var(--c-blue-tint);
-  border-radius: var(--r-card);
+  /* 6 — 바로 밑 v2 띠 · 모듈과 같은 모서리(12 이던 땐 따로 놀았다, 2026-10-05 점검). */
+  border-radius: 6px;
   color: var(--c-cold-ink);
 }
 .hz-news-link {
@@ -23,8 +24,9 @@
   padding: 11px 0;
   color: inherit;
   text-decoration: none;
-  font-size: var(--fs-13-5);
-  font-weight: 600;
+  font-size: 13px;
+  /* 띠 문장은 500, 갈 화면 이름(.hz-news-em)만 600 — 문장 전체가 600 이면 강조가 강조로 안 읽혔다(2026-10-04). */
+  font-weight: 500;
   letter-spacing: -0.01em;
 }
 /* 낱말 가운데서 끊기지 않게 — 좁은 화면에서 두 줄이 되어도 읽히는 단위로 접힌다. */
@@ -32,6 +34,7 @@
 /* 화면 이름에만 밑줄. 띠 전체가 링크라 이건 '어디로 가는지'의 표시다.
    글자 밑선에 붙이지 않고 3px 띄운다 — 받침(ㅇ·ㄹ)이 선에 닿아 뭉개진다. */
 .hz-news-em {
+  font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-thickness: 1px;
@@ -63,6 +66,11 @@
   cursor: pointer;
 }
 .hz-news-x:hover { opacity: 1; background: var(--c-blue-tint2); }
+/* 폰 — 겉 30 은 그대로 두고 누르는 자리만 44 로(2026-10-05 모바일 점검). */
+@media (max-width: 560px) {
+  .hz-news-x { position: relative; }
+  .hz-news-x::after { content: ""; position: absolute; inset: -7px; }
+}
 
 /* 좁은 화면에서는 '보러 가기' 글자를 접는다. 띠 전체가 링크라 화살표만으로 충분하고,
    그 글자까지 두면 문장이 세 줄이 된다. */
@@ -80,6 +88,10 @@
   .hz-news-tail-full { display: none; }
   .hz-news-tail-short { display: inline; }
 }
+/* 330px 안팎 폰에서는 설문 문장(밑줄 이름이 끝에 선다)이 두 줄을 넘어 '참여하기'가 잘렸다 — 이 폭에서만 세 줄까지 둔다(2026-10-05 머지 전 점검). */
+@media (max-width: 340px) {
+  .hz-news:not(.hz-news-namefirst) .hz-news-text { -webkit-line-clamp: 3; }
+}
 
 /* 명절 인사 팝업(.hz-greet*)이 여기 있었다. 2026 추석 연휴(09-24~09-27)에 띄우고 연휴가 끝나 걷었다.
    다음 명절에 되살릴 땐 PR #560·#561 의 app/HolidayGreeting.tsx 와 이 자리의 CSS 를 가져와 인사 문구만 바꾼다.
@@ -89,17 +101,6 @@
 /* 테마 줄의 종목 팝오버(.hz-theme-host · .hz-theme-pop*)가 여기 있었다. 2026-09-22 에 국장·미장 카더라의 테마 줄이
    **테마 리포트로 가는 링크**가 되면서 걷었다 — 팝오버가 보이던 종목 목록은 테마 리포트의 '이 테마의 주인공'이 요약·이유·
    일정과 함께 보인다. 지울 때 grep 으로 참조를 셌다(tsx 0곳). 홈 지표 셀의 팝오버(home.css)는 같은 어법을 제 몫으로 갖고 있다. */
-
-/* 클릭 가능한 카드(트렌딩 메시지 등) — 마우스를 올리면 살짝 떠오르고 테두리가
-   강조돼 "누를 수 있다"는 걸 알린다. */
-.hz-lift {
-  cursor: pointer;
-  transition: transform 0.14s ease, border-color 0.14s ease;
-}
-.hz-lift:hover {
-  transform: translateY(-2px);
-  border-color: var(--c-blue);
-}
 
 /* 리스트 행 링크(채널 랭킹 등) — 호버 시 메시지 카드와 같은 배경으로 강조된다.
    음수 마진으로 여백을 카드 안쪽까지 넓혀 행 전체가 눌리는 느낌을 준다. */
@@ -229,29 +230,6 @@
   color: #ffffff;
 }
 
-/* 카더라 종목 카드 → MDD 정밀분석 링크. 카드 하단에 은근히 붙는 작은 텍스트 링크다
-   (버튼처럼 크게 두면 카드마다 반복돼 너무 튄다). 평소엔 옅은 회색, 호버에만 파랗게.
-   서버 컴포넌트라 인라인 호버를 못 줘서 여기 클래스로 둔다. */
-.hz-mdd-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: var(--fs-11);
-  font-weight: 600;
-  color: var(--c-sub);
-  text-decoration: none;
-  white-space: nowrap;
-  transition: color 0.12s ease;
-}
-/* 호버는 파랑 램프의 **맨 앞**(--c-blue-1)이다. --c-blue 로 두면 종목 리포트의 최근
-   3일 막대와 똑같은 색인데, 막대는 면적이 크고 이쪽은 11px 글자라 같은 색이 훨씬
-   흐리게 보인다 — 한 단계 깊은 값이라야 "링크를 짚었다"가 읽힌다.
-   다크에선 램프가 뒤집혀 --c-blue-1 이 가장 밝은 값이라, 어두운 바탕에서도 같은
-   '가장 또렷한 파랑' 자리를 그대로 가리킨다. */
-.hz-mdd-link:hover {
-  color: var(--c-blue-1);
-}
-
 /* 종목 이름 링크 — 카더라의 급부상 셀·주요 종목 리포트가 쓴다.
 
    ⚠️ 링크라고 파랗게 칠하지 않는다. 이름은 카드에서 가장 진한 글자(--c-ink)라야 하는데,
@@ -285,56 +263,6 @@
   color: var(--c-blue-1);
 }
 
-/* 국장 미리보기 — 하이퍼리퀴드 시장으로 나가는 심볼 링크(xyz:SKHX ↗).
-
-   ⚠️ 색을 인라인으로 주지 말 것. 인라인은 :hover 를 이겨서 호버가 죽는다(카더라 '더 보기'가
-   그래서 한 번도 호버가 안 보였다). 기본색도 여기 적는다 — 인라인에 두면 그 한 줄이
-   아래 :hover 를 계속 이긴다.
-
-   ⚠️ 기본을 파랑으로 칠하지 않는다. 카드마다 파란 덩이가 서면 무엇이 중요한지가 흐려진다.
-   위의 종목 이름·MDD 링크와 같은 규칙이다 — 누를 수 있다는 것은 화살표와 호버로 말한다. */
-.hz-perp-link {
-  color: var(--c-muted);
-  text-decoration: none;
-  transition: color 0.12s ease;
-}
-.hz-perp-link:hover {
-  color: var(--c-blue-1);
-}
-
-/* 주요 종목 리포트의 머리줄 — 로고 · 종목명 · 종목코드 · 시세.
-   시세 묶음은 nowrap 이고 종목코드도 안 줄어서, 좁아지면 줄어들 수 있는 게 종목명(clip)
-   하나뿐이다. 폰에서 그 이름이 0 까지 눌려 아예 안 보였다. 폭이 모자라면 시세를 통째로
-   다음 줄로 내려 이름에 한 줄을 다 준다. */
-.hz-stock-price {
-  margin-left: auto;
-}
-/* 이 줄은 baseline 으로 맞춘다(page.tsx). 17px 종목명·11px 코드·15px 시세가 한 줄에
-   섞여 있어 center 로 두면 눈에 보이는 밑선이 2.5px 어긋난다.
-   로고만 빼 준다 — 그림에는 baseline 이 없어 상자 밑변이 baseline 에 걸리고, 그러면
-   로고가 글자 위로 떠오른다. 이 하나는 광학 중심이 맞다.
-
-   ⚠️ 그 중심은 **줄 전체가 아니라 종목명 줄**의 중심이다. 오른쪽 시세 묶음이 두 줄
-   (N개 채널 · 최근 N일 N회, 37px)이라 줄이 종목명(26px)보다 키가 크고, `align-self: center`
-   로 두면 로고가 줄 한가운데(21px)로 내려가 종목명 중심(13px)보다 8px 아래에 앉았다
-   (2026-09-18 지적, 09-05 리디자인 때 시세가 두 줄이 되면서 생긴 것). baseline 묶음은
-   줄 위(cross-start)에 붙으므로 로고도 위에 붙이고, 종목명 줄(17px × 1.5 = 25.5px)과
-   로고(--hz-logo)의 키 차이 절반만큼 끌어올려 두 중심을 맞춘다. 로고 30px 이면 −2px. */
-.hz-stock-head > :first-child {
-  align-self: flex-start;
-  margin-top: calc((25.5px - var(--hz-logo, 24px)) / 2);
-}
-@media (max-width: 560px) {
-  .hz-stock-head {
-    flex-wrap: wrap;
-    row-gap: 4px;
-  }
-  .hz-stock-price {
-    margin-left: 0;
-    flex-basis: 100%;
-  }
-}
-
 /* 신고가 괴리율 카드의 종목 목록. 넓을 땐 왼쪽 게이지와 세로 선으로 나뉘지만, 좁아져
    아랫줄로 내려가면 그 선이 허공에 뜬다 — 그때는 가로 선으로 바꿔 위아래를 나눈다. */
 .hz-peer-list {
@@ -354,20 +282,6 @@
    (나머지는 더 옅어져 어디를 보고 있는지 분명해진다). 서버 컴포넌트라 인라인 호버를 못 줘서
    여기 클래스로 둔다. 규칙 순서가 곧 우선순위다 — :hover 규칙이 기본 규칙 뒤에 와야
    마우스를 올렸을 때 다른 칸이 같이 옅어진다(안 그러면 진한 막대가 둘이 된다). */
-/* 종목 리포트 막대는 **두 단계뿐**이다 — 진한 칸 = 카드 수치에 들어간 최근 3일,
-   옅은 칸 = 그 앞 배경 맥락. 예전엔 마지막 하루만 진하고 나머지 집계일이 중간 톤이라
-   세 단계였는데, 그러면 "어디까지가 480회인가"가 색으로 안 읽혔다. 경계를 색이 직접
-   말하게 두 단계로 줄인다(값은 숨기지 않는다 — 툴팁·hover 는 7칸 전부 동작). */
-.hz-bars .hz-bar {
-  opacity: 0.95; /* 집계 창(최근 3일) */
-  transition: opacity 0.12s ease;
-}
-.hz-bars .hz-bar-ctx { opacity: 0.45; } /* 그 앞 배경 맥락 */
-.hz-bars:hover .hz-bar { opacity: 0.45; }
-.hz-bars:hover .hz-bar-ctx { opacity: 0.25; }
-.hz-bars .hz-bar-col:hover .hz-bar { opacity: 1; }
-.hz-bars .hz-bar-date { transition: color 0.12s ease; }
-.hz-bars .hz-bar-col:hover .hz-bar-date { color: var(--c-sub); }
 
 /* 카드 바닥에 붙는 옅은 버튼형 링크(모니터링 현황의 "채널 등록 신청"). 파란 글자만
    덩그러니 떠 있으면 눌리는 것인지 알기 어려워, 테두리를 줘 버튼으로 읽히게 한다.
@@ -403,3 +317,7 @@
 .hz-logo-link:hover {
   opacity: 0.72;
 }
+
+/* 사이드바 맨 아래 줄(오늘 뭐래? + 다크 모드). 접힌 아이콘 막대(64px)에선 둘이 한 줄에 안 들어가 세로로 쌓는다. */
+html[data-sidebar="icon"] .hz-sidebar .hz-side-foot { flex-direction: column; }
+html[data-sidebar="icon"] .hz-sidebar .hz-side-foot .hz-theme-btn { width: 100% !important; }

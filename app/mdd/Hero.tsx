@@ -5,21 +5,22 @@
 import dynamic from "next/dynamic";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { MddAnalysis } from "@/lib/mdd";
-import { C, Icon, MONO } from "../ui";
+import { C, Icon } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
+import { Module } from "../kadera/V2Modules";
+import { SummaryModule } from "./V2Sheets";
 import { StockLogo } from "../StockLogo";
 import {
   fmtPct,
   fmtPrice,
-  benchName,
-  benchParticle,
-  benchVerb,
-  cautionText,
   fmtDur,
-  fmtDayCount,
   fmtDay,
-  isDeepestNow,
+  fmtYm,
+  fmtDot,
+  benchName,
+  marketName,
   periodInfo,
+  cautionShort,
   DOWN,
   UP,
   DOWN_BAR,
@@ -30,224 +31,107 @@ import { Sheet, Foot, StatCell } from "./sheet";
 // 확대 판(Base UI Dialog, gzip 약 20KB)은 폰에서 확대 단추를 처음 누를 때 받는다(app/insider/ChartZoom.tsx 와 같다).
 const ZoomDialog = dynamic(() => import("../ZoomDialog").then((m) => m.ZoomDialog), { ssr: false });
 
-function Reading({ data, periodLabel }: { data: MddResult; periodLabel: string }) {
-  const a = data.analysis;
-  const period = periodInfo(data.years, a.firstDate, a.asOf);
-  const p: React.CSSProperties = { margin: 0, fontSize: "var(--fs-14)", lineHeight: 1.7, color: C.inkSoft, wordBreak: "keep-all" };
-  const b = (color?: string) => ({ fontWeight: 800, color: color ?? C.ink });
-  const paras: React.ReactNode[] = [];
-
-  // 1 — 얼마나 드문 깊이인가.
-  //
-  // ⚠️ 두 수는 모집단이 다르다. bigDrops 는 −20% 보다 깊은 사건만(depthHistogram), deeperCount 는
-  //    깊이와 상관없이 **지금보다 깊었던** 사건 전부(recoveryStats)다. 지금 낙폭이 −20% 보다
-  //    얕으면 뒤가 앞보다 커진다(NVDA −2.3% 일 때 7 vs 64, 2026-09-09 실측). 그래서 뒤 문장을
-  //    "그중" 으로 앞에 묶지 않고, 지금 낙폭을 적어 자기 모집단을 스스로 말하게 한다.
-  // ⚠️ similarCount(같거나 더 깊었던)가 아니다 — 신저점 날에는 진행 중 사건 자신이 세어져 "없음" 옆에 "1번"이 선다.
-  const bigDrops = a.depthBuckets.reduce((s, d) => s + d.count, 0);
-  if (bigDrops > 0) {
-    paras.push(
-      <p key="depth" style={p}>
-        {periodLabel} 동안 <b style={b()}>−20%보다 깊이</b> 잠긴 구간은 {bigDrops}번이었고, 가장 깊었던 때는{" "}
-        <b style={b()}>{fmtPct(a.mdd)}</b>였습니다.
-        {a.recovery && a.recovery.deeperCount > 0 && (
-          <>
-            {" "}
-            지금({fmtPct(a.currentDd)})보다 깊이 잠긴 적은 같은 기간에 {a.recovery.deeperCount}번입니다.
-          </>
-        )}
-      </p>,
-    );
-  }
-
-  // 2 — 시장·업종으로 설명되는 몫과 안 되는 몫.
-  const attr = data.attribution;
-  if (attr) {
-    const bench = attr.theme ?? attr.market;
-    const themeName = data.theme?.name;
-    const gap = bench !== null ? attr.stock - bench : null;
-    paras.push(
-      <p key="attr" style={p}>
-        {/* ⚠️ 기준 지수가 **올랐을 때**를 빼먹으면 안 된다. 국장은 이 문장이 쓰이는
-            대부분의 날에 코스피도 같이 빠져 있어 "빠졌습니다"가 맞았는데, 미장을 들이자
-            바로 드러났다 — "S&P500은 +3.4% 빠졌습니다"(실측). 부호로 동사를 가른다. */}
-        같은 기간 {benchName(data.market)}
-        {benchParticle(data.market)}{" "}
-        {attr.market !== null ? fmtPct(attr.market) : data.partial?.market ? "지금 불러오지 못했고" : "기록이 없고"}
-        {attr.theme !== null && <>, {themeName ?? "테마"} 업종은 {fmtPct(attr.theme)}</>}{" "}
-        {benchVerb(attr.market, attr.theme)}.
-        {gap !== null &&
-          (gap < 0 ? (
-            <>
-              {" "}
-              시장·업종으로 설명되지 않는 <b style={b(DOWN)}>{fmtPct(gap)}p</b>가 이 종목 고유의 낙폭입니다.
-            </>
-          ) : (
-            <>
-              {" "}
-              이 종목은 오히려 <b style={b(UP)}>{fmtPct(gap)}p</b> 덜 빠졌습니다.
-            </>
-          ))}
-      </p>,
-    );
-  }
-
-  // 3 — 과거엔 회복까지 얼마나 걸렸나.
-  const r = a.recovery;
-  if (r) {
-    paras.push(
-      <p key="rec" style={p}>
-        {r.recoveredCount >= 2 ? (
-          <>
-            과거 {r.recoveredCount}번의 회복은 <b style={b()}>중앙값 {fmtDur(r.medianDays!)}</b>({fmtDur(r.minDays!)}~
-            {fmtDur(r.maxDays!)})이 걸렸습니다.
-          </>
-        ) : r.recoveredCount === 1 ? (
-          <>
-            {/* 범위가 없는 한 번이라 '범위로 참고'는 틀린 말이었다(mdd#5). */}
-            고점을 되찾은 전례는 <b style={b()}>{fmtDur(r.medianDays!)}</b> 걸린 한 번뿐이라 참고로만 보십시오.
-          </>
-        ) : (
-          <>
-            {/* '가장 깊다'는 지금이 **조회 기간의 최저점**일 때만, 그리고 기간을 밝혀서 말한다. 예전 "역대 최대 낙폭"은
-                1·3년 조회에서도, 저점에서 조금 올라온 때에도 떴다(isDeepestNow 주석). */}
-            {period.label} 동안 이만큼 깊게 빠진 뒤 <b style={b()}>회복한 전례가 없습니다</b>.
-            {isDeepestNow(a) && <> 지금이 이 기간의 가장 깊은 낙폭입니다.</>}
-          </>
-        )}
-      </p>,
-    );
-  }
-
-  // 정직성 경고 — 겹쳐 쌓지 않고 필요한 것만(shared.ts cautionText).
-  const caution = cautionText(data.years, period.truncated, period.approxYears);
-
-  return (
-    <>
-      {paras}
-      {caution && (
-        <p style={{ ...p, fontSize: "var(--fs-11)", color: C.muted, marginTop: "auto" }}>
-          <Icon name="info" style={{ fontSize: "var(--fs-13)", verticalAlign: -2, marginRight: 4 }} />
-          {caution}
-        </p>
-      )}
-    </>
-  );
-}
-
 /* ── 히어로 ──────────────────────────────────────────────────────
-   다른 화면(내부자·종목·테마·미리보기)과 같은 3칸 틀(.hz-kd-hero)이다(2026-09-23). 예전엔 이
-   화면만 칸을 인라인 헤어라인으로 갈랐고, 첫 칸에 "분석 종목" 라벨 + 테두리 알약(KOSPI),
-   셋째 칸에 작은 아이콘 타일이 따로 있었다. 이제 왼쪽 두 칸은 회색 타일, 오른쪽 넓은 칸은
-   흰 문장 칸이다 — 다른 화면 히어로와 같은 짜임이라 어디를 먼저 읽을지가 같은 자리에 선다.
-
-   칸 폭은 flex 값만 인라인으로 준다. 둘째 칸(게이지 + 통계 셋)이 가장 넓어야 통계 칸 라벨이 안
-   잘리고, 셋째 칸(문단)은 50% 틀보다 조금 좁아도 된다. 접힘(flex-wrap)은 틀이 한다. */
+   둘째 줄 모듈 셋 — 종목 | 지금 낙폭 | 낙폭 요약(V2Sheets.tsx SummaryModule). 카더라 · 시장 브리핑 둘째 줄과 같은
+   v2 모듈 꼴이다(2026-10-03). 예전엔 다른 화면 히어로와 같은 3칸 틀(.hz-kd-hero)에 회색 타일 둘 + 흰 문장 칸('이 하락의
+   맥락' 세 문단)이었다. 그 문단은 줄마다 이름표를 단 요약으로 다시 짰다. */
 
 export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel: string }) {
   const a = data.analysis;
   const atHigh = a.currentDd > -1;
   const sincePeak = Math.round((Date.parse(a.asOf) - Date.parse(a.athDate)) / 86_400_000);
   const fromLow = a.low > 0 ? (a.price / a.low - 1) * 100 : 0;
-  const title: React.CSSProperties = { fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink };
+  // 오늘이 신고가면 전고점 · 저점이 둘 다 오늘 종가다 — 현재가와 같은 값이 세 번 서고 '고점 이후 0일 · 저점 대비 0.0%'가 남았다(심텍, 2026-10-03).
+  // 그날은 직전 큰 하락(15% 넘게 빠졌다 되찾은 마지막 것)의 고점 · 저점 · 되찾은 날을 대신 적는다.
+  const drop = sincePeak === 0 ? a.lastDrop : null;
+  // 등락 0.0%(반올림해 0)은 오르지도 내리지도 않았다 — 빨강으로 칠하지 않는다.
+  const tone = (v: number) => (Math.abs(v) < 0.05 ? undefined : v > 0 ? "is-up" : "is-down");
+  const period = periodInfo(data.years, a.firstDate, a.asOf);
+  const caution = cautionShort(data.years, period.truncated, period.approxYears);
 
   return (
-    <section className="hz-sheet">
-      <div className="hz-kd-hero">
-        {/* 1 — 종목. 제목 줄 자리에 종목 자체가 선다(라벨 "분석 종목"은 위 검색창이 이미 말한다). */}
-        <div className="hz-kd-hero-q" style={{ flex: "1 1 260px" }}>
-          {/* 로고는 글자 기준선이 아니라 가운데에 맞아야 한다 — baseline 이면 정사각형
-              타일이 글자 밑선에 걸려 위로 떠 보인다.
-              크기 40 은 두 줄 글자의 높이에 맞춘 것이다. 종목명 윗변에서 코드 줄 밑변까지가
-              PC 38px · 폰 40px(코드가 12px 로 커진다)이다(2026-09-26 픽셀 실측). 30 일 땐 가운데만
-              맞고 위아래가 5px 씩 글자 안쪽에 떠 있었다.
-              38 이 아닌 까닭: 로고 그림마다 **안쪽 여백**이 다르다. 현대차처럼 꽉 찬 로고는 상자가
-              곧 보이는 크기지만, 삼성전자는 그림 가장자리가 투명해 파란 면이 상자의 91% 뿐이다
-              (로고 바탕 #f2f4f6 이 이 타일 #f3f6fa 와 거의 같아 여백이 안 보인다). 38 이면 삼성전자가
-              위 1.5 · 아래 1px 짧게 보였다. 40 에서 삼성전자 PC 0.5 · 0, 꽉 찬 로고는 PC 1px 씩 크고
-              폰에서 딱 맞는다. 종목 상세 히어로도 40 이다.
-              ⚠️ 두 줄의 글자 크기를 바꾸면 이 값도 다시 잴 것. */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <StockLogo code={data.code} name={data.name} market={data.market} size={40} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-              <strong style={{ fontSize: "var(--fs-21)", fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{data.name}</strong>
-              <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.muted }}>
-                {data.code}
-                {data.market && ` · ${data.market}`}
-              </span>
-            </div>
+    /* v2(2026-10-03) — 회색 타일 셋을 모듈 셋으로. 카더라 · 시장 브리핑 둘째 줄과 같은 꼴이다(머리 띠 + 1px 테두리).
+       세 모듈은 키가 같고(stretch) 아래 줄들은 바닥에 붙는다 — 칸 안 빈 곳은 줄 사이로 고르게 간다(v2.css .v2-md-band). */
+    <div className="v2-md-band">
+      {/* 1 — 종목. 머리 띠의 이름이 곧 이 화면의 주제다. */}
+      <Module title={data.name} meta={`${data.code} · ${marketName(data.market)}`} className="v2-md-stock">
+        <div className="v2-md-body">
+          <div className="v2-md-price">
+            <StockLogo code={data.code} name={data.name} market={data.market} size={32} />
+            <span className="v2-card-val is-big">
+              <b>{fmtPrice(a.price, data.market)}</b>
+              {a.changePct !== null && <span className={["v2-md-chg", tone(a.changePct)].filter(Boolean).join(" ")}>{fmtPct(a.changePct)}</span>}
+            </span>
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 9, flexWrap: "wrap" }}>
-            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 800, letterSpacing: "-.03em", color: C.ink }}>{fmtPrice(a.price, data.market)}</strong>
-            {a.changePct !== null && (
-              <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 800, color: a.changePct >= 0 ? UP : DOWN }}>{fmtPct(a.changePct)}</span>
+          <div className="v2-md-rows">
+            {drop ? (
+              <>
+                <PriceRow label="직전 고점" date={fmtDay(drop.peakDate, a.asOf)} value={fmtPrice(drop.peak, data.market)} />
+                <PriceRow label="직전 저점" date={fmtDay(drop.troughDate, a.asOf)} value={fmtPrice(drop.trough, data.market)} />
+              </>
+            ) : (
+              <>
+                <PriceRow label="전고점" date={fmtDay(a.athDate, a.asOf)} value={fmtPrice(a.ath, data.market)} />
+                <PriceRow label="저점" date={fmtDay(a.lowDate, a.asOf)} value={fmtPrice(a.low, data.market)} />
+              </>
             )}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", marginTop: "auto" }}>
-            <PriceRow label="전고점" date={fmtDay(a.athDate, a.asOf)} value={fmtPrice(a.ath, data.market)} />
-            <PriceRow label="저점" date={fmtDay(a.lowDate, a.asOf)} value={fmtPrice(a.low, data.market)} />
-          </div>
         </div>
+      </Module>
 
-        {/* 2 — 지금 낙폭 */}
-        <div className="hz-kd-hero-q" style={{ flex: "1.2 1 300px" }}>
-          <div className="hz-kd-hero-title">
-            <span style={title}>지금 낙폭</span>
-          </div>
-          {/* 밑선 맞춤은 CSS 가 한다(.hz-figrow). */}
-          <div className="hz-figrow">
-            <strong
-              style={{ fontFamily: MONO, fontSize: "var(--fs-40)", fontWeight: 800, lineHeight: 1, letterSpacing: "-.04em", color: atHigh ? C.ink : DOWN }}
-            >
-              {atHigh ? "신고가 부근" : fmtPct(a.currentDd)}
-            </strong>
-            {!atHigh && (
-              <div className="hz-figrow-aside">
-                <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub }}>전고점 대비</span>
-                <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.sub }}>
-                  저점 대비 <b style={{ color: fromLow >= 0 ? UP : DOWN, fontWeight: 800 }}>{fmtPct(fromLow)}</b>
-                </span>
-              </div>
+      {/* 2 — 지금 낙폭. 기간이 상장 이력보다 길거나 '전체'면 주의를 머리 근거에 그대로 적는다 — 물음표에 숨기면 마우스를 올려야 읽혔다
+          ("헬프 툴팁이 필요하면 심플하지 않다", 2026-10-04). */}
+      <Module title="지금 낙폭" meta={caution ? `${periodLabel} · ${caution}` : periodLabel} className="v2-md-dd">
+        <div className="v2-md-body">
+          <span className="v2-card-val is-big">
+            {/* 오늘 종가가 기간 최고가면 '신고가' — '부근'은 −1% 안쪽일 때만(2026-10-05 점검, 심텍). */}
+            <b className={atHigh ? undefined : "is-down"}>{atHigh ? (a.currentDd === 0 ? "신고가" : "신고가 부근") : fmtPct(a.currentDd)}</b>
+            {!atHigh && <span className="v2-md-aside">전고점 대비</span>}
+          </span>
+          {/* 신고가 부근에도 게이지를 둔다 — 핀이 0% 에 서고 '최대' 눈금이 이 기간 가장 깊었던 자리를 말한다. 빼면 칸 가운데가 비었다. */}
+          <DrawdownGauge current={a.currentDd} mdd={a.mdd} periodLabel={periodLabel} />
+          {/* 통계 셋 — 칸 바닥에 붙는다. 보조 줄에 기간 이름은 안 붙인다('전체' 조회에서 칸을 넘겼다). */}
+          <div className="v2-md-stats">
+            {/* '기간 최저점'은 게이지 끝 · 사례 표 첫 줄과 같은 값이라 뺐다(판정표 3) — 그 자리에 저점 대비. */}
+            {/* 보조 줄('2,448일 중' · '6월 18일부터' · '7월 30일 저점')은 걷었다 — 띠의 거래일 수 · 옆 종목 칸의 전고점 · 저점 날짜와
+                같은 말이었다(2026-10-03). */}
+            {/* 신고가 당일엔 '이보다 깊었던 날 2,341일'이 뜻이 없다 — 직전 큰 하락의 고점보다 얼마나 올라섰나로 바꾼다(2026-10-04 점검, 심텍). */}
+            {drop ? (
+              <StatCell label="직전 고점 대비" value={fmtPct((a.price / drop.peak - 1) * 100)} tone={UP} />
+            ) : (
+              <StatCell label="이보다 깊었던 날" value={deeperLabel(a)} />
+            )}
+            {drop ? (
+              <>
+                <StatCell label="직전 하락" value={fmtPct(drop.depth)} tone={DOWN} />
+                <StatCell label="회복한 날" value={fmtDay(drop.recoveryDate, a.asOf)} />
+              </>
+            ) : (
+              <>
+                {/* 사람 단위(5.3년) — '1,927일'은 큰 날수라 안 읽혔고 표의 '3.4년'과 꼴이 갈렸다(2026-10-05 점검). */}
+                <StatCell label="고점 이후" value={fmtDur(sincePeak)} />
+                <StatCell label="저점 대비" value={fmtPct(fromLow)} tone={Math.abs(fromLow) < 0.05 ? undefined : fromLow > 0 ? UP : DOWN} />
+              </>
             )}
           </div>
-          {!atHigh && <DrawdownGauge current={a.currentDd} mdd={a.mdd} periodLabel={periodLabel} />}
-          {/* 통계 셋은 칸 바닥에 붙는다(marginTop:auto). 윗선은 알파 헤어라인이다 — 회색 타일 위에서도
-              흰 판 위와 같은 세기로 보인다(theme.css 의 --c-hairline 주석).
-              위 여백이 14 가 아니라 18.5 인 것은 **옆 칸과 선을 맞추기 위해서**다. 이 블록과 왼쪽 칸의
-              전고점·저점 두 줄은 둘 다 marginTop:auto 로 칸 바닥에 붙으므로, 두 블록의 높이가 같아야 위
-              경계선이 한 줄에 선다. 왼쪽은 줄마다 1 + 10 + 글줄 19.5 + 10 = 40.5, 두 줄이라 81 이다.
-              이 칸은 1 + 여백 + 통계칸 61.5 라 여백이 18.5.
-              ⚠️ 글자 크기를 건드리면 이 숫자를 다시 재야 한다(둘 중 한쪽만 바뀌어도 어긋난다). */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10, marginTop: "auto", paddingTop: 18.5, borderTop: "1px solid var(--c-hairline)" }}>
-            {/* 보조 줄에 조회 기간 이름("최근 10년")은 안 붙인다 — '전체' 조회에서
-                "상장 이후·약 27년 6,646일 중"이 되어 칸을 넘겼다(실측 121 > 115px). */}
-            <StatCell label="이보다 깊었던 날" value={deeperLabel(a)} sub={`${fmtDayCount(a.tradingDays)} 중`} />
-            <StatCell label="기간 최저점" value={fmtPct(a.mdd)} sub={fmtDay(a.mddDate, a.asOf)} tone={DOWN} />
-            <StatCell label="고점 이후" value={fmtDayCount(sincePeak)} sub={`${fmtDay(a.athDate, a.asOf)}부터`} />
-          </div>
         </div>
+      </Module>
 
-        {/* 3 — 이 하락의 맥락. 흰 문장 칸(다른 화면 히어로의 '브리핑' 자리). LLM 을 쓰지 않는다
-            (반짝 아이콘·AI 고지 없음) — 이 화면이 이미 가진 수치를 문장으로 옮긴 것이다. */}
-        <div className="hz-kd-hero-h" style={{ flex: "1.4 1 320px" }}>
-          <div className="hz-kd-hero-title">
-            <span style={title}>이 하락의 맥락</span>
-          </div>
-          <Reading data={data} periodLabel={periodLabel} />
-        </div>
-      </div>
-    </section>
+      {/* 3 — 낙폭 요약. 이 종목 낙폭을 쉬운 말로 한 줄씩(깊이 · 회복 · 시장 · 업종). 잠깐 '채널이 말한 까닭'(카더라 언급)을
+          세웠다가 걷었다(2026-10-03 "이 종목 mdd 를 쉽게 말해 주는 게 낫다"). */}
+      <SummaryModule data={data} />
+    </div>
   );
 }
 
-/** 히어로 1번 칸의 전고점·저점 두 줄. 윗선은 알파 헤어라인이라 회색 타일 위에서도 보인다. */
+/** 종목 칸의 전고점 · 저점 두 줄 — 이름 · 날짜(12/500) · 값(13/700). 옛 인라인 눈금(11.5px · 굵기 800)을 v2 눈금으로(2026-10-03, v2.css .v2-md-pr). */
 function PriceRow({ label, date, value }: { label: string; date: string; value: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "10px 0", borderTop: "1px solid var(--c-hairline)" }}>
-      <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub, minWidth: 0 }}>
-        {label} <span style={{ fontFamily: MONO, fontSize: "var(--fs-11)", color: C.muted }}>{date}</span>
+    <div className="v2-md-pr">
+      <span className="v2-md-pr-k">
+        {label} <span>{date}</span>
       </span>
-      <span style={{ fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink, flex: "none" }}>{value}</span>
+      <b className="v2-md-pr-v">{value}</b>
     </div>
   );
 }
@@ -261,7 +145,8 @@ function PriceRow({ label, date, value }: { label: string; date: string; value: 
  */
 function deeperLabel(a: MddAnalysis): string {
   if (a.deeperThanNowDays === 0) return "없음";
-  return fmtDayCount(a.deeperThanNowDays);
+  // 거래일이라고 적는다 — 옆 칸 '고점 이후 106일'은 달력 날수라, 같은 'N일'이면 두 칸이 같은 것을 세는 줄 알았다(2026-10-04 점검).
+  return `${Math.round(a.deeperThanNowDays).toLocaleString("ko-KR")}거래일`;
 }
 
 /** 눈금 줄 라벨 배치 결과. left 는 마커 라벨의 중심(px), null 이면 아직 안 쟀다. */
@@ -383,7 +268,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
       <div ref={rowRef} style={{ position: "relative", height: 13 }}>
         <span
           ref={startRef}
-          style={{ position: "absolute", left: 0, top: 0, fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, visibility: fit.showStart ? "visible" : "hidden" }}
+          style={{ position: "absolute", left: 0, top: 0, fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub, visibility: fit.showStart ? "visible" : "hidden" }}
         >
           0%
         </span>
@@ -396,17 +281,18 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
               top: 0,
               transform: "translateX(-50%)",
               fontSize: "var(--fs-11)",
-              fontWeight: 600,
+              fontWeight: 500,
               color: C.sub,
               whiteSpace: "nowrap",
             }}
           >
-            {periodLabel} 최대 {fmtPct(mdd)}
+            {/* '최근 10년'은 칸 머리 근거 글자와 같은 말이라 뺐다(2026-10-03). */}
+            최대 {fmtPct(mdd)}
           </span>
         )}
         <span
           ref={endRef}
-          style={{ position: "absolute", right: 0, top: 0, fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, visibility: fit.showEnd ? "visible" : "hidden" }}
+          style={{ position: "absolute", right: 0, top: 0, fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub, visibility: fit.showEnd ? "visible" : "hidden" }}
         >
           −100%
         </span>
@@ -452,9 +338,37 @@ function smoothPath(pts: [number, number][]): string {
   return d;
 }
 
-export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodLabel: string; market: string | null }) {
+export function Underwater({
+  a,
+  periodLabel,
+  market,
+  focus,
+  focusPeak,
+  cases,
+  onCase,
+  benchSeries,
+}: {
+  a: MddAnalysis;
+  periodLabel: string;
+  market: string | null;
+  /** 사례 표에서 고른 하락(고점 → 되찾은 날, 진행 중이면 끝까지) — 그 구간을 옅게 칠한다(판정표 9). */
+  focus?: { from: string; to: string | null } | null;
+  /** 고른 사례의 고점 날짜 — 표식 하나를 채운다. */
+  focusPeak?: string | null;
+  /** 역대 하락 사례(깊은 순) — 바닥 자리에 사례 표와 같은 번호를 찍는다(판정표 10). */
+  cases?: { peakDate: string; troughDate: string }[];
+  /** 번호 표식을 누르면 그 사례를 고른다(사례 표 줄을 누른 것과 같다). */
+  onCase?: (peakDate: string) => void;
+  /** 같은 기간 기준 지수의 낙폭(series 와 같은 길이) — '○○와 함께' 탭을 골랐을 때만 겹친다. 없으면 탭도 없다. */
+  benchSeries?: (number | null)[] | null;
+}) {
   const series = a.underwater;
   const mdd = a.mdd;
+  const bench = benchName(market);
+  // 시장 선은 고를 때만 — 늘 깔면 두 겹이 겹쳐 이중으로 보였다(09-27 면으로 깔았다가 걷음). 그래서 선택 탭으로 둔다(10-03).
+  const [withMarket, setWithMarket] = useState(false);
+  const overlay = withMarket && !!benchSeries && benchSeries.length === series.length;
+  const benchVals = overlay ? benchSeries!.filter((v): v is number => v !== null) : [];
   const W = 720;
   const H = 176;
   // 축 글자(0%·−23%·연도)는 그림 **밖**의 HTML 칸에 선다(2026-09-27). 그림 안 <text> 는 그림이 폭에 맞춰 늘어나는 만큼
@@ -464,7 +378,8 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
   const VB_PAD = 6;
   const VBH = H + VB_PAD * 2;
   const n = series.length;
-  const floor = Math.min(mdd, -1); // 0 나눗셈·완전 평평 방지
+  // 0 나눗셈·완전 평평 방지. 시장 선을 겹치면 시장이 더 깊었던 때까지 들어가게 바닥을 넓힌다.
+  const floor = Math.min(mdd, -1, ...(benchVals.length ? [Math.min(...benchVals)] : []));
   const x = (i: number) => (n <= 1 ? PAD_L : PAD_L + (i / (n - 1)) * (W - PAD_L));
   const y = (dd: number) => (dd / floor) * H;
 
@@ -492,14 +407,70 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
     yearStep = s;
     if (yearMarks.filter((t) => t.year % s === 0).length <= maxLabels) break;
   }
-  const ticks = yearMarks.filter((t) => t.year % yearStep === 0);
-  // 그리드 라인(0/절반/바닥) 라벨.
-  const rows = [0, floor / 2, floor];
-  // 격자는 넷으로 나눈 다섯 줄(shadcn 차트처럼 옅게 촘촘히), 라벨은 위 셋에만.
-  const gridRows = [0, floor / 4, floor / 2, (floor * 3) / 4, floor];
-  // 기간 최저점 — 곡선에서 가장 깊은 지점에 표시를 남긴다.
+  // 2년이 안 되면(1년 조회) 해 경계가 하나뿐이라 '2026' 하나만 섰다(2026-10-05 점검) — 두 달 간격 달 눈금으로(1월은 해).
+  const spanDays = n > 1 ? (Date.parse(series[n - 1].date) - Date.parse(series[0].date)) / 86_400_000 : 0;
+  const ticks: { x: number; key: string; label: string }[] = [];
+  if (spanDays < 730) {
+    for (let i = 1; i < n; i++) {
+      const m = Number(series[i].date.slice(5, 7));
+      if (series[i - 1].date.slice(0, 7) === series[i].date.slice(0, 7) || m % 2 === 0) continue;
+      ticks.push({ x: x(i), key: series[i].date.slice(0, 7), label: m === 1 ? series[i].date.slice(0, 4) : `${m}월` });
+    }
+  } else {
+    for (const t of yearMarks) if (t.year % yearStep === 0) ticks.push({ x: t.x, key: String(t.year), label: String(t.year) });
+  }
+  // 세로축 눈금은 떨어지는 값으로 — 바닥의 절반을 찍으면 '−23% · −45%'처럼 어정쩡했고, −23% 줄이 '지금 −23.9%'의 눈금처럼 읽혔다(2026-10-05 점검).
+  // 간격은 바닥까지 눈금이 둘 이하인 가장 작은 값(45 → 20: 0 · −20 · −40, 66 → 25, 81 → 40). 폰의 낮은 그림에서 글자가 닿지 않게 셋까지.
+  const absFloor = Math.abs(floor);
+  const step = [1, 2, 5, 10, 20, 25, 40, 50].find((s) => Math.floor(absFloor / s) <= 2) ?? 50;
+  const rows = [0, -step, -2 * step].filter((v) => v >= floor);
+  // 격자는 눈금 줄 + 바닥선(글자 없음).
+  const gridRows = rows.includes(floor) ? rows : [...rows, floor];
+  // 사례 표에서 고른 구간 — 솎아 낸 점(250개 남짓)이라 날짜로 가장 가까운 점을 찾는다.
+  let band: { x0: number; x1: number } | null = null;
+  if (focus && n > 1) {
+    let i0 = series.findIndex((p) => p.date >= focus.from);
+    if (i0 < 0) i0 = 0;
+    let i1 = n - 1;
+    if (focus.to) for (let i = n - 1; i >= 0; i--) if (series[i].date <= focus.to) { i1 = i; break; }
+    if (i1 > i0) band = { x0: x(i0), x1: x(i1) };
+  }
+  // 기간 최저점 — 곡선에서 가장 깊은 지점에 표시를 남긴다(사례 번호가 있으면 1번이 그 자리라 안 찍는다).
   let ti = 0;
   for (let i = 1; i < n; i++) if (series[i].dd < series[ti].dd) ti = i;
+
+  // 시장 선 — 빈 날(그 전 지수 봉이 없는 첫머리)에서 끊는다.
+  let benchLine = "";
+  if (overlay) {
+    const segs: [number, number][][] = [];
+    let cur: [number, number][] = [];
+    benchSeries!.forEach((v, i) => {
+      if (v === null) {
+        if (cur.length) segs.push(cur);
+        cur = [];
+      } else cur.push([x(i), y(v)]);
+    });
+    if (cur.length) segs.push(cur);
+    benchLine = segs.filter((sg) => sg.length > 1).map((sg) => smoothPath(sg)).join(" ");
+  }
+
+  // 사례 번호 표식 — 바닥 날짜에 가장 가까운 물속 점(250개로 솎았지만 사례 바닥 날짜는 솎기에서 남긴다).
+  const pointOf = (date: string) => {
+    let k = series.findIndex((p) => p.date >= date);
+    if (k < 0) return n - 1;
+    if (k > 0 && series[k].date !== date && Date.parse(date) - Date.parse(series[k - 1].date) < Date.parse(series[k].date) - Date.parse(date)) k -= 1;
+    return k;
+  };
+  const marks = (cases ?? []).map((c, i) => ({ no: i + 1, peak: c.peakDate, k: pointOf(c.troughDate) }));
+  // 폰에선 뷰박스 720 이 화면 폭(≈300~400)으로 눌려 18px 표식이 가로 32~44 · 세로 20 units 남짓을 먹는다 — 이웃 번호 표식이 그 안이면
+  // 뒤 번호에 is-nudge(위로 20px), 끝 점 가로 62 units(≈30px) 안에 표식이 있으면 '지금' 글자를 점 아래로(is-below).
+  // 옮기는 건 폰 컨테이너 쿼리 안에서만(v2.css) — 넓은 화면은 표식이 작아 안 겹친다(2026-10-05 모바일 점검, 삼성전자 5 · 6번).
+  const markXY = marks.map((m) => [x(m.k), y(series[m.k].dd)] as const);
+  const nudged = marks.map((_, i) => markXY.slice(0, i).some(([px, py]) => Math.abs(px - markXY[i][0]) < 50 && Math.abs(py - markXY[i][1]) < 26));
+  const nowBelow = marks.some((m) => m.k !== n - 1 && x(n - 1) - x(m.k) < 62);
+  const at = (k: number) => ({ left: `${(x(k) / W) * 100}%`, top: `${((y(series[k].dd) + VB_PAD) / VBH) * 100}%` });
+  // 선 끝 '지금' — 진행 중인 사례의 바닥이 곧 오늘이면(신저점) 그 번호 표식에 '지금'을 붙이고 점은 따로 안 찍는다.
+  const nowOnMark = marks.some((m) => m.k === n - 1);
 
   /* 확대 보기. 폰에서 이 차트는 뷰박스 720 units 가 화면 폭(≈350)으로 눌려 **절반 축척**이
      된다 — 연도·퍼센트 라벨이 11 units 라 실제 5~6px 로 찍혀 안 읽힌다.
@@ -531,7 +502,9 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
           <div
             key={i}
             className={`hz-tip hz-vline${edge}`}
-            data-tip={`${p.date} · ${fmtPrice(p.close, market)} · 고점 대비 ${fmtPct(p.dd)}`}
+            data-tip={`${fmtDot(p.date)} · ${fmtPrice(p.close, market)} · 고점 대비 ${fmtPct(p.dd)}${
+              overlay && benchSeries![i] !== null ? ` · ${bench} ${fmtPct(benchSeries![i]!)}` : ""
+            }`}
             // 선·호버 점을 실제 점 자리(칸 폭의 i/(n−1))에 세운다(app/home/parts.tsx AreaChart 와 같은 셈).
             style={{ flex: 1, position: "relative", ["--hz-x" as string]: `${at * 100}%` }}
           >
@@ -546,14 +519,18 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
       <svg
       viewBox={`0 ${-VB_PAD} ${W} ${VBH}`}
       width="100%"
+      // 폰에선 그림 키를 늘린다(v2.css .mdd-uw-body .mdd-uw-svg) — 너비에 맞춰 72px 로 눌려 표식이 서로 · 확대 단추와 겹쳤다(2026-10-05 점검).
+      // 선은 non-scaling-stroke, 표식 · 십자선 · 축 글자는 % 자리라 함께 따라간다.
+      preserveAspectRatio="none"
+      className="mdd-uw-svg"
       style={{ overflow: "visible" }}
       role="img"
       aria-label={`고점 대비 낙폭 곡선. 현재 ${fmtPct(series[n - 1].dd)}, 기간 최저 ${fmtPct(mdd)}`}
     >
       {/* shadcn 영역 차트 꼴(Area Chart · Interactive, 2026-09-27) — 면은 그라데이션, 격자는 가로 실선만 옅게, 선은 1px.
           shadcn 은 선에서 진하고 바닥으로 옅어지는데, 이 차트는 0% 가 위이고 선이 아래라 **깊을수록 진하게** 뒤집었다.
-          종목 한 겹만 그린다 — 시장(코스피) 낙폭을 뒤에 한 겹 더 깔았더니 두 면이 겹쳐 이중으로 보였다(09-27 걷음).
-          시장과의 견줌은 아래 '시장 탓' 구간이 맡는다.
+          시장(코스피) 낙폭은 늘 깔지 않는다 — 면으로 한 겹 더 깔았더니 두 면이 겹쳐 이중으로 보였다(09-27 걷음).
+          머리의 '○○와 함께' 탭을 고르면 면 없이 회색 선 하나로만 겹친다(10-03).
           이 그림은 확대 보기에서도 한 번 더 그려져 id 가 두 번 선다 — 모양이 같아 어느 쪽을 집어도 같다. */}
       <defs>
         <linearGradient id="mdd-uw-fill" x1="0" y1="0" x2="0" y2="1">
@@ -566,11 +543,21 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
       {gridRows.map((dd, i) => (
         <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke="var(--c-line)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
       ))}
+      {/* 고른 사례 구간 — 면 뒤에 옅게, 양 끝은 점선. */}
+      {band && (
+        <g className="mdd-uw-band">
+          <rect x={band.x0} y={-VB_PAD} width={band.x1 - band.x0} height={VBH} />
+          <line x1={band.x0} y1={-VB_PAD} x2={band.x0} y2={H + VB_PAD} vectorEffect="non-scaling-stroke" />
+          <line x1={band.x1} y1={-VB_PAD} x2={band.x1} y2={H + VB_PAD} vectorEffect="non-scaling-stroke" />
+        </g>
+      )}
       <path d={area} fill="url(#mdd-uw-fill)" />
+      {benchLine && <path className="mdd-uw-bench" d={benchLine} vectorEffect="non-scaling-stroke" />}
       <path d={line} fill="none" stroke={DOWN_BAR[1]} strokeWidth="1" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-      {/* 기간 최저점 표시 — **빈 동그라미만**. 현재 지점에도 속 찬 점을 찍었었는데 뺐다:
-          선이 끝나는 자리가 곧 현재이고, 그 값은 히어로가 이미 크게 말한다. */}
-      <circle cx={x(ti)} cy={y(series[ti].dd)} r="3" fill={C.card} stroke={DOWN} strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
+      {/* 기간 최저점 — 빈 동그라미. 사례 번호를 찍으면 1번(가장 깊은 사례)이 그 자리라 안 찍는다. */}
+      {marks.length === 0 && (
+        <circle cx={x(ti)} cy={y(series[ti].dd)} r="3" fill={C.card} stroke={DOWN} strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
+      )}
     </svg>
   );
 
@@ -589,12 +576,37 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
       <div style={{ position: "relative", minWidth: 0 }}>
         {chartOnly}
         {crosshair(extraClass)}
+        {/* 표식은 HTML 로 얹는다 — 그림 안 글자는 그림 폭에 따라 커졌다 작아졌다 한다(축 글자를 밖으로 뺀 것과 같은 까닭).
+            '지금'은 선 끝 점 + 후광. 예전(09)엔 값이 히어로에 있다고 뺐지만, 번호 표식과 같이 보면 지금이 어느 사례 뒤인지가 보인다. */}
+        <div className="mdd-uw-marks">
+          {/* 끝 점이 고점 바로 밑(−2% 안)이면 '지금' 글자를 점 왼쪽에 — 위에 두면 머리 띠 선을 넘었다(2026-10-04 점검, 신고가 심텍). */}
+          {!nowOnMark && (
+            <span className={`mdd-uw-now${series[n - 1].dd > -2 ? " is-top" : nowBelow ? " is-below" : ""}`} style={at(n - 1)} aria-hidden>
+              <em>지금</em>
+            </span>
+          )}
+          {marks.map((m, i) => (
+            <button
+              key={m.peak}
+              type="button"
+              className={`mdd-uw-num${focusPeak === m.peak ? " is-on" : ""}${m.k === n - 1 && series[n - 1].dd > -2 ? " is-top" : ""}${nudged[i] ? " is-nudge" : ""}`}
+              style={at(m.k)}
+              aria-label={`${m.no}번 사례 구간을 차트에 표시`}
+              aria-pressed={focusPeak === m.peak}
+              onClick={() => onCase?.(m.peak)}
+              data-ga="mdd_uw_case"
+            >
+              {m.no}
+              {m.k === n - 1 && <em>지금</em>}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="hz-chart-x" aria-hidden>
         {ticks.map((t, i) => (
           // 둘째마다 표시 — 좁은 폭에선 CSS 가 이것들을 숨겨 연도가 겹치지 않는다.
-          <span key={t.year} data-minor={i % 2 === 1 ? "" : undefined} style={{ left: `${(t.x / W) * 100}%` }}>
-            {t.year}
+          <span key={t.key} data-minor={i % 2 === 1 ? "" : undefined} style={{ left: `${(t.x / W) * 100}%` }}>
+            {t.label}
           </span>
         ))}
       </div>
@@ -605,22 +617,40 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
     <Sheet>
       <SectionHead level={3}
         icon="show_chart"
-        title="언더워터 차트"
+        title="낙폭 추이"
         desc="전고점을 0으로 두고 그 아래로 얼마나 잠겼는지"
-        note={periodLabel}
+        right={
+          <div className="mdd-uw-head">
+            <span className="hz-sheet-head-note">
+              {focus ? `${periodLabel} · ${fmtYm(focus.from)} ~ ${focus.to ? fmtYm(focus.to) : "진행 중"}` : periodLabel}
+            </span>
+            {/* 시장 선 고르기(10-03 "옵션을 주자 선택 탭을 넣어서"). 지수를 못 받았으면 탭이 없다. */}
+            {benchSeries && benchSeries.length === series.length && (
+              <div className="hz-seg hz-seg-hover mdd-uw-seg" role="group" aria-label="차트에 시장 겹치기">
+                <button type="button" aria-pressed={!withMarket} onClick={() => setWithMarket(false)}>
+                  종목만
+                </button>
+                <button type="button" aria-pressed={withMarket} onClick={() => setWithMarket(true)} data-ga="mdd_uw_market">
+                  {bench}
+                  {market === "US" || market === "KOSDAQ" ? "과" : "와"} 함께
+                </button>
+              </div>
+            )}
+          </div>
+        }
       />
-      <div style={{ padding: "20px 22px 16px", position: "relative" }}>
+      {/* 본문 여백은 다른 v2 칸과 같은 12 · 14(옛 시트 20 · 22 였다). */}
+      <div className="mdd-uw-body" style={{ padding: "12px 14px 14px", position: "relative" }}>
       {/* overflow:visible — 최저점 표시가 하필 마지막 지점일 때(지금이 역대 최저인
           종목) 뷰박스 오른쪽 끝에 놓여 기본값(hidden)이면 반지름만큼 잘린다. 뷰박스를
           넓히는 대신 넘침만 허용한다 — 넓히면 아래 크로스헤어 띠(퍼센트로 잡은 위치)가
           곡선과 어긋난다. */}
       {chartWith("")}
-      {/* 확대 버튼 — 차트 오른쪽 아래. 리스크 프로필의 '전체보기'(.hz-yrpop-btn)와 같은
-          아이콘·같은 자리 어법이라 새 언어를 안 만든다. 폰에서만 뜬다(CSS). */}
+      {/* 확대 버튼 — 차트 오른쪽 아래. 폰에서만 뜬다(CSS). */}
       <button
         type="button"
         className="hz-zoom-btn"
-        aria-label="언더워터 차트 확대해서 보기"
+        aria-label="낙폭 추이 차트 확대해서 보기"
         onClick={() => {
           setZoomUsed(true);
           setZoom(true);
@@ -633,16 +663,10 @@ export function Underwater({ a, periodLabel, market }: { a: MddAnalysis; periodL
       {/* 판은 app/ZoomDialog.tsx(Base UI Dialog)가 그린다 — 여백을 누르거나 Esc 로 닫히고, 초점이 판 안에 갇혔다가
           닫으면 확대 단추로 돌아온다. 무대는 90도 돌려 화면의 긴 변을 쓴다. */}
       {zoomUsed && (
-        <ZoomDialog open={zoom} onOpenChange={setZoom} label="언더워터 차트 확대">
+        <ZoomDialog open={zoom} onOpenChange={setZoom} label="낙폭 추이 차트 확대">
           {chartWith(" mdd-crosshair-zoom")}
         </ZoomDialog>
       )}
     </Sheet>
   );
 }
-
-/* ── 리스크 프로필 ─────────────────────────────────────────────────
-   세 타일이 완전히 같은 문법을 쓴다: [범례] → [연도 + 막대 2줄 + 값 2개] × 최대 4줄 →
-   [요약 한 줄]. 타일마다 구조가 다르면 종목을 바꿀 때마다 길이가 들쭉날쭉해진다.
-   요약 한 줄은 줄 수가 모자라도 타일 맨 아래에 붙는다 — 표본이 얇은 종목(네이버 등)에서
-   요약이 막대를 따라 위로 딸려 올라가면 세 타일의 밑단이 어긋나 보인다. */

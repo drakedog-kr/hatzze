@@ -156,20 +156,24 @@ function plain(inline: NoteInline[]): string {
   return inline.map((x) => x.s).join("");
 }
 
+/** 주말 글 맨 앞의 고정 도입('토요일에는 한 주의 미국 시장을 묶습니다.'). 그 글에만 붙는 문장이 아니라 요약에서 뺀다. */
+const FIXED_INTRO = /^(토|일)요일에는 .*묶습니다\.$/;
+
 /**
- * 검색 결과·공유 카드에 실을 한 줄. **첫 소제목 아래 첫 문단**을 쓴다.
+ * 검색 결과·공유 카드·RSS 에 실을 한 줄.
  *
- * 원고의 맨 첫 문단이 매일 같은 도입이던 시절의 규칙이다(올리는 스크립트가 지금은 그 문장을
- * 뗀다). 그래도 그날의 첫 꼭지 첫 문단이 그 글에만 붙는 문장이라 이 규칙을 그대로 둔다.
- * 소제목이 없는 글(짧은 판)은 첫 본문 문단으로 물러선다.
+ * 1) **첫 소제목 앞의 본문 문단**(고정 도입은 뺀다)을 먼저 쓴다. 2026-09-14 부터 글 맨 앞에 '오늘은 …가 가장 많았고
+ *    …가 뒤를 이었습니다' 요약 문단이 있어 그 날을 가장 잘 말한다 — 첫 꼭지 세부 문단을 쓰면 그 문단이 빠졌다(2026-10-04 점검).
+ * 2) 없으면(그 전 글) **첫 소제목 아래 첫 문단** — 원고의 맨 첫 문단이 매일 같은 도입이던 시절의 규칙이다.
+ * 3) 소제목이 없는 글(짧은 판)은 첫 본문 문단으로 물러선다.
  */
 export function noteDescription(md: string, max = 150): string {
   const blocks = parseNoteMarkdown(md);
   const firstHeading = blocks.findIndex((b) => b.k === "heading");
   const from = firstHeading >= 0 ? firstHeading + 1 : 0;
-  const para =
-    blocks.slice(from).find((b): b is Extract<NoteBlock, { k: "para" }> => b.k === "para" && b.kind === "body") ??
-    blocks.find((b): b is Extract<NoteBlock, { k: "para" }> => b.k === "para" && b.kind === "body");
+  const isBody = (b: NoteBlock): b is Extract<NoteBlock, { k: "para" }> => b.k === "para" && b.kind === "body";
+  const lead = firstHeading > 0 ? blocks.slice(0, firstHeading).filter(isBody).find((b) => !FIXED_INTRO.test(plain(b.inline).trim())) : undefined;
+  const para = lead ?? blocks.slice(from).find(isBody) ?? blocks.find(isBody);
   if (!para) return "";
   const text = plain(para.inline).replace(/\s+/g, " ").trim();
   if (text.length <= max) return text;

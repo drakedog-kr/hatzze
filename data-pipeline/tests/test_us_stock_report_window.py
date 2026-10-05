@@ -43,10 +43,10 @@ def test_card_window_is_three_days_before_base():
     assert US.card_window(BASE) == ("2026-09-26", "2026-09-28")
 
 
-def test_required_is_the_cards_top_four():
-    # 카드: 09-26~09-28 언급 수 → AAA 60 · C1 40 · C2 35 · C3 30.
+def test_required_is_the_tables_rows():
+    # 표: 09-26~09-28 언급 수 → AAA 60 · C1 40 · C2 35 · C3 30 · C4 25 · C5 20. 표가 열 줄이라(CARD_TOP_N) 있는 여섯 모두 요약이 있어야 한다.
     _digests, required = US.build_stock_digests(BASE, _msgs(PLAN), NAMES)
-    assert [t for t, _n in required] == ["AAA", "C1", "C2", "C3"]
+    assert [t for t, _n in required] == ["AAA", "C1", "C2", "C3", "C4", "C5"]
 
 
 def test_digests_cover_card_tickers_and_card_days_only():
@@ -78,4 +78,4 @@ def test_excerpts_reach_the_base_day_but_counts_do_not():
     assert "[최근 3일] 언급 40회" in c1
     assert "[일별] 09-27 20회 · 09-28 20회" in c1
     assert "C1 밤사이 마감 소식" in c1
-    assert [t for t, _n in required] == ["AAA", "C1", "C2", "C3"]
+    assert [t for t, _n in required] == ["AAA", "C1", "C2", "C3", "C4", "C5"]

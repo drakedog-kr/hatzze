@@ -27,6 +27,8 @@ export function MddExplorer({
   const [data, setData] = useState<MddResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 표에 없는 코드(api/mdd missing) — 고장이 아니라 빨간 아이콘을 쓰지 않는다.
+  const [missing, setMissing] = useState(false);
   // 자리표시자 배지 문구를 가르는 값 — 기간만 바꿨나(true), 아니면 첫 진입·종목 변경인가.
   // 이유는 Skeleton 주석에. 조회를 거는 두 입구에서 세워 두고 Skeleton 이 읽는다.
   const [periodOnly, setPeriodOnly] = useState(false);
@@ -73,6 +75,7 @@ export function MddExplorer({
     const run = async () => {
       setLoading(true);
       setError(null);
+      setMissing(false);
       const params = new URLSearchParams({
         code: selected.code,
         market: selected.market ?? "KOSPI",
@@ -84,7 +87,10 @@ export function MddExplorer({
         const json = await res.json();
         if (!active) return;
         if (json.ok) setData(json as MddResult);
-        else setError(json.error ?? "불러오지 못했습니다.");
+        else {
+          setError(json.error ?? "불러오지 못했습니다.");
+          setMissing(json.missing === true);
+        }
       } catch {
         if (active) setError("네트워크 오류로 불러오지 못했습니다.");
       } finally {
@@ -109,9 +115,25 @@ export function MddExplorer({
           없어 티가 안 나고 넓은 화면에서만 드러난다. */
   /* 세로 간격은 시트끼리의 간격(Results 의 gap 16)과 같은 값 하나로 둔다. 예전엔 여기만
      20 이라 조회 바 밑의 틈이 시트 사이보다 넓어, 조회 바가 결과에서 떨어져 보였다. */
+  const pick = (s: StockOption) => {
+    setPeriodOnly(false);
+    setSelected(s);
+    remember(s);
+    pushUrl(s, years);
+  };
+  /* 화면 아래쪽(업종 칸)에서 종목을 누르면 맨 위로 올린다 — 결과가 자리표시자로 바뀌며 키가 줄어,
+     그 자리에 머물면 바닥(푸터)만 보인다. 본문 스크롤은 셸의 main.hz-scroll 이 맡는다(폰은 창). */
+  const pickFromResults = (s: StockOption) => {
+    pick(s);
+    const main = document.querySelector<HTMLElement>("main.hz-scroll");
+    if (main && main.scrollHeight > main.clientHeight) main.scrollTo({ top: 0, behavior: "smooth" });
+    else window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     // 뿌리의 hz-tx 가 이번 리디자인을 켠다(globals.css). 세로 간격도 그쪽 값(18)을 쓴다.
-    <div className="hz-tx">
+    // v2(2026-10-03) — 카더라 · 시장 브리핑의 v2 규칙을 옮겼다. v2-kd 는 v2 토큰 · 폭 단계, v2-md 는 이 화면 전용 덮기(v2.css).
+    <div className="hz-tx v2-kd v2-md">
       {/* 제목도 설명 문단도 여기서 안 그린다 — 셸의 본문 헤더(AppShell 의 PageHeader)가
           제목과 한 줄 부제를 이미 그린다. 예전엔 그 아래에 세 갈래 설명("얼마나 빠졌는지 ·
           얼마나 드문지 · 얼마나 걸렸는지")을 한 문단 더 뒀는데, 바로 아래 시트들이 같은
@@ -119,12 +141,7 @@ export function MddExplorer({
       <Controls
         stocks={stocks}
         selected={selected}
-        onSelect={(s) => {
-          setPeriodOnly(false);
-          setSelected(s);
-          remember(s);
-          pushUrl(s, years);
-        }}
+        onSelect={pick}
         years={years}
         onYears={(y) => {
           setPeriodOnly(true);
@@ -135,8 +152,8 @@ export function MddExplorer({
       />
 
       {loading && <Skeleton periodOnly={periodOnly} />}
-      {!loading && error && <ErrorCard message={error} />}
-      {!loading && !error && data && <Results data={data} />}
+      {!loading && error && <ErrorCard message={error} missing={missing} />}
+      {!loading && !error && data && <Results data={data} onPick={pickFromResults} />}
     </div>
   );
 }

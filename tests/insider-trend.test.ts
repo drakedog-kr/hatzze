@@ -43,6 +43,21 @@ describe("mentionTrend", () => {
   });
 
   it("한 번도 언급되지 않았으면 빈 추이다(화면이 '아직 잡힌 적이 없다'고 적는다)", () => {
-    assert.deepEqual(mentionTrend([], "2026-09-28", 40), { trend: [], today: null, date: null });
+    assert.deepEqual(mentionTrend([], "2026-09-28", 40), { trend: [], today: null, date: null, partial: false });
+  });
+
+  it("끝점이 오늘(아직 안 끝난 날)이면 머리 숫자는 전날 — 아침 실행의 반나절치를 '하루 언급'으로 적지 않는다", () => {
+    const rows = [
+      { date: "2026-10-03", mentions: 46, channels: 20 },
+      { date: "2026-10-04", mentions: 2, channels: 2 },
+    ];
+    const r = mentionTrend(rows, "2026-10-04", 3, "2026-10-04");
+    assert.equal(r.partial, true);
+    assert.equal(r.date, "2026-10-03");
+    assert.equal(r.today?.mentions, 46);
+    // 막대는 그대로 사흘(오늘 칸 포함) — 화면이 마지막 칸을 옅게 그린다.
+    assert.deepEqual(r.trend.map((p) => p.mentions), [0, 46, 2]);
+    // 끝점이 어제면 그대로.
+    assert.equal(mentionTrend(rows, "2026-10-04", 3, "2026-10-05").partial, false);
   });
 });

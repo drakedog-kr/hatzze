@@ -31,7 +31,7 @@ describe("expectedUsualMentions", () => {
       const usual = expectedUsualMentions(s);
       assert.ok(Math.abs(usual - s.recent) < 1e-9, `${base}: 평소 ${usual} · 최근 ${s.recent}`);
       assert.equal(stockTone(s.recent, usual), "is-flat", base);
-      assert.equal(usualDeltaText(s.recent, usual), "평소만큼 언급", base);
+      assert.equal(usualDeltaText(s.recent, usual), "평소만큼", base);
     }
   });
 
@@ -57,12 +57,12 @@ describe("expectedUsualMentions", () => {
 
 describe("평소 대비 문구", () => {
   it("세 배부터는 배로, 열 배에서 멈춘다 — '+8900%' 를 찍지 않는다", () => {
-    assert.equal(usualDeltaText(10, 0.111), "평소의 10배 넘게 언급");
+    assert.equal(usualDeltaText(10, 0.111), "평소의 10배 넘게");
     assert.equal(usualDeltaShort(10, 0.111), "10배 넘게");
-    assert.equal(usualDeltaText(12, 3), "평소의 4배 언급");
-    assert.equal(usualDeltaText(16, 10), "평소 대비 +60% 언급");
-    assert.equal(usualDeltaText(58, 100), "평소 대비 −42% 언급");
-    assert.equal(usualDeltaShort(58, 100), "−42%");
+    assert.equal(usualDeltaText(12, 3), "평소의 4배");
+    assert.equal(usualDeltaText(16, 10), "평소 대비 +60%");
+    assert.equal(usualDeltaText(58, 100), "평소 대비 -42%");
+    assert.equal(usualDeltaShort(58, 100), "-42%");
     assert.equal(usualDeltaText(5, 0), "새로 등장");
     assert.equal(usualDeltaShort(10, 10), "평소만큼");
   });

@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { getDevOverrides } from "@/lib/dev-overrides";
-import { LOAD_FAILED, type MaybeFailed } from "@/lib/load-state";
+import { LOAD_FAILED, type MaybeFailed, withScopedLoadFailures } from "@/lib/load-state";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 export type DailyScore = {
@@ -347,6 +347,52 @@ export async function getKospiCloseSeries(days = 61): Promise<MaybeFailed<CloseP
     .reverse()
     .map((r) => ({ date: r.date, close: Number(r.raw_value) }))
     .filter((p) => Number.isFinite(p.close) && p.close > 0);
+}
+
+/** 지수 하나의 마지막 종가와 전 거래일 대비(%). 앞 거래일 값이 없으면 changePct 는 null. */
+export type IndexClose = { date: string; close: number; changePct: number | null };
+
+/**
+ * 코스피 · 코스닥 마지막 종가와 전 거래일 대비 — 국장 카더라 첫 줄(개요 띠)이 쓴다.
+ *
+ * 둘 다 내부용 캐시 지표(kospi_close_raw · kosdaq_close_raw, is_public=false)라 getPublicIndicators 에 안 잡힌다.
+ * 파이프라인이 하루 두 번 채우는 값이라 화면을 새로고침해도 안 바뀐다 — 햇쩨 지수와 같은 리듬이다(위 getKospiCloseSeries).
+ * 지수마다 최근 두 줄만 읽는다(embedded limit 은 지수마다 걸린다).
+ */
+export async function getKrIndexCloses(): Promise<MaybeFailed<{ kospi: IndexClose | null; kosdaq: IndexClose | null }>> {
+  const { data, error } = await getSupabaseServer()
+    .from("indicators")
+    .select("slug,indicator_values(date,raw_value)")
+    .in("slug", ["kospi_close_raw", "kosdaq_close_raw"])
+    .order("date", { referencedTable: "indicator_values", ascending: false })
+    .limit(2, { referencedTable: "indicator_values" });
+  if (error) {
+    console.error("[getKrIndexCloses] 코스피 · 코스닥 종가를 못 읽었습니다", error);
+    return LOAD_FAILED;
+  }
+  const of = (slug: string): IndexClose | null => {
+    const rows = ((data ?? []).find((r) => r.slug === slug)?.indicator_values ?? []) as { date: string; raw_value: number }[];
+    const [last, prev] = rows.map((r) => ({ date: r.date, close: Number(r.raw_value) })).filter((p) => Number.isFinite(p.close) && p.close > 0);
+    if (!last) return null;
+    return { date: last.date, close: last.close, changePct: prev ? (last.close / prev.close - 1) * 100 : null };
+  };
+  return { kospi: of("kospi_close_raw"), kosdaq: of("kosdaq_close_raw") };
+}
+
+/**
+ * 첫 줄 띠의 지수 칸용 — 곁들이는 칸이라 실패를 이 조회 안에 가둔다(lib/load-state.ts withScopedLoadFailures). 그냥 부르면
+ * 조회 클라이언트가 5xx 를 렌더 실패 목록에 적어 assertLoaded 가 화면 재생성을 통째로 멈췄다 — 주석은 '칸만 빠진다'였다
+ * (2026-10-04 머지 전 점검, 홈 · 국장 카더라 · 국장 미리보기). 실패하면 LOAD_FAILED 로 그 칸만 뺀다.
+ */
+export async function getKrIndexClosesSide(): ReturnType<typeof getKrIndexCloses> {
+  try {
+    const { value, failed } = await withScopedLoadFailures(getKrIndexCloses);
+    if (!failed.length) return value;
+    console.error(`[getKrIndexClosesSide] 지수 칸 조회 실패 — 그 칸만 뺍니다: ${failed.join(", ")}`);
+  } catch (e) {
+    console.error("[getKrIndexClosesSide] 지수 칸을 못 만들었습니다 — 그 칸만 뺍니다", e);
+  }
+  return LOAD_FAILED;
 }
 
 export async function getTopStockHighGaps(limit = 3): Promise<MaybeFailed<StockHighGap[]>> {

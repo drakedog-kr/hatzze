@@ -44,6 +44,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import has_column, get_client, load_all, load_all_keyset, replace_rows  # noqa: E402
 from common.theme_tone import THEME_TONE_MAX_THEMES, list_effect_lines, theme_tone_targets  # noqa: E402
+from common.keyword_overlap import drop_overlaps  # noqa: E402
+from common.thin_days import usable_days  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from config.issue_keywords import EXCLUDE, MAX_KEYWORD_LEN, MIN_KEYWORD_LEN  # noqa: E402
 from config.stock_extraction import ALIASES as STOCK_ALIASES  # noqa: E402
@@ -53,10 +55,10 @@ from config.us_stock_themes import US_THEMES  # noqa: E402
 # 정규화·버킷 규칙은 국내 집계가 이미 정한 것을 그대로 가져다 쓴다. 여기서 다시 짜면
 # 두 화면의 화제어가 같은 말을 다르게 묶는다(예: "금리 인하" vs "금리인하").
 from calculate_telegram_sentiment import (  # noqa: E402
-    ISSUE_KEYWORD_FLAT,
     ISSUE_KEYWORD_WINDOW_DAYS,
     OVERALL,
     bucket_of,
+    keyword_trend,
     norm,
 )
 
@@ -248,7 +250,14 @@ def issue_keyword_rows(
     if not rows:
         return [], ISSUE_KEYWORD_COUNT_DAYS
 
-    dates = sorted({r["date"] for r in rows})
+    day_total: Counter = Counter()
+    for r in rows:
+        day_total[r["date"]] += r["mention_count"] or 0
+
+    # 표본이 거의 없는 날(기준일 아침 · 수집이 끊긴 날)은 창에서 뺀다 — 국장 issue_keyword_rows 와 같은 규칙(common/thin_days.py).
+    dates = usable_days(day_total, sorted({r["date"] for r in rows}))
+    if not dates:
+        return [], ISSUE_KEYWORD_COUNT_DAYS
     latest = datetime.fromisoformat(dates[-1]).date()
 
     def days_before(d: str) -> int:
@@ -256,10 +265,6 @@ def issue_keyword_rows(
 
     recent_dates = set(dates[-3:])
     prior_dates = {d for d in dates if days_before(d) >= 5}
-
-    day_total: Counter = Counter()
-    for r in rows:
-        day_total[r["date"]] += r["mention_count"] or 0
 
     # 증감용 점유율은 창과 무관하므로 한 번만 모은다(위 docstring 의 ⚠️).
     recent_share: defaultdict = defaultdict(float)
@@ -316,7 +321,10 @@ def issue_keyword_rows(
             # 언급 수로 세운다(위 ISSUE_KEYWORD_MIN_SKEW 주석). 동점은 화제어로 가른다 —
             # 안 가르면 순위가 실행마다 흔들린다.
             scored.append((-count, word, count, total, skew))
-        return sorted(scored, key=lambda s: (s[0], s[1]))[:ISSUE_KEYWORD_LIMIT], chan_win, day_win
+        scored.sort(key=lambda s: (s[0], s[1]))
+        # 같은 화제를 두 칸에 세우지 않는다 — 국장 issue_keyword_rows 와 같은 규칙(common/keyword_overlap.py).
+        keep = set(drop_overlaps([s[1] for s in scored]))
+        return [s for s in scored if s[1] in keep][:ISSUE_KEYWORD_LIMIT], chan_win, day_win
 
     # 10줄이 차면 거기서 멈춘다. 끝까지 못 채우면 **가장 많이 건진 창**을 쓴다 —
     # 넓힌다고 줄이 반드시 느는 것은 아니라서다(기준선이 같이 움직여 쏠림이 뒤집힐 수
@@ -338,12 +346,7 @@ def issue_keyword_rows(
         # 두 값(방향·크기)은 **같은 뺄셈 하나**에서 나온다. trend 는 여기에 flat 문턱만
         # 더한 것이다 — 한쪽만 고치면 화살표와 하이라이트 칸이 서로 다른 말을 한다.
         delta = None if not can_compare else recent_avg - prior_avg
-        if delta is None:
-            trend = None
-        elif abs(delta) < ISSUE_KEYWORD_FLAT:
-            trend = "flat"
-        else:
-            trend = "up" if delta > 0 else "down"
+        trend = None if delta is None else keyword_trend(recent_avg, prior_avg)
         out.append(
             {
                 "rank": i,

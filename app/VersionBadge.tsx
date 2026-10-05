@@ -134,9 +134,9 @@ export function VersionLink() {
       data-tip={show ? TIP_NEW : TIP_PLAIN}
       /* 이름을 글자에서 만들게 두면 툴팁 ::after 의 글까지 딸려 들어와 같은 말이 두 번
          읽힌다. 여기서 못박아 두면 그 셈이 아예 안 일어난다.
-         ⚠️ 눈에 보이는 글자("v.1.12.0")로 시작해야 한다 — 이름이 보이는 글자를 품지
+         ⚠️ 눈에 보이는 글자("v1.12.0")로 시작해야 한다 — 이름이 보이는 글자를 품지
             않으면 음성으로 조작하는 사람이 본 대로 부를 수 없다(WCAG 2.5.3). */
-      aria-label={`v.${APP_VERSION} · ${show ? TIP_NEW : TIP_PLAIN}`}
+      aria-label={`v${APP_VERSION} · ${show ? TIP_NEW : TIP_PLAIN}`}
       onClick={markSeen}
       style={{
         display: "inline-flex",
@@ -147,12 +147,13 @@ export function VersionLink() {
         cursor: "pointer",
         fontFamily: MONO,
         fontSize: "var(--fs-11)",
-        fontWeight: 600,
+        // 곁줄 버전은 500 — 굵기 세 단(500 · 600 · 700), 곁줄은 굵게 하지 않는다(2026-10-05 점검).
+        fontWeight: 500,
         lineHeight: 1,
         letterSpacing: "0.02em",
       }}
     >
-      <span className="hz-version-num">v.{APP_VERSION}</span>
+      <span className="hz-version-num">v{APP_VERSION}</span>
       {show && <NewBadge lift={BADGE_LIFT} />}
     </Link>
   );
@@ -224,7 +225,7 @@ const BADGE_LIFT = Math.round(BADGE_SIZE / 2 - INK_TOP);
    링크의 aria-label 이 "새 업데이트가 있습니다" 로 말한다.
    ⛔ role="img" + aria-label 로 바꾸지 말 것 — 크롬은 안쪽 'N' 을 그대로 남긴다.
 
-   ⭐ 사이드바의 '테마 리포트' 옆에도 이 표식이 선다(AppShell). 거기는 위첨자로 올릴 값이 다르므로
+   ⭐ 사이드바의 새 화면 옆에도 이 표식이 선다(AppShell 의 isNew — 2026-10-04 테마 리포트에서 떼어 지금은 단 곳이 없다). 거기는 위첨자로 올릴 값이 다르므로
       끌어올리는 양을 **밖에서 준다** — 푸터는 lift={BADGE_LIFT}(11px 글자 기준), 사이드바는 자리를
       절대 좌표로 잡아 0 이다. 동그라미 안에서 'N' 을 가운데 두는 셈(BADGE_LINE_HEIGHT)은 두 곳이 같다. */
 export function NewBadge({ lift = 0 }: { lift?: number }) {
@@ -256,7 +257,7 @@ export function NewBadge({ lift = 0 }: { lift?: number }) {
         background: "var(--c-new, #cd3945)",
         color: "#fff",
         fontSize: BADGE_FONT,
-        fontWeight: 800,
+        fontWeight: 700,
         /* 자간은 0 이어야 한다. 링크가 0.02em(11px 에서 **0.22px**)을 물려주는데, 자간은
            글자 **뒤**에 붙는다. 한 글자짜리 배지에서는 오른쪽에만 0.22px 이 더 붙어
            라인박스가 그만큼 넓어지고, text-align:center 가 그 상자를 가운데 두므로 N 이

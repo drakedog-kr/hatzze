@@ -8,7 +8,7 @@ import { PageJsonLd } from "./JsonLd";
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
 import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
-import { DAILY_PUBLIC, DIVIDEND_PUBLIC, THEME_NAV_NEW, THEME_PUBLIC } from "./screen-flags";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC, THEME_PUBLIC } from "./screen-flags";
 import { DOC_PAGES } from "./legal";
 import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "@/lib/theme-href";
 import { ShellEnvContext, useShellEnv, type ShellEnv } from "./shell-env";
@@ -207,7 +207,10 @@ type NavItem = {
   Glyph?: Glyph;
   sub: string;
   badge?: string;
-  /** 라벨 옆 빨간 N — 새로 생긴 화면이라는 표식(app/screen-flags.ts 의 THEME_NAV_NEW). 기한이 없어 뗄 때 그 줄을 지운다. */
+  /**
+   * 라벨 옆 빨간 N — 새로 생긴 화면이라는 표식. 기한이 없어(푸터 배지처럼 저절로 안 꺼진다) 켤 땐 NAV 항목에 이 값을 직접 적고, 뗄 땐 그 줄을 지운다.
+   * 테마 리포트에 2026-09-23 오픈부터 달았다가 2026-10-04 뗐다(v2.0.0).
+   */
   isNew?: boolean;
   children?: NavChild[];
 };
@@ -250,8 +253,6 @@ function buildNav(themeNav: boolean): NavItem[] {
           label: THEME_PAGE.label,
           icon: THEME_PAGE.icon,
           sub: THEME_PAGE.sub,
-          // 새로 생긴 화면 표식(빨간 N). 기한 없이 켜 두고, 뗄 때 screen-flags.ts 의 THEME_NAV_NEW 를 지운다.
-          isNew: THEME_NAV_NEW,
           children: [
             { label: KR_THEME_SHORT, href: THEME_PAGE.href, Glyph: KrTrigramsIcon },
             { label: US_THEME_PAGE.short, href: US_THEME_PAGE.href, Glyph: UsEmpireIcon, sub: US_THEME_PAGE.sub },
@@ -462,11 +463,12 @@ function NavGroupLabel({ label, first, inset }: { label: string; first: boolean;
       role="presentation"
       className="hz-side-text"
       style={{
-        margin: first ? "0 0 -2px" : "14px 0 -2px",
+        // v2(2026-10-03): 굵은 잉크 → 본문 모듈 머리의 근거 글자 꼴(12 · 500 · 회색). 묶음 이름은 메뉴가 아니라 표지라 한 단 물린다.
+        margin: first ? "0 0 4px" : "16px 0 4px",
         padding: `0 ${inset}px`,
         fontSize: "var(--fs-12)",
-        fontWeight: 700,
-        color: C.label,
+        fontWeight: 500,
+        color: C.muted,
       }}
     >
       {label}
@@ -651,12 +653,12 @@ function SearchTrigger() {
       onFocus={preloadCommandMenu}
       aria-label="종목·테마 검색"
       data-label="검색"
-      className="hz-side-search border-border text-muted-foreground hover:bg-accent flex h-9 w-full shrink-0 cursor-pointer items-center gap-2 rounded-xl border bg-transparent px-3 text-[13px] transition-colors"
+      className="hz-side-search text-muted-foreground flex h-[34px] w-full shrink-0 cursor-pointer items-center gap-2 rounded-[6px] border bg-transparent px-2.5 text-[13px] transition-colors"
       // 사이드바 바깥 간격(28)을 위아래로 덜어 쓴다 — 로고와 16 · 메뉴와 20. 늘어난 높이를 44px 로 묶어 사이드바가
       // 프로덕션 높이(782) 안에 들게 한다(노트북에서 스크롤이 생기면 안 된다).
-      style={{ margin: "-12px 0 -8px" }}
+      style={{ margin: "-6px 0 -4px" }}
     >
-      <Icon name="search" style={{ fontSize: 17 }} />
+      <Icon name="search" style={{ fontSize: 16 }} />
       <span className="hz-side-text">종목·테마 검색</span>
       <Kbd className="hz-side-text ml-auto">{mac ? "⌘K" : "Ctrl K"}</Kbd>
     </button>
@@ -690,9 +692,10 @@ function Sidebar() {
         flexShrink: 0,
         background: C.card,
         borderRight: `1px solid var(--c-divider)`,
-        padding: "28px 14px 20px",
+        // v2(2026-10-03): 본문 모듈과 같은 눈금으로 줄였다 — 글자 13 · 줄 34 · 모서리 6 · 1px 가는 선.
+        padding: "22px 12px 16px",
         // 28: 묶음 머리를 넣으며 사이드바가 782 → 930px 로 늘어 노트북에서 스크롤이 생겼다(2026-09-25). 줄 여백과 함께 줄였다.
-        gap: 28,
+        gap: 22,
         // 내용 높이는 745px 다(2026-09-26 실측 · 로고 아래 슬로건을 뺀 뒤 · 프로덕션 782). 창이 그보다 낮을 때만(1366×768 노트북 등) 사이드바
         // 안에서 스크롤한다 — 예전엔 맨 아래 텔레그램 칸이 잘렸다. 막대는 숨긴다(보이면 어수선하다는 지적).
         overflowY: "auto",
@@ -700,7 +703,7 @@ function Sidebar() {
         scrollbarWidth: "none",
       }}
     >
-      <div style={{ padding: "0 6px" }}>
+      <div style={{ padding: "0 4px" }}>
         {/* 베타 배지는 로고 우측 상단에 붙인다 — 서비스 전체가 베타라는 표시라서,
             페이지마다(예전엔 카더라 제목 옆) 다는 것보다 여기 한 곳이 맞다.
             alignItems:flex-start 로 로고 윗선에 맞춰 위첨자처럼 올린다. */}
@@ -709,7 +712,7 @@ function Sidebar() {
         <LogoTag className="hz-side-logo" style={{ margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
           {/* 로고는 메인(시장 브리핑)으로 가는 링크 — 어느 페이지에서든 홈으로 돌아올 수 있게. */}
           <Link href="/" aria-label="hatzze 홈" className="hz-logo-link" style={{ display: "inline-flex" }}>
-            <LogoLockup symbolSize={29} wordmarkSize={30} gap={7} />
+            <LogoLockup symbolSize={26} wordmarkSize={27} gap={6} />
           </Link>
           {/* 배지 크기는 '준비 중' 배지와 맞춘다(10px / padding 3-7). 서로 다른 크기면
               같은 사이드바 안에서 배지가 두 종류로 보인다. */}
@@ -717,9 +720,9 @@ function Sidebar() {
         </LogoTag>
       </div>
       <SearchTrigger />
-      <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         {sidebarItems(env).map((row) => {
-          if (row.kind === "group") return <NavGroupLabel key={`g-${row.label}`} label={row.label} first={row.first} inset={12} />;
+          if (row.kind === "group") return <NavGroupLabel key={`g-${row.label}`} label={row.label} first={row.first} inset={10} />;
           if (row.kind === "soon") {
             const soon = row.item;
             return (
@@ -730,18 +733,18 @@ function Sidebar() {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 12,
-                  padding: "10px 12px",
+                  gap: 10,
+                  padding: "8px 10px",
                   color: C.disabled,
                   fontWeight: 600,
-                  borderRadius: R.nav,
+                  borderRadius: 6,
                 }}
               >
-                <NavGlyph item={soon} size={20} />
+                <NavGlyph item={soon} size={18} />
                 {/* 배지를 라벨 '우측 상단'에 위첨자로 띄운다(로고 옆 베타 배지와 같은 어법).
                     absolute 라 배지가 행 폭 계산에서 빠져 라벨이 눌리지도, 항목이 넘치지도 않는다. */}
                 <span className="hz-side-text" style={{ position: "relative", display: "inline-flex" }}>
-                  <span style={{ fontSize: "var(--fs-14)", whiteSpace: "nowrap" }}>{soon.label}</span>
+                  <span style={{ fontSize: "var(--fs-13)", whiteSpace: "nowrap" }}>{soon.label}</span>
                   <span
                     style={{
                       position: "absolute",
@@ -771,9 +774,9 @@ function Sidebar() {
             const rowStyle = {
               display: "flex",
               alignItems: "center",
-              gap: 12,
-              padding: "10px 12px",
-              borderRadius: R.nav,
+              gap: 10,
+              padding: "8px 10px",
+              borderRadius: 6,
             } as const;
             if (!child.href) {
               return (
@@ -783,9 +786,9 @@ function Sidebar() {
                   data-tip={child.tip}
                   style={{ ...rowStyle, color: C.disabled, fontWeight: 600 }}
                 >
-                  <child.Glyph size={20} dimmed />
+                  <child.Glyph size={18} dimmed />
                   <span className="hz-side-text" style={{ position: "relative", display: "inline-flex" }}>
-                    <span style={{ fontSize: "var(--fs-14)", whiteSpace: "nowrap" }}>{child.label}</span>
+                    <span style={{ fontSize: "var(--fs-13)", whiteSpace: "nowrap" }}>{child.label}</span>
                     <span
                       style={{
                         position: "absolute",
@@ -824,8 +827,8 @@ function Sidebar() {
                   textDecoration: "none",
                 }}
               >
-                <child.Glyph size={20} />
-                <span className="hz-side-text" style={{ position: "relative", display: "inline-flex", fontSize: "var(--fs-14)" }}>
+                <child.Glyph size={18} />
+                <span className="hz-side-text" style={{ position: "relative", display: "inline-flex", fontSize: "var(--fs-13)" }}>
                   {child.label}
                   {child.isNew && (
                     <span style={{ position: "absolute", left: "100%", top: -1, marginLeft: 3 }}>
@@ -853,8 +856,8 @@ function Sidebar() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 12,
-                padding: "10px 12px",
+                gap: 10,
+                padding: "8px 10px",
                 // 활성 항목의 바탕·글자색은 여기 없다 — globals.css 의 .hz-nav-active 가 든다
                 // (옅은 하늘색 타일 + 파란 잉크, 2026-09-04 리디자인. 8월 목업의 꽉 찬 파랑
                 // 알약은 그 칸만 무거워 배너처럼 읽혔다).
@@ -866,14 +869,14 @@ function Sidebar() {
                 // ⚠️ 활성 항목에 파란 그림자를 주지 않는다. 0 10px 20px 이라 **바로 아래
                 // 항목 위로 번져서**, 그 항목만 호버 배경이 푸르스름하게 도드라졌다
                 // (카더라는 볼록하고 MDD 는 평평해 보이던 원인, 2026-08-03).
-                borderRadius: R.nav,
+                borderRadius: 6,
                 textDecoration: "none",
               }}
             >
-              <NavGlyph item={item} size={20} />
+              <NavGlyph item={item} size={18} />
               {/* 새 화면 표식은 '준비 중' 배지와 같은 자리다 — 라벨 우측 상단 위첨자. absolute 라 배지가
                   행 폭 계산에서 빠져 210px 사이드바에서 라벨이 눌리지 않는다. */}
-              <span className="hz-side-text" style={{ position: "relative", display: "inline-flex", fontSize: "var(--fs-14)" }}>
+              <span className="hz-side-text" style={{ position: "relative", display: "inline-flex", fontSize: "var(--fs-13)" }}>
                 {item.label}
                 {item.isNew && (
                   /* top −1 은 눈대중이 아니다. 14px 라벨이 21px 줄상자 안에 서면 잉크 꼭대기가 상자 위에서
@@ -898,9 +901,10 @@ function Sidebar() {
 
 
       {/* 바닥에 붙인다(margin-top:auto). 예전엔 flex:1 빈 칸을 끼웠는데 그 칸도 간격(28)을 하나 더 먹었다. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: "auto" }}>
+      {/* '오늘 뭐래?' 와 다크 모드 단추가 한 줄에 선다(2026-10-02, 머리 오른쪽에서 옮겨 왔다). 접힌 막대에선 세로로 쌓인다(.hz-side-foot). */}
+      <div className="hz-side-foot" style={{ display: "flex", gap: 6, marginTop: "auto" }}>
         {/* 라벨은 바뀌었어도 data-ga-cta 는 "community" 그대로 둔다 — 값을 같이 바꾸면
-            이름 변경 전후의 클릭수를 한 줄로 비교할 수 없다. 탭바·푸터도 같은 값이다. */}
+            이름 변경 전후의 클릭수를 한 줄로 비교할 수 없다. 햄버거 메뉴도 같은 값이다(푸터 링크는 2026-10-02 에 걷었다). */}
         <a
           href={TELEGRAM.href}
           target="_blank"
@@ -921,21 +925,23 @@ function Sidebar() {
           className="hz-tip hz-tg-cta"
           data-tip="텔레그램에서 매일 시장 요약을 해 드립니다"
           style={{
+            flex: 1,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: 8,
-            // 높이 44 · 모서리 12 — 카더라 히어로의 '미장 카더라 보기' 버튼과 같은 눈금이다.
-            padding: 12,
-            borderRadius: R.nav,
-            fontSize: "var(--fs-14)",
-            fontWeight: 700,
+            // 높이 38 · 모서리 6 — v2 모듈과 같은 눈금(2026-10-03). 테두리·바탕은 .hz-sidebar .hz-tg-cta(v2.css).
+            padding: 9,
+            borderRadius: 6,
+            fontSize: "var(--fs-13)",
+            fontWeight: 600,
             textDecoration: "none",
           }}
         >
-          <Icon name={TELEGRAM.icon} style={{ fontSize: "var(--fs-19)" }} />
+          <Icon name={TELEGRAM.icon} style={{ fontSize: 18 }} />
           <span className="hz-side-text">{TELEGRAM.label}</span>
         </a>
+        <ThemeToggle size={38} radius={6} />
       </div>
     </aside>
   );
@@ -1163,7 +1169,7 @@ const curStore = {
   },
 };
 
-function CurrencyToggle({ fallback }: { fallback: "krw" | "usd" }) {
+export function CurrencyToggle({ fallback }: { fallback: "krw" | "usd" }) {
   // 뿌리 속성이 없으면(아직 안 고름) 화면의 기본값이 눌린 칸이다. 이 값은 aria-pressed
   // 에만 쓴다 — **눌린 칸의 모양은 CSS 가 뿌리 속성을 보고 고른다**(mobile.css
   // .hz-cur-switch). 모양까지 리액트가 그리면 쿠키가 기본값과 다른 사람에게 첫 페인트에서
@@ -1200,9 +1206,10 @@ function CurrencyToggle({ fallback }: { fallback: "krw" | "usd" }) {
  * ⚠️ 기본값은 CSS 에도 적혀 있다(`[data-cur-default]`, globals.css). **두 곳이 같아야
  *    한다** — 갈리면 서버가 그린 화면과 스위치의 눌린 칸이 어긋난다.
  */
-const CURRENCY_PAGES: { prefix: string; fallback: "krw" | "usd" }[] = [
+const CURRENCY_PAGES: { prefix: string; fallback: "krw" | "usd"; except?: RegExp }[] = [
   // 재료가 전부 미국 공시라 달러가 원본이고, 원화는 크기를 가늠하라고 얹은 것이다.
-  { prefix: "/insider", fallback: "usd" },
+  // 돈 값이 없는 전체보기(의원 · 늘린 · 줄인 · 증권가)는 뺀다 — 눌러도 바뀌는 것이 없었다(2026-10-05 점검, 띠 스위치와 같은 목록).
+  { prefix: "/insider", fallback: "usd", except: /^\/insider\/list\/(congress|adds|trims|analyst)(\/|$)/ },
 ];
 
 /* 채널 등록 신청(.hz-btn-soft, 탑바)이 여기 있었다. 국장 카더라 히어로의 큰 단추 → 탑바 → **국장 '채널 파워 랭킹' 카드 머리**로
@@ -1252,24 +1259,28 @@ function MarketSwap({ pathname }: { pathname: string }) {
  * ⚠️ 통화는 **달러 금액을 내는 화면에만** 있는 개념이라 경로로 가린다. 국장 화면에
  * 두면 눌러도 아무것도 안 바뀌는 단추가 된다.
  */
-function PageTools() {
+function PageTools({ inHead = false }: { inHead?: boolean }) {
   const pathname = useAppPathname();
   const { themeNav } = useShellEnv();
+  // v2 화면은 머리를 걷는다 — 머리 오른쪽에 도구가 남으면 그 한 줄이 빈 띠가 된다. 내부자 리포트의 통화 스위치는 화면의
+  // 첫 줄 띠가 든다(app/insider/page.tsx). 폰 탑바(≤560)는 그대로 그린다 — 거기엔 첫 줄 띠의 통화 칸이 숨는다.
+  if (inHead && isV2Page(pathname)) return null;
   return (
     <>
       {/* 쿠키로 고른 게 없으면 그 화면의 기본값을 눌린 칸으로 쓴다. */}
       {(() => {
-        const page = CURRENCY_PAGES.find((p) => pathname.startsWith(p.prefix));
+        const page = CURRENCY_PAGES.find((p) => pathname.startsWith(p.prefix) && !p.except?.test(pathname));
         return page ? <CurrencyToggle key={page.prefix} fallback={page.fallback} /> : null;
       })()}
-      {/* 안 연 동안 배포에서는 /theme 가 404 라 단추도 내지 않는다(themeNav — ShellEnv 주석). */}
-      {(themeNav || !pathname.startsWith(THEME_PAGE.href)) && <MarketSwap pathname={pathname} />}
-      <ThemeToggle />
+      {/* 안 연 동안 배포에서는 /theme 가 404 라 단추도 내지 않는다(themeNav — ShellEnv 주석).
+          v2 화면은 시장 전환 단추를 안 둔다 — 사이드바에 국장·미장 항목이 이미 있다(V2_PAGES 주석). */}
+      {(themeNav || !pathname.startsWith(THEME_PAGE.href)) && !isV2Page(pathname) && <MarketSwap pathname={pathname} />}
+      {/* 다크 모드 단추는 여기 없다 — PC 는 사이드바 맨 아래, 폰은 탑바가 따로 단다(2026-10-02). */}
     </>
   );
 }
 
-function ThemeToggle() {
+function ThemeToggle({ size = 38, radius = R.control }: { size?: number; radius?: string | number }) {
   // 상태를 두지 않는다. 지금 테마는 뿌리의 data-theme 이 유일한 정의고(layout.tsx 의
   // PREF_SCRIPT 가 페인트 전에 붙인다), 아이콘은 CSS 가 그 속성을 보고 고른다
   // (mobile.css .hz-if-light/.hz-if-dark). 리액트 상태로 아이콘을 고르면 서버가 쿠키를
@@ -1290,22 +1301,29 @@ function ThemeToggle() {
     // 모바일 주소창 색도 같이 돌린다. 이 메타는 layout.tsx 가 라이트 값으로 내보내고
     // PREF_SCRIPT 가 다크 쿠키면 바꾸므로, 여기서 안 고치면 다음 페이지 로드까지
     // 주소창만 이전 테마로 남는다.
-    // 값을 또 적지 않고 방금 바뀐 data-theme 의 --c-bg 를 읽어 globals.css 를 따라간다.
-    const bg = getComputedStyle(root).getPropertyValue("--c-bg").trim();
-    if (bg) document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg);
+    // 값을 또 적지 않고 방금 바뀐 data-theme 의 토큰을 읽어 globals.css 를 따라간다 — 폰 메타(media 붙은 것)는 탑바 색 --c-card,
+    // 나머지는 바탕 --c-bg(layout.tsx THEME_COLOR_PHONE 주석).
+    const cs = getComputedStyle(root);
+    const bg = cs.getPropertyValue("--c-bg").trim();
+    const card = cs.getPropertyValue("--c-card").trim();
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+      const v = m.getAttribute("media") ? card : bg;
+      if (v) m.setAttribute("content", v);
+    });
   };
 
   return (
     <button
       onClick={toggle}
       aria-label="다크 모드 전환"
+      className="hz-theme-btn"
       style={{
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        width: 38,
-        height: 38,
-        borderRadius: R.control,
+        width: size,
+        height: size,
+        borderRadius: radius,
         border: `1px solid ${C.line}`,
         background: C.bg,
         color: C.sub,
@@ -1368,11 +1386,28 @@ const SELF_TITLED_PREFIXES = ["/insider/stock/", "/insider/investor/"];
  */
 const LABEL_TITLED_PREFIXES = [`${NOTE_PAGE.href}/`];
 
+/**
+ * v2 대시보드로 옮긴 화면(2026-10-02 시제품). 제목·부제 줄을 **화면에서만** 걷는다 — 토스증권·Blockworks 처럼
+ * 화면 이름은 사이드바의 현재 항목이 말하고, 본문은 첫 줄부터 내용이다. h1 은 지우지 않는다(검색엔진·스크린리더가
+ * 이 화면의 이름을 읽는 자리다). 오른쪽 도구(미장 전환·테마)는 그대로 선다.
+ */
+// 시장 브리핑(/) · MDD · 배당으로 살기 · 테마 판세(목록 · 테마 한 장, 국장 · 미장) · 국장 미리보기 · 미장 카더라는 2026-10-03 에 들였다 — 카더라 v2 의 디자인 규칙을 옮겼다.
+const V2_PAGES = ["/", "/kadera", "/kadera/us", "/mdd", "/dividend", "/preview", "/insider"];
+/** 테마 판세(/theme/semiconductor · /theme/us/memory) · 데일리 노트(/daily/2026-10-02) · 내부자 전체보기 · 종목 · 투자자 상세 ·
+ *  종목 페이지(/stock/005930)는 주소가 여럿이라 앞머리로 가른다. 문서 화면 넷(app/legal.tsx DOC_PAGES)은 2026-10-04 에 들였다. */
+const isV2Page = (pathname: string) =>
+  V2_PAGES.includes(pathname) ||
+  [THEME_PAGE.href, NOTE_PAGE.href].some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
+  ["/insider/list/", "/insider/stock/", "/insider/investor/", "/stock/"].some((p) => pathname.startsWith(p)) ||
+  pathname in DOC_PAGES;
+
 function PageHeader() {
   const pathname = useAppPathname();
-  const selfTitled = SELF_TITLED_PREFIXES.some((p) => pathname.startsWith(p));
+  // 문서 화면 넷(DOC_PAGES)도 첫 줄 띠에 자기 h1 을 둔다(v2, 2026-10-04 · app/legal.tsx DocCover). 이름 · 부제는 구조화 데이터에 그대로 쓰인다.
+  const selfTitled = SELF_TITLED_PREFIXES.some((p) => pathname.startsWith(p)) || pathname in DOC_PAGES;
   const TitleTag = LABEL_TITLED_PREFIXES.some((p) => pathname.startsWith(p)) ? "p" : "h1";
   const page = navFor(useShellEnv()).find((n) => isActive(n.href, pathname));
+  const v2 = isV2Page(pathname);
   // 서브 페이지에서는 서브의 이름을 h1 으로 쓴다. 부모(구역)의 이름을 그대로 두면
   // /kadera 와 /kadera/us 두 페이지가 **같은 h1** 을 갖는다.
   //
@@ -1442,7 +1477,7 @@ function PageHeader() {
    */
   const named = Boolean(deep) || child?.href === pathname || page?.href === pathname;
   return (
-    <header className="hz-page-head">
+    <header className={`hz-page-head${v2 ? " is-v2" : ""}`}>
       {named && title && sub && !badge && deep?.ld !== "none" && (
         <PageJsonLd
           title={title}
@@ -1458,7 +1493,7 @@ function PageHeader() {
           (아직 안 연 /preview)이 제목 칸을 통째로 비운다. */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, minWidth: 0, flex: 1 }}>
       {(page || deep) && !selfTitled && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+        <div className={v2 ? "sr-only" : undefined} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
           {/* 배지는 제목과 같은 줄, 세로 가운데 정렬. baseline 으로 두면 알약의 **글자**
               밑선이 제목 밑선에 맞아, 알약 자체는 그만큼(패딩+테두리) 아래로 내려앉는다 —
               옆에 붙은 라벨이 아니라 매달린 것처럼 보였다. */}
@@ -1497,7 +1532,7 @@ function PageHeader() {
       {/* 오른쪽 도구는 테마 토글 하나다. 검색은 PC 에선 사이드바 로고 아래, 폰에선 탑바 돋보기다(2026-09-26).
           알림 벨·프로필 칩은 기능이 없어 걷었다(2026-08-03). */}
       <div className="hz-page-tools">
-        <PageTools />
+        <PageTools inHead />
       </div>
     </header>
   );
@@ -1574,6 +1609,8 @@ function TopBar({
           <Icon name="search" style={{ fontSize: "var(--fs-20)" }} />
         </button>
         <PageTools />
+        {/* PC 에선 사이드바 맨 아래에 있다. 폰은 사이드바가 숨으니 탑바에 둔다. */}
+        <ThemeToggle />
         <button
           type="button"
           className="hz-menu-btn"
@@ -1640,8 +1677,8 @@ const NEWS_EVENT = "hz-news-change";
    다시 본다(닫힌 표시는 옛 키에 남아 있을 뿐 새 키를 막지 않는다).
    ⚠️ 옛 키를 되쓰지 말 것 — 그 소식을 닫았던 사람은 새 소식을 못 본다.
 
-   ⛔⛔ **아직 안 연 화면을 알리는 띠는 화면을 여는 날 함께 켜진다.** 이 띠에는 푸터
-   바로가기 같은 조건부가 없어서, 띠만 먼저 넣으면 프로덕션에서 눌러 404 로 간다. 그때는
+   ⛔⛔ **아직 안 연 화면을 알리는 띠는 화면을 여는 날 함께 켜진다.** 이 띠에는 사이드바
+   NAV 같은 조건부가 없어서, 띠만 먼저 넣으면 프로덕션에서 눌러 404 로 간다. 그때는
    `app/screen-flags.ts` 의 플래그로 갈라 목적지가 열려 있을 때만 걸리게 한다(국장
    미리보기·배당으로 살기·테마 리포트 때 그렇게 했다). */
 /* 지금 거는 소식은 하나(NEWS). 목적지가 우리 화면이면 **그 구역 안에서는 안 그린다**(NewsStrip 의 startsWith).
@@ -1651,7 +1688,8 @@ const NEWS_EVENT = "hz-news-change";
    ⛔ 소식을 새로 걸거나 문구를 고칠 때는 app/releases.ts 에 판을 올리지 않는다(2026-10-01 지시 — 업데이트 기록에 안 싣는다). */
 /* tailShort: 폰(≤560)에서 tail 대신 쓰는 짧은 꼬리. 이름이 앞에 서는 소식은 폰에서 한 줄로 잘리므로(components.css 의
    .hz-news-namefirst) 긴 tail 은 문장 중간에서 '…'로 끊긴다. 한 줄(360px 폰에서 글자 칸 238px)에 들어가는 문장을 따로 둔다. */
-type NewsItem = { key: string; from: string; href: string; head?: string; name: string; tail: string; tailShort?: string; aria?: string; icon: IconName; ga: string };
+/* until: 이 시각부터는 안 띄운다(없으면 계속). 마감이 있는 소식(설문 · 행사)이 끝난 뒤에 남지 않게. */
+type NewsItem = { key: string; from: string; until?: string; href: string; head?: string; name: string; tail: string; tailShort?: string; aria?: string; icon: IconName; ga: string };
 
 /* 2026-10-01 · 텔레그램 구독 권유 4판. 테마 리포트 오픈 소식(9/23~)을 내리고 다시 건다.
    ⭐ **문장이 먼저 오고 밑줄 이름이 뒤에 선다**(head → name → tail). 사람들이 가장 궁금해하는 '왜 올랐나'가 주인공이고
@@ -1675,14 +1713,33 @@ const TELEGRAM_NEWS: NewsItem = {
   ga: "news-telegram",
 };
 
-/** 지금 걸 소식. 소식을 바꿀 땐 이 줄과 위 덩이만 갈아 끼운다. */
-const NEWS: NewsItem = TELEGRAM_NEWS;
+/* 2026-10-05 · v2 의견 설문(구글 설문, 1분 · 추첨 10명 커피 기프티콘 · 10월 20일 마감). 텔레그램 4판을 내리고 건다.
+   문구는 운영자가 후보 열 중에 고른 것이다. 상품 수 · 마감일은 문장에 안 넣고(설문 첫 장이 말한다) '1분'과 '커피'만 둔다.
+   ⚠️ 키를 새로 땄다 — 텔레그램 띠를 닫았던 사람에게도 한 번 뜬다. 마감 다음 날 0시(KST)부터는 저절로 텔레그램 4판으로 돌아간다(until ·
+   아래 NEWS). 4판을 이미 닫은 사람에게는 안 뜬다 — 다시 모두에게 띄우려면 그때 4판 키를 새로 딴다.
+   아이콘 campaign 은 본문 어디에도 안 쓰는 그림이라 한 화면 두 번 규칙에 안 걸린다. */
+const SURVEY_NEWS: NewsItem = {
+  key: "hz-news-survey-v2",
+  from: "2026-10-05T00:00:00+09:00",
+  until: "2026-10-21T00:00:00+09:00",
+  href: "https://forms.gle/otD2jw73frGsTBqb9",
+  head: "hatzze가 새로 바뀌었습니다. 1분 의견 설문에 답하시면 추첨으로 커피를 드립니다. ",
+  name: "참여하기",
+  tail: "",
+  aria: "hatzze가 새로 바뀌었습니다. 1분 의견 설문에 답하시면 추첨으로 커피를 드립니다. 참여하기. 의견 설문 열기(새 탭)",
+  icon: "campaign",
+  ga: "news-survey",
+};
 
 // 모듈이 읽힐 때 한 번만 본다(렌더 안에서 Date.now() 를 부르면 React 컴파일러 린트가 막는다).
 // 서버는 어차피 안 그리고(getServerSnapshot 이 false), 클라이언트는 페이지를 열 때마다 새로 읽는다.
 // 개발 서버에서는 시각과 무관하게 띄운다 — 문구·아이콘을 로컬에서 보려면 날짜를 기다릴 수 없다.
 const NEWS_NOW = Date.now();
-const newsLive = (news: NewsItem) => process.env.NODE_ENV !== "production" || NEWS_NOW >= Date.parse(news.from);
+const newsLive = (news: NewsItem) =>
+  process.env.NODE_ENV !== "production" || (NEWS_NOW >= Date.parse(news.from) && (!news.until || NEWS_NOW < Date.parse(news.until)));
+
+/** 지금 걸 소식. 소식을 바꿀 땐 이 줄과 위 덩이만 갈아 끼운다. 설문이 끝나면(until) 텔레그램 4판으로 돌아간다. */
+const NEWS: NewsItem = newsLive(SURVEY_NEWS) ? SURVEY_NEWS : TELEGRAM_NEWS;
 
 /** 소식마다 저장소 하나. 훅에 넘기는 객체가 렌더마다 새것이면 useSyncExternalStore 가 계속 다시 구독한다 — 키로 캐시한다. */
 const newsStores = new Map<string, { subscribe: (cb: () => void) => () => void; getSnapshot: () => boolean }>();
@@ -1792,7 +1849,9 @@ function NewsStrip() {
  * 그래서 데스크톱 방문자는 '봤음' 표시를 남기지 않는다 — 나중에 폰으로 들어오면 그때
  * 제대로 한 번 뜬다.
  */
-const PC_HINT_KEY = "hz-pc-hint-seen";
+// ⚠️ 이름 뒤 '-v2' 는 v2 개편(2026-10-05)에 맞춰 예전에 닫은 사람에게도 한 번 더 띄우려고 붙였다(운영자 판단 "그래도 PC 가 좋긴 하다").
+//    다시 모두에게 띄우고 싶을 때만 꼬리를 바꾼다 — 문구만 고칠 땐 건드리지 말 것.
+const PC_HINT_KEY = "hz-pc-hint-seen-v2";
 const PC_HINT_EVENT = "hz-pc-hint-change";
 
 const pcHintStore = {
@@ -1817,8 +1876,11 @@ function PcHint() {
     pcHintStore.getSnapshot,
     () => false,
   );
+  const pathname = useAppPathname();
+  // 지표 화면용 문장이다 — 글을 읽는 화면(데일리 노트 · 문서)에선 띄우지 않는다(2026-10-04 점검).
+  const reading = pathname.startsWith(NOTE_PAGE.href) || pathname in DOC_PAGES;
 
-  if (!show) return null;
+  if (!show || reading) return null;
 
   const dismiss = () => {
     try {
@@ -1963,6 +2025,11 @@ function ToTop({
  * 자리는 **주소(pathname)마다 메모리에** 적는다. 쿼리만 바뀌는 이동(MDD 의 종목·기간)과 #앵커는 pathname 이 그대로라
  * 건드리지 않는다. 새로고침하면 브라우저 기본처럼 맨 위다.
  *
+ * ⚠️ **다른 화면의 #앵커로 오면 맨 위가 아니라 그 자리로 간다.** 맨 위로만 보냈더니 Next 가 앵커로 내려 준 자리를
+ *    이 훅이 도로 0 으로 덮어, 홈 급부상 칩(/kadera#surging)이 화면 맨 위에 떨어졌다(2026-10-02). 앵커가 아직 안 그려졌으면(loading.tsx 가 먼저 뜨는 화면 — 카더라) 맨 위로 둔 채
+ *    ANCHOR_WAIT_MS 동안 기다렸다가 그려지는 순간 내려간다. 그 사이 사람이 스크롤하면 기다림을 버린다.
+ *    주소창·새 탭으로 #앵커 주소를 바로 열 때도 처음 한 번 같은 일을 한다(브라우저 기본 이동이 main 안에서 늘 되리란 보장이 없어서).
+ *
  * ⭐ 바꿔 끼우기는 useLayoutEffect 다. 새 화면이 그려진 직후·칠하기 전에 돌아서 한 프레임도 옛 자리로 안 보인다.
  *    또 내용 높이가 줄어 생기는 스크롤 이벤트는 그다음 프레임에 오므로, 그보다 먼저 '지금 주소'를 바꿔 두면
  *    그 이벤트가 이전 화면의 자리를 덮어쓰지 않는다. 자식(페이지)의 레이아웃 효과보다 늦게 돌아 Next 의 처리도 이긴다.
@@ -1972,12 +2039,73 @@ function ToTop({
  *    튀었다(크로미움 실측, 2026-10-01). 휠·터치·키·클릭이 오면 그 사람이 움직인 것이니 바로 놓는다.
  */
 const RESTORE_HOLD_MS = 1500;
+const ANCHOR_WAIT_MS = 3000;
+
+/**
+ * 주소의 #앵커로 main 을 내린다. 지금 있으면 바로 내리고 true, 아직 안 그려졌으면 그려질 때까지(최대 ANCHOR_WAIT_MS)
+ * 기다리게 걸어 두고 false. 기다림을 거두는 함수는 `waiting` 에 넣는다 — 사람이 스크롤하거나 화면을 또 옮기면 부른다.
+ * 제목 위 여백은 앵커 쪽 scroll-margin-top 이 정한다(tx.css 의 .hz-sheet[id] · legal.tsx 의 Section).
+ */
+function seekAnchor(el: HTMLElement, hash: string, waiting: React.RefObject<(() => void) | null>): boolean {
+  let id = "";
+  try {
+    id = decodeURIComponent(hash.slice(1));
+  } catch {
+    // 깨진 %-인코딩(#%E0%A4%A)은 decodeURIComponent 가 던진다 — 앵커가 없는 것으로 친다.
+  }
+  if (!id) return false;
+  const find = () => {
+    const a = document.getElementById(id);
+    return a && el.contains(a) ? a : null;
+  };
+  // 내린 뒤에도 ANCHOR_WAIT_MS 동안은 다시 잰다 — 스트리밍이 끝나며 앵커 모듈이 **새 요소로 갈아 끼워지고** 위쪽이 자리를 잡아,
+  // 주소창으로 /kadera#surging 을 열면 폰에서 모듈 머리가 탑바 밑 −24 ~ −83px 에 멈췄다(2026-10-05 머지 전 점검). 그동안 짧게
+  // 재어(요소는 매번 id 로 다시 찾는다 · 붙잡아 둔 옛 요소는 문서에서 떨어져 있다) 처음 내린 자리에서 벗어나면 다시 내린다.
+  // 사람이 손대면(waiting 을 거두면) 바로 놓는다.
+  const toAnchor = (a: HTMLElement) => {
+    a.scrollIntoView({ block: "start", behavior: "instant" });
+    const landed = a.getBoundingClientRect().top;
+    const tick = window.setInterval(() => {
+      const cur = find();
+      if (cur && Math.abs(cur.getBoundingClientRect().top - landed) > 2) cur.scrollIntoView({ block: "start", behavior: "instant" });
+    }, 120);
+    const timer = window.setTimeout(() => settle(), ANCHOR_WAIT_MS);
+    const settle = () => {
+      window.clearInterval(tick);
+      window.clearTimeout(timer);
+      if (waiting.current === settle) waiting.current = null;
+    };
+    waiting.current = settle;
+  };
+  const now = find();
+  if (now) {
+    toAnchor(now);
+    return true;
+  }
+  const obs = new MutationObserver(() => {
+    const a = find();
+    if (!a) return;
+    stop();
+    toAnchor(a);
+  });
+  const timer = window.setTimeout(() => stop(), ANCHOR_WAIT_MS);
+  const stop = () => {
+    obs.disconnect();
+    window.clearTimeout(timer);
+    if (waiting.current === stop) waiting.current = null;
+  };
+  obs.observe(el, { childList: true, subtree: true });
+  waiting.current = stop;
+  return false;
+}
 
 function useMainScrollRestore(ref: React.RefObject<HTMLElement | null>, pathname: string) {
   const saved = useRef(new Map<string, number>());
   const current = useRef(pathname);
   const popped = useRef(false);
   const hold = useRef<{ top: number; until: number } | null>(null);
+  /** 아직 안 그려진 #앵커를 기다리는 중이면 그 기다림을 거두는 함수. */
+  const waiting = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -1985,6 +2113,7 @@ function useMainScrollRestore(ref: React.RefObject<HTMLElement | null>, pathname
     const release = () => {
       hold.current = null;
       el.style.overflowAnchor = "";
+      waiting.current?.();
     };
     const onScroll = () => {
       const h = hold.current;
@@ -1998,6 +2127,8 @@ function useMainScrollRestore(ref: React.RefObject<HTMLElement | null>, pathname
     const intents = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
     el.addEventListener("scroll", onScroll, { passive: true });
     for (const t of intents) el.addEventListener(t, release, { passive: true });
+    // 처음 연 주소에 #앵커가 있으면(주소창·새 탭) 그 자리로. 아래 레이아웃 효과는 처음엔 안 돈다(current 가 이미 이 주소).
+    if (window.location.hash) seekAnchor(el, window.location.hash, waiting);
     return () => {
       el.removeEventListener("scroll", onScroll);
       for (const t of intents) el.removeEventListener(t, release);
@@ -2018,8 +2149,15 @@ function useMainScrollRestore(ref: React.RefObject<HTMLElement | null>, pathname
     current.current = pathname;
     const back = popped.current;
     popped.current = false;
+    waiting.current?.();
     const el = ref.current;
     if (!el) return;
+    // 뒤로 가기는 앵커보다 보던 자리가 먼저다.
+    if (!back && seekAnchor(el, window.location.hash, waiting)) {
+      hold.current = null;
+      el.style.overflowAnchor = "";
+      return;
+    }
     const top = back ? (saved.current.get(pathname) ?? 0) : 0;
     el.scrollTo({ top, behavior: "instant" });
     if (back && top > 0) {
@@ -2035,12 +2173,9 @@ function useMainScrollRestore(ref: React.RefObject<HTMLElement | null>, pathname
 export default function AppShell({
   children,
   themeNav = THEME_PUBLIC,
-  year,
 }: {
   children: React.ReactNode;
   themeNav?: boolean;
-  /** 푸터 저작권 연도 — 서버가 한국 시각으로 정한다(Footer 주석). */
-  year: number;
 }) {
   const env: ShellEnv = { themeNav };
   const mainRef = useRef<HTMLElement>(null);
@@ -2163,13 +2298,14 @@ export default function AppShell({
               margin: "0 auto",
               display: "flex",
               flexDirection: "column",
-              gap: 20,
+              // 12 — v2 화면의 띠 · 모듈 사이와 같은 리듬(소식 띠 아래만 20 이라 따로 놀았다, 2026-10-05 점검). 푸터 위 여백은 푸터가 따로 든다.
+              gap: 12,
             }}
           >
             <NewsStrip />
             <PageHeader />
             {children}
-            <Footer year={year} />
+            <Footer />
           </div>
         </main>
         {/* 둘 다 오른쪽 아래 구석을 쓴다. 층은 DOM 순서가 아니라 z-index 로 못박아

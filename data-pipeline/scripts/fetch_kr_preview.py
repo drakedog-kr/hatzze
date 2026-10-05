@@ -550,7 +550,8 @@ def main() -> None:
         ex = dp - beta * spx
         z = abs(ex) / sd
         if z >= Z_MIN:
-            movers.append((t, dp, round(z, 1), ex > 0))
+            # 둘째 자리까지 — 화면은 1.5 밑을 1.04배처럼 둘째 자리로 적는데, 첫째 자리로 저장하면 늘 1.00 · 1.10 이었다(2026-10-05 점검).
+            movers.append((t, dp, round(z, 2), ex > 0))
     print(f"[선별] 평소의 {Z_MIN}배를 넘은 종목 {len(movers)}개")
 
     def strong(p) -> bool:

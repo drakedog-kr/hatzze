@@ -10,7 +10,8 @@
  * adjclose 는 감자에서 음수가 나오는 등 깨져 있어 쓰지 않는다(SK하이닉스 실측).
  */
 
-export type Bar = { date: string; close: number };
+/** volume 은 그날 거래량(주). 야후가 안 준 봉(결측)이나 거래량을 안 쓰는 경로에선 없다 — 가격대별 거래(priceLadder)만 쓴다. */
+export type Bar = { date: string; close: number; volume?: number };
 
 /** 각 시점의 고점 대비 낙폭(%). dd 는 0 이하이고, 새 고점에서 0 이 된다. */
 export type DrawdownPoint = { date: string; close: number; dd: number };
@@ -30,6 +31,11 @@ export type Episode = {
   /** 고점→저점까지의 달력 일수 — 하락 '속도'(급락형/완만형)를 가른다. */
   troughDays: number;
   recovered: boolean;
+  /**
+   * 같은 기간(고점→저점) 시장 지수의 등락(%). 조회 경로(api/mdd)가 지수 시세를 받은 뒤 채운다 — 못 받았으면 null.
+   * v2 '역대 하락 사례' 표의 한 칸이다(2026-10-03). 예전엔 리스크 프로필의 '혼자 빠지나, 같이 빠지나'가 큰 하락만 따로 셌다.
+   */
+  market?: number | null;
 };
 
 /**
@@ -81,7 +87,8 @@ export type RecoveryStats = {
   deeperCount: number;
   recoveredCount: number;
   unrecoveredCount: number;
-  /** 회복한 사건들의 달력 일수. 회복 사례가 없으면 null. */
+  /** 회복한 사건들의 **저점에서 고점을 되찾기까지** 달력 일수. 회복 사례가 없으면 null.
+   *  고점부터 잰 일수였을 땐 사례 표의 '되찾은 기간'(저점부터)과 기준이 갈려 '2.2년 보통'이 표 어디에도 없었다(2026-10-05 점검). */
   minDays: number | null;
   medianDays: number | null;
   maxDays: number | null;
@@ -127,6 +134,12 @@ export type MddAnalysis = {
   recovery: RecoveryStats | null;
   character: DrawdownCharacter | null;
   topDrawdowns: Episode[];
+  /**
+   * 직전 큰 하락 — 15% 넘게 빠졌다 되찾은 사건 중 마지막 것(고점 · 저점의 날과 종가).
+   * 오늘이 신고가인 날 화면이 쓴다: 전고점 · 저점이 둘 다 오늘 종가라 종목 칸에 같은 값이 세 번 섰다(심텍, 2026-10-03).
+   * 깊이 문턱은 15%(CHARACTER_MIN_DEPTH) — 하루 −0.3% 같은 잔물결을 '직전 하락'이라 부르지 않는다.
+   */
+  lastDrop: { peakDate: string; peak: number; troughDate: string; trough: number; depth: number; recoveryDate: string } | null;
   /** 낙폭 구간별 발생 횟수(−20% 이상 하락만). 위 depthHistogram 주석 참고. */
   depthBuckets: DepthBucket[];
 };
@@ -218,7 +231,7 @@ function recoveryStats(eps: Episode[], currentDd: number): RecoveryStats | null 
     return { similarCount: 0, deeperCount: 0, recoveredCount: 0, unrecoveredCount: 0, minDays: null, medianDays: null, maxDays: null, samples: [] };
   }
   const recovered = similar.filter((e) => e.recovered);
-  const days = recovered.map((e) => e.days);
+  const days = recovered.map((e) => e.days - e.troughDays);
   return {
     similarCount: similar.length,
     // 진행 중 사건의 깊이는 currentDd 와 같은 식·같은 고점으로 나와, 신저점 날에는 두 값이 비트까지 같다.
@@ -246,12 +259,15 @@ function drawdownCharacter(eps: Episode[], currentDd: number, bars: Bar[]): Draw
 
   // 표본이 얇으면 급락/완만 비교는 생략하되(버킷 null), 섹션 자체는 살려 둔다 —
   // 현재 하락의 성격(급락/완만)만이라도 보여주고, 화면이 "기간을 넓히라"고 안내한다.
-  const meaningful = eps.filter((e) => e.recovered && e.depth <= CHARACTER_MIN_DEPTH);
+  // ⭐ 모집단은 회복 통계(recoveryStats)와 같다 — 지금만큼 깊었다 되찾은 하락. 15% 넘게 빠진 것 전부를 세던 때 같은 칸에서
+  //    '4번 중 3번 되찾음'과 '급락 3 · 완만 2'가 맞아 보이지 않았다(2026-10-05 점검). 여기 오는 currentDd 는 CHARACTER_MIN_DD(−8%) 아래라 잔물결은 안 든다.
+  const meaningful = eps.filter((e) => e.recovered && e.depth <= currentDd);
   const enough = meaningful.length >= 3;
 
   const bucket = (fast: boolean) => {
     if (!enough) return null;
-    const days = meaningful.filter((e) => (e.troughDays <= CHARACTER_SPLIT_DAYS) === fast).map((e) => e.days);
+    // 기간은 저점에서 되찾기까지(recoveryStats 와 같은 기준).
+    const days = meaningful.filter((e) => (e.troughDays <= CHARACTER_SPLIT_DAYS) === fast).map((e) => e.days - e.troughDays);
     return days.length ? { count: days.length, medianRecovery: median(days) } : null;
   };
 
@@ -402,7 +418,23 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
      오늘이다. 0일은 '지금이 이 구간에서 가장 깊다'는 뜻이라 화면이 문장을 갈아탄다. */
   const deeperDays = ds.filter((p) => p.dd < last.dd).length;
   const eps = episodes(bars);
-  const topDrawdowns = [...eps].sort((a, b) => a.depth - b.depth).slice(0, 5);
+  // 깊은 순 다섯 — 단, 15% 넘게 빠진 사건은 여덟까지 다 싣는다. 회복까지 칸이 '15% 넘게 빠졌다 되찾은 5번'이라 세는데 표엔 넷만 있어
+  // 확인할 수 없었다(2026-10-04 점검). 여덟이 상한인 까닭은 아래 격자(is-quad) 키다.
+  const byDepth = [...eps].sort((a, b) => a.depth - b.depth);
+  const big15 = byDepth.filter((e) => e.depth <= CHARACTER_MIN_DEPTH).length;
+  const topDrawdowns = byDepth.slice(0, Math.min(8, Math.max(5, big15)));
+  const closeOn = new Map(bars.map((b) => [b.date, b.close]));
+  const big = [...eps].reverse().find((e) => e.recovered && e.depth <= CHARACTER_MIN_DEPTH);
+  const lastDrop = big
+    ? {
+        peakDate: big.peakDate,
+        peak: closeOn.get(big.peakDate)!,
+        troughDate: big.troughDate,
+        trough: closeOn.get(big.troughDate)!,
+        depth: big.depth,
+        recoveryDate: big.recoveryDate!,
+      }
+    : null;
 
   /* 차트가 반드시 지나야 하는 날 = 화면이 날짜와 값을 함께 적는 곳.
      헤드라인의 최고가(athDate)·기간 최저점(mddDate)과 '역대 낙폭 Top 5'의 고점·저점이다.
@@ -432,62 +464,173 @@ export function analyzeDrawdown(bars: Bar[]): MddAnalysis | null {
     recovery: recoveryStats(eps, last.dd),
     character: drawdownCharacter(eps, last.dd, bars),
     topDrawdowns,
+    lastDrop,
     depthBuckets: depthHistogram(eps),
   };
 }
 
-/* ── 리스크 프로필 ─────────────────────────────────────────────────
- * 종목의 '기질'을 숫자 몇 개로 요약한다(스탯 타일용):
- *   보상 = 감수한 최악 낙폭 대비 벌어준 수익(연환산)
- *   빈도 = 큰 하락(−20% 이상)이 평균 몇 년에 한 번
- *   동반 = 그 큰 하락들이 시장과 함께였나, 이 종목만이었나
+/* ── 해마다 ───────────────────────────────────────────────────────
+ * 조회 기간의 복리 연평균 수익과 해마다 수익 · 그 해 최악 낙폭(화면 '해마다' 모듈, app/mdd/V2Sheets.tsx).
+ * 예전엔 '리스크 프로필'로 큰 하락 빈도 · 시장 동반성 · 하락 vs 회복 속도도 냈다 — v2(2026-10-03)에서 그 셋은
+ * '역대 하락 사례' 표(사건마다 깊이 · 같은 기간 시장 · 빠진 기간 · 되찾은 기간)로 옮겨 여기서 걷었다.
  */
 
-/** 큰 하락으로 셀 낙폭 기준(%, 음수). */
-const RP_BIG_DROP = -20;
-/** 시장이 종목 낙폭의 이 비율만큼 이상 빠졌으면 '시장 동반'으로 본다. */
-const RP_MARKET_RATIO = 0.5;
-
 export type RiskProfile = {
-  /** 분석 기간(년). 수익·빈도는 이 기간에 의존한다. */
+  /** 분석 기간(년). 수익은 이 기간에 의존한다. */
   years: number;
   /** 연환산 수익률(%). 음수일 수 있다. */
   annualReturn: number;
-  /** 최대 낙폭(%, 음수). */
-  mdd: number;
-  /** 큰 하락 기준(%, 음수). */
-  bigDropThreshold: number;
-  /** 큰 하락 횟수. */
-  bigDropCount: number;
-  /** 큰 하락 중 시장과 함께 빠진 횟수. 코스피 데이터 없으면 null. */
-  withMarket: number | null;
-  /** 큰 하락의 고점→저점 일수 중앙값(빠지는 속도). 표본 얇으면 null. */
-  dropDaysMedian: number | null;
-  /** 큰 하락의 저점→회복 일수 중앙값(되찾는 속도). 표본 얇으면 null. */
-  recoverDaysMedian: number | null;
-  /** 큰 하락 사건들 — 그때 종목 낙폭과 코스피 낙폭(같은 창). '시장 동반성' 시각화용. */
-  events: RiskEvent[];
-  /** 해마다 얼마 벌고(수익) 얼마나 아팠나(그 해 최악 낙폭). '낙폭 대비 보상' 시각화용. */
+  /** 해마다 얼마 벌고(수익) 얼마나 아팠나(그 해 최악 낙폭). */
   yearly: YearStat[];
-};
-
-/**
- * 큰 하락 한 번 — 그 창에서 종목·코스피가 각각 얼마나 빠졌나,
- * 그리고 고점→저점(dropDays)·저점→회복(recoverDays)이 각각 며칠이었나.
- */
-export type RiskEvent = {
-  year: number;
-  /** 고점이 난 달(1~12). 한 해에 두 건 이상이면 화면에서 이걸로 줄을 구분한다. */
-  month: number;
-  stock: number;
-  market: number | null;
-  dropDays: number;
-  /** 저점→고점 회복까지의 일수. 아직 회복 못 했으면 null. */
-  recoverDays: number | null;
 };
 
 /** 한 해의 수익률과 그 해 안에서 겪은 최악 낙폭(둘 다 %). */
 export type YearStat = { year: number; ret: number; mdd: number };
+
+/** `from` 종가에서 `to` 종가까지 등락(%). 두 날 중 하나라도 그 전 종가가 없으면 null. 사례 표의 시장 칸이 쓴다. */
+export function moveBetween(bars: Bar[], from: string, to: string): number | null {
+  const a = closeOnOrBefore(bars, from);
+  const b = closeOnOrBefore(bars, to);
+  return a && b ? (b / a - 1) * 100 : null;
+}
+
+/** 지금 낙폭 한 점 — 마지막 종가가 기간 안 최고 종가보다 얼마나 낮나(%, 0 이하)와 그 고점 날짜. */
+export type DdNow = { dd: number; peakDate: string };
+
+/** bars 전체에서 지금 낙폭. MDD 첫 줄 띠의 시장 칸(같은 기간 지수)이 쓴다. 봉이 없으면 null. */
+export function drawdownNow(bars: Bar[]): DdNow | null {
+  if (bars.length === 0) return null;
+  let peak = bars[0];
+  for (const b of bars) if (b.close >= peak.close) peak = b;
+  return { dd: (bars[bars.length - 1].close / peak.close - 1) * 100, peakDate: peak.date };
+}
+
+/* ── 가격대별 거래 ─────────────────────────────────────────────────
+ * 최근 1년 거래대금(그날 종가 × 거래량)을 같은 폭의 가격대로 나눈 것 — MDD '수익 · 손실 비율' 칸(2026-10-03, '많이 빠진 대형주' 자리).
+ * 낙폭 화면을 여는 사람은 대개 손실 중인 보유자라 "지금 가격보다 비싸게 거래된 돈이 얼마나 되나 · 어느 가격대에 몰렸나"를 묻는다.
+ * ⚠️ 하루를 종가 한 점으로 본다 — 장중에 어느 가격에서 거래됐는지는 나누지 못하는 어림이다.
+ */
+
+/** 가격대 칸 수의 상한. 칸 맨 위에 요약(큰 숫자)이 서서 옆 업종 칸(11줄)과 같은 키에 여덟 줄이 든다(2026-10-03). */
+export const LADDER_ROWS = 8;
+/** 창(달력 일). 1년. */
+const LADDER_DAYS = 365;
+
+export type LadderBand = { lo: number; hi: number; share: number; days: number };
+export type PriceLadder = {
+  from: string;
+  to: string;
+  /** 지금 종가. */
+  price: number;
+  /** 칸 경계가 지나는 지금 가격 — 종가를 칸 단위로 반올림한 값(국장은 대개 종가 그대로). 화면의 '지금' 선이 여기 선다. */
+  anchor: number;
+  /**
+   * 창 거래대금 중 종가가 **지금 가격(price)보다 높았던 날**의 몫(%) — 손실 쪽. 칸 경계(anchor)가 아니라 지금 가격 그대로 가른다.
+   * anchor 는 칸 경계용으로 반올림한 값이라(엔비디아 $233.95 → $234) 그걸로 가르면 그 사이 날이 수익 쪽에 섞였다(2026-10-04).
+   * 국장은 대개 anchor = price 라 위 aboveCount 칸의 share 합과 같다.
+   */
+  aboveShare: number;
+  /** 가격대 칸 너비(원 · 달러) — 칸 경계를 떨어지는 수로 맞춘 값. */
+  step: number;
+  /** 비싼 칸부터. 앞의 aboveCount 칸이 지금 가격보다 위, 나머지가 아래. */
+  bands: LadderBand[];
+  aboveCount: number;
+  /**
+   * 평균 매수가 — 그쪽 거래대금 ÷ 거래량(한 주를 평균 얼마에 샀나, 종가 어림). 수익 쪽(지금 가격 이하에서 거래) · 손실 쪽(지금보다 비싸게).
+   * 그쪽에 거래가 없으면 null. MDD '수익 · 손실 비율' 칸의 표(2026-10-04 "정보가 없는 느낌").
+   */
+  gainAvg: number | null;
+  lossAvg: number | null;
+};
+
+/**
+ * 칸 경계는 **지금 가격에서 출발**한다 — 그래야 '지금' 선이 칸 사이에 정확히 서고, 선 위 칸의 합이 곧 '지금보다 비싸게 거래된 몫'이다.
+ * 처음엔 최저가에서 같은 폭으로 잘라 지금 가격이 칸 한가운데 들었고, 그 칸에 '지금' 꼬리표만 달았다 — 큰 숫자(31%)와 막대 색의
+ * 갈림이 어디서 나뉘는지 화면에서 안 보여 "한번에 이해하기 힘들다"였다(2026-10-04).
+ * 칸 너비는 유효 숫자 두 자리로 올림하고(같은 폭으로만 자르면 '121,337~143,373' 같은 경계가 섰다), 지금 가격도 그 단위로 반올림한다.
+ * 너비가 1 이상이면 단위를 1 아래로 내리지 않는다 — 엔비디아(너비 6.4달러)가 6.5 로 잡혀 줄 이름이 '$224'(실제 223.5)로 어긋났다.
+ * 위아래 칸 수를 합쳐 rows 를 넘으면 너비를 한 단위씩 키운다. 그래서 칸이 rows 보다 적을 수 있다.
+ */
+export function priceLadder(bars: Bar[], rows: number): PriceLadder | null {
+  if (bars.length === 0 || rows < 2) return null;
+  const last = bars[bars.length - 1];
+  const start = new Date(Date.parse(last.date) - LADDER_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const win = bars.filter((b) => b.date > start && typeof b.volume === "number" && b.volume > 0);
+  // 거래가 스무 날도 안 되면(상장 직후 · 거래량 결측) 가격대를 나눌 표본이 아니다.
+  if (win.length < 20) return null;
+  const closes = win.map((b) => b.close);
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  if (!(max > min)) return null;
+  const raw = (max - min) / rows;
+  const unit = raw >= 1 ? Math.max(1, 10 ** (Math.floor(Math.log10(raw)) - 1)) : 10 ** (Math.floor(Math.log10(raw)) - 1);
+  // 소수 단위(동전주)에서 반올림 찌꺼기(0.30000000000000004)가 경계에 남지 않게 단위의 자릿수로 자른다.
+  const digits = Math.max(0, -Math.floor(Math.log10(unit)));
+  const fix = (v: number) => Number(v.toFixed(digits));
+  const anchor = fix(Math.round(last.close / unit) * unit);
+  let step = fix(Math.ceil(raw / unit) * unit);
+  const countAbove = (s: number) => (max > anchor ? Math.ceil((max - anchor) / s) : 0);
+  const countBelow = (s: number) => (anchor >= min ? Math.floor((anchor - min) / s) + 1 : 0);
+  while (countAbove(step) + countBelow(step) > rows) step = fix(step + unit);
+  const nAbove = countAbove(step);
+  const nBelow = countBelow(step);
+  // 위 칸은 (anchor + i·step, anchor + (i+1)·step], 아래 칸은 [anchor − (j+1)·step, anchor − j·step]. 지금 가격과 같은 날은 아래(비싸지 않다).
+  const up = Array.from({ length: nAbove }, (_, i) => ({ lo: fix(anchor + i * step), hi: fix(anchor + (i + 1) * step), value: 0, days: 0 }));
+  const down = Array.from({ length: nBelow }, (_, j) => ({ lo: Math.max(0, fix(anchor - (j + 1) * step)), hi: fix(anchor - j * step), value: 0, days: 0 }));
+  let total = 0;
+  let above = 0;
+  let shares = 0;
+  let sharesAbove = 0;
+  for (const b of win) {
+    const v = b.close * b.volume!;
+    shares += b.volume!;
+    // 수익 · 손실은 지금 가격 그대로 가른다(aboveShare 주석). 칸은 아래에서 anchor 로.
+    if (b.close > last.close) {
+      above += v;
+      sharesAbove += b.volume!;
+    }
+    if (b.close > anchor) {
+      const c = up[Math.min(nAbove - 1, Math.max(0, Math.ceil((b.close - anchor) / step) - 1))];
+      c.value += v;
+      c.days += 1;
+    } else {
+      const c = down[Math.min(nBelow - 1, Math.max(0, Math.floor((anchor - b.close) / step)))];
+      c.value += v;
+      c.days += 1;
+    }
+    total += v;
+  }
+  if (!(total > 0)) return null;
+  const share = (c: { lo: number; hi: number; value: number; days: number }) => ({ lo: c.lo, hi: c.hi, share: (c.value / total) * 100, days: c.days });
+  return {
+    from: win[0].date,
+    to: last.date,
+    price: last.close,
+    anchor,
+    aboveShare: (above / total) * 100,
+    step,
+    bands: [...up.reverse().map(share), ...down.map(share)],
+    aboveCount: nAbove,
+    gainAvg: shares > sharesAbove ? (total - above) / (shares - sharesAbove) : null,
+    lossAvg: sharesAbove > 0 ? above / sharesAbove : null,
+  };
+}
+
+/**
+ * 다른 시계열(시장 지수)의 고점 대비 낙폭을 주어진 날짜들에 맞춰 뽑는다 — 물속 차트에 시장 선을 겹칠 때(2026-10-03).
+ * 화면의 물속 점은 250개로 솎은 것이라 그 날짜에 맞춘다. 그날 지수 봉이 없으면(휴장 차이) 그 전 마지막 봉, 그보다 앞이면 null.
+ * 고점은 bars 첫 봉부터 잰다 — 종목과 같은 기간으로 받은 지수라 두 선의 0% 가 같은 출발점에 선다.
+ */
+export function drawdownOnDates(bars: Bar[], dates: readonly string[]): (number | null)[] {
+  const ds = drawdownSeries(bars);
+  const out: (number | null)[] = [];
+  let j = -1;
+  for (const d of dates) {
+    while (j + 1 < ds.length && ds[j + 1].date <= d) j++;
+    out.push(j >= 0 ? ds[j].dd : null);
+  }
+  return out;
+}
 
 /** date(YYYY-MM-DD) 당일 또는 그 이전의 마지막 종가. 없으면 null. */
 function closeOnOrBefore(bars: Bar[], date: string): number | null {
@@ -537,7 +680,7 @@ function yearlyStats(bars: Bar[]): YearStat[] {
 }
 
 /** 종목 종가 + (있으면) 시장 종가로 리스크 프로필을 낸다. */
-export function riskProfile(bars: Bar[], marketBars: Bar[] | null): RiskProfile | null {
+export function riskProfile(bars: Bar[]): RiskProfile | null {
   const n = bars.length;
   if (n < 30) return null;
   const first = bars[0];
@@ -545,63 +688,10 @@ export function riskProfile(bars: Bar[], marketBars: Bar[] | null): RiskProfile 
   const years = (Date.parse(last.date) - Date.parse(first.date)) / (365 * 86_400_000);
   if (years < 0.5) return null;
 
-  const annualReturn = (Math.pow(last.close / first.close, 1 / years) - 1) * 100;
-
-  let peak = -Infinity;
-  let mdd = 0;
-  for (const b of bars) {
-    if (b.close > peak) peak = b.close;
-    const dd = (b.close / peak - 1) * 100;
-    if (dd < mdd) mdd = dd;
-  }
-
-  const big = episodes(bars).filter((e) => e.depth <= RP_BIG_DROP);
-  const bigDropCount = big.length;
-  const hasMarket = !!(marketBars && marketBars.length > 1);
-
-  // 큰 하락마다 그 창에서 코스피가 얼마나 빠졌는지. 시각화(events)와 동반 판정(withMarket)에 둘 다 쓴다.
-  const events: RiskEvent[] = big.map((e) => {
-    let market: number | null = null;
-    if (hasMarket) {
-      const mp = closeOnOrBefore(marketBars!, e.peakDate);
-      const mt = closeOnOrBefore(marketBars!, e.troughDate);
-      if (mp && mt) market = (mt / mp - 1) * 100;
-    }
-    return {
-      year: Number(e.peakDate.slice(0, 4)),
-      month: Number(e.peakDate.slice(5, 7)),
-      stock: e.depth,
-      market,
-      dropDays: e.troughDays,
-      recoverDays: e.recovered ? e.days - e.troughDays : null,
-    };
-  });
-
-  // 시장이 종목 낙폭의 절반 이상 함께 빠졌으면 '동반'. 코스피가 아예 없으면 null.
-  const withMarket = hasMarket
-    ? events.filter((ev) => ev.market !== null && ev.market <= RP_MARKET_RATIO * ev.stock).length
-    : null;
-
-  // 하락 vs 회복 속도 — 되찾은 큰 하락만(고점→저점, 저점→회복). 표본 2건 미만이면 null.
-  const bigRecovered = big.filter((e) => e.recovered);
-  const enoughSpeed = bigRecovered.length >= 2;
-
   return {
     years,
-    annualReturn,
-    mdd,
-    bigDropThreshold: RP_BIG_DROP,
-    bigDropCount,
-    withMarket,
-    dropDaysMedian: enoughSpeed ? median(bigRecovered.map((e) => e.troughDays)) : null,
-    recoverDaysMedian: enoughSpeed ? median(bigRecovered.map((e) => e.days - e.troughDays)) : null,
-    events: events.slice(-6),
-    /**
-     * 해마다 한 줄이라 조회 기간 전체를 그대로 보낸다(10년이면 11개, 전체면 상장 이후 전부).
-     * 예전엔 여기서 6개로 잘랐는데, 화면이 최근 5줄만 막대로 그리므로 그걸로 충분했다.
-     * 지금은 타일에 '전체보기'가 붙어 조회 기간 전체를 펼쳐 보여주므로 자르면 안 된다
-     * (자르면 10년을 골라도 6년치만 열린다). 한 줄이 숫자 셋이라 늘려도 응답이 거의 안 는다.
-     */
+    annualReturn: (Math.pow(last.close / first.close, 1 / years) - 1) * 100,
+    // 조회 기간 전체를 그대로 보낸다(10년이면 11개, 전체면 상장 이후 전부). 화면이 조회 기간만큼 잘라 다 펼친다.
     yearly: yearlyStats(bars),
   };
 }

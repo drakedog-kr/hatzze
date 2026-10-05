@@ -35,7 +35,9 @@ LOOKBACK_DAYS = 14
 RECENT_MAX = 3           # US_WINDOW_DAYS
 SHARE_SMOOTHING = 0.0006  # ⚠️ 국내(common/surging.py)는 0.002 다. 베끼다 틀렸던 자리
 MIN_RECENT_MENTIONS = 3
-CARD_LIMIT = 6           # 화면이 getUsSurgingStocks(6) 으로 부른다
+# 화면 표 줄 수(app/kadera/us/page.tsx MAX_ROWS = lib/kadera-us-why.ts US_BOARD_TILES)와 같아야 한다 — 6 으로 남아 있어
+# v2 표 10줄 가운데 7~10행은 한 줄 요약이 안 만들어졌다(2026-10-04 머지 전 점검).
+CARD_LIMIT = 10
 
 
 def load_us_stock_daily(db, base_date: str | None = None) -> tuple[list[dict], list[str]]:

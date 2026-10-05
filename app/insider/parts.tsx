@@ -8,20 +8,19 @@
  *    붙이는 순간 여기 실린 데이터가 통째로 클라이언트 번들을 탄다.
  */
 import { Fragment } from "react";
-import { SectionIntro } from "../SectionIntro";
 
 import Link from "next/link";
 
-import type { AnalystTop, CongressTicker, InsiderActivity, InsiderOverview, InsiderRow, ManagerMove, ManagerRank } from "@/lib/insider-data";
-import type { AnalystAction, AnalystConsensus, ManagerHolding, StockHolder } from "@/lib/insider-detail";
+import { HOLD_FLOOR } from "@/lib/insider-13f";
+
+import type { AnalystTop, CongressTicker, InsiderActivity, InsiderOverview, ManagerMove, ManagerRank } from "@/lib/insider-data";
+import type { AnalystAction, AnalystConsensus } from "@/lib/insider-detail";
 
 import { ExpandableList } from "../kadera/ExpandableList";
 import type { InsiderListSlug } from "./lists";
 import { Pill, type Tone } from "../kadera/parts";
 import { StockLogo } from "../StockLogo";
-import { C, Icon, MONO } from "../ui";
-import type { IconName } from "@/lib/icon-names";
-import { Empty as EmptyState, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty";
+import { C, MONO } from "../ui";
 
 /** 이 화면의 자. 서학개미(scale.ts)와 같은 네 단이다. */
 export const T = { big: "var(--fs-22)", lead: "var(--fs-15)", body: "var(--fs-12)", small: "var(--fs-11)" } as const;
@@ -40,22 +39,27 @@ export const T = { big: "var(--fs-22)", lead: "var(--fs-15)", body: "var(--fs-12
  * globals.css 의 '읽히는 잉크 램프'가 못박은 규칙이다 — **정보성 텍스트는 12px 이
  * 바닥이고 10~11px 은 차트 축 눈금뿐**이다. 보조줄을 11 로 쓰던 것이 그 규칙 위반이었다.
  *
- * ⭐ 크기 차이를 **또렷하게** 벌린다(13.5 / 13 / 12). 굵기는 둘(700 / 500)뿐이고,
+ * ⭐ 크기 차이를 **또렷하게** 벌린다(13.5 / 13 / 12). 굵기는 둘(600 / 500)뿐이고(700 은 v2 에서 내렸다, 2026-10-04),
  *   색도 잉크와 sub2 둘뿐이다.
  */
 export const ROW = {
   /** 주인공 — 종목 이름이나 사람 이름. */
-  lead: { fontSize: "var(--fs-13-5)", fontWeight: 700, color: C.ink } as const,
+  lead: { fontSize: "var(--fs-13-5)", fontWeight: 600, color: C.ink } as const,
   /** 값 — 숫자. 주인공과 같은 무게로 두어 눈이 좌우를 함께 짚는다. */
-  value: { fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 700, color: C.ink } as const,
+  value: { fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 600, color: C.ink } as const,
   /** 보조 — **한 종류뿐이다.** 여기에 또 단을 만들지 말 것. */
   sub: { fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 } as const,
 } as const;
 
+/**
+ * 'M/D' — 올해(KST)가 아니면 '25.12.18'처럼 연도 두 자리를 붙인다. 연도 없이 '12/18'이면 지난해 매매가 앞으로 올 날로 읽혔고,
+ * 매매일 순 목록이 '3/23 · 1/30 · 12/24 · 1/14'로 순서가 깨진 것처럼 보였다(2026-10-04 점검).
+ */
 export function fmtDate(iso: string | null): string {
   if (!iso) return "-";
-  const [, m, d] = iso.split("-");
-  return `${Number(m)}/${Number(d)}`;
+  const [y, m, d] = iso.split("-");
+  const thisYear = new Date(Date.now() + 9 * 3600e3).getUTCFullYear();
+  return Number(y) === thisYear ? `${Number(m)}/${Number(d)}` : `${y.slice(2)}.${Number(m)}.${Number(d)}`;
 }
 
 /**
@@ -102,14 +106,12 @@ export function insiderNote(kind: InsiderListSlug, ov: InsiderOverview): string 
       return upTo(ov.asOf, ov.windowDays);
     case "congress":
       return upTo(ov.congressAsOf, ov.congressWindowDays);
-    case "hot":
-      return `${fmtDate(ov.mentionDate)} 하루`;
     case "analyst":
-      return ov.analystAsOf ? `${fmtDate(ov.analystAsOf)} 기준` : "받은 날 기준";
+      // 날짜만 — 띠 열쇠가 이미 '기준'이라 '기준 10/4 기준'으로 두 번 섰다(2026-10-04 점검). 본 화면 머리 근거도 날짜면 읽힌다.
+      return ov.analystAsOf ? `${fmtDate(ov.analystAsOf)} 받음` : "받은 날";
     case "adds":
     case "trims":
     case "managers":
-    case "holders":
       return quarter;
   }
 }
@@ -131,15 +133,10 @@ export const CODE_LABEL: Record<string, { text: string }> = {
   F: { text: "세금 원천징수" },
   C: { text: "전환" },
   G: { text: "증여" },
-  J: { text: "그 밖" },
+  J: { text: "기타" },
 };
 
-/**
- * 변화를 "유지"로 접는 문턱(%). 13F 의 주식 수는 자잘하게 흔들린다 — 실측 2,616개
- * 보유 중 105개가 0 이 아니면서 0.5% 미만이었다(−0.072% 같은 값). 그대로 반올림하면
- * **"0% 줄임"** 이라는 없는 말이 나온다.
- */
-const HOLD_FLOOR = 0.5;
+// 변화를 "유지"로 접는 문턱(%)은 판정(lib/insider-13f.ts quarterShift)과 하나다 — 그대로 반올림하면 "0% 줄임"이라는 없는 말이 나온다.
 
 /**
  * 방향 배지의 색 — **국내 증시 관례**다. 사는 쪽이 빨강, 파는 쪽이 파랑, 그대로면 회색.
@@ -181,6 +178,17 @@ const MOVE_TONE = { buy: "hot", sell: "cold", hold: "plain" } as const satisfies
  * 여기 관례를 따른다. 이 규칙은 `MOVE_TONE` 에 모아 두었고 화면 전체가 그걸 쓴다 —
  * 한 자리만 고치면 같은 뜻이 화면마다 다른 색으로 뜬다.
  */
+/**
+ * 분기 움직임의 갈래 — 줄 글자(moveBadge)와 **같은 잣대**로 센다. 주식 수가 HOLD_FLOOR 미만으로 바뀐 곳은 '유지'다.
+ * ⚠️ 원천의 move 로 세면 표에는 '유지'로 적힌 줄이 '늘림 7'에 섞였다(버핏 2026 Q2, 2026-10-04). 개수를 내는 곳은 이 함수를 쓴다.
+ */
+export function moveKind(move: "new" | "add" | "trim" | "hold" | null, sharesChange: number | null): "new" | "add" | "trim" | "hold" | null {
+  if (!move) return null;
+  if (move === "new") return "new";
+  if (sharesChange == null || Math.abs(sharesChange) < HOLD_FLOOR) return "hold";
+  return sharesChange < 0 ? "trim" : "add";
+}
+
 export function moveBadge(
   move: "new" | "add" | "trim" | "hold" | null,
   sharesChange: number | null,
@@ -196,56 +204,17 @@ export function moveBadge(
 }
 
 /**
- * 카드 묶음 앞에 붙는 **구간 이름**. 생김새는 공용 `SectionIntro` —
- * 시장 브리핑·카더라·MDD 의 같은 줄과 한 벌이다.
- *
- * ⭐ 하는 일은 이름 짓기가 아니라 **박자 만들기**다. 카드가 줄줄이 이어지면 어디까지가
- *   한 이야기인지 안 보인다.
- *
- * ⚠️ **묶음 크기(개수)는 안 적는다.** 여기는 한두 장짜리 구간이 많아 숫자가 뜻을 잃는다.
- *    `n` 은 개수가 아니라 **장 번호**다(01·02·03) — 몇 장짜리 글의 어디쯤인지를 말한다.
- * ⚠️ 장이 하나뿐인 화면(거물 상세)에서는 `n` 을 비운다 — "01" 만 혼자 있으면 다음 장이
- *    있다고 약속해 놓고 안 지키는 꼴이다.
- * ⚠️ 태그가 h2 인 것은 문서 구조다 — 페이지 h1 아래 구간 h2, 시트 제목이 h3 다.
- */
-export function GroupTitle({ n, children }: { n?: number; children: string }) {
-  return <SectionIntro n={n} title={children} />;
-}
-
-/**
- * "카더라 언급" 알약 — **회색이다.** 이 화면에서 색은 방향(사고 판 것)이 갖는다.
- *
- * ⚠️ 파랑이었는데 방향의 파랑(`cold`)과 라이트에서 **같은 값**이라(둘 다 `#e8f3fe`),
- *    한 줄에 나란히 서면 색으로 안 갈렸다 — 버핏 페이지 BAC 행이 "6% 줄임"과
- *    "카더라 언급" 둘 다 파랑이었다. 색은 방향에만 남기고 이 표시는 회색으로 내렸다.
- *
- * ⚠️ 여섯 자리가 이 알약을 쓴다. 자리마다 `<Pill>` 을 손으로 적으면 한 곳을 고칠 때
- *    나머지가 남는다 — 실제로 툴팁이 두 자리에만 붙어 있었다.
- *
- * ⚠️ **하루치다.** `ourTickers` 가 `telegram_us_stock_daily` 를 `.eq("date", mentionDate)`
- *    로 하루만 읽는다. 툴팁이 "최근 언급된 적이 있는" 이었는데 그건 쌓인 기간으로 읽혀서
- *    실물보다 넓었다 — 8/25 하루가 107종목인데 최근 7일이면 160종목이라, 기간으로
- *    읽으면 53종목이 빠져 보인다(2026-08-25 실측). 하루로 두기로 하고 문구를 좁혔다.
- */
-export function KaderaPill() {
-  return (
-    <Pill tone="plain" title="오늘 주식 텔레그램에서 언급된 종목입니다">
-      카더라 언급
-    </Pill>
-  );
-}
-
-/**
  * 한 종목의 코드 묶음을 한 줄로 편다 — "세금 원천징수 9 · 장내 매도 2".
  *
  * ⚠️ 종류가 서넛까지 가는데(루멘텀이 F·A·S 셋) 다 적으면 줄이 넘친다. 많은 순으로
- * 둘만 적고 나머지는 "외 N종"으로 접는다.
+ * 둘만 적고 나머지는 "등"으로 접는다.
  */
 export function codeSummary(codes: { code: string; n: number }[]): string {
   // ⚠️ 단위를 붙인다. "장내 매도 165" 는 165가 건수인지 금액인지 주식 수인지 안 말한다 —
   //    바로 옆 칸이 금액이라 특히 헷갈렸다.
   const head = codes.slice(0, 2).map((c) => `${CODE_LABEL[c.code]?.text ?? c.code} ${c.n}건`);
-  return head.join(" · ") + (codes.length > 2 ? ` 외 ${codes.length - 2}종` : "");
+  // 셋째부터는 '등'으로 접는다 — '외 2종'은 무엇이 두 종류인지 되짚게 했다(2026-10-04).
+  return head.join(" · ") + (codes.length > 2 ? " 등" : "");
 }
 
 export function money(v: number | null): string {
@@ -322,8 +291,8 @@ export function Quote({
       <span
         style={{
           fontFamily: MONO,
-          fontSize: large ? 22 : 12,
-          fontWeight: 800,
+          fontSize: large ? 22 : 13,
+          fontWeight: large ? 700 : 600,
           color: C.ink,
           letterSpacing: large ? "-.02em" : undefined,
           whiteSpace: "nowrap",
@@ -342,13 +311,14 @@ export function Quote({
         <span
           style={{
             fontFamily: MONO,
-            fontSize: large ? 13 : 11,
-            fontWeight: 700,
+            fontSize: large ? 13 : 12,
+            fontWeight: 600,
             whiteSpace: "nowrap",
             color: change > 0 ? "var(--c-hot-ink)" : change < 0 ? "var(--c-cold-ink)" : C.sub2,
           }}
         >
-          {change > 0 ? "▲" : change < 0 ? "▼" : ""}
+          {/* v2(2026-10-03) — 부호는 +/-(다른 화면과 같다). ▲▼ 는 걷었다. */}
+          {change > 0 ? "+" : change < 0 ? "-" : ""}
           {Math.abs(change).toFixed(2)}%
         </span>
       )}
@@ -452,42 +422,6 @@ export function Row({ left, right }: { left: React.ReactNode; right: React.React
   );
 }
 
-/**
- * 거물이 분기 사이에 움직인 종목 한 줄.
- *
- * ⚠️ 오른쪽 숫자는 **금액이 아니라 사람 수**다. 13F 금액은 주가가 움직여도 변해서,
- * 한 주도 안 사고 늘어난 것처럼 보인다(그래서 판정 자체를 주식 수로 한다). 사람 수는
- * 그런 오염이 없고, 옆 블록('거물이 들고 있는 종목')과 눈금이 같아 견주기도 쉽다.
- */
-export function MoveRow({ m, kind }: { m: ManagerMove; kind: "add" | "trim" }) {
-  const markLabel = kind === "add" ? "신규" : "청산";
-  return (
-    <Row
-      left={
-        <StockCell
-          ticker={m.ticker}
-          name={m.name}
-          sub={`${m.names.slice(0, 2).join(" · ")}${m.names.length > 2 ? ` 외 ${m.names.length - 2}명` : ""}`}
-          badge={m.inKadera ? <KaderaPill /> : undefined}
-        />
-      }
-      right={
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {m.mark > 0 && (
-            <Pill tone={kind === "add" ? MOVE_TONE.buy : MOVE_TONE.sell} title={`반대로 움직인 곳 ${m.against}명`}>
-              {markLabel} {m.mark}
-            </Pill>
-          )}
-          <span style={{ ...ROW.value, whiteSpace: "nowrap" }}>
-            {m.movers}
-            <span style={{ ...ROW.sub, fontWeight: 600 }}>명</span>
-          </span>
-        </span>
-      }
-    />
-  );
-}
-
 export function Empty({ children }: { children: React.ReactNode }) {
   return (
     <p style={{ margin: 0, padding: "20px 22px", fontSize: T.body, color: C.sub, lineHeight: 1.75 }}>{children}</p>
@@ -495,295 +429,48 @@ export function Empty({ children }: { children: React.ReactNode }) {
 }
 
 /* ── 줄 만들기 ──────────────────────────────────────────────────────
-   메인 화면은 다섯 줄, 전체보기는 전부 — **같은 함수가 만든다.** 전체보기는
-   "이 카드의 나머지"라, 줄의 생김새가 갈리면 다른 자료로 읽힌다. */
-
-export function execRows(rows: InsiderActivity[], rate: number | null) {
-  return rows.map((b) => (
-    <li key={b.ticker}>
-      <Row
-        left={
-          <StockCell
-            ticker={b.ticker}
-            name={b.name}
-            // ⚠️ 날짜는 여기서 뺐다 — 오른쪽 금액 아래로 갔다. 종목 이름 밑에 사실이 넷이면
-            //    (사람 수 · 코드 둘 · 날짜) 줄이 나열이 되고, 정작 "무슨 거래였나"가 안 보인다.
-            // ⭐ "임원"을 붙인다. 그냥 "5명"이면 무엇의 5명인지 이 줄만 봐서는 모른다.
-            sub={`임원 ${b.people}명 · ${codeSummary(b.codes)}`}
-            // ⭐ 장내 매수는 드물어서(신고의 1%) 배지로 세우지 않으면 목록에
-            //    묻힌다. 이 카드에서 가장 뜻이 있는 사건이다.
-            badge={b.buyCount > 0 ? <Pill tone={MOVE_TONE.buy}>장내 매수 {b.buyCount}</Pill> : undefined}
-          />
-        }
-        right={
-          <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
-            <span style={{ ...ROW.value, whiteSpace: "nowrap" }}>
-              <Money usd={b.value} rate={rate} />
-            </span>
-            {/* ⚠️ 여기 "내놓은 금액"이라 적어 두었다가 2026-08-22 에 날짜로 바꿨다.
-                취득이냐 처분이냐는 **왼쪽 코드 요약이 이미 말한다** — "장내 매도 165건 ·
-                전환 7건" 은 이 금액이 무엇인지 라벨보다 정확히 말한다. 전체보기 물음표가
-                규칙(처분 합계, 장내 매수가 더 크면 매수 합계 — InsiderActivity.value)을 적는다. */}
-            <span style={{ ...ROW.sub, whiteSpace: "nowrap" }}>{fmtDate(b.filedDate)} 접수</span>
-          </span>
-        }
-      />
-    </li>
-  ));
-}
-
-export function congressRows(rows: CongressTicker[]) {
-  return rows.map((c) => (
-    <li key={c.ticker}>
-      <Row
-        left={
-          <StockCell
-            ticker={c.ticker}
-            name={c.name}
-            // ⚠️ 날짜는 여기서 뺐다 — 오른쪽 건수 아래로 갔다(임원 카드와 같은 꼴).
-            //    종목 이름 밑은 **누가**만 갖는다. 몇 건인지·언제인지는 오른쪽이 말한다.
-            sub={`의원 ${c.memberNames[0] ?? "이름 없음"}${c.members > 1 ? ` 외 ${c.members - 1}명` : ""}`}
-            badge={c.inKadera ? <KaderaPill /> : undefined}
-          />
-        }
-        right={
-          <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
-            <span style={{ display: "flex", alignItems: "baseline", gap: 8, whiteSpace: "nowrap" }}>
-              {/* ⚠️ 색은 국내 증시 관례다 — 사는 쪽 빨강, 파는 쪽 파랑.
-                  ⚠️⚠️ **원색이 아니라 잉크 토큰을 쓴다.** 흰 카드 위 실측으로 원색은
-                  `--c-hot` 3.91 · `--c-blue` 3.71 이라 AA(4.5)에 못 미친다. 잉크는
-                  5.44 · 5.23 으로 넘는다. 알약(Pill)이 이미 같은 이유로 잉크를 쓴다. */}
-              {c.buys > 0 && <span style={{ ...ROW.value, color: "var(--c-hot-ink)" }}>매수 {c.buys}</span>}
-              {c.sells > 0 && <span style={{ ...ROW.value, color: "var(--c-cold-ink)" }}>매도 {c.sells}</span>}
-            </span>
-            <span style={{ ...ROW.sub, whiteSpace: "nowrap" }}>{fmtDate(c.latest)} 매매</span>
-          </span>
-        }
-      />
-    </li>
-  ));
-}
-
-export function addRows(rows: ManagerMove[]) {
-  return rows.map((m) => (
-    <li key={m.ticker}>
-      <MoveRow m={m} kind="add" />
-    </li>
-  ));
-}
-
-export function trimRows(rows: ManagerMove[]) {
-  return rows.map((m) => (
-    <li key={m.ticker}>
-      <MoveRow m={m} kind="trim" />
-    </li>
-  ));
-}
-
-export function hotRowsView(rows: InsiderRow[], rate: number | null) {
-  return rows.map((r) => (
-    <li key={r.ticker}>
-      <Row
-        left={
-          <StockCell
-            ticker={r.ticker}
-            name={r.name}
-            sub={
-              r.txns > 0
-                ? `언급 ${r.mentions}회 · 채널 ${r.channels}곳 · 임원 신고 ${r.txns}건`
-                : `언급 ${r.mentions}회 · 채널 ${r.channels}곳 · 임원 신고 없음`
-            }
-            badge={r.buys > 0 ? <Pill tone={MOVE_TONE.buy}>장내 매수 {r.buys}</Pill> : undefined}
-          />
-        }
-        right={<Quote price={r.price} change={r.changeRate} rate={rate} />}
-      />
-    </li>
-  ));
-}
-
-export function holderRowsView(rows: InsiderRow[], managers: number) {
-  return rows.map((r) => (
-    <li key={r.ticker}>
-      <Row
-        left={
-          <StockCell
-            ticker={r.ticker}
-            name={r.name}
-            sub={`${r.holderNames.slice(0, 2).join(" · ")}${r.holders > 2 ? ` 외 ${r.holders - 2}명` : ""}`}
-          />
-        }
-        right={
-          <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span className="hz-bar" style={{ width: 64, height: 7 }}>
-              <span style={{ width: `${Math.max(6, (r.holders / Math.max(1, managers)) * 100)}%` }} />
-            </span>
-            <span style={{ ...ROW.value, whiteSpace: "nowrap" }}>
-              {r.holders}
-              <span style={{ ...ROW.sub, fontWeight: 600 }}>/{managers}</span>
-            </span>
-          </span>
-        }
-      />
-    </li>
-  ));
-}
+   전체보기 · 종목 · 투자자 화면의 줄이다. 메인 화면(v2)은 한 줄 · 네 칸 줄을 따로 쓴다(V2Rows.tsx, 2026-10-03 "너무 복잡하다") —
+   메인의 다섯 줄은 '그 표가 고른 까닭' 하나만 남긴 요약이고, 누가 · 어떤 코드로는 여기 줄이 자세히 말한다. */
 
 /**
- * 거물 한 명의 왼쪽 칸 — 이름과 소속. 통째로 그 사람의 상세로 가는 링크다.
+ * 차트 마커의 축. 배지 필터와 CSS 클래스와 마커 모양이 이 표 하나를 공유한다.
  *
- * ⚠️ 종목 줄(StockCell)과 달리 로고가 없다. 사람에는 붙일 그림이 없고, 빈 자리를
- *    이니셜 원으로 채웠더니 63줄이 알록달록한 밭이 됐다.
- */
-function PersonCell({ cik, person, sub }: { cik: number; person: string; sub: string }) {
-  return (
-    <Link
-      href={`/insider/investor/${cik}`}
-      style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0, textDecoration: "none" }}
-    >
-      <strong className="hz-cellsub" style={{ ...ROW.lead }}>
-        {person}
-      </strong>
-      <SubLine text={sub} />
-    </Link>
-  );
-}
-
-/**
- * '거물 명단과 증권가 시선' 짝의 **줄 안쪽 높이**(px).
- *
- * ⚠️⚠️ 두 카드가 나란히 서므로 줄 높이가 다르면 **구분선이 어긋난다.** 실측(2026-08-23)
- *      으로 거물 줄 40 · 증권가 줄 46 이라 넷째 줄에서 25px 벌어져 있었다. 큰 쪽에 맞춘다 —
- *      증권가 줄이 "숫자 + 알약" 두 층이라 46 이고, 거물 줄은 글자 두 층이라 40 이다.
- * ⚠️ 알약 크기나 글자 단을 바꾸면 **다시 재서 고칠 것.** 줄 높이는 그 줄에서 가장 큰
- *    것이 정하므로, 한쪽만 키우면 이 값이 조용히 거짓이 된다.
- */
-const PAIR_ROW_H = 46;
-
-/**
- * 거물 명단 — **신고 합계 큰 순.**
- *
- * ⚠️ 순위 숫자를 안 붙인다. 한때 "29종목 중 1위"처럼 등수를 적었다가 뺐다 — 줄이 이미
- *    큰 순이라 등수는 같은 말을 두 번 하는 것이고, 자리만 먹는다.
- */
-export function managerAumRows(rows: ManagerRank[], rate: number | null) {
-  return rows.map((m) => (
-    <li key={m.cik}>
-      <Row
-        left={
-          <PersonCell
-            cik={m.cik}
-            person={m.person}
-            /* ⭐ 기관 이름만 적던 자리다. 옆 카드들이 전부 "이름 + 뒷받침하는 사실"인데
-               여기만 이름 둘이라 줄이 비어 보였다. 가장 크게 담은 한 종목을 붙인다.
-               ⚠️⚠️ 문구를 두 번 고쳤다. **"최대 애플"** 은 무엇이 최대인지 안 읽혔고,
-                  **"애플에 22%"** 는 22% 의 분모가 안 적혀 있었다. 지금 꼴은 셋을 한 줄에
-                  담는다 — 무엇을 재는지(비중) · 어느 종목인지 · 얼마인지.
-               ⚠️ `비중` 은 이 저장소가 인물 상세의 열 이름("포트폴리오 비중")으로 이미
-                  쓰는 말이다. 두 화면이 같은 뜻으로 같은 낱말을 써야 한다. */
-            sub={
-              m.topTicker
-                ? `${m.firm} · 최대 비중 ${m.topName || m.topTicker} ${Math.round(m.topWeight)}%`
-                : m.firm
-            }
-          />
-        }
-        right={
-          <span
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              justifyContent: "center",
-              gap: 1,
-              minHeight: PAIR_ROW_H,
-            }}
-          >
-            <span style={{ ...ROW.value, whiteSpace: "nowrap" }}>
-              <Money usd={m.aum} rate={rate} />
-            </span>
-            <span style={{ ...ROW.sub, whiteSpace: "nowrap" }}>{m.holdings}종목</span>
-          </span>
-        }
-      />
-    </li>
-  ));
-}
-
-/**
- * 증권가가 긍정적으로 보는 종목.
- *
- * ## ⛔ 숫자를 손대지 않는다
- *
- * 오른쪽에 적는 건 원천이 준 두 수(`62명 중 49명`)를 **그대로** 옮긴 것이다. 비율은
- * 줄 세우는 데만 쓰고 숫자로 내지 않는다 — 약관이 "수정 없이" 를 요구한다.
- * 막대는 그 두 수의 관계를 눈에 보이게 하는 것이라 **절대 눈금**이다(1위를 가득 채우면
- * 옆 숫자와 다른 말을 하게 된다).
- *
- * ⚠️ **우리 판정이 아니다.** 카드 제목이 "증권가가" 로 시작해야 누가 그렇게 보는지가
- *    먼저 읽힌다. 출처는 카드 툴팁이 밝힌다.
- */
-export function analystTopRows(rows: AnalystTop[]) {
-  return rows.map((a) => {
-    const share = a.analystCount > 0 ? (a.strongBuy / a.analystCount) * 100 : 0;
-    return (
-      <li key={a.ticker}>
-        <Row
-          left={<StockCell ticker={a.ticker} name={a.name} sub="" />}
-          right={
-            /* ⚠️ 알약은 **회색(plain)** 이다. 빨강으로 두면 우리가 미는 것처럼 읽힌다 —
-                 남의 등급을 옮긴 것이라 온도를 얹으면 안 된다.
-               ⚠️ 자리를 두 번 옮겼다. 티커 옆 첫 줄(badge)에 뒀더니 폰에서 회사 이름을
-                 밀어냈고("PWR 콴.."), 왼쪽 둘째 줄로 내렸다가 **숫자 아래**로 왔다.
-                 여기가 맞는 자리인 이유는 알약이 옆 숫자를 설명하는 말이기 때문이다 —
-                 "16명 중 14명"이 무슨 등급으로 묶였는지가 바로 아래 붙는다. */
-            <span
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-end",
-                justifyContent: "center",
-                gap: 4,
-                minHeight: PAIR_ROW_H,
-              }}
-            >
-              <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span className="hz-bar" style={{ width: 72, height: 7 }}>
-                  <span style={{ width: `${Math.max(1.5, Math.min(100, share))}%` }} />
-                </span>
-                <span style={{ ...ROW.value, whiteSpace: "nowrap" }}>
-                  {a.analystCount}명 중 {a.strongBuy}명
-                </span>
-              </span>
-              <Pill>{CONSENSUS_KO[a.consensus ?? ""] ?? a.consensus ?? "-"}</Pill>
-            </span>
-          }
-        />
-      </li>
-    );
-  });
-}
-
-/**
- * 차트 마커의 축. 배지 필터와 CSS 클래스와 마커 색이 이 표 하나를 공유한다.
- *
- * ## ⭐ 색은 **축**을, 채움은 **방향**을 말한다
+ * ## 내력
  *
  * 처음엔 색을 방향(매수 파랑 / 매도 회색)에 쓰고 축은 크기로 갈랐다. 크기 차이(2.6·3.4·4)는
- * 실제 화면에서 안 읽혔다. 색을 축에 주고 방향을 채움으로 옮기면 둘 다 또렷해진다.
+ * 실제 화면에서 안 읽혔다. 그다음 색을 축(임원 파랑 · 거물 잉크 · 의원 빨강)에 주고 방향을 채움으로 옮겼는데,
+ * 의원이 판 점이 빨강이라 같은 화면 줄 글자의 빨강(매수)과 반대로 읽혔다(2026-10-05 점검).
  *
  * ## ⚠️ 새 색을 만들지 않는다
  *
- * 이 저장소는 **2색 체계**다(파랑·빨강. 전역이라 카더라·MDD 도 같이 움직인다). 세 번째
- * 색조를 들이면 그 체계가 깨진다. 그래서 파랑·잉크·빨강 셋으로 가른다 — 전부 있는
- * 토큰이고 다크에서도 짝이 정의돼 있다.
+ * 이 저장소는 **2색 체계**다(파랑·빨강. 전역이라 카더라·MDD 도 같이 움직인다). 세 번째 색조를 들이지 않고
+ * 갈래는 모양으로 가른다.
  */
+/* ⭐ 2026-10-05 — 색은 **방향**(매수 빨강 채움 · 매도 파랑 고리), 사람 갈래는 **모양**(임원 원 · 거물 네모 · 의원 마름모)으로 바꿨다.
+   색이 갈래였을 땐 의원이 판 점(빨강 고리)이 같은 화면 줄 글자의 빨강(매수)과 반대로 읽혔다. 2색 체계는 그대로다. */
 export const MARK_GROUPS = [
-  { key: "all", label: "전체", color: null },
-  { key: "insider", label: "임원", color: "var(--c-blue)" },
-  { key: "manager", label: "거물", color: "var(--c-ink)" },
-  { key: "congress", label: "의원", color: "var(--c-hot)" },
+  { key: "all", label: "전체", shape: null },
+  { key: "insider", label: "임원", shape: "circle" },
+  { key: "manager", label: "거물", shape: "square" },
+  { key: "congress", label: "의원", shape: "diamond" },
 ] as const;
+
+/** 방향 색 — 매수 빨강 · 매도 파랑(이 화면 줄 글자와 같은 뜻). */
+const SIDE_COLOR = { buy: "var(--c-hot)", sell: "var(--c-blue)" } as const;
+
+/** 갈래 모양 하나 — 가운데(cx, cy) · 반지름 r. 원 · 네모 · 마름모(넓이가 비슷하게 네모는 조금 작게). */
+function MarkShape({ shape, cx, cy, r, ...rest }: { shape: "circle" | "square" | "diamond"; cx: number; cy: number; r: number } & React.SVGProps<SVGElement>) {
+  if (shape === "square") {
+    const h = r * 0.88;
+    return <rect x={cx - h} y={cy - h} width={h * 2} height={h * 2} {...(rest as React.SVGProps<SVGRectElement>)} />;
+  }
+  if (shape === "diamond") {
+    const d = r * 1.22;
+    return <polygon points={`${cx},${cy - d} ${cx + d},${cy} ${cx},${cy + d} ${cx - d},${cy}`} {...(rest as React.SVGProps<SVGPolygonElement>)} />;
+  }
+  return <circle cx={cx} cy={cy} r={r} {...(rest as React.SVGProps<SVGCircleElement>)} />;
+}
+const SHAPE_OF = { insider: "circle", manager: "square", congress: "diamond" } as const;
 
 /**
  * 마커 반지름. **하나뿐이다.**
@@ -794,11 +481,6 @@ export const MARK_GROUPS = [
  */
 const MARK_R = 3.6;
 
-const MARK_COLOR: Record<string, string> = {
-  insider: "var(--c-blue)",
-  manager: "var(--c-ink)",
-  congress: "var(--c-hot)",
-};
 
 export type ChartMark = {
   date: string;
@@ -811,6 +493,16 @@ export type ChartMark = {
   low: number | null;
   high: number | null;
 };
+
+/** 차트가 실제로 그리는 표식 자리 수(같은 봉에 선 것은 한 자리) — 머리의 '매매 시점 N개'가 이 수라야 점을 세어 맞는다(2026-10-05 점검). */
+export function markSpotCount(bars: { date: string }[], marks: { date: string }[]): number {
+  const spots = new Set<number>();
+  for (const m of marks) {
+    const i = bars.findIndex((b) => b.date >= m.date);
+    if (i >= 0) spots.add(i);
+  }
+  return spots.size;
+}
 
 /**
  * 주가 선 + **매매 시점 표시** + 축 + 호버.
@@ -864,11 +556,13 @@ export function PriceChart({
   const line = bars.map((b, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(b.close).toFixed(1)}`).join(" ");
   const area = `${line} L${W},${H - PAD_B} L${PAD_L},${H - PAD_B} Z`;
 
-  // 가로축 — 달이 바뀌는 지점. 일봉 반년이면 6~7개라 겹치지 않는다.
+  // 가로축 — 달이 바뀌는 지점. 일봉 반년이면 6~7개라 겹치지 않는다. 해가 바뀌는 1월은 '26년'으로 — 2년 차트에 같은 달 이름이
+  // 두 번 나와 어느 해인지 몰랐다(2026-10-04 점검).
   const monthTicks: { x: number; label: string }[] = [];
   for (let i = 1; i < n; i++) {
     if (bars[i].date.slice(5, 7) !== bars[i - 1].date.slice(5, 7)) {
-      monthTicks.push({ x: x(i), label: `${Number(bars[i].date.slice(5, 7))}월` });
+      const mm = Number(bars[i].date.slice(5, 7));
+      monthTicks.push({ x: x(i), label: mm === 1 ? `${bars[i].date.slice(2, 4)}년` : `${mm}월` });
     }
   }
   // 세로축 — 위·가운데·아래 셋. 더 넣으면 반년짜리 작은 차트에서 시끄럽다. 격자는 그 사이까지 다섯 줄로 옅게.
@@ -894,28 +588,31 @@ export function PriceChart({
    *    (반지름을 키워 겹쳐 담아 봤다가 크기가 제각각이 되어 되돌렸다.)
    */
   const WHO_ORDER = ["insider", "congress", "manager"] as const;
+  /** 물량은 방향마다 따로 — 같은 날 산 주식 수와 판 주식 수(의원은 구간)를 더하면 아무 뜻이 없다(2026-10-04 점검). */
+  type Qty = { shares: number | null; low: number | null; high: number | null };
   type Slot = {
     i: number;
     who: ChartMark["who"];
     buy: number;
     sell: number;
     names: string[];
-    shares: number | null;
-    low: number | null;
-    high: number | null;
+    buyQty: Qty;
+    sellQty: Qty;
   };
   const slotOf = new Map<string, Slot>();
   for (const m of marks) {
     const i = nearest(m.date);
     if (i < 0) continue;
     const key = `${i}|${m.who}`;
-    const s = slotOf.get(key) ?? { i, who: m.who, buy: 0, sell: 0, names: [], shares: null, low: null, high: null };
+    const blank = (): Qty => ({ shares: null, low: null, high: null });
+    const s = slotOf.get(key) ?? { i, who: m.who, buy: 0, sell: 0, names: [], buyQty: blank(), sellQty: blank() };
     if (m.side === "buy") s.buy += m.count;
     else s.sell += m.count;
     for (const nm of m.names) if (!s.names.includes(nm)) s.names.push(nm);
-    if (m.shares != null) s.shares = (s.shares ?? 0) + m.shares;
-    if (m.low != null) s.low = (s.low ?? 0) + m.low;
-    if (m.high != null) s.high = (s.high ?? 0) + m.high;
+    const q = m.side === "buy" ? s.buyQty : s.sellQty;
+    if (m.shares != null) q.shares = (q.shares ?? 0) + m.shares;
+    if (m.low != null) q.low = (q.low ?? 0) + m.low;
+    if (m.high != null) q.high = (q.high ?? 0) + m.high;
     slotOf.set(key, s);
   }
   const perIndex = new Map<number, Slot[]>();
@@ -923,6 +620,11 @@ export function PriceChart({
   // 축 순서를 못박아 둔다 — 같은 점에 겹치면 늘 같은 것이 위에 온다(그림이 안 흔들린다).
   for (const list of perIndex.values()) list.sort((a, b) => WHO_ORDER.indexOf(a.who) - WHO_ORDER.indexOf(b.who));
   const drawn = [...perIndex.values()].flat();
+  // ⭐ 겹친 표식 — 나중에 그려 위에 선 것(앞)을 흐리게 해 아래 것이 비쳐 보이게 한다(2026-10-05 운영자 판단 "겹쳐 있다는 걸 표현").
+  //    같은 봉의 다른 축(완전히 같은 자리)과 가까운 날끼리 반쯤 겹친 것 둘 다다. 문턱은 두 모양이 맞닿는 거리(반지름 둘 남짓 —
+  //    마름모 · 네모 모서리가 원보다 1.2배 나간다). 흐리는 건 '전체'를 볼 때만(sheets.css) — 한 축만 고르면 나머지가 흐려져 겹침이 없다.
+  const ctr = drawn.map((s) => [x(s.i), y(bars[s.i].close)] as const);
+  const over = drawn.map((_, k) => ctr.slice(0, k).some(([px, py]) => Math.hypot(px - ctr[k][0], py - ctr[k][1]) < MARK_R * 2.2));
 
   /**
    * 호버에 뜰 한 줄 — **누가 · 언제 · 얼마나.**
@@ -931,21 +633,25 @@ export function PriceChart({
    *    (13F 는 분기말 보유의 차이라 매매 물량이 아니다). 없는 축에 숫자를 지어내지 말 것.
    */
   const tipOf = (s: Slot) => {
-    // 거물은 신고 "건"이 아니라 운용사 수다 — 한 곳이 한 번 신고한다.
-    const unit = s.who === "manager" ? "곳" : "건";
-    const acts = [s.buy ? `매수 ${s.buy}${unit}` : "", s.sell ? `매도 ${s.sell}${unit}` : ""].filter(Boolean).join(" · ");
-    const qty =
-      s.shares != null
-        ? `${Math.round(s.shares).toLocaleString("ko-KR")}주`
-        : s.low != null && s.high != null
-          ? `${money(s.low)}~${money(s.high)}`
-          : "";
+    // 거물은 신고 "건"이 아니라 거물 수다 — 한 사람이 한 번 신고한다. '명'으로 센다(본 화면 · 상세와 같은 단위, 2026-10-04).
+    // 거물 축은 13F 두 분기의 차이라 상세 둘째 줄과 같은 말(늘림 · 줄임 · 정리)로 — 매수 · 매도라 부르면 다른 숫자로 읽혔다.
+    const unit = s.who === "manager" ? "명" : "건";
+    const [buyWord, sellWord] = s.who === "manager" ? ["늘림", "줄임 · 정리"] : ["매수", "매도"];
+    const qtyOf = (q: Qty) =>
+      q.shares != null ? `${Math.round(q.shares).toLocaleString("ko-KR")}주` : q.low != null && q.high != null ? `${money(q.low)}~${money(q.high)}` : "";
+    // 방향마다 '매수 1건 $1K~$15K'처럼 물량을 붙인다.
+    const acts = [
+      s.buy ? [`${buyWord} ${s.buy}${unit}`, qtyOf(s.buyQty)].filter(Boolean).join(" ") : "",
+      s.sell ? [`${sellWord} ${s.sell}${unit}`, qtyOf(s.sellQty)].filter(Boolean).join(" ") : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
     const who = s.names.length
       ? `${s.names.slice(0, 2).join(", ")}${s.names.length > 2 ? ` 외 ${s.names.length - 2}명` : ""}`
       : "";
     // ⚠️ 날짜는 여기서 안 붙인다. 한 자리에 축이 여럿이면 말풍선에 날짜가 두 번 나온다 —
     //    날짜는 손닿는 자리가 **한 번만** 앞에 적는다.
-    return [`${whoLabel[s.who]} ${acts}`, qty, who, s.who === "manager" ? "분기말 기준" : ""]
+    return [`${whoLabel[s.who]} ${acts}`, who, s.who === "manager" ? "분기말 기준" : ""]
       .filter(Boolean)
       .join(" · ");
   };
@@ -992,18 +698,20 @@ export function PriceChart({
           vectorEffect="non-scaling-stroke"
           pointerEvents="none"
         />
-        {drawn.map((s) => {
+        {drawn.map((s, k) => {
           // ⭐ **선 위에 정확히 얹는다.** 예전엔 매수를 7 위로, 매도를 7 아래로 띄웠는데
           //    선이 가파른 자리에서 점이 선과 떨어져 보였다. 방향은 자리가 아니라
           //    **채움**이 말한다 — 채운 점이 매수, 빈 고리가 매도.
           // ⛔ 반지름을 자리마다 바꾸지 말 것. 겹친 마커를 겹쳐 담으려고 크기를 키웠더니
           //    "동그라미 크기가 왜 다르냐"가 됐다 — 크기는 이 화면에서 아무 뜻도 없다.
-          const color = MARK_COLOR[s.who];
+          // 색은 방향(그날 많은 쪽), 모양은 갈래.
           const buyish = s.buy >= s.sell;
+          const color = buyish ? SIDE_COLOR.buy : SIDE_COLOR.sell;
           return (
-            <circle
+            <MarkShape
               key={`${s.i}-${s.who}`}
-              className={`hz-mk hz-mk-${s.who}`}
+              shape={SHAPE_OF[s.who]}
+              className={`hz-mk hz-mk-${s.who}${over[k] ? " is-over" : ""}`}
               cx={x(s.i)}
               cy={y(bars[s.i].close)}
               r={MARK_R}
@@ -1033,7 +741,8 @@ export function PriceChart({
             <div
               key={b.date}
               className={`hz-tip hz-vline${edge}`}
-              data-tip={`${b.date} · $${b.close.toLocaleString("en-US", { maximumFractionDigits: 2 })}${won}`}
+              // 날짜 꼴은 표식 말풍선과 같은 fmtDate · 값은 소수 둘째 자리(2026-10-05 점검).
+              data-tip={`${fmtDate(b.date)} · $${b.close.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${won}`}
               // 선·호버 점을 칸 가운데가 아니라 실제 점 자리(칸 폭의 i/(n−1))에 세운다(app/home/parts.tsx AreaChart 와 같은 셈).
               style={{ flex: 1, position: "relative", ["--hz-x" as string]: `${at2 * 100}%` }}
             >
@@ -1081,18 +790,22 @@ export function PriceChart({
               width: `${wPct}%`,
               aspectRatio: "1",
               // 겹쳐 있으면 맨 위 마커의 색으로 불을 켠다.
-              ["--mk" as string]: MARK_COLOR[list[list.length - 1].who],
+              ["--mk" as string]: list[list.length - 1].buy >= list[list.length - 1].sell ? SIDE_COLOR.buy : SIDE_COLOR.sell,
             }}
           />
         );
       })}
     </div>
       <div className="hz-chart-x" aria-hidden>
-        {monthTicks.map((t, k) => (
-          <span key={k} data-minor={k % 2 === 1 ? "" : undefined} style={{ left: `${(t.x / W) * 100}%` }}>
-            {t.label}
-          </span>
-        ))}
+        {monthTicks.map((t, k) => {
+          const at = (t.x / W) * 100;
+          return (
+            // 양 끝 글자는 가운데 맞춤이면 반쯤 판 밖으로 나가 모듈 테두리에 잘렸다('10월' 4px, 2026-10-04) — 끝 쪽으로 붙인다.
+            <span key={k} data-minor={k % 2 === 1 ? "" : undefined} data-edge={at > 96 ? "end" : at < 4 ? "start" : undefined} style={{ left: `${at}%` }}>
+              {t.label}
+            </span>
+          );
+        })}
       </div>
     </div>
   );
@@ -1138,9 +851,10 @@ export function MarkBadges({ id }: { id: string }) {
     <span className="hz-mkfilter-set">
       {MARK_GROUPS.map((g) => (
         <label key={g.key} htmlFor={`${id}-${g.key}`} data-k={g.key}>
-          {g.color && (
-            <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
-              <circle cx="4" cy="4" r="3.2" fill={g.color} />
+          {/* 칩 점은 갈래 모양(잉크) — 색은 방향이라 갈래 칩엔 안 싣는다. */}
+          {g.shape && (
+            <svg width="9" height="9" viewBox="0 0 9 9" aria-hidden="true">
+              <MarkShape shape={g.shape} cx={4.5} cy={4.5} r={3.2} fill="var(--c-label)" />
             </svg>
           )}
           {g.label}
@@ -1150,133 +864,6 @@ export function MarkBadges({ id }: { id: string }) {
   );
 }
 
-/**
- * 차트 아래 한 줄. **축 색은 배지가 말하므로** 여기서는 채움의 뜻과 단서만 적는다.
- * 예전엔 축 색까지 여기 다 적어서 배지와 같은 말을 두 번 하고 있었다.
- */
-export function ChartLegend() {
-  const dot = (filled: boolean) => (
-    <svg width="11" height="11" viewBox="0 0 11 11" style={{ flexShrink: 0 }} aria-hidden="true">
-      <circle cx="5.5" cy="5.5" r="3.6" fill={filled ? C.sub : "var(--c-card)"} stroke={C.sub} strokeWidth="1.6" />
-    </svg>
-  );
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 14px", padding: "12px 22px 0" }}>
-      {[
-        { el: dot(true), text: "채운 점은 매수" },
-        { el: dot(false), text: "빈 고리는 매도" },
-      ].map((i) => (
-        <span key={i.text} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "var(--fs-11)", color: C.sub2 }}>
-          {i.el}
-          {i.text}
-        </span>
-      ))}
-      <span style={{ fontSize: "var(--fs-11)", color: C.sub2, lineHeight: 1.55, wordBreak: "keep-all" }}>
-        옵션 행사와 세금 원천징수는 매매가 아니라 찍지 않았습니다. 거물 표시는 13F에 매매일이 없어 분기말에 찍은
-        것이라, 그 분기 사이 어느 날인지는 공시에 없습니다.
-      </span>
-    </div>
-  );
-}
-
-/* ── 매수·매도로 가른 줄 ────────────────────────────────────────────
-   전체보기 페이지가 임원·의원을 두 카드로 나눠 쓴다. 메인 화면의 한 카드짜리 줄
-   (execRows·congressRows)과 **같은 꼴**을 유지한다 — 자리마다 생김새가 갈리면 같은
-   자료가 다른 자료로 읽힌다.
-
-   ⚠️ 한 종목이 양쪽 카드에 다 뜰 수 있다. 임원 여럿이 같은 종목을 사고팔았거나,
-      의원 하나가 같은 종목을 사고팔았으면 그게 사실이다. 감추지 않는다. */
-
-/** 임원이 **장내에서 산** 종목. 드물어서 이 카드가 곧 신호다. */
-export function execBuyRows(rows: InsiderActivity[], rate: number | null) {
-  return rows.map((b) => (
-    <li key={b.ticker}>
-      <Row
-        left={
-          <StockCell
-            ticker={b.ticker}
-            name={b.name}
-            sub={`${b.buyPeople}명 · 장내 매수 ${b.buyCount}건 · ${fmtDate(b.filedDate)} 접수`}
-          />
-        }
-        right={
-          <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
-            <span style={{ ...ROW.value, color: "var(--c-cold-ink)", whiteSpace: "nowrap" }}>
-              <Money usd={b.boughtValue} rate={rate} />
-            </span>
-            <span style={{ ...ROW.sub, whiteSpace: "nowrap" }}>장내에서 사들임</span>
-          </span>
-        }
-      />
-    </li>
-  ));
-}
-
-/** 임원이 **내놓은** 종목. 코드 요약을 함께 적어 장내 매도와 기계적 흐름을 가른다. */
-export function execSellRows(rows: InsiderActivity[], rate: number | null) {
-  return rows.map((b) => (
-    <li key={b.ticker}>
-      <Row
-        left={
-          <StockCell
-            ticker={b.ticker}
-            name={b.name}
-            sub={`${b.sellPeople}명 · ${codeSummary(b.codes)} · ${fmtDate(b.filedDate)} 접수`}
-          />
-        }
-        right={
-          <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
-            <span style={{ ...ROW.value, whiteSpace: "nowrap" }}>
-              <Money usd={b.disposedValue} rate={rate} />
-            </span>
-            <span style={{ ...ROW.sub, whiteSpace: "nowrap" }}>내놓은 금액</span>
-          </span>
-        }
-      />
-    </li>
-  ));
-}
-
-/** 의원 매수·매도. 이름은 **그 방향으로 움직인 사람만** 적는다. */
-function congressSideRows(rows: CongressTicker[], side: "buy" | "sell") {
-  return rows.map((c) => {
-    const names = side === "buy" ? c.buyMembers : c.sellMembers;
-    const n = side === "buy" ? c.buys : c.sells;
-    return (
-      <li key={c.ticker}>
-        <Row
-          left={
-            <StockCell
-              ticker={c.ticker}
-              name={c.name}
-              sub={`${names[0] ?? "이름 없음"}${names.length > 1 ? ` 외 ${names.length - 1}명` : ""} · ${fmtDate(c.latest)} 매매`}
-              badge={c.inKadera ? <KaderaPill /> : undefined}
-            />
-          }
-          right={
-            <span style={{ display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
-              <span
-                style={{
-                  fontFamily: MONO,
-                  fontSize: "var(--fs-12)",
-                  fontWeight: 800,
-                  color: side === "buy" ? "var(--c-cold-ink)" : C.ink,
-                }}
-              >
-                {n}
-                <span style={{ ...ROW.sub, fontWeight: 600 }}>건</span>
-              </span>
-              <span style={{ ...ROW.sub }}>{names.length}명</span>
-            </span>
-          }
-        />
-      </li>
-    );
-  });
-}
-
-export const congressBuyRows = (rows: CongressTicker[]) => congressSideRows(rows, "buy");
-export const congressSellRows = (rows: CongressTicker[]) => congressSideRows(rows, "sell");
 
 /* ── 전체보기의 **넓은 줄** ──────────────────────────────────────────
    ⚠️ 전체보기는 시트가 페이지 폭을 다 쓴다(1440px 에서 1,164). 메인 카드의 두 칸짜리
@@ -1306,32 +893,16 @@ export const congressSellRows = (rows: CongressTicker[]) => congressSideRows(row
  *
  * 더 알고 싶으면 종목·인물 상세로 간다. 목록은 **고르는 자리**이지 읽는 자리가 아니다.
  */
+/* 첫 칸은 고정 폭 — 비율(1.2fr)이면 이름 뒤 · 가운데 칸 뒤에 270~470px 가 비었다. 본 화면 줄처럼 이름 → 곁말 → 값(2026-10-05 점검).
+   가장 긴 'MSFT 마이크로소프트'가 약 220px. */
 export const WIDE_COLS = {
-  exec: "minmax(220px, 1.2fr) minmax(0, 1.9fr) 128px",
-  congress: "minmax(220px, 1.2fr) minmax(0, 1.9fr) 96px",
-  move: "minmax(220px, 1.2fr) minmax(0, 1.9fr) 96px",
-  hot: "minmax(220px, 1.2fr) minmax(0, 1.9fr) 128px",
-  holders: "minmax(220px, 1.2fr) minmax(0, 1.9fr) 128px",
+  exec: "240px minmax(0, 1fr) 128px",
+  congress: "240px minmax(0, 1fr) 96px",
+  move: "240px minmax(0, 1fr) 96px",
   /** 거물 명단. 사람이 주인공이라 첫 칸이 이름, 둘째가 대표 보유, 끝이 금액이다. */
-  managers: "minmax(200px, 1.1fr) minmax(0, 1.6fr) 92px 124px",
+  managers: "200px minmax(0, 1fr) 92px 124px",
   /** 증권가 순위. 끝 칸이 "62명 중 49명"이라 다른 표의 금액 칸보다 넓어야 한다. */
-  analyst: "minmax(220px, 1.2fr) minmax(0, 1.6fr) 132px",
-  /**
-   * 종목 상세의 "이 종목을 든 월가 거물". 사람이 주인공이라 첫 칸이 이름이다.
-   *
-   * ⚠️ 소속 칸을 **줄이고** 비중 칸을 키웠다. 1.6fr 을 주고 있었는데 운용사 이름은
-   *    길어야 96px 이라 실측 채움이 26% 였다 — 표 한복판이 통째로 비어 보인 자리다.
-   *    남는 폭은 막대가 받는다(막대는 길어질수록 말을 더 잘 한다).
-   */
-  stockHolders: "minmax(190px, 1fr) minmax(0, 0.8fr) minmax(180px, 1.4fr) 116px",
-  /**
-   * 인물 상세의 "보유 종목". 종목 상세의 거물 표와 **같은 문법**이다 — 주인공 · 한 줄
-   * 설명 · 비중 막대 · 금액. 두 화면이 같은 자료를 다른 각도로 보는 것이라, 줄의 생김새가
-   * 갈리면 독자가 다른 표로 읽는다.
-   */
-  managerHoldings: "minmax(190px, 1fr) minmax(0, 0.8fr) minmax(180px, 1.4fr) 116px",
-  /** 인물 상세의 "전량 정리". 설명 칸이 없어 셋이다. */
-  managerExited: "minmax(190px, 1fr) minmax(180px, 1.4fr) 116px",
+  analyst: "240px minmax(0, 1fr) 132px",
 } as const;
 
 export function WideHead({ cols, labels }: { cols: string; labels: (string | null)[] }) {
@@ -1364,7 +935,7 @@ const num = (v: React.ReactNode, muted?: string) => (
   <span style={{ ...ROW.value, textAlign: "right", whiteSpace: "nowrap" }}>
     {v}
     {/* 단위는 값보다 한 단 아래. 같은 크기로 두면 "9.4%" 가 두 덩이로 읽힌다. */}
-    {muted && <span style={{ ...ROW.sub, fontWeight: 600 }}>{muted}</span>}
+    {muted && <span style={{ ...ROW.sub }}>{muted}</span>}
   </span>
 );
 /**
@@ -1391,9 +962,10 @@ function WideStock({ ticker, name, badge }: { ticker: string; name: string; badg
     <Link
       href={`/insider/stock/${encodeURIComponent(ticker)}`}
       className="hz-cellhead"
-      style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, textDecoration: "none" }}
+      style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, textDecoration: "none" }}
     >
-      <StockLogo code={ticker} name={name} market="US" size={26} />
+      {/* 본 화면 줄(V2Rows)과 같은 20px — 26px 이던 땐 같은 종목이 두 화면에서 다른 크기로 섰다(2026-10-04 점검). */}
+      <StockLogo code={ticker} name={name} market="US" size={20} />
       <strong style={{ ...ROW.lead, fontFamily: MONO }}>{ticker}</strong>
       {name && name.toUpperCase() !== ticker.toUpperCase() && (
         <span className="hz-cellname" style={{ ...ROW.sub }}>{name}</span>
@@ -1416,9 +988,11 @@ export function wideExecRows(rows: InsiderActivity[], rate: number | null, side:
         cells={[
           <WideStock key="s" ticker={b.ticker} name={b.name} />,
           text(
-            `${side === "buy" ? `장내 매수 ${b.buyCount}건` : codeSummary(b.codes)} · ${
+            // 날짜는 그 방향 신고의 마지막 접수일(InsiderActivity.boughtFiled · disposedFiled).
+            // '임원 N명' — 본 화면과 같은 말('5명'만이면 무엇의 수인지 없었다, 2026-10-05 점검).
+            `${side === "buy" ? `장내 매수 ${b.buyCount}건` : codeSummary(b.codes)} · 임원 ${
               side === "buy" ? b.buyPeople : b.sellPeople
-            }명 · ${fmtDate(b.filedDate)} 접수`,
+            }명 · ${fmtDate((side === "buy" ? b.boughtFiled : b.disposedFiled) ?? b.filedDate)} 접수`,
             "left",
           ),
           num(<Money usd={side === "buy" ? b.boughtValue : b.disposedValue} rate={rate} />),
@@ -1446,13 +1020,17 @@ export function wideManagerRows(rows: ManagerRank[], rate: number | null) {
           </Link>,
           // ⚠️ 전체보기는 "이 카드의 나머지"다. 칸이 넓으니 소속과 대표 보유를 나눠 적되,
           //    **카드와 같은 사실**을 낸다(카드는 한 줄에 붙여 적는다).
+          // 운용사가 사람 이름으로 시작하면('무바달라 / 무바달라 인베스트먼트') 소속을 뺀다 — 같은 말이 두 번 섰다(2026-10-04 점검).
           text(
-            m.topTicker
-              ? `${m.firm} · 최대 비중 ${m.topName || m.topTicker} ${Math.round(m.topWeight)}%`
-              : m.firm,
+            [m.firm && !m.firm.startsWith(m.person) ? m.firm : null, m.topTicker ? `최대 비중 ${m.topName || m.topTicker} ${Math.round(m.topWeight)}%` : null]
+              .filter(Boolean)
+              .join(" · ") || m.firm,
             "left",
           ),
-          num(<>{m.holdings}<span style={{ ...ROW.sub, fontWeight: 600 }}>종목</span></>),
+          // 보유 수는 500 — 이름 · 보유 수 · 금액 셋이 굵어 한 줄에 굵은 덩어리가 셋이었다(2026-10-05 점검).
+          <span key="h" style={{ ...ROW.sub, color: C.ink, textAlign: "right", whiteSpace: "nowrap" }}>
+            {m.holdings}종목
+          </span>,
           num(<Money usd={m.aum} rate={rate} />),
         ]}
       />
@@ -1470,15 +1048,12 @@ export function wideAnalystRows(rows: AnalystTop[]) {
           cols={WIDE_COLS.analyst}
           cells={[
             <WideStock key="s" ticker={a.ticker} name={a.name} />,
-            <span key="b" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-              <span className="hz-bar" style={{ flex: 1, height: 7 }}>
-                <span style={{ width: `${Math.max(1.5, Math.min(100, share))}%` }} />
-              </span>
-              <span style={{ ...ROW.sub, whiteSpace: "nowrap", flexShrink: 0 }}>
-                {CONSENSUS_KO[a.consensus ?? ""] ?? a.consensus ?? "-"}
-              </span>
+            // 비율 막대는 걷었다 — 상위 열이 76~82% 라 줄마다 같은 길이로 보였고, 같은 값을 글자 · 끝 칸이 이미 말한다(2026-10-05 점검).
+            // 본 화면과 같은 꼴 — 'N명 중 적극 매수 M명'. 등급(매수)을 옆에 두었더니 폰에서 '매수 26명 중 14명'으로 읽혔다(2026-10-04 점검).
+            <span key="b" style={{ ...ROW.sub, minWidth: 0 }}>
+              {a.analystCount}명 중 적극 매수 {a.strongBuy}명
             </span>,
-            num(<>{a.analystCount}명 중 {a.strongBuy}명</>),
+            num(`${Math.round(share)}%`),
           ]}
         />
       </li>
@@ -1494,13 +1069,15 @@ export function wideCongressRows(rows: CongressTicker[], side: "buy" | "sell") {
         <WideRow
           cols={WIDE_COLS.congress}
           cells={[
-            <WideStock key="s" ticker={c.ticker} name={c.name} badge={c.inKadera ? <KaderaPill /> : undefined} />,
-            // 이름과 마지막 매매일을 한 칸에. 인원은 "외 N명"이 이미 말한다.
+            // '카더라 언급' 알약은 걷었다 — 본 화면 줄엔 없고, 한 줄에 굵은 덩어리가 셋이었다(2026-10-05 점검).
+            <WideStock key="s" ticker={c.ticker} name={c.name} />,
+            // 이름 · 건수 · 그 방향의 마지막 거래일을 한 칸에. 값 칸은 정렬 기준인 그 방향 의원 수 — 건수를 두었더니 의원 수 순인데
+            // 값이 9 · 7 · 6 · 4 … 5건으로 들쭉날쭉해 순서가 틀려 보였다(2026-10-04 점검). 날짜는 산 카드엔 마지막 매수일.
             text(
-              `${names[0] ?? "이름 없음"}${names.length > 1 ? ` 외 ${names.length - 1}명` : ""} · ${fmtDate(c.latest)} 매매`,
+              `${names[0] ?? "이름 없음"}${names.length > 1 ? ` 외 ${names.length - 1}명` : ""} · ${side === "buy" ? c.buys : c.sells}건 · ${fmtDate((side === "buy" ? c.buyLatest : c.sellLatest) ?? c.latest)} 매매`,
               "left",
             ),
-            num(side === "buy" ? c.buys : c.sells, "건"),
+            num(names.length, "명"),
           ]}
         />
       </li>
@@ -1515,20 +1092,12 @@ export function wideMoveRows(rows: ManagerMove[], kind: "add" | "trim") {
       <WideRow
         cols={WIDE_COLS.move}
         cells={[
-          <WideStock
-            key="s"
-            ticker={m.ticker}
-            name={m.name}
-            badge={
-              m.mark > 0 ? (
-                // 신규·청산은 배지로 종목 옆에 붙인다. 자기 칸을 주면 대부분 빈 칸이 된다.
-                <Pill tone={kind === "add" ? MOVE_TONE.buy : MOVE_TONE.sell} title={`반대로 움직인 곳 ${m.against}명`}>
-                  {markLabel} {m.mark}
-                </Pill>
-              ) : undefined
-            }
-          />,
-          text(`${m.names.slice(0, 3).join(" · ")}${m.names.length > 3 ? ` 외 ${m.names.length - 3}명` : ""}`, "left"),
+          <WideStock key="s" ticker={m.ticker} name={m.name} />,
+          // 신규 · 청산은 본 화면과 같은 회색 곁글('신규 12명') — 여기만 색 알약('신규 12')이라 다른 자료로 읽혔다(2026-10-04 점검).
+          text(
+            `${m.names.slice(0, 3).join(" · ")}${m.names.length > 3 ? ` 외 ${m.names.length - 3}명` : ""}${m.mark > 0 ? ` · ${markLabel} ${m.mark}명` : ""}`,
+            "left",
+          ),
           num(m.movers, "명"),
         ]}
       />
@@ -1536,171 +1105,7 @@ export function wideMoveRows(rows: ManagerMove[], kind: "add" | "trim") {
   ));
 }
 
-export function wideHotRows(rows: InsiderRow[], rate: number | null) {
-  return rows.map((r) => (
-    <li key={r.ticker}>
-      <WideRow
-        cols={WIDE_COLS.hot}
-        cells={[
-          <WideStock key="s" ticker={r.ticker} name={r.name} />,
-          text(
-            `언급 ${r.mentions}회 · 채널 ${r.channels}곳${r.txns > 0 ? ` · 임원 신고 ${r.txns}건` : ""}`,
-            "left",
-          ),
-          <span key="q" style={{ display: "flex", justifyContent: "flex-end" }}>
-            <Quote price={r.price} change={r.changeRate} rate={rate} />
-          </span>,
-        ]}
-      />
-    </li>
-  ));
-}
 
-export function wideHolderRows(rows: InsiderRow[], managers: number) {
-  return rows.map((r) => (
-    <li key={r.ticker}>
-      <WideRow
-        cols={WIDE_COLS.holders}
-        cells={[
-          <WideStock key="s" ticker={r.ticker} name={r.name} />,
-          text(`${r.holderNames.slice(0, 3).join(" · ")}${r.holders > 3 ? ` 외 ${r.holders - 3}명` : ""}`, "left"),
-          num(r.holders, `/${managers}`),
-        ]}
-      />
-    </li>
-  ));
-}
-
-/**
- * 비중 한 칸 — **긴 막대 + 숫자**. 넓은 표 세 곳(종목 상세의 거물 · 인물 상세의 보유와
- * 정리)이 같은 자를 쓴다.
- *
- * ## ⚠️⚠️ 눈금은 **0~100% 절대값**이다
- *
- * 한때 "그 표의 최대 비중"을 가득 찬 길이로 놓고 서로 견주게 했다. 되돌렸다 —
- * **21%인데 막대가 꽉 차 있으면 그 자체가 거짓말이다.** 옆에 적힌 숫자와 막대가 다른
- * 말을 하면 둘 다 못 믿는다.
- *
- * ⚠️ 그 대가로 대부분의 줄이 짧아진다. 실측(종목 상세 거물 카드에 뜨는 3,017줄):
- *    중앙값 0.36% · **65%가 1% 미만**이다. 시장을 넓게 사는 곳은 어느 한 종목이
- *    원래 그만큼이라, 짧은 게 사실이다 — 길게 보이게 만들 이유가 없다.
- * ⭐ 다만 0 이 아닌 값은 **최소 잉크**를 남긴다. 아예 안 보이면 "안 갖고 있다"와
- *    구별이 안 된다.
- * ⚠️ 인물 상세는 사정이 다르다(중앙값 5.18% · 1% 미만이 4%뿐). 같은 자를 써도 거기선
- *    막대가 넉넉히 찬다.
- */
-function weightCell(weight: number) {
-  const ink = weight > 0 ? Math.min(100, Math.max(1.5, weight)) : 0;
-  return (
-    <span key="w" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
-      <span className="hz-bar" style={{ flex: 1, minWidth: 56, height: 8 }}>
-        <span style={{ width: `${ink}%` }} />
-      </span>
-      {/* ⚠️ 작은 값에 자리를 하나 더 준다. 한 자리로 반올림하면 버핏이 정리한 STZ 가
-          **"0.0%"** 로 떴다 — 있는 값이 없는 값으로 보인다. */}
-      <span style={{ ...ROW.sub, fontFamily: MONO, fontWeight: 600, minWidth: 42, textAlign: "right" }}>
-        {weight >= 1 ? weight.toFixed(1) : weight.toFixed(2)}%
-      </span>
-    </span>
-  );
-}
-
-
-/**
- * 종목 상세의 거물 보유 한 줄 — **넓은 줄**.
- *
- * ⚠️ 이 카드는 시트가 페이지 폭을 다 쓴다. 두 칸짜리 줄로 두면 **68%가 흰 여백**이었다
- * (실측 1,162px 중 793px). 종목 밑에 깔려 있던 소속·주식 수를 자기 칸으로 편다.
- */
-export function wideStockHolderRows(rows: StockHolder[], rate: number | null) {
-  /**
-   * 막대의 분모 — **이 표에서 가장 큰 비중**이다. 0~100% 로 두면 안 된다.
-   *
-   * ⚠️⚠️ 실측 보유 3,126개의 비중 중앙값이 **0.36%** 다(p90 이 5.06% · p95 가 8.28%).
-   *    100% 를 가득 찬 길이로 놓으면 절반이 넘는 줄에서 잉크가 1px 도 안 되고, 막대를
-   *    길게 늘일수록 **회색 트랙만 길어진다.** 가장 큰 곳을 가득 채우고 나머지를 그것에
-   *    견주면 그제야 막대가 "누가 더 걸었나"를 말한다.
-   *
-   * ⚠️ 절대값을 잃는 게 아니다 — 옆에 %가 그대로 적혀 있다. 막대는 견주는 자, 숫자는 값.
-   * ⚠️ 분모는 **넘겨받은 목록 전체**에서 뽑는다. 화면에 다섯 줄만 펴져 있어도 '더 보기'로
-   *    늘렸을 때 눈금이 흔들리면 안 된다.
-   */
-  return rows.map((h) => {
-    const label = moveBadge(h.move, h.sharesChange);
-    return (
-      <li key={h.cik}>
-        <WideRow
-          cols={WIDE_COLS.stockHolders}
-          cells={[
-            <Link
-              key="p"
-              href={`/insider/investor/${h.cik}`}
-              style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, textDecoration: "none" }}
-            >
-              <strong style={{ ...ROW.lead, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {h.person}
-              </strong>
-              {label && <Pill tone={label.tone}>{label.text}</Pill>}
-            </Link>,
-            text(h.firm, "left"),
-            weightCell(h.weight),
-            num(<Money usd={h.value} rate={rate} />),
-          ]}
-        />
-      </li>
-    );
-  });
-}
-
-/**
- * 인물 상세의 보유 한 줄 — 종목 상세의 거물 표와 **같은 꼴**이다.
- *
- * ⚠️ 예전엔 두 칸짜리 줄에 종목 이름 밑으로 주식 수를 깔았다. 한 줄이 두 덩이가 되고
- *    (반쪽 카드에서 되돌린 것과 같은 실수) 오른쪽 막대는 54px 이라 비중이 안 갈렸다.
- *    주식 수는 자기 칸으로 내보내고 막대는 칸을 다 쓴다.
- */
-export function wideManagerHoldingRows(rows: ManagerHolding[], rate: number | null) {
-  return rows.map((h) => {
-    const label = moveBadge(h.move, h.sharesChange);
-    return (
-      <li key={h.ticker}>
-        <WideRow
-          cols={WIDE_COLS.managerHoldings}
-          cells={[
-            <WideStock key="s" ticker={h.ticker} name={h.name} badge={label ? <Pill tone={label.tone}>{label.text}</Pill> : undefined} />,
-            text(`${Math.round(h.shares).toLocaleString("ko-KR")}주`, "left"),
-            weightCell(h.weight),
-            num(<Money usd={h.value} rate={rate} />),
-          ]}
-        />
-      </li>
-    );
-  });
-}
-
-/**
- * 인물 상세의 전량 정리 한 줄.
- *
- * ⭐ 막대가 **직전 분기** 비중이다. "$2.6B 정리"만으로는 그 사람 규모를 모르면 크기를
- *    못 가늠하는데, "4.1% 짜리 자리를 통째로"는 그 자체로 크기다.
- */
-export function wideManagerExitedRows(
-  rows: { ticker: string; name: string; value: number; weight: number }[],
-  rate: number | null,
-) {
-  return rows.map((e) => (
-    <li key={e.ticker}>
-      <WideRow
-        cols={WIDE_COLS.managerExited}
-        cells={[
-          <WideStock key="s" ticker={e.ticker} name={e.name} />,
-          weightCell(e.weight),
-          num(<Money usd={e.value} rate={rate} />),
-        ]}
-      />
-    </li>
-  ));
-}
 
 /**
  * 애널리스트 등급의 한글 이름과 색.
@@ -1749,9 +1154,10 @@ const CONSENSUS_KO: Record<string, string> = {
  *    "수정하지 않고" 쓰라는 조건이라 목표가를 $304.73 → $305 로 바꾸면 그 조건을
  *    어긴다. 시세를 적는 `Quote` 와 같은 자릿수(소수 둘째까지)로 둔다.
  */
-function ExactMoney({ usd, rate }: { usd: number | null; rate: number | null }) {
+export function ExactMoney({ usd, rate }: { usd: number | null; rate: number | null }) {
   if (usd == null) return <>-</>;
-  const d = `$${usd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  // 소수 둘째 자리까지 늘 — '$192 ~ $309.81'처럼 끝의 0 을 지워 자릿수가 들쭉날쭉했다(2026-10-05 점검).
+  const d = `$${usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (!rate) return <>{d}</>;
   return (
     <>
@@ -1806,19 +1212,20 @@ export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: nu
     const act = r.action ? ACTION_KO[r.action] : undefined;
     return (
       <li key={`${r.date}-${r.firm}-${r.analyst}-${i}`}>
-        {/* ⚠️ 좌우 22 는 **줄이 들고 있어야 한다.** 목록(listStyle)에 주면 줄이 그만큼
+        {/* ⚠️ 좌우 여백(14)은 **줄이 들고 있어야 한다.** 목록(listStyle)에 주면 줄이 그만큼
             안쪽으로 밀려서, 호버 하이라이트가 카드 끝까지 못 닿고 양옆에 흰 띠가 남는다
             (2026-08-26). 다른 목록은 `.hz-trow` 가 `padding: 9px 22px` 로 이미 이 방식이다. */}
-        <div className="hz-trow hz-actionrow" style={{ padding: "7px 22px" }}>
+        <div className="hz-trow hz-actionrow" style={{ padding: "7px 14px" }}>
           <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
             <strong className="hz-cellsub" style={{ ...ROW.lead, fontSize: "var(--fs-13)" }}>
               {r.firm}
             </strong>
-            <SubLine text={`${r.analyst === "Unknown Analyst" ? "이름 없음" : r.analyst} · ${fmtDate(r.date)}`} />
+            {/* 이름을 모르면 날짜만 — '이름 없음'이 찍혔다(2026-10-05 점검). */}
+            <SubLine text={r.analyst === "Unknown Analyst" ? fmtDate(r.date) : `${r.analyst} · ${fmtDate(r.date)}`} />
           </span>
           <span style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, flexWrap: "wrap" }}>
             {act && (act.tone ? <Pill tone={act.tone}>{act.text}</Pill> : <span style={{ ...ROW.sub }}>{act.text}</span>)}
-            {r.rating && <span style={{ ...ROW.sub, fontWeight: 600, color: C.ink }}>{CONSENSUS_KO[r.rating] ?? r.rating}</span>}
+            {r.rating && <span style={{ ...ROW.sub, color: C.ink }}>{CONSENSUS_KO[r.rating] ?? r.rating}</span>}
           </span>
           <span style={{ ...ROW.value, textAlign: "right", whiteSpace: "nowrap" }}>
             {r.targetNow == null ? (
@@ -1847,9 +1254,9 @@ export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: nu
           엔비디아는 사흘, 가장 긴 곳은 176일이다(커버리지가 뜸한 종목).
           그래서 기간을 **재서 적는다.** 그래야 "64명 중 왜 8명뿐이냐"에도 답이 된다 —
           64명은 등급을 걸어 둔 사람 수, 이 목록은 그 사이에 움직인 사람이다. */}
-      <span style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 22px 4px" }}>
-        <span style={{ ...ROW.sub, fontWeight: 600 }}>최근 의견</span>
-        {span && <span style={{ fontSize: T.small, color: C.muted, fontFamily: MONO }}>{span}</span>}
+      <span style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 14px 4px" }}>
+        <span style={{ ...ROW.sub }}>최근 의견</span>
+        {span && <span style={{ fontSize: "var(--fs-12)", color: C.muted, fontFamily: MONO }}>{span}</span>}
       </span>
       {/* ⭐ 다섯 줄로 열고 눌러서 늘린다. 다 펴면 '접기'가 함께 뜬다(ExpandableList 기본).
           ⚠️⚠️ 바닥 띠는 **`hz-sheet-foot-row`** 를 쓴다. 기본 푸터로 뒀더니 카드 한가운데
@@ -1890,7 +1297,10 @@ export function ConsensusBody({
   const upside = price && c.targetAvg ? ((c.targetAvg - price) / price) * 100 : null;
   // 현재가가 최저~최고 사이 어디인지. 목표가 구간이 없으면 안 그린다.
   const span = c.targetLow != null && c.targetHigh != null && c.targetHigh > c.targetLow;
-  const pos = span && price ? Math.min(100, Math.max(0, ((price - c.targetLow!) / (c.targetHigh! - c.targetLow!)) * 100)) : null;
+  // 구간 밖이면(현재가 < 최저 목표가 · > 최고 목표가) 막대 끝에 붙이지 않고 바깥에 빈 고리로 — 끝에 붙으면 '최저 목표가' 자리를 가리켰다(EVMN, 2026-10-05 점검).
+  const raw = span && price ? ((price - c.targetLow!) / (c.targetHigh! - c.targetLow!)) * 100 : null;
+  const outside = raw == null ? null : raw < 0 ? "low" : raw > 100 ? "high" : null;
+  const pos = raw == null ? null : Math.min(100, Math.max(0, raw));
 
   return (
     // ⚠️ 가로 여백을 여기 두지 말 것. 아래 목록의 '더 보기' 띠가 **카드 폭을 꽉 채워야**
@@ -1898,12 +1308,13 @@ export function ConsensusBody({
     <div style={{ display: "flex", flexDirection: "column" }}>
       {/* ⭐ **두 값을 나란히 세운다.** 등급과 목표가는 이 카드가 답하는 질문 둘이라 위아래로
           쌓으면 카드가 길기만 하고 무엇이 요점인지 안 보인다. 좁아지면 저절로 접힌다. */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "14px 22px 16px" }}>
+      {/* 좌우 14 — v2 모듈 안쪽 여백(제목 · 다른 모듈 줄과 한 세로줄). 옛 시트의 22 가 남아 8px 더 깊었다(2026-10-04 점검). */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "14px 14px 16px" }}>
         {total > 0 && (
           <div style={{ flex: "1 1 260px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
-            <span style={{ ...ROW.sub, fontWeight: 600 }}>증권가 종합</span>
+            <span style={{ ...ROW.sub }}>증권가 종합</span>
             <span style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-              <strong style={{ fontSize: "var(--fs-22)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+              <strong style={{ fontSize: "var(--fs-22)", fontWeight: 700, color: C.ink, letterSpacing: "-.02em" }}>
                 {(c.consensus && CONSENSUS_KO[c.consensus]) ?? c.consensus ?? "등급 미상"}
               </strong>
               <span style={{ ...ROW.sub }} title={c.consensus ? `원문 등급 ${c.consensus}` : undefined}>
@@ -1924,7 +1335,7 @@ export function ConsensusBody({
               {RATING.filter((r) => counts[r.key] > 0).map((r) => (
                 <span key={r.key} style={{ display: "inline-flex", alignItems: "center", gap: 5, ...ROW.sub }}>
                   <span style={{ width: 8, height: 8, borderRadius: 2, background: r.tone, flexShrink: 0 }} />
-                  {r.label} <strong style={{ fontFamily: MONO, color: C.ink, fontWeight: 700 }}>{counts[r.key]}</strong>
+                  {r.label} <strong style={{ fontFamily: MONO, color: C.ink, fontWeight: 600 }}>{counts[r.key]}</strong>
                 </span>
               ))}
             </span>
@@ -1933,17 +1344,17 @@ export function ConsensusBody({
 
         {c.targetAvg != null && (
           <div style={{ flex: "1 1 260px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
-            <span style={{ ...ROW.sub, fontWeight: 600 }}>
+            <span style={{ ...ROW.sub }}>
               1년 목표가 평균{c.targetCount != null ? ` · 애널리스트 ${c.targetCount}명` : ""}
             </span>
             <span style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-              <strong style={{ fontFamily: MONO, fontSize: "var(--fs-22)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
+              <strong style={{ fontFamily: MONO, fontSize: "var(--fs-22)", fontWeight: 700, color: C.ink, letterSpacing: "-.02em" }}>
                 <ExactMoney usd={c.targetAvg} rate={rate} />
               </strong>
               {upside != null && (
                 // ⚠️ 색을 주지 않는다. 목표가는 예측이지 약속이 아니라, 화면이 좋고 나쁨을
                 //    말하는 자리가 아니다.
-                <span style={{ ...ROW.sub, fontFamily: MONO, fontWeight: 700 }}>
+                <span style={{ ...ROW.sub, fontFamily: MONO }}>
                   현재가 대비 {upside > 0 ? "+" : "−"}
                   {Math.abs(upside).toFixed(1)}%
                 </span>
@@ -1954,22 +1365,35 @@ export function ConsensusBody({
                 {/* 채우는 막대가 아니라 **구간 위의 점**이다. 저점부터 채우면 "이만큼 올랐다"로
                     읽히는데, 이 값은 그게 아니라 예측 범위 안 어디에 지금 값이 있느냐다. */}
                 <span className="hz-range" style={{ position: "relative", height: 10 }}>
-                  {pos != null && <span className="hz-range-knob" style={{ left: `${pos}%` }} />}
+                  {pos != null && (
+                    <span
+                      className={`hz-range-knob${outside ? " is-out" : ""}`}
+                      style={{ left: outside === "low" ? "-8px" : outside === "high" ? "calc(100% + 8px)" : `${pos}%` }}
+                    />
+                  )}
                 </span>
                 {/* ⚠️ 숫자만 두면 그게 목표가의 양끝인지 축 눈금인지 안 보인다 — 바로 위가
                     막대라 특히 그렇다. 숫자 아래에 무엇인지 적는다. */}
                 <span style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                   <span style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    <span style={{ ...ROW.sub, fontFamily: MONO, color: C.ink, fontWeight: 600 }}>
+                    <span style={{ ...ROW.sub, fontFamily: MONO, color: C.ink }}>
                       <ExactMoney usd={c.targetLow} rate={rate} />
                     </span>
-                    <span style={{ fontSize: T.small, color: C.muted }}>최저 목표가</span>
+                    <span style={{ fontSize: "var(--fs-12)", color: C.muted }}>최저 목표가</span>
                   </span>
+                  {/* 막대 위 점이 무엇인지 — 바로 위 큰 숫자가 '목표가 평균'이라 점도 평균 자리로 읽혔다(2026-10-04 점검). */}
+                  {pos != null && (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, alignSelf: "flex-end", fontSize: "var(--fs-12)", color: C.muted }}>
+                      <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-blue)", flexShrink: 0 }} />
+                      {/* 값을 붙인다 — 구간 밖이면 점만으로는 어디인지 안 읽힌다. */}
+                      현재가 {price != null && <ExactMoney usd={price} rate={rate} />}
+                    </span>
+                  )}
                   <span style={{ display: "flex", flexDirection: "column", gap: 1, alignItems: "flex-end" }}>
-                    <span style={{ ...ROW.sub, fontFamily: MONO, color: C.ink, fontWeight: 600 }}>
+                    <span style={{ ...ROW.sub, fontFamily: MONO, color: C.ink }}>
                       <ExactMoney usd={c.targetHigh} rate={rate} />
                     </span>
-                    <span style={{ fontSize: T.small, color: C.muted }}>최고 목표가</span>
+                    <span style={{ fontSize: "var(--fs-12)", color: C.muted }}>최고 목표가</span>
                   </span>
                 </span>
               </>
@@ -1986,82 +1410,4 @@ export function ConsensusBody({
   );
 }
 
-/**
- * 반쪽 카드(492~570px)의 한 줄 — **이름 · 한 줄 설명 · 값 하나.**
- *
- * 넓은 표(`WIDE_COLS`)와 **같은 문법**이다: ①누가 ②무엇을 언제 ③얼마. 폭만 다르다.
- *
- * ## ⚠️ 오른쪽에 사실을 쌓지 말 것
- *
- * 이 줄은 네 번 고쳤고, 세 번은 **사실을 어디에 쌓을까**를 잘못 고른 탓이었다.
- *
- *   ① 가운데에 막대 → 정보를 안 담았다(의원 금액이 구간이라 길이가 거의 같다).
- *   ② 이름 밑에 보조줄 → 한 줄이 두 덩이가 되어 다섯 줄 카드가 열 덩이로 읽혔다.
- *   ③ 값 밑에 보조줄 → 이번엔 오른쪽에 사실이 셋(금액·주식 수·날짜) 붙어 **덩어리를
- *      해독하는 자리**가 됐다. 왼쪽은 이름 하나뿐인데 오른쪽만 빽빽했다.
- *
- * 답은 쌓는 자리를 옮기는 게 아니라 **가로로 펴고 수를 줄이는 것**이었다. 지금은 칸이
- * 셋이고 칸마다 하나씩만 있다. 사실을 더 얹고 싶으면 그건 이 줄이 할 일이 아니다.
- *
- * ⚠️ 굵기는 이름(700)과 값(600) 둘뿐이다. 셋이 되면 어느 쪽도 주인공이 아니게 된다.
- */
-export function HalfRow({
-  name,
-  note,
-  value,
-  valueMuted,
-}: {
-  name: React.ReactNode;
-  /** 가운데 한 줄 설명 — **무엇을 언제.** 짧은 한 마디여야지 사실의 나열이면 안 된다. */
-  note?: React.ReactNode;
-  value: React.ReactNode;
-  /**
-   * 값이 금액이 아니라 대체값(주식 수)일 때. 한 칸에 단위가 섞이므로 색과 굵기를
-   * 한 단 내려 "다른 종류의 숫자"로 보이게 한다.
-   */
-  valueMuted?: boolean;
-}) {
-  return (
-    <div className="hz-trow hz-halfrow">
-      <strong style={{ ...ROW.lead, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {name}
-      </strong>
-      <span style={{ ...ROW.sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{note}</span>
-      <span
-        style={{
-          ...(valueMuted ? { ...ROW.sub, fontFamily: MONO } : ROW.value),
-          textAlign: "right",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
 
-/** 자료가 없는 카드. 빈 칸으로 두지 않고 **왜 없는지**를 적는다. */
-export function EmptyCard({ icon, children }: { icon: IconName; children: React.ReactNode }) {
-  // shadcn Empty 꼴(아이콘을 회색 둥근 칸에 담고 설명을 회색 글로). 안쪽 여백만 rhea 기본(48)보다 줄여 예전 자리(34)에 맞춘다.
-  return (
-    <EmptyState className="px-6 py-8">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <Icon name={icon} style={{ fontSize: 20 }} />
-        </EmptyMedia>
-        {/* ⭐ **문장마다 줄을 바꾼다.** 흘려 두면 "…없습니다. 임원이" 처럼 두 문장이 한 줄에 걸쳐 이어져, 빈 상태를 알리는
-            첫 문장과 그 이유를 대는 둘째 문장이 한 덩이로 읽힌다. ⚠️ 마침표 뒤 공백이 아니라 **한글 뒤 마침표**로 가른다 —
-            그냥 `. ` 로 자르면 `stockanalysis.com ` 이나 소수점이 문장 끝으로 잡힌다. */}
-        <EmptyDescription style={{ wordBreak: "keep-all", maxWidth: 300 }}>
-          {typeof children === "string"
-            ? children.split(/(?<=[가-힣]\.)\s+/).map((line, i) => (
-                <span key={i} style={{ display: "block" }}>
-                  {line}
-                </span>
-              ))
-            : children}
-        </EmptyDescription>
-      </EmptyHeader>
-    </EmptyState>
-  );
-}

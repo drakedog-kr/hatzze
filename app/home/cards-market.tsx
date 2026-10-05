@@ -5,12 +5,11 @@ import type { ClosePoint, StockHighGap } from "@/lib/data";
 import { formatEokMixed, formatIndicatorValue, shortDate } from "@/lib/format";
 import { stockHref } from "@/lib/stock-page";
 import { BLUE_SCALE, C, MONO, R } from "../ui";
-import { sourceDateBadge, Shell, TitleRow, Big, Foot, HeatKnob, HeatFill, HeatBar, AreaChart } from "./parts";
+import { sourceDateBadge, Shell, TitleRow, Big, Foot, HeatKnob, HeatFill, HeatBar, HeatScale, AreaChart, SplitStats } from "./parts";
 import type { Pick } from "./parts";
 
 export function CardBuffett({ v }: { v: Pick }) {
   const dt = v.details;
-  const ratio = v.raw !== null ? v.raw / 100 : null; // 시총/GDP 배수
   // GDP 막대는 시총을 100% 로 둔 상대 길이다. 둘이 같은 축 위에 있어야 "몇 배"가 그림으로 읽힌다.
   const gdpWidth = v.raw && v.raw > 0 ? Math.min(100, (100 / v.raw) * 100) : 50;
   const jo = (won: number) => Math.round(won / 1e12).toLocaleString("ko-KR"); // 원 → 조원
@@ -19,33 +18,29 @@ export function CardBuffett({ v }: { v: Pick }) {
       {/* ⚠️ payments(지폐) 였다. 이 지표는 돈의 크기가 아니라 **나라 경제(GDP) 대비 증시
           크기**라, 지폐보다 경제를 가리키는 그림이 가깝다. 지폐는 거래대금 카드로 옮겼다. */}
       <TitleRow desc={v.headline} icon="account_balance" name={v.name} />
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
-        {ratio !== null && (
-          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
-            {ratio.toFixed(1)}배
-          </span>
-        )}
-      </div>
+      {/* 'n배' 알약과 '증시가 실물 경제보다 n배 커진 상태입니다' 상자를 걷었다(2026-10-03 v2) — 큰 숫자 195% 와
+          같은 값을 두 번 더 말했다. 몇 배인지는 아래 두 막대 길이가 그림으로 말한다. */}
+      <Big disp={v.disp} unit={v.unit} color={v.color} size={32} />
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-            <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>
               나라 경제 (GDP){dt && dt.gdp_year ? ` · ${String(dt.gdp_year).slice(2)}년 ${dt.gdp_q}분기` : ""}
             </span>
-            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.label, whiteSpace: "nowrap" }}>
+            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, whiteSpace: "nowrap" }}>
               {dt && dt.gdp ? `약 ${jo(dt.gdp)}조원` : "기준 100"}
             </span>
           </div>
           {/* shadcn 막대 꼴(빈칸 위, 데이터 끝만 둥근 10px 막대 · shadcn.css .hz-hbar-*) — MDD 와 같은 방식(2026-09-27). */}
           <div className="hz-hbar-track hz-hbar-md hz-hbar-block">
-            <div className="hz-hbar-fill" style={{ width: `${gdpWidth}%`, background: "var(--c-blue-5)" }} />
+            {/* 비교 막대는 --c-blue-3 — --c-blue-5 는 바탕 막대와 1.15:1 이라 끝이 안 보였다(2026-10-05 점검). */}
+            <div className="hz-hbar-fill" style={{ width: `${gdpWidth}%`, background: "var(--c-blue-3)" }} />
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-            <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>증시 시가총액</span>
-            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 700, color: C.ink, whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>증시 시가총액</span>
+            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.ink, whiteSpace: "nowrap" }}>
               {dt && dt.market_cap ? `약 ${jo(dt.market_cap)}조원` : `${v.disp}${v.unit}`}
             </span>
           </div>
@@ -53,9 +48,6 @@ export function CardBuffett({ v }: { v: Pick }) {
             <div className="hz-hbar-fill" style={{ width: "100%", background: C.blue }} />
           </div>
         </div>
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, background: C.soft, borderRadius: R.control, padding: "9px 11px" }}>
-          증시가 실물 경제보다 {ratio !== null ? `${ratio.toFixed(1)}배 커진` : "커진"} 상태입니다
-        </span>
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -79,7 +71,7 @@ export function CardLeverage({ v }: { v: Pick }) {
           return `${f.display}${f.displayUnit}`;
         })()
       : null;
-  const oiAmount = dt?.futures_oi != null ? `${Math.round(dt.futures_oi).toLocaleString("ko-KR")}` : null;
+  const oiAmount = dt?.futures_oi != null ? `${Math.round(dt.futures_oi).toLocaleString("ko-KR")}계약` : null;
   // "기준 대비 N%" 는 두 타일이 **서로 다른 기준**을 같은 말로 부르던 라벨이었다.
   // ETF 는 4조원(고정), 선물은 "1년 평균의 1.5배" 라, 선물의 53% 는 두 단계 건너뛴 말이라
   // 카드만 보고는 풀 수 없었다. 이제 파이프라인이 기준 자체를 details 로 보낸다.
@@ -97,34 +89,24 @@ export function CardLeverage({ v }: { v: Pick }) {
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-32)", fontWeight: 800, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
+        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
           {heat ?? "-"}
-          <span style={{ fontSize: "var(--fs-17)", fontWeight: 700, color: C.sub }}>/100</span>
+          <span style={{ fontSize: "var(--fs-13)", fontWeight: 500, color: C.sub }}>/100</span>
         </strong>
-        <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2 }}>종합 과열도</span>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>종합 과열도</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <HeatFill pct={heat ?? 0} />
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>안심</span>
-          <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>과열</span>
-        </div>
+        <HeatScale />
       </div>
       {dt && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
-          {/* 서브바 두 개는 각자 '자기 기준 대비 달성률'이라 큰 숫자와 다른 눈금이다.
-              라벨을 '기준 대비'로 갈라 둔 것이 그 표시다(같은 이름으로 부르면 안 된다). */}
-          <div style={{ background: C.soft, borderRadius: R.control, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
-            <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2 }}>ETF 거래대금</span>
-            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: C.ink }}>{etfAmount ?? "-"}</strong>
-            <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{etfBaseLabel} 대비 {Math.round(dt.etf_progress ?? 0)}%</span>
-          </div>
-          <div style={{ background: C.soft, borderRadius: R.control, padding: 13, display: "flex", flexDirection: "column", gap: 5 }}>
-            <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2 }}>선물 미결제약정</span>
-            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: C.ink }}>{oiAmount ?? "-"}</strong>
-            <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>1년 평균 대비 {oiVsAvg !== null ? Math.round(oiVsAvg) : "-"}%</span>
-          </div>
-        </div>
+        // 근거 둘은 각자 '자기 기준 대비'라 큰 숫자와 다른 눈금이다 — 아래 줄을 '기준 대비'로 갈라 둔 것이 그 표시다.
+        <SplitStats
+          items={[
+            { label: "ETF 거래대금", value: etfAmount ?? "-", sub: `과열선 ${etfBaseLabel}의 ${Math.round(dt.etf_progress ?? 0)}%` },
+            { label: "선물 미결제약정", value: oiAmount ?? "-", sub: `1년 평균의 ${oiVsAvg !== null ? Math.round(oiVsAvg) : "-"}%` },
+          ]}
+        />
       )}
       <Foot text={v.desc} />
     </Shell>
@@ -157,41 +139,47 @@ export function CardMarketActions({ v }: { v: Pick }) {
   // ⚠️ 눈금 자체는 그대로다. 히어로 '지표 분포'에서 이 지표는 여전히 고온 칸에 앉으므로,
   //    카드와 갈리는 게 거슬리면 indicator_thresholds 에 floor 0.25 를 얹는 재보정이
   //    따로 필요하다(그러면 오늘 값이 54.5 → 9.1 로 내려간다).
+  // 하나도 안 걸린 달은 '균형'이 아니라 '발동 없음'이다 — 0건인데 '균형'이라 적으면 무엇이 맞섰는지 되묻게 됐다(2026-10-04 점검).
+  const total = buyN + sellN + cbN;
   const dir =
-    buyN > sellN
-      ? { label: "매수 우세", color: C.hot, hint: "달아오른 쪽이 잦았습니다" }
-      : sellN > buyN
-        ? { label: "매도 우세", color: C.neutral, hint: "식는 쪽이 잦았습니다" }
-        : { label: "균형", color: C.ink, hint: "양쪽이 비슷했습니다" };
+    total === 0
+      ? { label: "발동 없음", color: C.ink }
+      : buyN > sellN
+        ? { label: "매수 우세", color: C.hot }
+        : sellN > buyN
+          ? { label: "매도 우세", color: C.neutral }
+          : { label: "매수 · 매도 같음", color: C.ink };
   // 세 값을 **같은 눈금**에 올린다. 숫자 타일 셋으로 흩어 두면 5·8·6 을 눈이 직접 빼야
   // 하는데, 같은 축의 막대로 두면 "매도가 더 잦았다"가 길이로 바로 증명된다.
   // 색이 방향을 진다 — 매수 안전장치(상승 제동)는 달아오른 쪽이라 고온, 매도 쪽은 식는
   // 쪽이라 상온 파랑, CB 는 둘 다 걸릴 수 있어 중립인 연파랑.
+  // 줄 이름은 장치 이름 그대로 — 'CB' 같은 영문 약어는 걷었다(v2, 2026-10-03). 매수 · 매도는 사이드카 방향이다(fetch_market_actions.py).
   const rows = [
-    { label: "매수", n: buyN, fill: C.hot, ink: C.hot },
-    { label: "매도", n: sellN, fill: C.neutral, ink: C.ink },
-    { label: "CB", n: cbN, fill: "var(--c-blue-4)", ink: C.label },
+    // 글자는 건수가 있을 때만 칠한다 — 발동 없음인데 '0건'만 빨갰다(2026-10-05 점검).
+    { label: "매수 사이드카", n: buyN, fill: C.hot, ink: buyN > 0 ? C.hot : C.ink },
+    { label: "매도 사이드카", n: sellN, fill: C.neutral, ink: C.ink },
+    { label: "서킷브레이커", n: cbN, fill: "var(--c-blue-4)", ink: C.label },
   ];
   const maxN = Math.max(1, buyN, sellN, cbN);
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       {/* ⚠️ speed(속도계) 였다. 이 지표가 세는 것은 VI·사이드카·서킷브레이커 — 시장을
           **멈추는** 장치이지 속도가 아니다. 속도계는 MDD 의 '하락 vs 회복 속도' 타일이 쓴다. */}
-      <TitleRow desc={v.headline} icon="shield" name={v.name} badge="최근 한 달" />
+      {/* '최근 한 달' 꼬리표는 걷었다 — 지표 이름('최근 한 달 매매 안전장치 동향')이 이미 말한다. */}
+      <TitleRow desc={v.headline} icon="shield" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-        {/* 한글은 같은 font-size 라도 숫자보다 글리프가 커 보인다 — 다른 카드의 32px 숫자와
-            '눈에 보이는 크기'를 맞춘 값이 30 이다. */}
-        <strong style={{ fontSize: "var(--fs-30)", fontWeight: 800, letterSpacing: "-.03em", color: dir.color, lineHeight: 1 }}>{dir.label}</strong>
-        <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{dir.hint}</span>
+        <strong style={{ fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: dir.color, lineHeight: 1 }}>{dir.label}</strong>
+        {/* 곁말은 판정을 풀어 쓴 문장('양쪽이 비슷했습니다')이었다 — 문장 대신 셋을 합친 건수. 판정은 아래 막대가 증명한다. */}
+        {total > 0 && <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2, whiteSpace: "nowrap" }}>{total}건 발동</span>}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 34, flexShrink: 0, fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2 }}>{r.label}</span>
+            <span style={{ width: 76, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2, whiteSpace: "nowrap" }}>{r.label}</span>
             <div className="hz-hbar-track hz-hbar-md">
               <div className="hz-hbar-fill" style={{ width: `${(r.n / maxN) * 100}%`, background: r.fill }} />
             </div>
-            <span style={{ width: 30, flexShrink: 0, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 800, color: r.ink }}>
+            <span style={{ width: 30, flexShrink: 0, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: r.ink }}>
               {r.n}건
             </span>
           </div>
@@ -225,7 +213,8 @@ export function CardTurnover({ v }: { v: Pick }) {
   const others = Math.max(0, 100 - share);
   const segs = [
     ...top.map((t, i) => ({ key: t.name, label: t.name, code: t.code, pct: t.share, fill: BLUE_SCALE[i] ?? "var(--c-blue-5)", ink: C.ink })),
-    { key: "__rest", label: "나머지 상위 10종목", code: undefined, pct: restOfTop, fill: "var(--c-blue-5)", ink: C.ink },
+    // '나머지 상위 10종목'은 또 다른 열 종목처럼 읽혔다 — 순위 구간으로 부른다.
+    { key: "__rest", label: `${top.length + 1}~10위`, code: undefined, pct: restOfTop, fill: "var(--c-blue-5)", ink: C.ink },
     { key: "__others", label: "그 외 전 종목", code: undefined, pct: others, fill: C.track, ink: C.sub2 },
   ];
   return (
@@ -236,11 +225,13 @@ export function CardTurnover({ v }: { v: Pick }) {
         <div className="hz-tip" data-tip={barTip} style={{ display: "flex", height: 14, borderRadius: 4, overflow: "hidden" }}>
           {segs.map((s2) => (s2.pct <= 0 ? null : <div key={s2.key} style={{ width: `${s2.pct}%`, background: s2.fill }} />))}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {/* 범례는 두 열 — 여섯 줄이 한 열이면 이 카드가 둘째 줄 높이를 정해 옆 카드 가운데가 비었다(1440 풋/콜 84px). */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: 12, rowGap: 8 }}>
           {segs.map((s2) =>
             s2.pct <= 0 ? null : (
-              <div key={s2.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 3, background: s2.fill, flexShrink: 0 }} />
+              <div key={s2.key} className="hz-rowlink" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {/* 옅은 조각(5~10위 · 그 외)은 점이 바탕에 묻혔다(1.12~1.28:1) — 가는 테두리로 점 자리를 보인다. */}
+                <span style={{ width: 8, height: 8, borderRadius: 3, background: s2.fill, boxShadow: "inset 0 0 0 1px var(--t-frame)", flexShrink: 0 }} />
                 {/* 종목 줄은 종목 화면으로 잇는다(코드가 있는 줄만 — 옛 행엔 코드가 없다). 말줄임을 자르는
                     상자가 링크 자신이라 크기·굵기·clip 을 링크에 준다(.hz-stock-link 주석). */}
                 {s2.code ? (
@@ -251,17 +242,17 @@ export function CardTurnover({ v }: { v: Pick }) {
                       data-ga="cta_click"
                       data-ga-cta="stock"
                       data-ga-surface="home_turnover"
-                      style={{ minWidth: 0, fontSize: "var(--fs-12)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      style={{ minWidth: 0, fontSize: "var(--fs-12)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                     >
                       {s2.label}
                     </Link>
                   </span>
                 ) : (
-                  <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {s2.label}
                   </span>
                 )}
-                <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 800, color: s2.ink }}>{s2.pct.toFixed(1)}%</span>
+                <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: s2.ink }}>{s2.pct.toFixed(1)}%</span>
               </div>
             ),
           )}
@@ -287,7 +278,8 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
   const priorHigh = v.details?.prior_high;
   const num = (n: number) => n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
   // 순위대로 진한 파랑 → 옅은 파랑. 색조가 아니라 명도만 움직여 '서열'로 읽히게 한다.
-  const rankColor = ["var(--c-blue-2)", "var(--c-blue-3)", "var(--c-blue-4)"];
+  // 셋째(--c-blue-4)가 바탕과 1.26:1 이라 통째로 한 단 진하게 옮겼다(2026-10-05 점검).
+  const rankColor = ["var(--c-blue-1)", "var(--c-blue-2)", "var(--c-blue-3)"];
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow
@@ -296,10 +288,10 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
         name={v.name}
         badge={sourceDateBadge(v) ?? "최근 거래일 기준"}
       />
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={`${gap > 0 ? "+" : ""}${v.disp}`} unit={v.unit} color={v.color} size={32} sub={gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"} />
         {typeof priorHigh === "number" && (
-          <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
             전고점 {num(priorHigh)}
           </span>
         )}
@@ -315,23 +307,17 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
           {/* 현재가·52주 고점 둘 다 야후 **종가**다. 실시간이 아니다 — 파이프라인이 하루 두 번
               받아 저장한 값을 읽기만 한다. 이 카드가 장중에 움직이면 왼쪽 지수 값·햇쩨 지수와
               시점이 갈리기 때문이다. */}
-          <span
-            className="hz-tip hz-tip-wide hz-tip-start"
-            data-tip={`현재가와 52주 고점 모두 야후 파이낸스 종가 기준입니다${tops[0]?.priceDate ? ` (${tops[0].priceDate} 종가)` : ""}. 막대가 꽉 찰수록 고점에 가깝습니다.`}
-            data-ga-tip="high_gap_source"
-            style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.muted }}
-          >
-            거래대금 상위 종목의 52주 고점 근접도
-          </span>
+          {/* 머리는 오른쪽 숫자와 같은 말로 — '근접도'라 적으면 −38.4% 와 반대말이었다. 출처 · 읽는 법 툴팁은 걷었다(출처는 /disclaimer). */}
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted }}>거래대금 상위 종목 · 52주 고점 대비</span>
           {tops.map((st, i) => (
-            <div key={st.code} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div key={st.code} className="hz-rowlink" style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <Link
                 href={stockHref(st.code)}
                 className="hz-stock-link hz-stock-link-label"
                 data-ga="cta_click"
                 data-ga-cta="stock"
                 data-ga-surface="home_high_gap"
-                style={{ width: 76, flexShrink: 0, fontSize: "var(--fs-12-5)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                style={{ width: 76, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
               >
                 {st.name}
               </Link>
@@ -350,7 +336,7 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
                     없다(같은 값이 52.5 · 64.0 · 48.9 로 갈린다). */}
                 <div className="hz-hbar-fill" style={{ width: `${Math.max(0, Math.min(100, 100 + st.gapPct))}%`, background: rankColor[i] ?? "var(--c-blue-4)" }} />
               </div>
-              <span style={{ width: 50, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: C.ink }}>
+              <span style={{ width: 50, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.ink }}>
                 {st.gapPct >= 0 ? "+" : ""}{st.gapPct.toFixed(1)}%
               </span>
             </div>
@@ -381,6 +367,9 @@ export function CardSpeed({ v, path = [], failed = false }: { v: Pick; path?: Cl
   const pts = base > 0 ? path.map((x) => ({ key: x.date, value: (x.close / base - 1) * 100 })) : [];
   const hi = pts.length ? Math.max(...pts.map((x) => x.value), 0) : null;
   const lo = pts.length ? Math.min(...pts.map((x) => x.value), 0) : null;
+  const hiLo = [hi !== null && hi >= 0.05 ? `최고 +${hi.toFixed(1)}%` : null, lo !== null && lo <= -0.05 ? `최저 ${lo.toFixed(1)}%` : null]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="trending_up" name={v.name} />
@@ -399,12 +388,9 @@ export function CardSpeed({ v, path = [], failed = false }: { v: Pick; path?: Cl
             tip={(x) => `${shortDate(x.key)} · ${x.value >= 0 ? "+" : ""}${x.value.toFixed(1)}%`}
           />
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>3개월 전 = 0%</span>
-            {hi !== null && lo !== null && (
-              <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>
-                최고 {hi >= 0 ? "+" : ""}{hi.toFixed(1)}% · 최저 {lo.toFixed(1)}%
-              </span>
-            )}
+            <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>3개월 전부터</span>
+            {/* 시작점(0%)에 머문 쪽은 적지 않는다 — 석 달 내내 아래였으면 '최고 +0.0%'가 뜻 없이 섰다(2026-10-05 점검). */}
+            {hiLo && <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>{hiLo}</span>}
           </div>
         </div>
       ) : (
@@ -414,11 +400,11 @@ export function CardSpeed({ v, path = [], failed = false }: { v: Pick; path?: Cl
               평소에 그리던 모양까지 건드리게 된다. 고칠 이유가 없는 자리는 안 건드린다. */
         failed ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <HeatBar v={v} hideThreshold />
+            <HeatBar v={v} />
             <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>60일 궤적을 불러오지 못했습니다.</span>
           </div>
         ) : (
-          <HeatBar v={v} hideThreshold />
+          <HeatBar v={v} />
         )
       )}
       <Foot text={v.desc} />
@@ -446,9 +432,10 @@ export function CardVkospi({ v }: { v: Pick }) {
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="monitor_heart" name={v.name} />
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <Big disp={v.disp} color={v.color} size={32} sub="변동성지수" />
-        <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        {/* 곁말 '변동성지수'는 걷었다 — 지표 이름 'VKOSPI (변동성지수)'와 같은 말이다(v2, 2026-10-03). */}
+        <Big disp={v.disp} color={v.color} size={32} />
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
           {verdict}
         </span>
       </div>
@@ -459,14 +446,12 @@ export function CardVkospi({ v }: { v: Pick }) {
           </div>
           <HeatKnob left={pos * 100} color={knob} />
         </div>
-        {/* 양 끝 라벨은 **변동성 자체**를 말한다(잔잔 ↔ 출렁). 예전엔 '방심 ↔ 불안'
-            이었는데, 방심은 시장의 상태가 아니라 그 상태에 대한 평가라서 눈금 끝에
-            적히면 무엇을 잰 값인지가 흐려졌다(2026-08-04). 낮은 쪽이 왜 과열 신호인지는
-            셀 맨 아래 설명 한 줄이 맡는다. */}
+        {/* 양 끝은 막대의 눈금 — 최근 30일 최저 · 최고. '잔잔 39 · 출렁 58'은 숫자가 무엇인지(30일 최저 · 최고) 안 읽혔다(2026-10-04 점검).
+            그 전엔 '방심 ↔ 불안'이었다(평가라서 걷음, 2026-08-04). 낮은 쪽이 왜 과열 신호인지는 셀 맨 아래 설명 한 줄이 맡는다. */}
+        {/* 가운데 '최근 30일 범위'는 걷었다 — 위 알약('최근 30일 중 낮은 편')이 같은 기간을 말한다. */}
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.muted }}>잔잔 {lo !== null ? Math.round(lo) : "-"}</span>
-          <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>최근 30일 범위</span>
-          <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.muted }}>출렁 {hi !== null ? Math.round(hi) : "-"}</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted }}>30일 최저 {lo !== null ? Math.round(lo) : "-"}</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted }}>30일 최고 {hi !== null ? Math.round(hi) : "-"}</span>
         </div>
       </div>
       <Foot text={v.desc} />
@@ -475,6 +460,8 @@ export function CardVkospi({ v }: { v: Pick }) {
 }
 
 export function CardAsia({ v }: { v: Pick }) {
+  // ⭐ 코스피 100 기준 지수 꼴로 되돌렸다(2026-10-05 운영자 판단 "기존 것이 더 쉽게 이해된다"). 10-04 점검에서 나라마다 실제 한 달 등락을
+  //    0 가운데 좌우 막대로 바꿨었는데, 그쪽이 덜 읽혔다. 굵기만 v2 눈금(500 · 600)으로 낮췄다.
   const dt = v.details;
   const k = dt?.kospi ?? 0;
   const bars = dt
@@ -503,7 +490,7 @@ export function CardAsia({ v }: { v: Pick }) {
           (외국인)를 말하는 자리라 방향에 매이지 않는 그림이 필요하고, 이 카드가 실제로 하는
           일은 네 나라를 **한 기준선에서 견주는 것**이다. 아이콘이 카드의 모양을 되풀이하는
           것은 이 화면의 어법이다(쏠림=pie_chart · 증권앱 순위=leaderboard). */}
-      <TitleRow desc={v.headline} icon="align_horizontal_left" name={v.name} badge="최근 한 달" />
+      <TitleRow desc={v.headline} icon="align_horizontal_left" name={v.name} badge="최근 30일" />
       <Big
         disp={`${v.raw !== null && v.raw > 0 ? "+" : ""}${v.disp}`}
         unit={v.unit}
@@ -540,10 +527,10 @@ export function CardAsia({ v }: { v: Pick }) {
           {bars.map((b) => (
             <div key={b.label} style={{ display: "flex", alignItems: "center", gap: ROW_GAP }}>
               <span style={{ width: LABEL_W, flexShrink: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-                <span style={{ fontSize: "var(--fs-11)", fontWeight: b.self ? 800 : 700, color: b.self ? C.ink : C.label, whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: "var(--fs-11)", fontWeight: b.self ? 600 : 500, color: b.self ? C.ink : C.label, whiteSpace: "nowrap" }}>
                   {b.label}
                 </span>
-                <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub }}>{b.sub}</span>
+                <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub }}>{b.sub}</span>
               </span>
               {/* 막대 두께는 카드 안 목록 막대(10px, shadcn.css .hz-hbar-md)와 맞춘다(2026-09-27, 16 → 10). */}
               <div style={{ position: "relative", flex: 1, minWidth: 0, height: 10 }}>
@@ -569,7 +556,7 @@ export function CardAsia({ v }: { v: Pick }) {
                   textAlign: "right",
                   fontFamily: MONO,
                   fontSize: "var(--fs-12)",
-                  fontWeight: 800,
+                  fontWeight: b.self ? 600 : 500,
                   color: b.self ? C.ink : C.label,
                 }}
               >
@@ -589,7 +576,7 @@ export function CardAsia({ v }: { v: Pick }) {
                   top: 0,
                   transform: "translateX(50%)",
                   fontSize: "var(--fs-11)",
-                  fontWeight: 700,
+                  fontWeight: 500,
                   color: "var(--c-cold-ink)",
                   whiteSpace: "nowrap",
                 }}
@@ -612,7 +599,7 @@ export function CardGoldRatio({ v }: { v: Pick }) {
   const k = v.details?.kospi_close;
   const g = v.details?.gold_close;
   const num = (n: number) => n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
-  const note = typeof k === "number" && typeof g === "number" ? `코스피 ${num(k)} ÷ 금 ${num(g)}` : "코스피 지수 ÷ 금 시세";
+  const note = typeof k === "number" && typeof g === "number" ? `코스피 ${num(k)} ÷ 금 1온스 $${num(g)}` : "코스피 지수 ÷ 금 시세";
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow icon="balance" name={v.name} desc={v.headline} />
@@ -638,7 +625,7 @@ export function CardVolume({ v }: { v: Pick }) {
   // 두 막대는 같은 축 위에 있어야 길이 비교가 뜻을 갖는다 — 큰 쪽을 100%로 둔다.
   const max = Math.max(avg ?? 0, today ?? 0) || 1;
   const rows: { label: string; value: number | null; fill: string; strong: boolean }[] = [
-    { label: "30일 평균", value: avg, fill: "var(--c-blue-5)", strong: false },
+    { label: "30일 평균", value: avg, fill: "var(--c-blue-3)", strong: false },
     { label: "최근 거래일", value: today, fill: C.blue, strong: true },
   ];
   return (
@@ -653,11 +640,11 @@ export function CardVolume({ v }: { v: Pick }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 60, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub2 }}>{r.label}</span>
+            <span style={{ width: 60, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>{r.label}</span>
             <div className="hz-hbar-track hz-hbar-md">
               <div className="hz-hbar-fill" style={{ width: `${((r.value ?? 0) / max) * 100}%`, background: r.fill }} />
             </div>
-            <span style={{ width: 58, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 700, color: r.strong ? C.ink : C.label }}>
+            <span style={{ width: 58, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: r.strong ? C.ink : C.label }}>
               {r.value !== null ? fmt(r.value) : "-"}
             </span>
           </div>
@@ -680,14 +667,14 @@ export function CardFx({ v }: { v: Pick }) {
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="waves" name={v.name} />
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <Big disp={`±${v.disp}`} unit={v.unit} color={v.color} size={32} />
-        {typeof close === "number" && (
-          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
-            {close.toLocaleString("ko-KR", { maximumFractionDigits: 0 })}원
-          </span>
-        )}
-      </div>
+      {/* 환율은 큰 숫자 곁말로 — 알약이면 바로 아래 선이 환율 추이로 읽혔다(선은 변동성이다, 2026-10-05 점검). */}
+      <Big
+        disp={`±${v.disp}`}
+        unit={v.unit}
+        color={v.color}
+        size={32}
+        sub={typeof close === "number" ? `환율 ${close.toLocaleString("ko-KR", { maximumFractionDigits: 0 })}원` : undefined}
+      />
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <AreaChart points={pts} color={v.color} tip={(x) => `${shortDate(x.key)} · ±${x.value.toFixed(2)}%`} />
         {/* 기간은 차트의 캡션이지 큰 수치의 곁말이 아니다 — 차트 밑 오른쪽에 둔다
@@ -721,6 +708,11 @@ export function CardNetBuy({ v }: { v: Pick }) {
   const daily = dt?.daily5 ?? [];
   // 거래일은 주말·휴장을 건너뛰어 화면에서 역산할 수 없다 — 파이프라인이 넣어준 값을 쓴다.
   const dates = dt?.dates5 ?? [];
+  // 막대 아래 값 — 칸이 50px 안팎이라 조 단위 한 자리('-3.3조')로 줄인다. 천억 미만만 억으로.
+  const flowShort = (d: number) => {
+    const a = Math.abs(d);
+    return `${d >= 0 ? "+" : "-"}${a >= 1000 ? `${(a / 10000).toFixed(1)}조` : `${Math.round(a / 10) * 10}억`}`;
+  };
   const ymdShort = (ymd: number) => shortDate(`${String(ymd).slice(0, 4)}-${String(ymd).slice(4, 6)}-${String(ymd).slice(6, 8)}`);
   const maxAbs = Math.max(1, ...daily.map((d) => Math.abs(d)));
   const isBuy = cum >= 0;
@@ -734,10 +726,10 @@ export function CardNetBuy({ v }: { v: Pick }) {
             기간은 다른 카드들과 똑같이 수치 옆 sub 로 붙인다. */}
         {/* 색은 **온도**다. 매수/매도 방향으로 칠하면 이 카드만 규칙이 갈린다 — 게이트
             (52주 고점 −5%)를 못 넘은 날은 아무리 크게 팔아도 과열도가 0(저온)인데,
-            숫자만 빨갛게 떠서 셀이 뜨거운 것처럼 읽혔다. 방향은 부호(+/−)와 아래 곁말
-            ("순매도")이 이미 말한다. */}
+            숫자만 빨갛게 떠서 셀이 뜨거운 것처럼 읽혔다. 방향은 아래 곁말("순매도")이 말한다 —
+            부호까지 붙이면 '순매도가 마이너스면 순매수인가'로 읽혀 절댓값만 적는다(2026-10-04 점검). */}
         <Big
-          disp={`${cum >= 0 ? "+" : ""}${formatEokMixed(cum)}`}
+          disp={formatEokMixed(Math.abs(cum))}
           color={v.color}
           size={32}
           sub={`최근 5거래일 ${isBuy ? "순매수" : "순매도"}`}
@@ -749,15 +741,16 @@ export function CardNetBuy({ v }: { v: Pick }) {
           <span
             style={{
               alignSelf: "flex-start",
-              fontSize: "var(--fs-11-5)",
-              fontWeight: 700,
+              fontSize: "var(--fs-12)",
+              fontWeight: 600,
               padding: "4px 10px",
               borderRadius: R.pill,
               color: atHigh ? "var(--c-hot-ink)" : "var(--c-cold-ink)",
               background: atHigh ? "var(--c-mania-tint)" : "var(--c-blue-tint)",
             }}
           >
-            {atHigh ? "고점권" : "고점권 아님"}
+            {/* 제목('고점권 외국인 매도')의 고점권은 코스피 이야기다 — '고점권 아님'만 적으면 제목과 반대말로 읽혔다(2026-10-04 점검). */}
+            {atHigh ? "코스피 고점권" : "코스피 고점권 아님"}
           </span>
         )}
       </div>
@@ -771,9 +764,7 @@ export function CardNetBuy({ v }: { v: Pick }) {
               const px = Math.max(3, Math.round((Math.abs(d) / maxAbs) * 28));
               const buy = d >= 0;
               const ymd = dates[i];
-              const label = ymd
-                ? `${ymdShort(ymd)} · ${d >= 0 ? "+" : ""}${formatEokMixed(d)} ${d >= 0 ? "순매수" : "순매도"}`
-                : `${d >= 0 ? "+" : ""}${formatEokMixed(d)}`;
+              const label = `${ymd ? `${ymdShort(ymd)} · ` : ""}${formatEokMixed(Math.abs(d))} ${d >= 0 ? "순매수" : "순매도"}`;
               return (
                 <div key={i} className="hz-tip" data-tip={label} style={{ flex: 1, position: "relative", height: 64 }}>
                   <div
@@ -783,7 +774,9 @@ export function CardNetBuy({ v }: { v: Pick }) {
                       right: "16%",
                       height: px,
                       borderRadius: 4,
-                      background: buy ? C.cold : C.hot,
+                      // 방향은 0선 위 · 아래가 말한다. 색은 큰 숫자처럼 온도만 — 고점권에서 판 날만 카드 온도색, 나머지는 회색.
+                      // 순매도를 빨강으로 칠하면 첫 줄 띠(+ 빨강)와 반대였고, 과열도 0 인 날도 카드가 뜨거워 보였다(2026-10-04 점검).
+                      background: atHigh && !buy ? v.color : C.sub2,
                       ...(buy ? { bottom: "50%" } : { top: "50%" }),
                     }}
                   />
@@ -802,6 +795,14 @@ export function CardNetBuy({ v }: { v: Pick }) {
               ))}
             </div>
           )}
+          {/* 그날 값 — 부호가 방향(+ 순매수 · − 순매도). 값이 말풍선에만 있어 막대가 무엇의 크기인지 안 읽혔다(2026-10-05 점검). */}
+          <div style={{ display: "flex", gap: 8 }}>
+            {daily.map((d, i) => (
+              <span key={i} style={{ flex: 1, textAlign: "center", fontFamily: MONO, fontSize: "var(--fs-11)", color: C.sub, whiteSpace: "nowrap" }}>
+                {flowShort(d)}
+              </span>
+            ))}
+          </div>
         </div>
       )}
       <Foot text={v.desc} />
@@ -854,17 +855,18 @@ export function CardLimitUp({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="bolt" name={v.name} badge={sourceDateBadge(v) ?? "최근 거래일 기준"} />
       <Big
         disp={String(surged)}
+        unit="종목"
         color={v.color}
         size={32}
         sub={`${listed ? `${listed.toLocaleString("ko-KR")}종목 중 ` : ""}${(v.raw ?? 0).toFixed(2)}%`}
       />
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {rank.length === 0 ? (
-          <span style={{ fontSize: "var(--fs-12-5)", color: C.sub }}>10% 넘게 오른 종목이 없습니다</span>
+          <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>10% 넘게 오른 종목이 없습니다</span>
         ) : (
           rank.map((r, i) => (
             <div key={`${r.n}-${i}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minWidth: 0 }}>
-              <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.label, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {r.n}
               </span>
               <span
@@ -872,9 +874,10 @@ export function CardLimitUp({ v }: { v: Pick }) {
                   flexShrink: 0,
                   fontFamily: MONO,
                   fontSize: "var(--fs-12)",
-                  fontWeight: 800,
-                  color: "var(--card-accent-ink, var(--c-cold-ink))",
-                  background: "var(--card-accent-tint, var(--c-blue-tint))",
+                  fontWeight: 600,
+                  // 오른 값은 늘 오름 색 — 카드 온도색(저온 = 파랑)을 따라가면 2색 체계에서 '내림'으로 읽혔다(2026-10-05 모바일 점검).
+                  color: "var(--c-hot-ink)",
+                  background: "var(--c-hot-tint)",
                   borderRadius: R.pill,
                   padding: "3px 9px",
                 }}
@@ -891,7 +894,7 @@ export function CardLimitUp({ v }: { v: Pick }) {
               buckets.map((b) => `${b.label}: ${b.n}종목`).join("\n") +
               (listed ? `\n전체: ${listed.toLocaleString("ko-KR")}종목` : "")
             }
-            style={{ fontSize: "var(--fs-11-5)", color: C.sub }}
+            style={{ fontSize: "var(--fs-11)", color: C.sub }}
           >
             외 {rest}개
           </span>
@@ -903,7 +906,8 @@ export function CardLimitUp({ v }: { v: Pick }) {
 }
 
 // 옵션 풋/콜 비율 — 콜(상승 베팅) vs 풋(하락 대비) 거래량 비중.
-// 목업은 두 칸을 **gap 4 로 떼어** 각자 알약으로 두고, 아래에 비중과 뜻풀이를 두 줄로 깐다.
+// 목업은 두 칸을 **gap 4 로 떼어** 각자 알약으로 두고, 아래에 비중을 깐다.
+// 뜻풀이 줄('콜 = 상승 베팅 · 풋 = 하락 대비')은 걷었다(v2, 2026-10-03 — 화면에 정의 문장을 두지 않는다). 뜻은 막대 툴팁이 진다.
 export function CardPutCall({ v }: { v: Pick }) {
   const dt = v.details as unknown as {
     put_vol?: number; call_vol?: number; put_eok?: number; call_eok?: number;
@@ -926,9 +930,9 @@ export function CardPutCall({ v }: { v: Pick }) {
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="casino" name={v.name} />
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={ratio.toFixed(2)} color={v.color} size={32} sub="풋/콜" />
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
           {greedy ? "콜 우세" : "풋 우세"}
         </span>
       </div>
@@ -939,14 +943,19 @@ export function CardPutCall({ v }: { v: Pick }) {
           <div className="hz-tip" data-tip={tip("put")} style={{ width: `${100 - callShare}%`, borderRadius: "0 99px 99px 0", background: C.cold }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.mania }}>콜 {Math.round(callShare)}%</span>
-          <span style={{ fontSize: "var(--fs-12)", fontWeight: 700, color: C.cold }}>풋 {Math.round(100 - callShare)}%</span>
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>콜 = 상승 베팅</span>
-          <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>풋 = 하락 대비</span>
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.mania }}>콜 {Math.round(callShare)}%</span>
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.cold }}>풋 {Math.round(100 - callShare)}%</span>
         </div>
       </div>
+      {/* 툴팁에만 있던 거래대금을 두 칸으로 꺼낸다 — 큰 숫자와 막대 사이가 비던 자리를 데이터로 채운다(1440 에서 84px). */}
+      {dt?.call_eok != null && dt?.put_eok != null && (
+        <SplitStats
+          items={[
+            { label: "콜 거래대금", value: formatEokMixed(dt.call_eok), sub: `${call.toLocaleString("ko-KR")}계약` },
+            { label: "풋 거래대금", value: formatEokMixed(dt.put_eok), sub: `${put.toLocaleString("ko-KR")}계약` },
+          ]}
+        />
+      )}
       <Foot text={v.desc} />
     </Shell>
   );

@@ -3,7 +3,7 @@
 // 계좌 유형과 세율·과세 몫. DividendCalculator.tsx 에서 그대로 옮겨 왔다(store.ts 머리말 참고).
 
 import { type StockLite } from "./types";
-import { won, wonShort } from "./format";
+import { wonCal, wonShort } from "./format";
 
 export type Account = "general" | "isa" | "pension" | "irp" | "exempt";
 
@@ -107,69 +107,59 @@ export const ACCOUNTS: { key: Account; label: string }[] = [
   { key: "exempt", label: "비과세 종합저축" },
 ];
 
+/** '1년에 받는 배당' 칸의 계좌 단추 — 다섯을 한 줄에 같은 폭으로(셋 · 둘로 나눈 두 줄이 고르지 않았다, 2026-10-05 운영자 지적). 원래 이름은 말풍선. */
+export const ACCOUNT_TINY: Record<Account, string> = { general: "일반", isa: "ISA", pension: "연금", irp: "IRP", exempt: "비과세" };
+
 /** 줄의 계좌 알약(select)은 폭이 좁아 짧은 이름. */
 export const ACCOUNT_SHORT: Record<Account, string> = { general: "일반 계좌", isa: "ISA", pension: "연금저축", irp: "IRP", exempt: "비과세저축" };
 
-/** 물음표 툴팁의 첫 줄 — 세금을 어떻게 뗐나, 계좌마다. */
-export const TAX_HELP: Record<TaxMode, string> = {
-  general: "세금: 국내 15.4%, 미국 15%를 뗀 값",
-  isa: `세금(ISA): 국내 주식·ETF 9.9%, 해외 주식은 ISA에 못 담아 15% · 만기까지 ${wonShort(ISA_FREE)}(서민형 ${wonShort(ISA_FREE_LOW)})은 비과세라 실제론 이보다 적습니다`,
-  pension: "세금(연금저축): 국내 ETF·상장 리츠는 연금으로 받을 때 5.5% · 주식은 못 담아 15.4%·15%",
-  // 안전자산 30% 얘기는 넘었을 때 히어로 아래 한 줄이 하니 여기엔 안 적는다(2026-09-15 지적: 툴팁이 너무 길다).
-  irp: "세금(IRP): 국내 ETF·상장 리츠는 연금으로 받을 때 5.5% · 주식은 못 담아 15.4%·15%",
-  exempt: `세금(비과세 종합저축): 국내 주식·ETF 배당 0% · 원금 ${wonShort(EXEMPT_LIMIT)}까지(전 금융기관 합산) · 만 65세 이상(2026년부터 기초연금 수급자)·장애인·유공자 등 · 해외 주식은 못 담아 15%`,
-  gross: "세전: 세금을 빼기 전 값(국내 15.4%, 미국 15%를 뗍니다)",
+/**
+ * 계좌마다 떼는 세율(짧게) — '1년에 받는 배당' 칸 세후 버튼의 말풍선이 쓴다(V2Parts.tsx TaxSeg). 긴 단서(ISA 비과세 한도 등)는
+ * 칸 아래 한 줄(taxNote)이 맡는다. 같은 날(2026-10-04) 칸 안 '떼는 세금' 줄 → 세후 버튼 말풍선으로 옮겼다.
+ */
+export const TAX_SHORT: Record<TaxMode, string> = {
+  general: "국내 15.4% · 미국 15%",
+  isa: "국내 9.9% · 해외 15%",
+  // 연금 계좌에 못 담는 미국 종목은 일반 계좌 세율(15%)로 센다(taxRate) — 빠뜨리면 미국 종목 세금이 말풍선에 없다(2026-10-04 점검).
+  pension: "ETF·리츠 5.5% · 국내 주식 15.4% · 미국 15%",
+  irp: "ETF·리츠 5.5% · 국내 주식 15.4% · 미국 15%",
+  exempt: "국내 0% · 해외 15%",
+  gross: "",
 };
 
 /**
- * 히어로 아래 한 줄 — 금융소득 종합과세 문턱(2,000만원)까지 얼마 남았나, 넘으면 어떻게 되나, 고배당기업 배당을
- * 분리과세로 빼면 어떻게 되나. 세전 합이 1,000만원을 넘을 때만 적는다. 다른 이자·배당은 모르니 그 말도 적는다.
- * ISA·연금저축·IRP 는 문턱과 무관하다(계좌 안 소득은 금융소득에 안 합친다) — 그 계좌에 못 담은 줄이 있을 때만 적는다.
- * IRP 는 담긴 것 가운데 위험자산이 70% 를 넘으면 안전자산이 얼마 더 있어야 하는지 한 줄 더 적는다.
+ * 결과 셋 아래 한 줄 — 금융소득 종합과세 문턱(2,000만원)까지 · 넘으면 얼마가 · 고배당기업 분리과세를 고르면 어떻게 되나, 그리고 계좌 한도.
+ * ⭐ 문장이 아니라 숫자 조각을 ' · '로 잇는다 — 큰 금액이면 151자 세 문장(폰 다섯 줄)이었다(2026-10-05 점검, 설명 문장 금지).
+ *    '못 담아 일반 계좌로 셌습니다'는 걷었다 — 줄마다 붙는 '일반 계좌로 셈' 알약이 같은 말을 한다.
+ * 세전 합이 1,000만원을 넘을 때만 문턱 조각을 적는다. ISA · 연금 · IRP 는 문턱과 무관하다(계좌 안 소득은 금융소득에 안 합친다).
  */
-export function taxNote(mode: TaxMode, grossAll: number, taxableAll: number, sepGross: number, outsideCount: number, irp?: { riskPct: number; needKrw: number }, mixed = false, exemptOver?: { invested: number }): string | null {
+export function taxNote(mode: TaxMode, grossAll: number, taxableAll: number, sepGross: number, irp?: { riskPct: number; needKrw: number }, mixed = false, exemptOver?: { invested: number }): string | null {
   if (mode === "gross") return null;
   const parts: string[] = [];
-  if (outsideCount) {
-    parts.push(
-      mixed
-        ? `${outsideCount}종목은 고른 계좌에 못 담는 종목이라 일반 계좌로 셌습니다.`
-        : mode === "isa" || mode === "exempt"
-          ? `${outsideCount}종목은 해외 주식이라 ${mode === "isa" ? "ISA" : "비과세 종합저축"}에 못 담아 일반 계좌로 셌습니다.`
-          : `${outsideCount}종목은 개별 주식이거나 해외 상장이라 ${mode === "irp" ? "IRP" : "연금저축"}에 못 담아 일반 계좌로 셌습니다(국내 ETF와 상장 리츠만 담깁니다).`,
-    );
-  }
   if (exemptOver && exemptOver.invested > EXEMPT_LIMIT) {
-    parts.push(`비과세 종합저축은 원금 ${wonShort(EXEMPT_LIMIT)}까지입니다. 지금 ${wonShort(Math.round(exemptOver.invested / 1e4) * 1e4)}이라 넘는 몫의 배당은 일반 계좌 세율로 셌습니다(다른 금융기관 것과 합산이라 실제 한도는 더 적을 수 있습니다).`);
+    parts.push(`비과세 종합저축 한도 ${wonShort(EXEMPT_LIMIT)} · 지금 ${wonShort(Math.round(exemptOver.invested / 1e4) * 1e4)}`);
   }
   if (irp && irp.riskPct > IRP_RISK_MAX * 100) {
-    parts.push(`IRP는 위험자산이 70%까지입니다. 지금 ${Math.round(irp.riskPct)}%라 채권·채권혼합 ETF 같은 안전자산이 ${wonShort(Math.ceil(irp.needKrw / 1e4) * 1e4)} 더 있어야 합니다.`);
+    parts.push(`IRP 위험자산 ${Math.round(irp.riskPct)}% · 한도 70% · 안전자산 ${wonShort(Math.ceil(irp.needKrw / 1e4) * 1e4)} 더`);
   }
-  if (mode !== "general" && !mixed) return parts.length ? parts.join(" ") : null;
-  // 여기부터는 일반 계좌 줄의 금융소득 문턱 — 세전이 아니라 **과세되는 몫**으로 센다(국내 ETF 과표·감액배당을 뺀 값).
-  // 섞였으면 '일반 계좌 줄' 이라고 밝힌다. 비과세 몫이 있으면 그 차이를 한 번 적는다.
+  if (mode === "isa" && !mixed) parts.push(`ISA 비과세 ${wonShort(ISA_FREE)}(서민형 ${wonShort(ISA_FREE_LOW)}) 미반영`);
+  if (mode !== "general" && !mixed) return parts.length ? parts.join(" · ") : null;
+  // 여기부터 일반 계좌 줄의 금융소득 문턱 — 세전이 아니라 **과세되는 몫**으로 센다(국내 ETF 과표 · 감액배당을 뺀 값).
+  if (grossAll < COMPOSITE_NOTE_FROM) return parts.length ? parts.join(" · ") : null;
   const who = mixed ? "일반 계좌 줄 " : "";
-  const exempt = grossAll - taxableAll;
-  const base = `${who}과세 대상 배당 ${won(taxableAll)}` + (exempt >= 1 ? `(세전 ${won(grossAll)}에서 ETF 과표·감액배당의 비과세 몫 ${won(exempt)}을 뺀 값)` : "");
-  // 세전이 1,000만원을 넘으면 적는다 — 과세 대상이 그보다 훨씬 적은 사람(감액배당·국내 커버드콜)에게 그 사실이 곧 답이다.
-  if (grossAll < COMPOSITE_NOTE_FROM) return parts.length ? parts.join(" ") : null;
+  const base = `${who}과세 대상 ${wonCal(taxableAll)}`;
   if (taxableAll < COMPOSITE_FROM) {
-    parts.push(`${base}입니다. 금융소득 종합과세 문턱 ${wonShort(COMPOSITE_FROM)}까지 ${won(COMPOSITE_FROM - taxableAll)} 남았습니다(다른 이자·배당은 안 넣은 값).`);
-    return parts.join(" ");
+    parts.push(`${base} · 종합과세 문턱 ${wonShort(COMPOSITE_FROM)}까지 ${wonCal(COMPOSITE_FROM - taxableAll)}`);
+    return parts.join(" · ");
   }
   const over = taxableAll - COMPOSITE_FROM;
   if (sepGross <= 0) {
-    parts.push(`${base}으로 금융소득 종합과세 문턱 ${wonShort(COMPOSITE_FROM)}을 넘습니다. 넘는 ${won(over)}은 다른 소득과 합쳐 누진세율(6~45%)로 과세됩니다.`);
-    return parts.join(" ");
+    parts.push(`${base} · 종합과세 문턱 ${wonShort(COMPOSITE_FROM)} 넘음 · 넘는 ${wonCal(over)} 종합과세`);
+    return parts.join(" · ");
   }
-  const rest = taxableAll - sepGross;
-  const restOver = rest - COMPOSITE_FROM;
+  const restOver = taxableAll - sepGross - COMPOSITE_FROM;
   parts.push(
-    `${base}으로 금융소득 종합과세 문턱 ${wonShort(COMPOSITE_FROM)}을 넘습니다. ` +
-    `이 중 고배당기업 배당 ${won(sepGross)}을 분리과세(2,000만원까지 15.4% · 3억까지 22%)로 신청하면 ` +
-    (restOver > 0
-      ? `나머지 ${won(rest)} 가운데 문턱을 넘는 ${won(restOver)}만 다른 소득과 합쳐 과세됩니다.`
-      : `나머지 ${won(rest)}은 문턱 아래라 종합과세를 피합니다.`),
+    `${base} · 종합과세 문턱 ${wonShort(COMPOSITE_FROM)} 넘음 · 분리과세 고르면 ` + (restOver > 0 ? `종합과세 ${wonCal(restOver)}` : "종합과세 피함"),
   );
-  return parts.join(" ");
+  return parts.join(" · ");
 }

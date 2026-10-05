@@ -241,12 +241,7 @@ export default async function MddPage({
   const sp = await searchParams;
   // 기간도 주소에서 받는다(?years=3). 모르는 값은 기본 기간 — api/mdd 와 같은 규칙(normalizeYears).
   const initialYears = normalizeYears(typeof sp.years === "string" ? sp.years : null);
-  const [kospi, us, initial, suggestions] = await Promise.all([
-    loadKospiStocks(),
-    loadUsStocks(),
-    resolveInitial(sp),
-    loadSuggestions(),
-  ]);
+  const [kospi, us, initial, suggestions] = await Promise.all([loadKospiStocks(), loadUsStocks(), resolveInitial(sp), loadSuggestions()]);
   // 국내를 앞에 둔다. 등급이 같을 때의 마지막 정렬은 rankStockMatches 가 맡으므로
   // 이 순서가 결과를 흔들지는 않는다 — 두 목록을 잇는 자리일 뿐이다.
   const stocks = [...kospi, ...us];

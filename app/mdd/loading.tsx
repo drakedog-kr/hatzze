@@ -12,8 +12,8 @@ import { C } from "../ui";
  * 두 번째는 이미 있던 것이고 종목·기간을 바꿀 때마다 다시 뜬다. 여기서는 첫 번째만 맡는다.
  *
  * ⭐ **골격은 그쪽 `Skeleton` 과 글자 그대로 같아야 한다.** 두 단계가 이어 붙는데 모양이
- * 다르면 화면이 갈아타는 것처럼 보인다. 그래서 시트 배치(히어로 3분할 → 전폭 차트 →
- * 50:50 짝)를 여기서도 그대로 그린다.
+ * 다르면 화면이 갈아타는 것처럼 보인다. 그래서 시트 배치(둘째 줄 모듈 셋 → 전폭 차트 →
+ * 2:1 짝)를 여기서도 그대로 그린다.
  *
  * ⚠️ **폭 상한을 여기서 걸지 말 것.** 셸(AppShell)이 본문 상자를 이미 1340 으로 잡는다.
  * 예전엔 `maxWidth:1180, margin:"0 auto"` 가 있었는데, 세로 flex 안에서 가로 margin:auto 가
@@ -38,32 +38,38 @@ const body: React.CSSProperties = { padding: "18px 22px", display: "flex", flexD
 export default function Loading() {
   return (
     // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
-    <div className="hz-tx" style={{ position: "relative" }}>
-      {/* 조회 바(종목 검색 + 기간 탭). 실제 Controls 가 앉을 자리를 그대로 비워 둔다. */}
+    // v2(2026-10-03): 실제 화면과 같은 범위(v2-kd v2-md)라 시트 · 간격이 v2 꼴로 선다.
+    <div className="hz-tx v2-kd v2-md" style={{ position: "relative" }}>
+      {/* 조회 바(종목 검색 + 기간 탭). 실제 Controls 가 앉을 자리를 그대로 비워 둔다(키 41 · 모서리 6). */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }} aria-hidden>
         <div style={{ flex: "1 1 260px", minWidth: 220 }}>
-          <Block h={44} r={12} bg={C.track} />
+          <Block h={41} r={6} bg={C.track} />
         </div>
-        <Block h={44} w={218} r={9} bg={C.track} />
+        <Block h={41} w={218} r={6} bg={C.track} />
       </div>
 
-      {/* MddExplorer 의 Skeleton 과 같은 골격 — 히어로 3분할 + 전폭 차트 + 50:50 짝. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }} aria-hidden>
-        <section className="hz-sheet" style={{ display: "flex", flexWrap: "wrap" }}>
-          {[290, 300, 300].map((basis, i) => (
-            <div key={i} style={{ flex: `1 1 ${basis}px`, minWidth: 0, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 12 }}>
-              <Block h={14} />
-              <Block h={38} />
-              <Block h={48} />
-            </div>
+      {/* MddExplorer 의 Skeleton 과 같은 골격 — 첫 줄 띠 + 둘째 줄 모듈 셋 + 전폭 차트 + 사례 표 · 회복 짝(2:1). */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }} aria-hidden>
+        {/* 첫 줄 띠(키 41) — 결과의 MddCover 자리. */}
+        <div className="v2-cover" style={{ height: 41 }} />
+        <div className="v2-md-band">
+          {/* 결과와 같은 자리 클래스(sheet.tsx Skeleton 과 같다). */}
+          {(["v2-md-stock", "v2-md-dd", "v2-md-sum"] as const).map((cls) => (
+            <section key={cls} className={`hz-sheet ${cls}`}>
+              <div style={body}>
+                <Block h={14} />
+                <Block h={38} />
+                <Block h={48} />
+              </div>
+            </section>
           ))}
-        </section>
+        </div>
         <section className="hz-sheet">
           <div style={body}>
             <Block h={201} />
           </div>
         </section>
-        <div className="mdd-pair">
+        <div className="v2-md-row is-21">
           {[0, 1].map((i) => (
             <section key={i} className="hz-sheet">
               <div style={body}>
@@ -80,7 +86,7 @@ export default function Loading() {
       <div className="hz-loading-float" aria-hidden>
         <span className="hz-loading-badge">
           <Spinner />
-          10년치 들춰보는 중
+          시세 들춰보는 중
         </span>
       </div>
 

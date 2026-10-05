@@ -75,6 +75,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.js_round import js_round  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from config.indicator_thresholds import (  # noqa: E402
@@ -400,11 +401,12 @@ def relative_surge_progress(details: dict, config: dict) -> float | None:
 
 
 def stage_for_score(score: float) -> str:
-    if score < 25:
+    s = js_round(score)  # 화면에 찍히는 정수로 가른다(app/ui.tsx stageForScore). 24.72 는 25℃ · 상온이다.
+    if s < 25:
         return "저온"
-    if score < 50:
+    if s < 50:
         return "상온"
-    if score < 75:
+    if s < 75:
         return "고온"
     return "초고온"
 

@@ -1,7 +1,7 @@
 """미장 집계를 LLM(Claude Haiku)으로 문장화해 미장 카더라 카드에 넣는다.
 
   telegram_us_daily_brief.sentiment_summary : '오늘의 요약' 총평(빈 줄로 이어 붙인다)
-  telegram_us_stock_narrative.narrative     : 주요 종목 리포트의 흐름 요약(종목당 75~80자)
+  telegram_us_stock_narrative.narrative     : 주요 종목 리포트의 흐름 요약(종목당 95~105자 · 국장 LEN_MIN/MAX 그대로)
 
 국내 짝은 `generate_telegram_narratives.py`. **그 파일을 고치지 않는다** — 매일 도는
 검증된 경로이고, 히어로·종목 리포트 문장은 손대지 않기로 정해 둔 자리다.
@@ -64,6 +64,7 @@ from common.js_round import js_fixed1  # noqa: E402
 from common.market_sentiment import MARKET_MIN_MESSAGES, load_market_daily  # noqa: E402
 from common.supabase_client import get_client, load_all, load_window_keyset  # noqa: E402
 from common.text_check import is_clean, problems  # noqa: E402
+from common.thin_days import usable_days  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from config.us_stock_extraction import is_house  # noqa: E402
 
@@ -95,6 +96,7 @@ from generate_telegram_narratives import (  # noqa: E402
     first_sentences,
     has_schedule_block,
     kst_date,
+    newest_first,
     optimism,
     percent_count,
     schedule_digest,
@@ -115,11 +117,12 @@ WINDOW_DAYS = 3
 # 1,252 · 하위¼ 666 이라 400 이면 넓히는 날이 9일(주말·수집 첫날). 프론트
 # lib/us-telegram-data.ts 의 US_SENTIMENT_MIN_MESSAGES 와 같은 값이어야 한다.
 US_SENTIMENT_MIN_MESSAGES = 400
-# 요약을 만들 종목 수. 카드는 4장을 보여주지만 프론트가 요청 시점에 상위를 다시 뽑으므로
-# 여유를 둔다 — 실행 뒤 순위가 바뀌어도 문장이 비지 않는다(국내 NARRATIVE_TOP_N 과 같은 이유).
-NARRATIVE_TOP_N = 6
-# 화면 카드가 실제로 그리는 수. 커버리지 검사는 이만큼만 요구한다.
-CARD_TOP_N = 4
+# 요약을 만들 종목 수. 화면 '많이 언급' 표가 열 줄이라(lib/kadera-us-why.ts US_BOARD_TILES) 열에 여유 둘을 더한다 —
+# 프론트가 요청 시점에 상위를 다시 뽑으므로 실행 뒤 순위가 바뀌어도 문장이 비지 않는다(국내 NARRATIVE_TOP_N 과 같은 이유).
+# 여섯이던 때 표를 열 줄로 늘리고 이 값을 안 올려 7~10행이 늘 비었다(2026-10-04 점검). ⚠️ US_BOARD_TILES 와 짝이다.
+NARRATIVE_TOP_N = 12
+# 화면 표가 실제로 그리는 줄 수. 커버리지 검사는 이만큼 요구한다(US_BOARD_TILES).
+CARD_TOP_N = 10
 
 NEWS_EXCERPTS = 6      # 총평 셋째 대목이 볼 발췌 건수
 NEWS_TOP_STOCKS = 6
@@ -427,7 +430,11 @@ def theme_window_shares(rows: list[dict]) -> dict[str, float]:
     # 날짜 차례로 더한다 — 저쪽이 날짜 오름차순으로 reduce 하고, 실수 덧셈은 차례에 따라 끝자리가
     # 갈려 toFixed(1) 이 0.1 어긋난다. load_all 은 무작위 id 차례로 준다.
     win = sorted((r for r in rows if since <= r["date"] <= base), key=lambda r: r["date"])
-    recent = set(sorted({r["date"] for r in win})[-THEME_RECENT_DAYS:])
+    # 표본이 거의 없는 날(기준일 아침)은 뺀다 — 저쪽 usableDays 와 같은 규칙(common/thin_days.py). 총량이 없는 옛 행이면 그대로다.
+    day_totals: dict[str, int] = {}
+    for r in win:
+        day_totals[r["date"]] = day_totals.get(r["date"], 0) + (r.get("mention_count") or 0)
+    recent = set(usable_days(day_totals, sorted({r["date"] for r in win}))[-THEME_RECENT_DAYS:])
     sums: dict[str, float] = {}
     for r in win:
         sums[r["theme"]] = sums.get(r["theme"], 0.0) + (
@@ -575,7 +582,7 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
 
     # ── 테마 ────────────────────────────────────────────────────────────────
     lines += theme_lines(
-        load_all(db, "telegram_us_theme_daily", "date,theme,share_pct,rank"), end
+        load_all(db, "telegram_us_theme_daily", "date,theme,share_pct,rank,mention_count"), end
     )
 
     # ── 쏠림 화제어 ─────────────────────────────────────────────────────────
@@ -600,7 +607,8 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
     if picked:
         # 하루로 끝났고 그날이 기준일이면 '오늘'이라 불러도 된다. 넓혔으면 기간을 밝힌다.
         span = "오늘" if used == [end] else f"{used[0][5:]}~{used[-1][5:]}"
-        top = sorted(picked, key=lambda m: -(m.get("views") or 0))[:NEWS_EXCERPTS]
+        # 최근 날 글부터, 같은 날 안에서는 조회수 순(국장 newest_first 주석).
+        top = newest_first(picked, lambda m: m["date"], lambda m: m.get("views") or 0)[:NEWS_EXCERPTS]
         lines += ["", f"[{span} 오간 이야기] 조회수 상위 {len(top)}건 발췌 (표본 {len(picked)}건)"]
         for m in top:
             first = m["mentions"][0]
@@ -698,6 +706,18 @@ def build_stock_digests(
         return out
 
     by_ticker = by_ticker_in(end)
+    # 같은 길이 직전 기간의 언급 수 — [일별]에 붙인다(국장 짝 generate_telegram_narratives 와 같은 재료, 2026-10-05 점검).
+    # 받은 메시지가 그 기간을 덮을 때만 — 덮지 않는데 0회라 적으면 거짓 재료다(테마 급부상 길은 제 범위로 받는다).
+    prev_until = (date.fromisoformat(since) - timedelta(days=1)).isoformat()
+    prev_since = (date.fromisoformat(since) - timedelta(days=WINDOW_DAYS)).isoformat()
+    covered = bool(msgs) and min(m["date"] for m in msgs) <= prev_since
+    prev_count: Counter = Counter()
+    if covered:
+        for m in msgs:
+            if prev_since <= m["date"] <= prev_until:
+                for x in m["mentions"]:
+                    if not is_house(x):
+                        prev_count[x["ticker"]] += 1
     # 발췌는 기준일 것까지 본다(국장 종목 요약과 같은 규칙) — 세는 값이 아니라 '무엇이 화제였나'의
     # 예시라, 기준일을 빼면 아침 실행이 밤사이 미장 마감 소식을 못 보고 하루 늦은 얘기를 한다.
     # 고르기·언급 수·[일별]은 위 창(카드와 같은 사흘) 그대로다.
@@ -723,7 +743,7 @@ def build_stock_digests(
         lines = [
             f"[종목] {name} ({ticker}) · 미국 상장",
             f"[최근 {WINDOW_DAYS}일] 언급 {len(items)}회 · {chans}개 채널",
-            "[일별] " + " · ".join(f"{d[5:]} {by_day[d]}회" for d in sorted(by_day)),
+            "[일별] " + " · ".join(f"{d[5:]} {by_day[d]}회" for d in sorted(by_day)) + (f" · 직전 {WINDOW_DAYS}일 합 {prev_count[ticker]}회" if covered else ""),
             "",
             f"[대표 메시지 발췌] 조회수 상위 {len(top)}건",
         ]
@@ -762,7 +782,8 @@ def main() -> None:
         for s in load_all(db, "us_stocks", "ticker,name_ko", order_by="ticker")
     }
     # 종목 리포트 창이 하루 앞에서 시작하므로 그만큼 앞에서부터 받는다(총평은 제 창으로 다시 자른다).
-    msgs = load_us_messages(db, min(since, card_since))
+    # 직전 같은 길이 기간까지 받는다 — 종목 요약 [일별]의 '직전 N일 합'이 그 기간을 센다(build_stock_digests).
+    msgs = load_us_messages(db, (date.fromisoformat(min(since, card_since)) - timedelta(days=WINDOW_DAYS)).isoformat())
     print(f"[재료] 창 안 미국 언급 메시지 {len([m for m in msgs if since <= m['date'] <= end]):,}건")
 
     brief_digest = build_brief_digest(db, latest, msgs, name_of)

@@ -85,9 +85,56 @@ function readBandColor(img: HTMLImageElement): string | null {
 /**
  * 받은 그림이 진짜 로고인가. 라우트는 로고가 없을 때 1×1 투명 그림을 200 으로 준다(app/api/logo 의 reply).
  * 폭 0 은 받다 실패한 것(옛 404 가 브라우저 캐시에 남은 경우 포함), 폭 1 은 '없음' 표시다.
+ *
+ * 보이는 픽셀이 전부 흰색인 로고(어두운 바탕용 로고)도 '없음'으로 친다 — 흰 타일 위에 얹히면 동그라미가 빈칸처럼
+ * 보였다(2026-10-04 점검, HLB제약 047920: 불투명 52% · 어두운 픽셀 0%). 그럴 땐 글자 배지가 낫다.
  */
 function isRealLogo(img: HTMLImageElement): boolean {
-  return img.naturalWidth > 1;
+  return img.naturalWidth > 1 && !unreadableMark(img);
+}
+
+/**
+ * 동그라미 안에서 못 읽히는 그림인가. 못 읽으면 거짓(로고를 그대로 띄운다).
+ *  ① 불투명 픽셀 가운데 흰색에 가깝지 않은 것(R+G+B < 600)이 2% 도 안 된다 — 어두운 바탕용 흰 로고.
+ *  ② 그림(흰색 아닌 불투명 픽셀)의 세로 폭이 높이의 30% 미만인데 가로로는 60% 넘게 퍼졌다 — 가로로 긴 글자 로고.
+ *     22px 로 줄면 글자 높이가 4~7px 라 얼룩이나 짧은 선이 됐다(코미코 · 테스 · DB하이텍, 2026-10-05 점검). 띠 로고(삼성전자 검은 띠)는
+ *     띠 자체가 어두워 세로 폭이 가득 차므로 걸리지 않는다.
+ */
+function unreadableMark(img: HTMLImageElement): boolean {
+  try {
+    const n = 32;
+    const canvas = document.createElement("canvas");
+    canvas.width = n;
+    canvas.height = n;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return false;
+    ctx.drawImage(img, 0, 0, n, n);
+    const d = ctx.getImageData(0, 0, n, n).data;
+    let opaque = 0;
+    let dark = 0;
+    let top = n;
+    let bottom = -1;
+    let left = n;
+    let right = -1;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 200) continue;
+      opaque += 1;
+      if (d[i] + d[i + 1] + d[i + 2] >= 600) continue;
+      dark += 1;
+      const p = i / 4;
+      const x = p % n;
+      const y = Math.floor(p / n);
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+      if (x < left) left = x;
+      if (x > right) right = x;
+    }
+    if (opaque === 0) return false;
+    if (dark / opaque < 0.02) return true;
+    return (bottom - top + 1) / n < 0.3 && (right - left + 1) / n > 0.6;
+  } catch {
+    return false;
+  }
 }
 
 export function StockLogo({

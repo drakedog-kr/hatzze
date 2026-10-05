@@ -5,7 +5,7 @@
 import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
 import { StockLogo } from "../StockLogo";
-import { won, usd, money, pct } from "./format";
+import { won, wonShort, usd, money, pct } from "./format";
 import { isSafeAsset, fitsAccount, foreignTaxNotCredited, ACCOUNTS, ACCOUNT_SHORT } from "./tax";
 import type { Account, TaxMode } from "./tax";
 import { HOT_YIELD_PCT, TODAY_KST, Badges, SPLIT_OPTION, nextAccountFor } from "./shared";
@@ -29,15 +29,38 @@ const SortMenu = dynamic(() => import("./SortMenu").then((m) => m.SortMenu), {
 type Drag = { id: string; from: number; to: number; dy: number; height: number };
 
 /* ── 담은 종목 표 ─────────────────────────────────────────────────── */
+/**
+ * 담은 종목 머리 — 몇 종목인지 · 정렬 · 모두 빼기. '내 종목' 모듈 머리(근거 · 오른쪽 끝)에 선다(DividendCalculator).
+ * 예전엔 표 바로 위 한 줄이라 모듈 머리는 '내 종목'만 있고 비었고, 칩 세 판 아래 깊은 자리에 따로 섰다(2026-10-04 점검).
+ */
+export function HoldingsBar({ lines, onSort, onClear }: { lines: Line[]; onSort: (key: SortKey) => void; onClear: () => void }) {
+  // '담은 종목'은 종목 수다 — 한 종목을 두 계좌로 나눠 두 줄이어도 하나. 줄 수는 안 적는다(2026-09-16 지적).
+  const distinct = new Set(lines.map((l) => l.stock.code)).size;
+  // 체크를 푼 종목이 있으면 몇 개를 뺐는지도 — 합계가 표와 다른 까닭이 이 한 마디다. "계산에 4개"는 어색하다는 지적(2026-09-18).
+  const excluded = distinct - new Set(lines.filter((l) => !l.off).map((l) => l.stock.code)).size;
+  return (
+    <>
+      <span className="v2-mod-meta dv-table-count">
+        담은 종목 {distinct}개{excluded > 0 && <span className="dv-table-counted"> · {excluded}개 제외</span>}
+      </span>
+      <span className="v2-mod-aside dv-table-tools">
+        {/* 정렬은 한 번 세우는 동작이라 값이 남지 않는다 — 고르는 칸(select)이 아니라 메뉴다(shadcn DropdownMenu, 2026-09-26). */}
+        {lines.length > 1 && <SortMenu onSort={onSort} />}
+        <button type="button" className="dv-table-clear" onClick={onClear}>
+          모두 빼기
+        </button>
+      </span>
+    </>
+  );
+}
+
 export function HoldingsTable({
   lines,
   inputs,
   totalInvest,
   mode,
-  onClear,
   onToggle,
   onMove,
-  onSort,
   onAccount,
   onSplit,
   onShares,
@@ -50,23 +73,16 @@ export function HoldingsTable({
   totalInvest: number;
   /** 고른 계좌 — IRP 면 안전자산 줄에 알약을 붙인다. */
   mode: TaxMode;
-  onClear: () => void;
   /** 줄을 계산에 넣고(true) 빼기(false). */
   onToggle: (id: string, on: boolean) => void;
   /** 줄 id 를 targetId 가 있던 자리로 옮긴다(위로는 그 앞, 아래로는 그 뒤). */
   onMove: (id: string, targetId: string, method: "drag" | "key") => void;
-  onSort: (key: SortKey) => void;
   onAccount: (id: string, acct: Account) => void;
   onSplit: (id: string) => void;
   onShares: (id: string, shares: number) => void;
   onCost: (id: string, cost: number | null) => void;
   onRemove: (id: string) => void;
 }) {
-  // '담은 종목'은 종목 수다 — 한 종목을 두 계좌로 나눠 두 줄이어도 하나. 줄 수는 안 적는다(2026-09-16 지적).
-  const distinct = new Set(lines.map((l) => l.stock.code)).size;
-  // 체크를 푼 종목이 있으면 몇 개를 뺐는지도 — 합계가 표와 다른 까닭이 이 한 마디다. "계산에 4개"는 어색하다는 지적(2026-09-18).
-  const excluded = distinct - new Set(lines.filter((l) => !l.off).map((l) => l.stock.code)).size;
-
   /* ── 끌어서 순서 바꾸기 ──────────────────────────────────────────
      HTML5 drag 이 아니라 포인터 이벤트다 — 칩 끌기(HTML5)는 폰에서 안 되는데, 순서 바꾸기는 폰에서도 돼야 한다. 손잡이에
      touch-action: none 을 주고 포인터를 잡으면(setPointerCapture) 손가락이 손잡이를 벗어나도 move·up 이 손잡이로 온다.
@@ -132,28 +148,13 @@ export function HoldingsTable({
   };
   return (
     <div className={`dv-table${drag ? " dv-table-dragging" : ""}`} role="table" aria-label="담은 종목">
-      {/* 표 위 한 줄 — 몇 종목인지, '정렬', '모두 빼기'. 바스켓을 통째로 담아 본 뒤 하나씩 ×로 지우던 것(2026-09-16). */}
-      <div className="dv-table-bar">
-        <span className="dv-table-count">
-          담은 종목 {distinct}개{excluded > 0 && <span className="dv-table-counted"> · {excluded}개 제외</span>}
-        </span>
-        <span className="dv-table-tools">
-          {/* 정렬은 한 번 세우는 동작이라 값이 남지 않는다 — 고르는 칸(select)이 아니라 메뉴다(shadcn DropdownMenu, 2026-09-26).
-              예전엔 값이 늘 '정렬'로 돌아오는 select 를 썼다. 손으로 끈 순서는 그 뒤에 이어진다. */}
-          {lines.length > 1 && (
-            <SortMenu onSort={onSort} />
-          )}
-          <button type="button" className="dv-table-clear" onClick={onClear}>
-            모두 빼기
-          </button>
-        </span>
-      </div>
       <div className="dv-trow dv-thead" role="row">
         <span role="columnheader">종목</span>
         <span role="columnheader">주수 · 평단</span>
         <span role="columnheader">1주당 1년 배당</span>
         <span role="columnheader">1년에 받는 배당</span>
-        <span role="columnheader">배당수익률</span>
+        {/* 세후일 땐 세후 수익률 — 같은 줄 '1년에 받는 배당'(세후)과 셈이 맞게(첫 칸 · 바스켓 표와 같은 규칙, 2026-10-05 점검). */}
+        <span role="columnheader">{mode === "gross" ? "배당수익률" : "세후 수익률"}</span>
         <span role="columnheader">비중 · 투자금</span>
         <span role="columnheader" aria-label="빼기" />
       </div>
@@ -238,60 +239,68 @@ function HoldingRow({
     const [year, p] = s.payout;
     const when = year != null ? `${year}년` : "지난 1년";
     const pctText = `${Math.round(p).toLocaleString("ko-KR")}%`;
-    if (p < 0) facts.push({ text: "적자 배당", title: `${when}엔 적자였는데도 배당을 줬습니다.`, warn: true });
-    else if (p > 100) facts.push({ text: `배당성향 ${pctText}`, title: `${when} 번 돈보다 많이 줬습니다. 오래 가기 어렵습니다.`, warn: true });
-    else facts.push({ text: `배당성향 ${pctText}`, title: `${when} 번 돈의 ${pctText}를 배당으로 줬습니다.` });
+    // 말풍선은 15자 안 — 도움말 규칙(2026-10-05 점검, 최대 68자였다).
+    if (p < 0) facts.push({ text: "적자 배당", title: `${when} 적자에도 배당`, warn: true });
+    else if (p > 100) facts.push({ text: `배당성향 ${pctText}`, title: "번 돈보다 많이 줌", warn: true });
+    else facts.push({ text: `배당성향 ${pctText}`, title: "이익 중 배당 몫" });
   }
-  if ((s.growthYears ?? 0) >= 10) facts.push({ text: `${s.growthYears}년 연속 늘림`, title: `${s.growthYears}년째 해마다 배당을 늘렸습니다.` });
+  if ((s.growthYears ?? 0) >= 10) facts.push({ text: `${s.growthYears}년 연속 늘림`, title: `${s.growthYears}년째 배당 늘림` });
   // 5년 연평균 증가율. 늘린 회사만이 아니라 줄인 회사도 적는다.
   if (s.growth5 != null && s.streak >= 5) {
     const g = Math.round(s.growth5);
-    if (g >= 1) facts.push({ text: `5년 연 +${g}%`, title: `최근 5년 동안 해마다 ${g}%씩 늘었습니다.` });
-    else if (g <= -1) facts.push({ text: `5년 연 −${-g}%`, title: `최근 5년 동안 해마다 ${-g}%씩 줄었습니다.` });
+    // '5년 연 −11%'는 연평균이란 말이 안 읽혔다(2026-10-04 점검) — '5년간 해마다'.
+    // '연평균' — '5년간 해마다 −11%'는 해마다 줄였다는 말로 읽혔다(실제는 연평균, 줄인 해는 한 번 · 2026-10-04 점검).
+    // 앞에 '배당' — '5년 연평균 −11%'는 무엇의 증감인지 없어 주가로 읽힐 수 있었다(2026-10-05 점검).
+    if (g >= 1) facts.push({ text: `배당 5년 연평균 +${g}%`, title: "배당 연평균 증감" });
+    else if (g <= -1) facts.push({ text: `배당 5년 연평균 -${-g}%`, title: "배당 연평균 증감" });
   }
-  if (mode !== "gross" && line.account === "irp" && !line.outside && isSafeAsset(s)) facts.push({ text: "안전자산", title: "IRP에서 안전자산(30% 몫)으로 칩니다." });
+  if (mode !== "gross" && line.account === "irp" && !line.outside && isSafeAsset(s)) facts.push({ text: "안전자산", title: "IRP 안전자산 30% 몫" });
   // 세금이 붙는 몫 — 돈이 달라지는 줄에만(전액 과세면 안 붙는다). 국내 주식은 감액배당, 국내 ETF 는 운용사가 공시한 과표.
   if (s.taxable != null && s.dps > 0 && s.taxable < s.dps * 0.99) {
     const pct = Math.round((s.taxable / s.dps) * 100);
     if (s.kind === "stock") {
       facts.push({
         text: pct <= 0 ? "비과세" : `비과세 ${100 - pct}%`,
-        title: pct <= 0
-          ? "감액배당이라 세금이 없습니다. 회사가 쌓아 둔 자본을 돌려주는 배당이라 그렇습니다."
-          : `배당 ${won(s.dps)} 중 ${won(s.dps - s.taxable)}은 감액배당이라 세금이 없습니다.`,
+        title: pct <= 0 ? "감액배당이라 비과세" : `${won(s.dps - s.taxable)} 감액배당`,
       });
     } else {
       facts.push({
         text: `과세 ${pct}%`,
-        title: pct <= 0 ? `분배금 ${won(s.dps)}에 세금이 안 붙습니다.` : `분배금 ${won(s.dps)} 중 ${won(s.taxable)}에만 세금이 붙습니다.`,
+        title: pct <= 0 ? "분배금 비과세" : `과세 대상 ${won(s.taxable)}`,
       });
     }
   }
   // 해외 주식형 국내 ETF 는 외국에서 낸 세금만큼 국내에서 덜 뗀다 — 이 셈엔 아직 그게 없다(tax.tsx 의 foreignTaxNotCredited).
   if (mode !== "gross" && (line.account === "general" || line.outside) && foreignTaxNotCredited(s)) {
-    facts.push({ text: "실제 세금 더 적음", title: "해외에서 이미 낸 세금을 빼 주지 않은 값이라, 실제로 떼는 세금은 이보다 적습니다." });
+    facts.push({ text: "실제 세금 더 적음", title: "외국 낸 세금 미반영" });
   }
   // 고배당기업(배당소득 분리과세 대상). 일반 계좌로 세는 줄에만 — ISA·연금 계좌 소득은 금융소득에 안 합친다.
   // 지난 1년 배당이 전부 감액배당(비과세)이면 안 붙인다 — 종목 페이지 배당 카드와 같은 규칙(calc.ts 의 showsSepTax).
-  if (showsSepTax(s) && (mode === "gross" || line.account === "general" || line.outside)) facts.push({ text: "분리과세", title: "고배당기업입니다. 배당이 2,000만원을 넘어도 종합과세 대신 분리과세(14~30%)를 고를 수 있습니다." });
+  if (showsSepTax(s) && (mode === "gross" || line.account === "general" || line.outside)) facts.push({ text: "분리과세", title: "분리과세 고를 수 있음" });
   // 지난 날짜는 안 붙인다 — 표가 며칠 낡으면 '다음' 기준일·지급일이 어제일 수 있다.
   const todayKst = TODAY_KST;
-  if (s.nextRecord && s.nextRecord >= todayKst) facts.push({ text: `기준일 ${md(s.nextRecord)}`, title: `${s.nextRecord}에 주주면 다음 배당을 받습니다.` });
-  if (s.nextPay && s.nextPay[0] && s.nextPay[0] >= todayKst) facts.push({ text: `${md(s.nextPay[0])} 지급 ${money(s.nextPay[1], s)}`, title: `${s.nextPay[0]}에 1주당 ${money(s.nextPay[1], s)}을 줍니다. 회사가 정해 공시한 값입니다.` });
-  else if (s.nextPay && !s.nextPay[0] && s.nextRecord && s.nextRecord >= todayKst) facts.push({ text: `확정 ${money(s.nextPay[1], s)}`, title: `다음 배당은 1주당 ${money(s.nextPay[1], s)}으로 정해졌습니다. 지급일은 아직입니다.` });
+  if (s.nextRecord && s.nextRecord >= todayKst) facts.push({ text: `기준일 ${md(s.nextRecord)}`, title: `${md(s.nextRecord)} 주주면 받음` });
+  if (s.nextPay && s.nextPay[0] && s.nextPay[0] >= todayKst) facts.push({ text: `${md(s.nextPay[0])} 지급 ${money(s.nextPay[1], s)}`, title: "공시된 확정값" });
+  else if (s.nextPay && !s.nextPay[0] && s.nextRecord && s.nextRecord >= todayKst) facts.push({ text: `확정 ${money(s.nextPay[1], s)}`, title: "지급일은 아직" });
 
   // ── 주의(붉은 기 알약)
-  if (line.outside) facts.push({ text: "일반 계좌로 셈", title: s.currency === "USD" ? "해외 종목은 이 계좌에 못 담아 일반 계좌 세율로 셌습니다." : "개별 주식은 연금 계좌에 못 담아 일반 계좌 세율로 셌습니다.", warn: true });
+  if (line.outside) facts.push({ text: "일반 계좌로 셈", title: "이 계좌에 못 담음", warn: true });
   // 미국은 "없다"고 못 말한다 — 허쉬·디지털리얼티처럼 1주당 배당 태그를 안 다는 회사가 있다.
-  if (s.dps === 0) facts.push({ text: "배당 없음", title: s.currency === "USD" ? "공시에서 배당을 못 읽었습니다. 안 주는 회사일 수 있습니다." : "최근 1년 현금배당이 없습니다.", warn: true });
-  if (s.unusual) facts.push({ text: "특별배당 섞임", title: "지난 1년에 특별·청산배당이 섞였습니다. 내년에도 이만큼 준다고 보긴 어렵습니다.", warn: true });
+  if (s.dps === 0) facts.push({ text: "배당 없음", title: s.currency === "USD" ? "공시에 배당 없음" : "최근 1년 배당 없음", warn: true });
+  if (s.unusual) facts.push({ text: "특별배당 섞임", title: "내년엔 줄 수 있음", warn: true });
   // 첫 배당 — 끝난 회계연도에 배당이 없었는데 지난 1년에 있다. 국내만: 미국 연속 연수는 늘린 햇수를 물려받는다.
-  else if (s.currency === "KRW" && s.kind === "stock" && s.dps > 0 && s.streak === 0) facts.push({ text: "작년 무배당", title: "지난 회계연도엔 배당이 없었습니다. 이어질지는 알 수 없습니다.", warn: true });
-  if (s.kind !== "etf" && s.estimated) facts.push({ text: "추정", title: "1년치 기록이 없어 마지막 배당으로 어림한 값입니다.", warn: true });
+  else if (s.currency === "KRW" && s.kind === "stock" && s.dps > 0 && s.streak === 0) facts.push({ text: "작년 무배당", title: "지난해 배당 없었음", warn: true });
+  if (s.kind !== "etf" && s.estimated) facts.push({ text: "추정", title: "마지막 배당으로 어림", warn: true });
   // 일드맥스(TSLY·MSTY)류. 지난 1년 분배가 가격의 3할을 넘으면 원금을 돌려주는 상품이라 봐야 한다.
-  if ((s.yieldPct ?? 0) > HOT_YIELD_PCT) facts.push({ text: "초고배당", title: "분배금이 달마다 크게 흔들립니다. 원금을 돌려주는 몫이 섞여 있습니다.", warn: true });
-  if (s.close == null) facts.push({ text: "종가 없음", title: "종가가 없어 투자금과 수익률을 못 냅니다.", warn: true });
-  if (s.dps > 0 && !s.pays.length) facts.push({ text: "달력엔 없음", title: "지급일 기록이 없어 아래 달력에는 안 들어갑니다.", warn: true });
+  if ((s.yieldPct ?? 0) > HOT_YIELD_PCT) facts.push({ text: "초고배당", title: "원금 반환 섞인 분배", warn: true });
+  if (s.close == null) facts.push({ text: "종가 없음", title: "투자금 · 수익률 못 냄", warn: true });
+  if (s.dps > 0 && !s.pays.length) facts.push({ text: "달력엔 없음", title: "지급일 기록 없음", warn: true });
+  /* 사실 알약 차례 — 다가오는 지급 · 확정 → 비과세/과세(돈이 달라짐) → 분리과세 → 연속 늘림 → 5년 증가율 → 배당성향 → 나머지, 주의(붉은 알약)는 뒤.
+     ⛔ '+n' 으로 접지 않는다(2026-10-04 점검) — 접힌 알약은 마우스를 올려야 읽혀 '+1'이 무엇인지 몰랐다. 줄이 길어지면 알약이 다음 줄로 감긴다. */
+  const factRank = (t: string) =>
+    /지급|확정|기준일/.test(t) ? 0 : /과세 \d|^비과세/.test(t) ? 1 : t === "분리과세" ? 2 : /연속 늘림/.test(t) ? 3 : /^배당 5년 연평균/.test(t) ? 4 : /^배당성향/.test(t) ? 5 : 6;
+  const plain = facts.filter((f) => !f.warn).sort((a, b) => factRank(a.text) - factRank(b.text));
+  const shownFacts = [...plain, ...facts.filter((f) => f.warn)];
 
   const fractional = s.currency === "USD";
   const [sharesTyped, setSharesTyped] = useState<string | null>(null);
@@ -299,8 +308,8 @@ function HoldingRow({
     setSharesTyped(null);
     onShares(line.id, Math.max(0, Math.round((shares + d) * 1e6) / 1e6));
   };
-  // 이 줄의 투자금(원). 종가도 평단도 없거나 0주면 안 적는다.
-  const invest = line.investKrw != null && line.investKrw > 0 ? won(line.investKrw) : null;
+  // 이 줄의 투자금(원). 종가도 평단도 없거나 0주면 안 적는다. 만원부터는 만 단위 — 첫 칸 · 바스켓의 '투자금'과 같은 꼴(13,800,000원 → 1,380만원).
+  const invest = line.investKrw != null && line.investKrw > 0 ? (line.investKrw >= 1e4 ? wonShort(Math.round(line.investKrw / 1e4) * 1e4) : won(line.investKrw)) : null;
   return (
     <div
       ref={rowRef}
@@ -332,10 +341,7 @@ function HoldingRow({
                 // 되돌아온다(controlled). 따로 단추를 두면 줄이 복잡해진다는 지적(2026-09-16)으로 목록 안에 넣었다.
                 onChange={(e) => (e.target.value === SPLIT_OPTION ? onSplit(line.id) : onAccount(line.id, e.target.value as Account))}
                 aria-label={`${s.name} 계좌 유형`}
-                title={
-                  (line.ownAccount ? "이 줄만 따로 고른 계좌입니다." : "위에서 고른 계좌를 따릅니다. 이 줄만 바꿀 수 있습니다.") +
-                  (canSplit ? " 맨 아래 '＋ 계좌'로 같은 종목을 다른 계좌에도 담습니다." : "")
-                }
+                title="이 줄 계좌 바꾸기"
               >
                 {ACCOUNTS.map((a) => (
                   <option key={a.key} value={a.key} disabled={!fitsAccount(s, a.key)}>
@@ -351,7 +357,7 @@ function HoldingRow({
           {facts.length > 0 && (
             <span className="dv-tfacts">
               {/* 브라우저 기본 title 은 1초 뒤에야 뜨고 폰에선 안 뜬다 — 이 화면의 말풍선(.hz-tip)으로. */}
-              {facts.map((f) => (
+              {shownFacts.map((f) => (
                 <span key={f.text} className={`dv-tfact${f.warn ? " dv-tfact-warn" : ""} hz-tip hz-tip-wide`} data-tip={f.title}>
                   {f.text}
                 </span>
@@ -431,7 +437,7 @@ function HoldingRow({
         {invest && <span className="dv-tsub dv-tinvest-m">투자금 {invest}</span>}
       </span>
       <span className="dv-tcell dv-tnum" role="cell">
-        {line.yieldPct != null ? pct(line.yieldPct) : "·"}
+        {mode !== "gross" && line.investKrw != null && line.investKrw > 0 ? pct((line.netKrw / line.investKrw) * 100) : line.yieldPct != null ? pct(line.yieldPct) : "·"}
         {line.onCost && <span className="dv-tsub">내 평단 기준</span>}
       </span>
       {/* 비중 — 투자금 가운데 이 줄이 몇 %인지. 숫자 옆에 얇은 막대로 한 번 더. 그 아래 이 줄의 투자금(주수 × 평단, 없으면 종가) —

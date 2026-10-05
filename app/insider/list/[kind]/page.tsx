@@ -1,25 +1,26 @@
 import type { Metadata } from "next";
 import { assertLoaded } from "@/lib/load-state";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 
 import { getInsiderOverview } from "@/lib/insider-data";
 
-import { SectionHead } from "../../../kadera/SectionHead";
+import { fmtKoDate } from "@/lib/stock-page";
+
+import { CurrencyToggle } from "../../../AppShell";
+import { CoverMeta, Module } from "../../../kadera/V2Modules";
 import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
 import { ExpandableList } from "../../../kadera/ExpandableList";
 import { LoadFailedNote } from "../../../LoadFailedNote";
-import { INSIDER_LISTS, INSIDER_LIST_MAX, INSIDER_LIST_SLUGS, type InsiderListSlug } from "../../lists";
+import { INSIDER_LISTS, INSIDER_LIST_MAX, INSIDER_LIST_SLUGS, RETIRED_INSIDER_LISTS, type InsiderListSlug } from "../../lists";
 import {
-  Empty,
   WIDE_COLS,
   WideHead,
   insiderNote,
+  quarterLabel,
   wideAnalystRows,
   wideCongressRows,
   wideExecRows,
-  wideHolderRows,
-  wideHotRows,
   wideManagerRows,
   wideMoveRows,
 } from "../../parts";
@@ -78,6 +79,8 @@ export async function generateMetadata({ params }: { params: Promise<{ kind: str
 
 export default async function InsiderListPage({ params }: { params: Promise<{ kind: string }> }) {
   const { kind } = await params;
+  // 걷은 목록의 옛 주소는 본 화면으로(lists.ts RETIRED_INSIDER_LISTS).
+  if (RETIRED_INSIDER_LISTS.includes(kind)) permanentRedirect("/insider");
   const spec = specOf(kind);
   if (!spec) notFound();
 
@@ -106,6 +109,10 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
     /** 열 구성과 머리 이름. 데이터 행과 **같은 문자열**을 써야 칸이 맞는다. */
     cols: string;
     heads: (string | null)[];
+    /** 머리 근거 끝의 셈법 한 마디 — 카드마다 범위가 다르면 카드가 적는다(없으면 spec.note). */
+    note?: string;
+    /** 머리 근거의 개수 단위 — 사람이 주인공인 목록(거물 명단)은 '명'. */
+    unit?: string;
   };
   const cards: Card[] = ((): Card[] => {
     switch (kind as InsiderListSlug) {
@@ -123,13 +130,16 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             heads: ["종목", "신고", "금액"],
           },
           {
-            title: "임원이 내놓은 종목",
+            // '처분' — 본 화면 값 칸과 같은 말('내놓은'이었다, 2026-10-04 점검). 장내 매도 말고도 옵션 행사 · 증여 · 원천징수가 든다.
+            title: "임원이 처분한 종목",
             icon: "trending_down",
-            desc: "금액이 큰 순입니다. 무엇으로 내놓았는지 옆에 적었습니다.",
+            desc: "금액이 큰 순입니다. 무엇으로 처분했는지 옆에 적었습니다.",
             items: wideExecRows(cut(sold), ov.usdKrw, "sell"),
             total: sold.length,
             cols: WIDE_COLS.exec,
             heads: ["종목", "신고", "금액"],
+            // 구분 '·'과 목록 '·'이 같은 꼴이라 네 덩어리로 읽혔다(2026-10-05 점검).
+            note: "옵션 행사 등 포함",
           },
         ];
       }
@@ -151,7 +161,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             items: wideCongressRows(cut(bought), "buy"),
             total: bought.length,
             cols: WIDE_COLS.congress,
-            heads: ["종목", "의원", "건수"],
+            heads: ["종목", "의원 · 건수", "의원 수"],
           },
           {
             title: "의원이 판 종목",
@@ -160,7 +170,7 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             items: wideCongressRows(cut(sold), "sell"),
             total: sold.length,
             cols: WIDE_COLS.congress,
-            heads: ["종목", "의원", "건수"],
+            heads: ["종목", "의원 · 건수", "의원 수"],
           },
         ];
       }
@@ -188,18 +198,6 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             heads: ["종목", "줄인 거물", "인원"],
           },
         ];
-      case "hot":
-        return [
-          {
-            title: spec.title,
-            icon: spec.icon,
-            desc: spec.sub,
-            items: wideHotRows(cut(ov.rows), ov.usdKrw),
-            total: ov.rows.length,
-            cols: WIDE_COLS.hot,
-            heads: ["종목", "커뮤니티", "시세"],
-          },
-        ];
       case "managers":
         return [
           {
@@ -209,7 +207,9 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             items: wideManagerRows(cut(ov.managerRanks), ov.usdKrw),
             total: ov.managerRanks.length,
             cols: WIDE_COLS.managers,
-            heads: ["거물", "소속", "보유", "운용자산"],
+            // 값은 13F 신고 합계(미국 상장주만)라 '운용자산'이 아니다 — 제목(미국 주식을 많이 든 거물)과 같은 말로(2026-10-04 점검).
+            heads: ["거물", "소속 · 최대 비중", "보유", "미국 주식"],
+            unit: "명",
           },
         ];
       case "analyst":
@@ -221,44 +221,74 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
             items: wideAnalystRows(cut(ov.analystTop)),
             total: ov.analystTop.length,
             cols: WIDE_COLS.analyst,
-            heads: ["종목", "증권가 종합", "적극 매수"],
+            heads: ["종목", "애널리스트", "적극 매수"],
           },
         ];
-      case "holders": {
-        // 메인 화면과 같은 순서. 저기서도 이 세 줄이 그대로다.
-        const rows = [...ov.rows]
-          .filter((r) => r.holders > 0)
-          .sort((a, b) => b.holders - a.holders || b.mentions - a.mentions);
-        return [
-          {
-            title: spec.title,
-            icon: spec.icon,
-            desc: spec.sub,
-            items: wideHolderRows(cut(rows), ov.scale.managers),
-            total: rows.length,
-            cols: WIDE_COLS.holders,
-            heads: ["종목", "든 거물", "보유"],
-          },
-        ];
-      }
     }
   })();
 
   // ⚠️ 여기서 규칙을 다시 쓰지 않는다. 카드와 **같은 함수**를 부른다 — 한때 이 자리에
   //    자기 삼항식이 있었고, 카드만 날짜 기준으로 바뀌면서 넷이 어긋났다(insiderNote 주석).
   const note = insiderNote(kind as InsiderListSlug, ov);
+  const koWd = (iso: string) => `${fmtKoDate(iso)}(${"일월화수목금토"[new Date(`${iso}T00:00:00Z`).getUTCDay()]})`;
+  const coverUpdated = ((): string => {
+    switch (kind as InsiderListSlug) {
+      case "exec":
+        return ov.asOf ? `${koWd(ov.asOf)} 공시까지` : "공시 준비 중";
+      case "congress":
+        return ov.congressAsOf ? `${koWd(ov.congressAsOf)} 신고까지` : "신고 준비 중";
+      case "analyst":
+        return ov.analystAsOf ? `${koWd(ov.analystAsOf)} 받음` : "받은 날 없음";
+      case "adds":
+      case "trims":
+        // 무엇과 견줬나 — 기준 칸의 분기('2026 Q2')를 되풀이하지 않고 비교 분기를 적는다(머리 근거의 '직전 분기말 대비'를 옮겼다, 2026-10-05 점검).
+        return ov.compareQuarters.length === 2 ? `${quarterLabel(ov.compareQuarters[0])} 말 대비` : "직전 분기말 대비";
+      default:
+        // 거물 명단 — 분기 신고. '13F'(SEC 서식 이름)는 본 화면에 없는 말이라 뗐다(2026-10-05 점검).
+        return ov.compareQuarters.length === 2 ? `${note} 신고` : "분기 신고";
+    }
+  })();
+  // 기준 칸 — 날짜는 업데이트 칸이 말하므로 여기는 기간 · 문턱만, 숫자만 굵게(날짜 · 단위는 굵게 하지 않는다, 2026-10-05 점검).
+  const coverBasis = ((): React.ReactNode => {
+    switch (kind as InsiderListSlug) {
+      case "exec":
+        return (
+          <>
+            기간 <b>{ov.windowDays}</b>일
+          </>
+        );
+      case "congress":
+        return (
+          <>
+            기간 <b>{ov.congressWindowDays}</b>일
+          </>
+        );
+      case "analyst":
+        return (
+          <>
+            애널리스트 <b>10</b>명 이상
+          </>
+        );
+      case "managers":
+        return null;
+      default:
+        return <b>{note}</b>;
+    }
+  })();
+  // 돈 값이 있는 목록만 통화 스위치 — 의원 · 늘린 · 줄인 · 증권가는 눌러도 바뀌는 것이 없었다(2026-10-05 점검, AppShell 탑바도 같은 목록).
+  const hasMoney = kind === "exec" || kind === "managers";
 
   /** 잘렸으면 **알약이 그 사실을 적는다.** "전체보기"라 해 놓고 조용히 100개만 내면 거짓말이 된다. */
-  const countNote = (total: number, shown: number) =>
-    total > shown ? `${total.toLocaleString("ko-KR")}개 중 ${shown}개` : `${total.toLocaleString("ko-KR")}개`;
+  const countNote = (total: number, shown: number, unit = "개") =>
+    total > shown ? `${total.toLocaleString("ko-KR")}${unit} 중 ${shown}${unit}` : `${total.toLocaleString("ko-KR")}${unit}`;
   /* ⚠️ 잘림은 **알약이 이미 말한다**("1,000개 중 100개"). 툴팁에 같은 말을 한 번 더
      넣었더니 96자가 되어 아무도 안 읽는 길이가 됐다 — 한 자리에서 한 번만 말한다. */
 
   return (
-    // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고,
-    // 원화는 크기를 가늠하라고 얹은 것이다. 쿠키로 한 번이라도 고르면 그 선택이 이긴다
-    // (규칙은 globals.css 의 `[data-cur-default]`).
-    <div className="hz-tx" data-cur-default="usd">
+    // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고, 원화는 크기를 가늠하라고 얹은 것이다.
+    // 쿠키로 한 번이라도 고르면 그 선택이 이긴다(규칙은 globals.css 의 `[data-cur-default]`).
+    // v2(2026-10-03) — 본 화면(app/insider/page.tsx)과 같은 꼴: 뒤로 가기 줄 → 첫 줄 띠(기준 · 통화 · 업데이트) → 카드마다 모듈.
+    <div className="hz-tx v2-kd v2-in" data-cur-default="usd">
       {/* 조회가 깨진 축은 빈 목록으로 물러나 카드가 "최근에는 없습니다"라고 적는다. 메인과 같은
           줄을 머리에 달아야 그게 실패인지 정말 없는 것인지 갈린다(InsiderOverview.failedSources). */}
       <LoadFailedNote sources={ov.failedSources} />
@@ -266,19 +296,39 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
           왔는지는 사이드바가 못 말한다. */}
       <BackTrail parent={{ name: "내부자 리포트", href: "/insider" }} current={spec.title} />
 
+      <div className="v2-cover">
+        {coverBasis && (
+          <div className="v2-cover-cell">
+            <span className="v2-cover-k">기준</span>
+            <span className="v2-cover-v">
+              <span>{coverBasis}</span>
+            </span>
+          </div>
+        )}
+        {ov.usdKrw != null && hasMoney && (
+          <div className="v2-cover-cell v2-in-cur">
+            <span className="v2-cover-k">통화</span>
+            <CurrencyToggle fallback="usd" />
+          </div>
+        )}
+        {/* 업데이트 자리는 그 목록의 끝점 — 늘 임원 공시 끝점을 적었더니 의원 목록에 날짜가 둘, 13F 목록엔 상관없는 날짜가 섰다(2026-10-04 점검). */}
+        <CoverMeta updated={coverUpdated} />
+      </div>
+
       {cards.map((card) => (
-        <section className="hz-sheet" key={card.title}>
-          <SectionHead level={2}
-            icon={card.icon}
-            title={card.title}
-            // ⚠️ `right` 를 주면 SectionHead 가 note 알약을 통째로 안 그린다 — 물음표
-            //    툴팁이 그 알약에 붙어 있어서 단서가 같이 사라진다. 개수는 알약 안에 적는다.
-            note={`${note} · ${countNote(card.total, card.items.length)}`}
-            noteHelp={spec.help}
-            desc={card.desc}
-          />
+        <Module
+          key={card.title}
+          title={card.title}
+          // ⚠️ 잘렸으면 머리 근거가 그 사실을 적는다("1,000개 중 100개") — "전체보기"라 해 놓고 조용히 100개만 내면 거짓말이 된다.
+          // 셈법 한 마디는 머리 근거 끝에 그대로(물음표 말풍선이던 것, 2026-10-04). 카드 부제(설명 문장)는 걷었다(v2).
+          // 증권가는 문턱('애널리스트 10명 이상')을 기준 칸이 말한다 · 늘린 · 줄인은 비교 분기를 업데이트 칸이 말한다.
+          meta={[countNote(card.total, card.items.length, card.unit), card.note ?? (kind === "analyst" || kind === "adds" || kind === "trims" ? null : spec.note)]
+            .filter(Boolean)
+            .join(" · ")}
+          className="v2-in-listmod"
+        >
           {card.items.length === 0 ? (
-            <Empty>최근에는 없습니다.</Empty>
+            <p className="v2-empty">최근에는 없습니다.</p>
           ) : (
             /* ⚠️ 처음부터 100줄을 펴면 카드 두 장이 200줄 벽이 된다. 열 줄로 열고
                 눌러서 늘린다 — 카더라의 '더 보기'와 같은 부품이다. */
@@ -295,14 +345,14 @@ export default async function InsiderListPage({ params }: { params: Promise<{ ki
               />
             </>
           )}
-        </section>
+        </Module>
       ))}
 
       {/* ⛔ 여기 있던 "SEC와 미 하원이 공개한 공시를 그대로 옮긴 것입니다 …" 각주는
-          2026-08-23 에 뺐다. **전역 푸터(app/Footer.tsx)가 이미 같은 고지를 한다** —
-          "투자 조언이나 매수·매도 추천이 아닙니다. 모든 투자 판단과 책임은 이용자 본인에게
-          있습니다." 그 푸터는 AppShell 이 모든 화면에 붙이므로 이 화면에도 뜬다.
-          ⚠️ 다시 넣지 말 것. 넣더라도 **푸터가 그 고지를 잃은 뒤에만** 넣는다. */}
+          2026-08-23 에 뺐다. 같은 고지("투자 조언이나 매수·매도 추천이 아닙니다. 모든 투자 판단과
+          책임은 이용자 본인에게 있습니다")는 투자 유의사항(/disclaimer)이 한다. 2026-10-02 까지는 전역
+          푸터가 그 문장을 들었고, 지금은 모든 화면의 푸터가 투자 유의사항으로 건너가는 링크를 든다.
+          ⚠️ 다시 넣지 말 것 — 고지를 화면마다 적지 않고 한 페이지에 모으기로 했다(2026-10-02). */}
     </div>
   );
 }

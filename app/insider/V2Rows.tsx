@@ -1,0 +1,226 @@
+import Link from "next/link";
+
+import type { InsiderBriefRow, InsiderLeanRow } from "@/lib/insider-brief";
+import type { AnalystTop, CongressTicker, InsiderActivity, ManagerMove, ManagerRank } from "@/lib/insider-data";
+
+import { StockLogo } from "../StockLogo";
+import { Money } from "./parts";
+
+/**
+ * 내부자 리포트 본 화면(v2)의 줄 — **한 줄 · 네 칸**(순위 · 종목 · 곁 숫자 · 값). 2026-10-03 "너무 복잡하다"로 새로 짰다.
+ *
+ * 옛 줄(parts.tsx 의 execRows 따위)은 두 줄이었다 — 티커 · 이름 · 알약('카더라 언급' · '신규 12') 위에, 사람 이름 줄('사우디 국부펀드 ·
+ * 다니엘 선드하임 외 10명') · 거래 코드 줄이 아래에, 오른쪽도 값 · 날짜 두 줄. 모듈 여덟 장에 그 줄이 다섯씩이라 한 화면에 알약 · 곁줄이
+ * 마흔 개 넘게 섰다. 여기는 **그 표가 줄을 고른 까닭 하나**만 값으로 남기고, 누가 · 어떤 코드로는 종목 화면과 전체보기가 말한다.
+ * ⛔ 알약 · 둘째 줄을 다시 붙이지 말 것. 전체보기 · 종목 화면은 옛 줄 그대로다(같은 자료를 자세히 보는 자리).
+ */
+
+function Row({
+  rank,
+  href,
+  ticker,
+  name,
+  sub,
+  aux,
+  value,
+  ga,
+}: {
+  rank: number;
+  href: string;
+  ticker?: string;
+  name: string;
+  /** 종목이 아니라 사람이 주인공인 줄(거물 명단)의 곁 이름 — 운용사. 이름 뒤 회색 글자. */
+  sub?: string;
+  aux?: React.ReactNode;
+  value: React.ReactNode;
+  ga: string;
+}) {
+  // 이름이 티커와 같으면(AMD) 한 번만.
+  const showName = !ticker || name.toUpperCase() !== ticker.toUpperCase();
+  return (
+    <li>
+      {/* 사람이 주인공인 줄(로고 없음)은 폰 둘째 줄을 들여 쓰지 않는다(v2.css .v2-in-row.is-person). */}
+      <Link href={href} className={`v2-in-row${ticker ? "" : " is-person"}`} data-ga={ga}>
+        <span className="v2-in-rank">{rank}</span>
+        <span className="v2-in-who">
+          {ticker && <StockLogo code={ticker} name={name} market="US" size={20} />}
+          {ticker && <b>{ticker}</b>}
+          {showName && <span className={ticker ? "v2-in-name" : "v2-in-name is-lead"}>{name}</span>}
+          {/* 운용사가 사람 이름으로 시작하면('국민연금 국민연금공단') 같은 말이 두 번 — 뺀다(2026-10-04 점검). */}
+          {sub && !sub.startsWith(name) && <span className="v2-in-name">{sub}</span>}
+        </span>
+        <span className="v2-in-aux">{aux}</span>
+        <span className="v2-in-val">{value}</span>
+      </Link>
+    </li>
+  );
+}
+
+const stockHref = (ticker: string) => `/insider/stock/${encodeURIComponent(ticker)}`;
+
+/** 임원이 신고한 매매 — 곁 숫자 임원 수, 값은 금액 + 성격(처분 · 매수). 금액 규칙은 InsiderActivity.value(처분 합계, 장내 매수가 더 크면 매수 합계). */
+export function execLines(rows: InsiderActivity[], rate: number | null) {
+  return rows.map((b, i) => (
+    <Row
+      key={b.ticker}
+      rank={i + 1}
+      href={stockHref(b.ticker)}
+      ticker={b.ticker}
+      name={b.name}
+      aux={`임원 ${b.people}명`}
+      value={
+        <>
+          <Money usd={b.value} rate={rate} />
+          <em className={b.direction === "buy" ? "is-up" : undefined}>{b.direction === "buy" ? "매수" : "처분"}</em>
+        </>
+      }
+      ga="insider_exec_click"
+    />
+  ));
+}
+
+/** 미 하원의원 — 곁 숫자 의원 수, 값은 산 건수 · 판 건수(사는 쪽 빨강 · 파는 쪽 파랑, 국내 관례). 금액은 구간으로만 신고돼 건수다. */
+export function congressLines(rows: CongressTicker[]) {
+  return rows.map((c, i) => (
+    <Row
+      key={c.ticker}
+      rank={i + 1}
+      href={stockHref(c.ticker)}
+      ticker={c.ticker}
+      name={c.name}
+      aux={`의원 ${c.members}명`}
+      value={
+        <span className="v2-in-pair-n">
+          {/* '건' — 옆 '의원 10명'과 붙어 '매도 10'이 사람 수로 읽혔다(2026-10-05 점검). 굵기는 500(방향은 색이 말한다). */}
+          {c.buys > 0 && <span className="is-up">매수 {c.buys}건</span>}
+          {c.sells > 0 && <span className="is-down">매도 {c.sells}건</span>}
+        </span>
+      }
+      ga="insider_congress_click"
+    />
+  ));
+}
+
+/** 거물 분기 변화 — 곁 숫자 새로 담은(신규) · 다 판(청산) 거물 수, 값은 움직인 거물 수. ⚠️ 금액이 아니라 사람 수다(MoveRow 주석 — 13F 금액은 주가에 오염된다). */
+export function moveLines(rows: ManagerMove[], kind: "add" | "trim") {
+  return rows.map((m, i) => (
+    <Row
+      key={m.ticker}
+      rank={i + 1}
+      href={stockHref(m.ticker)}
+      ticker={m.ticker}
+      name={m.name}
+      // 사람 수는 '명' 하나로 — '신규 12곳 · 12명'처럼 같은 거물을 곳 · 명으로 다르게 셌다(2026-10-04 점검).
+      aux={m.mark > 0 ? `${kind === "add" ? "신규" : "청산"} ${m.mark}명` : undefined}
+      value={`${m.movers}명`}
+      ga={kind === "add" ? "insider_adds_click" : "insider_trims_click"}
+    />
+  ));
+}
+
+/**
+ * 미국 주식을 많이 든 거물(월가 거물 명단, 옛 '운용자산이 큰 순') — 거물 · 운용사 | 가장 크게 담은 한 종목과 그 비중 | 신고 합계(13F).
+ * 2026-10-04 되살림(운영자 판단) — 한때 첫 줄 띠의 링크 칸으로만 남겼고 그 자리엔 '커뮤니티에서 뜨거운 종목'이 섰다.
+ * ⚠️ 값은 13F 신고 합계라 진짜 운용자산이 아니다(미국 상장주 롱만 · ManagerRank.aum 주석). 모듈 머리의 물음표가 그 말을 한다.
+ */
+export function managerLines(rows: ManagerRank[], rate: number | null) {
+  return rows.map((m, i) => (
+    <Row
+      key={m.cik}
+      rank={i + 1}
+      href={`/insider/investor/${m.cik}`}
+      name={m.person}
+      sub={m.firm}
+      aux={m.topTicker ? `최대 비중 ${m.topName || m.topTicker} ${Math.round(m.topWeight)}%` : `${m.holdings}종목`}
+      value={<Money usd={m.aum} rate={rate} />}
+      ga="insider_managers_click"
+    />
+  ));
+}
+
+/** 증권가가 긍정적으로 보는 종목 — 곁 숫자 등급을 낸 애널리스트 수, 값은 그중 가장 높은 등급 비율. 남의 등급을 옮긴 것이라 온도색을 안 얹는다. */
+export function analystLines(rows: AnalystTop[]) {
+  return rows.map((a, i) => (
+    <Row
+      key={a.ticker}
+      rank={i + 1}
+      href={stockHref(a.ticker)}
+      ticker={a.ticker}
+      name={a.name}
+      // 무엇의 비율인지 적는다 — '17명 중 14명 · 82%'만이면 14명이 무엇인지 안 읽혔다(2026-10-04 점검).
+      aux={`${a.analystCount}명 중 적극 매수 ${a.strongBuy}명`}
+      value={`${a.analystCount > 0 ? Math.round((a.strongBuy / a.analystCount) * 100) : 0}%`}
+      ga="insider_analyst_click"
+    />
+  ));
+}
+
+/**
+ * 브리핑 줄 넷(lib/insider-brief.ts) — 이름표 칸 · 문장 칸(.v2-brief3, 시장 브리핑 · MDD 낙폭 요약과 같은 줄 꼴).
+ * 문장은 종목을 적고 숫자는 옆 '매매 방향'이 맡는다. 종목은 종목 화면 링크.
+ */
+export function BriefRows({ rows }: { rows: InsiderBriefRow[] }) {
+  return (
+    <dl className="v2-brief3">
+      {rows.map((r) => (
+        <div key={r.key} className="v2-brief3-row">
+          <dt>{r.label}</dt>
+          <dd>
+            {r.parts.map((p, i) =>
+              typeof p === "string" ? (
+                p
+              ) : (
+                <Link key={i} href={stockHref(p.ticker)} className="v2-in-brief-link" data-ga="insider_brief_click">
+                  {p.name}
+                </Link>
+              ),
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * 매매 방향 — 줄마다 두 쪽을 한 막대에 가른다. 왼쪽 오르는 쪽(산 · 늘린 · 올린) 빨강 · 오른쪽 내리는 쪽(판 · 줄인 · 내린) 파랑 —
+ * 사는 쪽 빨강 · 파는 쪽 파랑, 이 화면의 다른 줄과 같은 뜻(lib/insider-brief.ts insiderLean).
+ * 막대는 그림일 뿐이라 읽어 주는 기계에선 빼고(aria-hidden) 아래 두 값이 같은 말을 한다. 한쪽이 0 이면 그 토막은 안 그린다.
+ */
+export function LeanRows({ rows }: { rows: InsiderLeanRow[] }) {
+  return (
+    <div className="v2-in-lean">
+      {rows.map((r) => {
+        const total = r.left + r.right;
+        const lp = total > 0 ? (r.left / total) * 100 : 0;
+        // 단위는 굵게 하지 않는다 — 숫자만 b(2026-10-05 점검).
+        const n = (v: number) => (
+          <>
+            <b>{v.toLocaleString("ko-KR")}</b>
+            {r.unit}
+          </>
+        );
+        return (
+          <div key={r.key} className="v2-in-lean-row">
+            <div className="v2-in-lean-head">
+              <b>{r.label}</b>
+              <span>{r.span}</span>
+            </div>
+            <div className="v2-in-lean-bar" aria-hidden>
+              {r.left > 0 && <i className="is-up" style={{ flexBasis: `${lp}%` }} />}
+              {r.right > 0 && <i className="is-down" style={{ flexBasis: `${100 - lp}%` }} />}
+            </div>
+            <div className="v2-in-lean-legend">
+              <span className="is-up">
+                {r.leftLabel} {n(r.left)}
+              </span>
+              <span className="is-down">
+                {r.rightLabel} {n(r.right)}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

@@ -14,7 +14,7 @@ import { track } from "@/lib/ga";
  *
  *   <a data-ga="cta_click" data-ga-cta="report_indicator" data-ga-surface="sentiment_grid">
  *
- * 이미 클라이언트인 컴포넌트(ThemeToggle·TrendingTabs·MddExplorer 등)는 이 위임을
+ * 이미 클라이언트인 컴포넌트(ThemeToggle·MddExplorer 등)는 이 위임을
  * 거치지 말고 track() 을 직접 부른다 — state 를 함께 실어야 해서 속성으로는 부족하다.
  */
 export default function GaEvents() {

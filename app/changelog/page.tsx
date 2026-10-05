@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 
-import { DOC_WIDTH } from "../legal";
+import { DocCell, DocCover } from "../legal";
+import { Module } from "../kadera/V2Modules";
 import { RELEASES } from "../releases";
 import { CHANGELOG_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
-import { C, MONO, R } from "../ui";
 import { ChangelogSeen } from "../VersionBadge";
 
 // og:image URL 에 그날의 도수가 실려 있어 요청마다 다시 계산해야 한다(상수로 두면
@@ -18,86 +18,76 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
+/** '2026-10-02' → '10/2'. 달 머리 아래 줄이라 해를 안 적는다. */
+const md = (iso: string) => iso.slice(5).split("-").map(Number).join("/");
+/** '2026-08-06' → '2026년 8월 6일'. */
+const koDate = (iso: string) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${y}년 ${m}월 ${d}일`;
+};
+
 /**
  * 업데이트 기록. 푸터의 버전 표기를 누르면 여기로 온다.
  *
  * 내용은 app/releases.ts 한 곳에서 온다 — 버전을 올릴 때 그 목록 맨 앞에 한 줄 넣으면
  * 푸터 표기와 이 페이지가 같이 따라온다.
  *
- * 조판은 법정 고지(개인정보처리방침·이용약관)와 같은 문서 폭을 쓴다. 카드 그리드로
- * 두면 지표 화면처럼 보여서, 눌러 들어온 사람이 "읽는 곳"이라는 걸 늦게 안다.
+ * v2(2026-10-04) — 판마다 테두리 카드 한 장(124장, 1,440 에서 18,285px)이던 것을 **달마다 모듈 한 장 · 판마다 한 줄**로 바꿨다.
+ * 줄 = 버전 · 배포일 · 바뀐 것(한 줄에 하나). 바뀐 것은 짧은 줄이라(가운데값 38자) 판 폭 전체를 써도 읽기 길이가 안 늘어난다 —
+ * 오른쪽 칸을 두지 않는다. 첫 줄 띠는 지금 판 · 지금까지 판 수 · 첫 공개.
+ * ⛔ '최근 30일 몇 번'처럼 오늘 기준 숫자는 안 둔다 — 이 화면은 배포 때 한 번 그려져 날이 지나면 거짓이 된다.
  */
 export default function ChangelogPage() {
+  const latest = RELEASES[0];
+  const first = RELEASES[RELEASES.length - 1];
+  // 달마다 묶는다(앞이 최신 — RELEASES 순서 그대로).
+  const months: { key: string; rows: typeof RELEASES }[] = [];
+  for (const rel of RELEASES) {
+    const key = rel.date.slice(0, 7);
+    const last = months[months.length - 1];
+    if (last?.key === key) last.rows.push(rel);
+    else months.push({ key, rows: [rel] });
+  }
   return (
-    <div style={{ maxWidth: DOC_WIDTH }}>
+    <div className="hz-tx v2-kd v2-dc v2-cl">
       {/* 이 화면을 봤다는 표시. 푸터 버전 옆의 빨간 N 이 여기서 꺼진다. 푸터를 눌러 온
           사람은 누르는 순간 이미 꺼지지만, 사이드바·검색·주소 직접 입력으로 닿은 사람은
           이 줄이 없으면 다 읽고 나가도 배지가 그대로 켜져 있다. 그리는 것은 없다. */}
       <ChangelogSeen />
-      {/* 제목과 그 아래 한 줄은 셸의 페이지 머리가 그린다(app/legal.tsx DOC_PAGES) — 다른 화면과 같은 자리·같은 크기다. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {RELEASES.map((rel, i) => (
-          <section
-            key={rel.version}
-            style={{
-              background: C.card,
-              border: `1px solid ${C.line}`,
-              borderRadius: R.card,
-              padding: "18px 20px",
-            }}
-          >
-            {/* 버전과 날짜를 한 줄에 마주 보게 둔다. 버전은 등고선처럼 훑는 값이라
-                고정폭으로 두어야 자릿수가 달라져도 세로로 정렬돼 보인다. */}
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <span style={{ fontFamily: MONO, fontSize: "var(--fs-15)", fontWeight: 700, color: C.ink, letterSpacing: "0.01em" }}>
-                v{rel.version}
-              </span>
-              {/* 맨 앞이 곧 지금 쓰이는 버전이다. 눌러 들어온 사람이 푸터에서 본 숫자를
-                  여기서 다시 찾을 수 있게 표시해 둔다. */}
-              {i === 0 && (
-                <span
-                  style={{
-                    fontSize: "var(--fs-11)",
-                    fontWeight: 700,
-                    // ⚠️ C.blue 는 **면**에 쓰는 원색이라 파란 tint 위 글자로는 3.3 이다.
-                    //    파란 글자 전용 값(blueInk)은 같은 tint 위에서 4.66 이다.
-                    color: C.blueInk,
-                    background: "var(--c-blue-tint)",
-                    borderRadius: 999,
-                    padding: "2px 8px",
-                  }}
-                >
-                  현재
-                </span>
-              )}
-              <span style={{ flex: 1 }} />
-              <time dateTime={rel.date} style={{ fontFamily: MONO, fontSize: "var(--fs-12)", color: "var(--c-muted)" }}>
-                {rel.date}
-              </time>
-            </div>
-
-            {/* Tailwind 프리플라이트가 list-style 을 지운다. 여기서 되살리지 않으면
-                항목이 들여쓴 문단처럼 보여 몇 가지가 바뀐 건지 눈에 안 들어온다. */}
-            <ul
-              style={{
-                margin: "12px 0 0",
-                paddingLeft: 18,
-                listStyle: "disc outside",
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-                fontSize: "var(--fs-14)",
-                lineHeight: 1.75,
-                color: C.sub,
-              }}
-            >
-              {rel.changes.map((line) => (
-                <li key={line}>{line}</li>
+      {/* 달 바로가기 — 9월 한 달이 94줄이라 지난달로 가려면 한참 내려야 했다(2026-10-04 점검). '현재'는 줄 배지와 같은 말. */}
+      <DocCover
+        title="업데이트 기록"
+        links={months.slice(1).map((m) => ({ href: `#m-${m.key}`, label: `${Number(m.key.slice(5))}월` }))}
+      >
+        {/* 날짜 꼴은 사이트 나머지와 같은 'n월 n일'(2026-10-05 점검). */}
+        <DocCell k="현재" v={`v${latest.version}`} sub={`${Number(latest.date.slice(5, 7))}월 ${Number(latest.date.slice(8, 10))}일`} />
+        <DocCell k="지금까지" v={`${RELEASES.length.toLocaleString("ko-KR")}번 업데이트`} />
+        <DocCell k="첫 공개" v={koDate(first.date)} sub={`v${first.version}`} />
+      </DocCover>
+      {months.map((m) => {
+        const [y, mo] = m.key.split("-").map(Number);
+        return (
+          <Module key={m.key} id={`m-${m.key}`} title={`${y}년 ${mo}월`} meta={`${m.rows.length}번 업데이트`} className="v2-cl-mod">
+            <ol className="v2-cl-list">
+              {m.rows.map((rel) => (
+                <li key={rel.version} className="v2-cl-row">
+                  <span className="v2-cl-ver">
+                    v{rel.version}
+                    {/* 맨 앞이 곧 지금 쓰이는 판이다 — 푸터에서 본 숫자를 여기서 다시 찾게. */}
+                    {rel === latest && <span className="v2-badge">현재</span>}
+                  </span>
+                  <time dateTime={rel.date}>{md(rel.date)}</time>
+                  <ul>
+                    {rel.changes.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </li>
               ))}
-            </ul>
-          </section>
-        ))}
-      </div>
+            </ol>
+          </Module>
+        );
+      })}
     </div>
   );
 }

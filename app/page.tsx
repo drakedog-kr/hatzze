@@ -1,15 +1,17 @@
-import { SCORE_TREND_DAYS, getKospiCloseSeries, getLatestDailyScore, getPublicIndicators, getScoreHistory, getTopStockHighGaps } from "@/lib/data";
+import { SCORE_TREND_DAYS, getKospiCloseSeries, getKrIndexClosesSide, getLatestDailyScore, getPublicIndicators, getScoreHistory, getTopStockHighGaps } from "@/lib/data";
+import { formatKstUpdate } from "@/lib/format";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
-import { SectionIntro } from "./SectionIntro";
 import type { IndicatorCategory } from "@/lib/data";
-import { C, Icon, R, stageForScore } from "./ui";
+import { Icon, stageForScore } from "./ui";
 import { pick, GenericCard } from "./home/parts";
-import { ANCHOR_ALIAS, BAND_LABELS, DIST_FILL, Hero } from "./home/Hero";
+import { ANCHOR_ALIAS, BAND_LABELS, DIST_FILL } from "./home/Hero";
 import type { BandItem } from "./home/Hero";
+import { BriefModule, IndexModule } from "./home/V2Briefing";
+import { CoverIndexCell, CoverLinkCell, CoverMeta, Module, type CoverLink } from "./kadera/V2Modules";
 import { CardBuffett, CardLeverage, CardMarketActions, CardTurnover, CardHighGap, CardSpeed, CardVkospi, CardAsia, CardGoldRatio, CardVolume, CardFx, CardNetBuy, CardLimitUp, CardPutCall } from "./home/cards-market";
 import { CardComingSoon, CardDivergence, CardTrend, CardSentiment, CardYoutube, CardSpending, CardUpbit, CardBrokerage } from "./home/cards-sentiment";
 import type { IconName } from "@/lib/icon-names";
-import { loadSpotlight } from "./home/spotlight-data";
+import { loadSpotlight, type SpotChip } from "./home/spotlight-data";
 
 // 캐시 주기는 루트 레이아웃의 `revalidate` 가 정한다(app/layout.tsx). 예전엔 여기가
 // force-dynamic 이라 방문마다 서버가 새로 그렸다.
@@ -46,7 +48,7 @@ const FALLBACK_ICONS: Record<string, IconName> = {
 };
 
 export default async function Home() {
-  const [dailyScore, indicators, rawTopGaps, rawKospiPath, rawScoreTrend, spotlight] = await Promise.all([
+  const [dailyScore, indicators, rawTopGaps, rawKospiPath, rawScoreTrend, spotlight, rawIndexes] = await Promise.all([
     getLatestDailyScore(),
     getPublicIndicators(),
     getTopStockHighGaps(3),
@@ -57,6 +59,8 @@ export default async function Home() {
     // 히어로 바닥 '오늘 눈에 띄는 것' 칩. 실패해도 던지지 않는다(app/home/spotlight-data.ts 머리말) —
     // 그래서 아래 assertLoaded 에 넣지 않는다.
     loadSpotlight(),
+    // v2 첫 줄의 지수 종가(국장 카더라와 같은 칸). 곁들이는 칸이라 실패해도 칸만 빠진다.
+    getKrIndexClosesSide(),
   ]);
 
   /* 조회 실패를 "자료 없음" 과 가른다(lib/load-state.ts). 두 값 다 카드의 **곁가지**라,
@@ -117,31 +121,53 @@ export default async function Home() {
     if (short && short !== i.name) nameAnchors[short] = href;
   }
 
+  /* ── v2(2026-10-03) — 카더라 v2 의 디자인 규칙을 옮겼다 ──────────────────────────
+     첫 줄 띠(지수 종가 · 링크 칸 · 업데이트) → 둘째 줄 [햇쩨 지수 | 오늘의 브리핑] → 지표 모듈 둘(시장 · 감성).
+     페이지 제목 · 구간 제목('01 시장 지표')은 걷고 모듈 머리 띠가 이름을 말한다. 카드 안의 부제 · 바닥 설명 문장은 v2.css .v2-bf 가 숨긴다.
+     링크 칸은 홈 '오늘 눈에 띄는 것'의 재료다(급부상 1위 · 테마 유입 1위). ⛔ 밤사이 미장 칸은 안 쓴다 — 2026-10-03 "별로". */
+  // 언급 배수('언급 5.9배' · '첫 언급')엔 색을 싣지 않는다 — 빨강은 주가가 오른 말로 읽힌다(카더라 띠 · 표와 같은 규칙, 2026-10-05 점검).
+  const toLink = (c: SpotChip): CoverLink => ({
+    cap: c.cap,
+    name: c.name,
+    val: c.val.replace("▲", "+"),
+    tone: c.val.includes("언급") ? "flat" : "up",
+    href: c.href,
+    ga: c.ga,
+  });
+  const coverLinks = [spotlight.timed.kadera, ...spotlight.fixed].filter((c): c is SpotChip => c !== null).map(toLink);
+  const indexes = isLoadFailed(rawIndexes) ? null : rawIndexes;
+  const nMarket = indicators.filter((i) => i.category === "시장").length;
+  const nSocial = indicators.filter((i) => i.category === "감성").length;
+  const hitsMeta = (n: number, hits: number) => `${n}개${hits ? ` · 초고온 ${hits}` : ""}`;
+
 
   return (
-    /* 뿌리의 hz-tx 가 이번 리디자인(시트 모서리 20·구간 제목·히어로 격자)을 켠다 — globals.css. */
-    <div className="hz-tx">
+    /* 뿌리의 hz-tx 는 카드 안 조판(시트 · 셀)을 켠다 — globals.css. v2-kd 는 v2 토큰 · 폭 단계, v2-bf 는 이 화면 전용 덮기(v2.css). */
+    <div className="hz-tx v2-kd v2-bf">
+            {/* 첫 줄 — 지수 종가 · 링크 칸(카더라로) · 업데이트 */}
+            <div className="v2-cover">
+              {indexes && <CoverIndexCell kospi={indexes.kospi} kosdaq={indexes.kosdaq} />}
+              {coverLinks.map((c) => (
+                <CoverLinkCell key={c.ga} c={c} />
+              ))}
+              {/* '지표 25개 분석'은 걷었다 — 바로 아래 햇쩨 지수 머리('지표 25개')와 같은 말이다(v2, 2026-10-03). */}
+              <CoverMeta updated={dailyScore ? formatKstUpdate(dailyScore.updated_at, "업데이트") : "업데이트 준비 중"} />
+            </div>
+
+            {/* 둘째 줄 — 햇쩨 지수 | 오늘의 브리핑 */}
             {dailyScore ? (
-              <Hero
-                dailyScore={dailyScore}
-                tradHits={countHits("시장")}
-                socialHits={countHits("감성")}
-                bandCounts={bandCounts}
-                bandTotal={bandTotal}
-                trend={isLoadFailed(rawScoreTrend) ? null : rawScoreTrend}
-                trendDays={SCORE_TREND_DAYS}
-                spotlight={spotlight}
-                nameAnchors={nameAnchors}
-              />
+              <div className="v2-bf-band">
+                <IndexModule dailyScore={dailyScore} trend={isLoadFailed(rawScoreTrend) ? null : rawScoreTrend} days={SCORE_TREND_DAYS} bands={bandCounts} total={bandTotal} />
+                <BriefModule summary={dailyScore.ai_summary} nameAnchors={nameAnchors} />
+              </div>
             ) : (
-              <section style={{ background: C.card, borderRadius: 16, padding: 44, textAlign: "center", color: C.sub }}>
-                아직 계산된 스코어가 없습니다.
-              </section>
+              <Module id="index" title="햇쩨 지수">
+                <p className="v2-empty">아직 계산된 스코어가 없습니다.</p>
+              </Module>
             )}
 
-            {/* 시장 지표 (category=시장) */}
-            <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <SectionIntro n={1} id="market" title="시장 지표" />
+            {/* 시장 지표 (category=시장) — 모듈 하나에 셀 격자. 구간 제목(SectionIntro)의 앵커 id 는 모듈이 그대로 잇는다. */}
+            <Module id="market" title="시장 지표" meta={hitsMeta(nMarket, countHits("시장"))} className="v2-sheet">
               <div className="hz-cards">
                 {/* 순서 = 가중치(config/indicator_weights.py) × 직관성 × 변동성.
                     ① 가중치 1·2위(4.5/4.0)를 2칸으로 맨 앞에 — 둘 다 설명이 필요 없는 지표다.
@@ -164,29 +190,23 @@ export default async function Home() {
                 <CardFx v={p("usdkrw_volatility")} />
                 <CardAsia v={p("kospi_asia_relative_strength")} />
                 <CardComingSoon />
-                {/* 순서 = 가중치 × 직관성 × 변동성. 칸 합계 20으로 5행이 정확히 채워진다.
-                    VIX 대비 VKOSPI 스프레드는 내렸다 — 1년의 76%가 과열도 0이라 종합점수에
-                    기여하지 못했고, VKOSPI 에서 파생된 지표라 VKOSPI 카드와 겹쳤다.
-                    그 한 칸을 버핏지수(1→2칸)로 돌려 총량은 그대로다.
-                    행 구성: [신고가2·거래대금·예탁금] [VKOSPI·순매수·풋콜·쏠림]
-                             [안전장치2·위험자산2] [버핏2·레버리지2]
-                             [환율·아시아2·준비중] */}
+                {/* 순서 = 가중치 × 직관성 × 변동성. VIX 대비 VKOSPI 스프레드는 내렸다 — 1년의 76%가 과열도 0이라
+                    종합점수에 기여하지 못했고, VKOSPI 에서 파생된 지표라 VKOSPI 카드와 겹쳤다.
+                    v2 행 구성(4열, 칸 합계 16): [신고가·거래대금·속도·급등] [외국인·쏠림·풋콜·안전장치]
+                                                [VKOSPI·레버리지·버핏·금] [환율·아시아·준비중2] */}
                 {extra("시장").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["시장"]} />
                 ))}
               </div>
-            </section>
+            </Module>
 
             {/* 감성 지표 (category=감성) */}
-            <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <SectionIntro n={2} id="sentiment" title="감성 지표" />
+            <Module id="sentiment" title="감성 지표" meta={hitsMeta(nSocial, countHits("감성"))} className="v2-sheet">
               <div className="hz-cards">
-                {/* 시장 지표와 같은 원칙으로 순서만 바꿨다 — 칸 수는 기존과 동일(12칸).
-                    검색량(가중치 3.0)과 코인 투기를 앞세우고, 명품·오마카세는 재미는 크지만
-                    가중치 0.5+0.5에 후행 지표라 뒤로, 베스트셀러는 30일간 값이 2종류뿐일
-                    만큼 안 움직여 맨 뒤로 뺐다.
-                    행 구성: [검색량·코인·디씨·뉴스] [증권앱·유튜브·실물괴리2]
-                             [명품2·봇레포·베스트셀러] — 3행이 정확히 채워진다. */}
+                {/* 시장 지표와 같은 원칙으로 순서만 바꿨다. 검색량(가중치 3.0)과 코인 투기를 앞세우고,
+                    명품·오마카세는 재미는 크지만 가중치 0.5+0.5에 후행 지표라 뒤로.
+                    v2 행 구성(4열, 칸 합계 12): [검색량·뉴스·디씨·코인] [여윳돈·실물괴리·유튜브·베스트셀러]
+                                                [봇레포·증권앱·제보2] */}
                 <CardTrend v={p("naver_search_trend")} icon="search" />
                 <CardSentiment v={p("news_sentiment")} icon="newspaper" countNoun="뉴스" />
                 <CardSentiment v={p("dcinside_post_count")} icon="forum" countNoun="글" />
@@ -201,37 +221,21 @@ export default async function Home() {
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["감성"]} />
                 ))}
                 <a
+                  className="hz-report-cell hz-cell-wide"
                   href="https://forms.gle/P4wzp2DkP2wyTPWP9"
                   target="_blank"
                   rel="noopener noreferrer"
                   data-ga="cta_click"
                   data-ga-cta="report_indicator"
                   data-ga-surface="sentiment_grid"
-                  // 시트의 한 칸이라 **라운드를 주지 않는다.** 라운드를 두면 격자 안에서
-                  // 이 칸만 안쪽으로 물러난 카드처럼 보인다. 점선 테두리가 이미 "이건
-                  // 지표가 아니라 빈자리"를 말한다.
-                  style={{
-                    background: "var(--c-blue-tint2)",
-                    border: "1.5px dashed var(--c-blue-4)",
-                    padding: 22,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 10,
-                    textAlign: "center",
-                    minHeight: 180,
-                    textDecoration: "none",
-                  }}
+                  // v2(2026-10-03): 점선 · 파란 면 · 아이콘 타일 · 곁말('아이디어가 있다면 알려주세요')을 걷고 칸 가운데 링크 한 줄로.
+                  // 꼴은 v2.css .hz-report-cell — 이 칸은 홈에만 있어 인라인 값을 !important 로 덮던 것을 걷었다.
                 >
-                  <div style={{ width: 44, height: 44, borderRadius: R.control, background: "var(--c-card)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Icon name="add_circle" style={{ fontSize: "var(--fs-23)", color: "var(--c-blue)" }} />
-                  </div>
-                  <strong style={{ fontSize: "var(--fs-15)", fontWeight: 800, color: "var(--c-ink)" }}>새로운 지표 제보하기</strong>
-                  <span style={{ fontSize: "var(--fs-12-5)", color: "var(--c-sub)" }}>아이디어가 있다면 알려주세요</span>
+                  <Icon name="add_circle" />
+                  <strong>새로운 지표 제보하기</strong>
                 </a>
               </div>
-            </section>
+            </Module>
     </div>
   );
 }

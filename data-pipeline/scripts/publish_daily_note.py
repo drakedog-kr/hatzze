@@ -157,6 +157,10 @@ def check(title: str, body: str) -> tuple[list[str], list[str]]:
                 errors.append(f"{where}: 금지어 {hits} — {snippet}")
         if not s.startswith(NOT_A_SENTENCE) and re.search(r"(?:어요|아요|해요|네요|죠|요)[.!?]?$", s):
             warnings.append(f"{where}: 해요체로 끝납니다 — …{s[-30:]}")
+    # 제목은 h1 · 탭 · 지난 노트 목록 · 공유 카드에 그대로 나가는 한 줄이라 합쇼체를 막는다. 2026-09-03 제목만
+    # '…다 팔았다'(해라체)로 나갔다 — 본문 줄 검사는 해요체만 잡아 해라체 제목이 지나갔다(2026-10-04 점검).
+    if title.strip() and not re.search(r"(?:니다|니까)[.!?]?$", title.strip()):
+        errors.append(f"제목: 합쇼체(~니다)로 끝나지 않습니다 — {title.strip()[:40]}")
     headings = [h.strip() for h in re.findall(r"^###\s+(.*)$", body, flags=re.M)]
     for sec in REQUIRED_SECTIONS:
         if sec not in headings:

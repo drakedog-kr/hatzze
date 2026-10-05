@@ -87,8 +87,8 @@ const hourLabel = (hour: number) => `${hour < 12 ? "오전" : "오후"} ${hour %
 
 // 화면의 다른 날짜("9월 22일 종가"·"9월 23일 기준")와 같은 꼴로 적는다(2026-09-23). 예전엔
 // "2026-09-23(수)" 라 한 화면에 날짜 표기가 둘이었다. 연도는 뺀다 — 이 줄은 늘 오늘·어제다.
-const updateLabel = (p: ReturnType<typeof kstUpdateParts>, time: string) =>
-  `${p.month}월 ${p.day}일(${p.weekday}) ${time} 기준`;
+const updateLabel = (p: ReturnType<typeof kstUpdateParts>, time: string, tail = "기준") =>
+  `${p.month}월 ${p.day}일(${p.weekday}) ${time} ${tail}`;
 
 /**
  * "최종 업데이트" 라벨 — 자료가 쓰인 시각을 **가장 가까운 30분**으로 적는다(2026-09-30).
@@ -113,11 +113,12 @@ const updateLabel = (p: ReturnType<typeof kstUpdateParts>, time: string) =>
  *
  * 테마 판세는 여기에 카더라 총평 시각을 넘긴다(lib/theme-page.ts 의 themeUpdatedAt).
  * 국장 미리보기만 정해 둔 정각에 붙인다(formatKstUpdateSnapped).
+ * 꼬리(tail)는 기본 '기준'이다. v2 국장 카더라 첫 줄은 '업데이트'로 쓴다(2026-10-03 요청).
  */
-export function formatKstUpdate(isoString: string): string {
+export function formatKstUpdate(isoString: string, tail = "기준"): string {
   const rounded = Math.round(new Date(isoString).getTime() / UPDATE_STEP_MS) * UPDATE_STEP_MS;
   const p = kstUpdateParts(new Date(rounded));
-  return updateLabel(p, `${hourLabel(p.hour)}${p.minute ? ` ${p.minute}분` : ""}`);
+  return updateLabel(p, `${hourLabel(p.hour)}${p.minute ? ` ${p.minute}분` : ""}`, tail);
 }
 
 /** 예정 시각에서 이만큼 안에 끝났으면 "예정대로 돌았다"고 보고 정각으로 스냅한다.
@@ -141,10 +142,20 @@ const SCHEDULE_SLACK_HOURS = 2;
  * 맨 앞 스텝이라, 잡이 끝나는 시각(옛 기본값 [9, 20])에 대면 "오전 9시" 로 붙어 두 시간을
  * 앞당겨 거짓말한다(2026-09-04 지적, 실측 34줄이 전부 7시).
  */
-export function formatKstUpdateSnapped(isoString: string, scheduledHours: readonly number[]): string {
+export function formatKstUpdateSnapped(isoString: string, scheduledHours: readonly number[], tail = "기준"): string {
   const p = kstUpdateParts(new Date(isoString));
   const scheduled = scheduledHours.find((h) => Math.abs(p.hour - h) <= SCHEDULE_SLACK_HOURS);
-  return updateLabel(p, scheduled !== undefined ? hourLabel(scheduled) : `${hourLabel(p.hour)}경`);
+  return updateLabel(p, scheduled !== undefined ? hourLabel(scheduled) : `${hourLabel(p.hour)}경`, tail);
+}
+
+/**
+ * formatKstUpdateSnapped 의 짧은 꼴 — "10/4 오후 6시". 미리보기 해외 값 머리가 살아 있는 값일 땐 "10/4 오후 11:20 시점",
+ * 담아 둔 값일 땐 "10월 4일(일) 오후 6시 시점"으로 같은 자리 꼴이 갈렸다(2026-10-05 점검). 정각 붙이기는 같다.
+ */
+export function formatKstSnappedShort(isoString: string, scheduledHours: readonly number[]): string {
+  const p = kstUpdateParts(new Date(isoString));
+  const scheduled = scheduledHours.find((h) => Math.abs(p.hour - h) <= SCHEDULE_SLACK_HOURS);
+  return `${p.month}/${p.day} ${scheduled !== undefined ? hourLabel(scheduled) : `${hourLabel(p.hour)}경`}`;
 }
 
 /**

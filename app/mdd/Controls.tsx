@@ -5,45 +5,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { gaSearchTerm, gaStockCode, track } from "@/lib/ga";
 import { C, Icon, MONO } from "../ui";
-import { SectionIntro } from "../SectionIntro";
 import { StockLogo } from "../StockLogo";
-import { PERIODS, marketBadge, benchName } from "./shared";
+import { MAJOR_NAMES, PERIODS, marketBadge, benchName, fmtDay } from "./shared";
 import type { StockOption, Suggestion, SuggestGroups, MddResult } from "./shared";
 import { periodLabelOf, AbsentSheet } from "./sheet";
 import { HeroStrip, Underwater } from "./Hero";
-import { RiskProfile } from "./RiskProfile";
-import { Attribution, Recovery, Character, Theme, TopDrawdowns } from "./sheets";
-
-/**
- * 시가총액 상위 KOSPI 보통주를 큰 것부터 손으로 고정한 목록(2026-07 기준).
- *
- * 관련도를 데이터로 뽑을 수 없어 손으로 둔다 — stocks 테이블에는 코드·종목명·종가만
- * 있고 시가총액도 상장주식수도 없다. 종가는 대용이 못 된다(삼성바이오로직스 한 주가
- * 삼성전자보다 열 배 넘게 비싸다). 검색창에 대표성을 주는 다른 신호가 없다.
- *
- * 하는 일은 하나다: "삼성"·"현대"처럼 그룹명이 겹쳐 수십 종목이 걸리는 질의에서 어느
- * 쪽을 먼저 보여줄지 가른다. 여기 없는 종목도 검색은 그대로 되고 이름 길이·가나다순으로
- * 뒤에 붙을 뿐이다. 순위가 낡아도 화면에 나오는 수치는 틀리지 않는다 — 후보를 세우는
- * 데만 쓰고 분석값에는 손대지 않기 때문이다. 그래서 시총이 바뀔 때마다 고칠 필요는 없고,
- * 새 대표주가 검색으로 안 나온다는 말이 나올 때 맨 앞쪽만 손보면 된다.
- *
- * 이름은 stocks 테이블(KRX 정식 종목명)과 정확히 같아야 맞는다 — "엔씨소프트"가 아니라
- * "NC", "네이버"가 아니라 "NAVER". lib/stock-themes.ts 의 테마 사전과 일부 겹치지만
- * 일부러 따로 둔다: 그쪽은 테마별 바스켓이라 안에 순서가 없고, 순서를 뜻하게 만들면
- * 테마 카드를 손볼 때 검색 순위가 조용히 따라 바뀐다.
- */
-const MAJOR_NAMES = [
-  "삼성전자", "SK하이닉스", "삼성바이오로직스", "LG에너지솔루션", "현대차", "기아",
-  "두산에너빌리티", "한화에어로스페이스", "HD현대중공업", "셀트리온", "NAVER", "신한지주",
-  "KB금융", "삼성물산", "현대모비스", "한국전력", "카카오", "하나금융지주", "메리츠금융지주",
-  "HD한국조선해양", "삼성생명", "삼성화재", "POSCO홀딩스", "LG화학", "SK스퀘어", "한화오션",
-  "삼성SDI", "크래프톤", "HMM", "하이브", "KT&G", "우리금융지주", "SK이노베이션",
-  "삼성에스디에스", "한국항공우주", "한미반도체", "현대글로비스", "삼성중공업", "LG전자",
-  "SK텔레콤", "KT", "기업은행", "대한항공", "유한양행", "삼양식품", "아모레퍼시픽", "삼성전기",
-  "포스코퓨처엠", "현대건설", "HD현대", "HD현대일렉트릭", "한화시스템", "현대로템", "고려아연",
-  "SK", "LG", "한화", "GS", "CJ", "두산", "삼성증권", "미래에셋증권", "DB손해보험", "현대해상",
-  "LG유플러스", "롯데케미칼", "한진칼", "CJ제일제당", "이마트", "LS",
-];
+import { AttributionModule, CasesTable, LadderModule, LastDropModule, MddCover, RecoveryModule, ThemeModule, YearVsMarketModule, YearsModule } from "./V2Sheets";
 
 const MAJOR_RANK = new Map(MAJOR_NAMES.map((n, i) => [n, i]));
 
@@ -129,7 +96,7 @@ function SuggestSection({
     <section>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, padding: "0 10px 6px" }}>
         <h3 style={{ margin: 0, fontSize: "var(--fs-13)", fontWeight: 700, color: C.ink }}>{title}</h3>
-        <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.muted, whiteSpace: "nowrap" }}>{hint}</span>
+        <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted, whiteSpace: "nowrap" }}>{hint}</span>
       </div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {items.map((s, i) => (
@@ -151,7 +118,10 @@ function SuggestSection({
                 textAlign: "left",
               }}
             >
-              <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", color: C.muted, width: 12, flexShrink: 0 }}>{i + 1}</span>
+              {/* 순위는 시장마다 따로(국내 1~3 · 미국 1~2) — 이어 매기면 '3 삼성전기 99회 → 4 마이크론 709회'처럼 값과 어긋났다(2026-10-04 점검). */}
+              <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", color: C.muted, width: 12, flexShrink: 0 }}>
+                {items.slice(0, i + 1).filter((x) => (x.market === "US") === (s.market === "US")).length}
+              </span>
               <StockLogo code={s.code} name={s.name} market={s.market} />
               <span style={{ fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {s.name}
@@ -170,7 +140,7 @@ function SuggestSection({
                   {marketBadge(s.market)}
                 </span>
               )}
-              <span style={{ marginLeft: "auto", fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{s.note}</span>
+              <span style={{ marginLeft: "auto", fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, whiteSpace: "nowrap" }}>{s.note}</span>
             </button>
           </li>
         ))}
@@ -258,16 +228,17 @@ export function Controls({
             display: "flex",
             alignItems: "center",
             gap: 8,
-            background: C.track,
-            border: `1px solid ${focused ? C.blue : "transparent"}`,
-            boxShadow: focused ? `0 0 0 3px var(--c-blue-tint)` : "none",
-            borderRadius: 12,
-            padding: "0 14px",
-            height: 44,
+            // v2: 흰 판 + 1px 테두리 + 모서리 6 — 모듈과 같은 면(2026-10-03). 고를 때만 파란 테두리.
+            background: "var(--t-card)",
+            border: `1px solid ${focused ? "var(--t-down)" : "var(--t-frame)"}`,
+            boxShadow: focused ? `0 0 0 3px var(--t-down-weak)` : "none",
+            borderRadius: 6,
+            padding: "0 12px",
+            height: 41,
             transition: "border-color .15s, box-shadow .15s",
           }}
         >
-          <Icon name="search" style={{ fontSize: "var(--fs-20)", color: focused ? C.blue : C.sub }} />
+          <Icon name="search" style={{ fontSize: 18, color: focused ? "var(--t-down)" : "var(--t-ink3)" }} />
           <input
             value={query}
             onChange={(e) => {
@@ -279,7 +250,8 @@ export function Controls({
               setFocused(true);
             }}
             onBlur={() => setFocused(false)}
-            placeholder={`${selected.name} · 다른 종목 검색`}
+            // 이름을 모르는 코드(없는 종목)면 코드가 이름처럼 박혔다('999999 · 다른 종목 검색', 2026-10-05 점검).
+            placeholder={selected.name === selected.code ? "종목 이름 · 코드 검색" : `${selected.name} · 다른 종목 검색`}
             className="mdd-search-input"
             style={{ flex: 1, alignSelf: "stretch", border: "none", outline: "none", background: "transparent", color: C.ink, minWidth: 0 }}
           />
@@ -379,83 +351,76 @@ export function Controls({
 }
 
 /* ── 결과 ─────────────────────────────────────────────────────── */
-/* 구간 제목. 설명은 달지 않는다 — **하는 일은 이름 짓기가 아니라 박자 만들기**다
-   (insider 의 GroupTitle 주석과 같은 판단). 아래 시트마다 제목과 부제가 이미 있어서,
-   그 위에 또 한 줄을 얹으면 같은 말이 두 번 난다. 생김새는 공용 SectionIntro 다.
-   `n` 은 장 번호다 — 이 화면은 두 장이라 01·02 로 읽는 순서를 말해 준다. */
+/* 구간 제목(SectionIntro '01 과거 낙폭 사례' · '02 이 하락의 정체')은 v2 에서 걷었다(2026-10-03) — 모듈 머리 띠가 이름을 말하고,
+   v2 화면(카더라 · 시장 브리핑)엔 큰 구간 제목이 없다. */
 
-function GroupLabel({ n, title }: { n: number; title: string }) {
-  return <SectionIntro n={n} title={title} />;
-}
 
-/** 50:50 두 시트가 나란히 서는 줄. 좁아지면 한 장씩 접힌다. */
-function Pair({ children }: { children: React.ReactNode }) {
-  return <div className="mdd-pair">{children}</div>;
-}
-
-export function Results({ data }: { data: MddResult }) {
+export function Results({ data, onPick }: { data: MddResult; onPick: (s: StockOption) => void }) {
   const a = data.analysis;
   const periodLabel = periodLabelOf(data);
+  // 사례 표에서 고른 하락 — 물속 차트에 그 구간을 칠한다(판정표 9). 결과가 새로 서면(종목 · 기간 변경) 이 컴포넌트가 새로 서서 풀린다.
+  const [focus, setFocus] = useState<string | null>(null);
+  const ep = focus ? (a.topDrawdowns.find((e) => e.peakDate === focus) ?? null) : null;
+  const onFocus = (peakDate: string | null) => {
+    setFocus(peakDate);
+    // 차트가 화면 밖이면 보이는 데까지만 올린다(이미 보이면 그대로 — block:nearest).
+    if (peakDate) document.getElementById("mdd-uw")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  };
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    // v2: 모듈 사이 간격은 v2 한 값(12). 구간 제목('01 과거 낙폭 사례' · '02 이 하락의 정체')은 걷었다 — 모듈 머리가 이름을 말한다.
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* 첫 줄 띠(판정표 7) — 같은 기간 지수 · 다른 화면 링크 · 종가 기준일. */}
+      <MddCover data={data} periodLabel={periodLabel} />
       <HeroStrip data={data} periodLabel={periodLabel} />
-      <Underwater a={a} periodLabel={periodLabel} market={data.market} />
-
-      {data.risk ? (
-        <RiskProfile r={data.risk} periodLabel={periodLabel} market={data.market} marketFailed={data.partial?.market ?? false} />
-      ) : (
-        <AbsentSheet
-          icon="monitoring"
-          title="리스크 프로필"
-          sub="이 종목을 들고 있으면 어떤 위험을 감수하게 되는지, 세 가지 각도로 봅니다"
-          body="상장한 지 얼마 되지 않아 연도별 성적과 큰 하락을 낼 만큼 이력이 쌓이지 않았습니다."
+      <div id="mdd-uw">
+        <Underwater
+          a={a}
+          periodLabel={periodLabel}
+          market={data.market}
+          focus={ep ? { from: ep.peakDate, to: ep.recoveryDate } : null}
+          focusPeak={focus}
+          cases={a.topDrawdowns}
+          onCase={(peakDate) => onFocus(focus === peakDate ? null : peakDate)}
+          benchSeries={data.benchUnderwater ?? null}
         />
-      )}
+      </div>
 
-      {/* ⚠️ 부제가 바로 아래 시트("역대 낙폭 Top 5")의 부제와 **글자까지 같았다.** 구간 부제는
-          그 아래 시트들을 아우르는 말이라야 한다 — 한 시트의 말을 그대로 올리면 되풀이다. */}
-      <GroupLabel n={1} title="과거 낙폭 사례" />
-      {/* 시트는 데이터가 없어도 자리를 지킨다 — 이유는 AbsentSheet 주석 참고.
-          짝의 칸 수도 그대로 유지해야 50:50 이 안 어긋난다. */}
-      <Pair>
+      {/* v2(2026-10-03 판정표 1단계) — 독자 질문 순서: 얼마나 빠졌나(위 둘) → 흔한가 · 언제 되찾나 → 왜(시장) · 장기 성적 → 업종 → 다른 종목.
+          옛 Top 5 · 리스크 '하락 vs 회복' · '혼자 빠지나' · 성격 타일은 같은 사건을 네 군데서 말해 사례 표 하나 + 회복 칸으로 합쳤다.
+          시트는 자료가 없어도 자리를 지킨다(AbsentSheet 주석) — 짝의 칸 수가 그대로여야 줄이 안 어긋난다. */}
+      <div className="v2-md-row is-21 is-quad">
         {a.topDrawdowns.length > 0 ? (
-          <TopDrawdowns eps={a.topDrawdowns} />
+          <CasesTable a={a} periodLabel={periodLabel} market={data.market} focus={focus} onFocus={onFocus} />
         ) : (
-          <AbsentSheet
-            icon="history"
-            title="역대 낙폭 Top 5"
-            sub="이만큼 빠졌던 구간과 회복까지 걸린 기간"
-            body="이 기간엔 순위를 매길 만한 하락이 없었습니다. 기간을 넓히면 더 나올 수 있습니다."
-          />
+          <AbsentSheet title="역대 하락 사례" body="이 기간엔 순위를 매길 만한 하락이 없었습니다." className="v2-md-cases-mod" />
         )}
         {a.recovery ? (
-          <Recovery a={a} periodLabel={periodLabel} />
+          <RecoveryModule a={a} />
+        ) : a.lastDrop ? (
+          <LastDropModule d={a.lastDrop} asOf={a.asOf} />
         ) : (
-          <AbsentSheet
-            /* ⚠️ 아래 실제 시트(`Recovery`)와 **같은 아이콘**이어야 한다 — 같은 자리에 번갈아 선다. */
-            icon="timer"
-            title="회복까지 걸린 기간"
-            sub="과거 사례로 본 회복 소요 기간"
-            body="지금은 고점 부근이라 회복을 기다릴 하락이 없습니다."
-          />
+          <AbsentSheet title="회복까지" body="지금은 고점 부근이라 회복을 기다릴 하락이 없습니다." />
         )}
-      </Pair>
 
-      <GroupLabel n={2} title="이 하락의 정체" />
-      <Pair>
+        {/* 해마다 | 시장 탓 — 위 줄(사례 2 : 회복 1)과 한 격자에 둬 칸 경계도 높이도 같다(2026-10-03 "위와 같은 크기로"). */}
+        {data.risk ? (
+          <YearsModule r={data.risk} periodLabel={periodLabel} asOf={a.asOf} firstDate={a.firstDate} />
+        ) : (
+          <AbsentSheet title="해마다" body="상장한 지 얼마 되지 않아 연도별 성적을 낼 만큼 이력이 쌓이지 않았습니다." className="v2-md-years" />
+        )}
         {data.attribution ? (
-          <Attribution
+          <AttributionModule
             attr={data.attribution}
             stockName={data.name}
             themeName={data.theme?.name ?? null}
-            themePeers={data.theme?.peers.filter((p) => !p.isSelf).map((p) => p.name) ?? []}
             market={data.market}
+            since={fmtDay(a.athDate, a.asOf)}
           />
+        ) : data.yearCmp ? (
+          <YearVsMarketModule c={data.yearCmp} stockName={data.name} market={data.market} />
         ) : (
           <AbsentSheet
-            icon="call_split"
-            title="시장 탓일까, 종목 탓일까"
-            sub="지수·업종과 견줘 이 종목만의 낙폭이 얼마인지"
+            title="시장 탓 · 종목 탓"
             body={
               a.currentDd > -1
                 ? "지금은 고점 부근이라 원인을 나눌 하락이 없습니다."
@@ -466,29 +431,36 @@ export function Results({ data }: { data: MddResult }) {
             }
           />
         )}
-        <Character ch={a.character} currentDd={a.currentDd} />
-      </Pair>
-      {data.theme ? (
-        <>
-          <Theme theme={data.theme} />
-          {/* 대표 종목 일부만 받았으면 그렇다고 적는다 — 평균이 몇 종목으로 낸 것인지 읽는 사람이 알아야 한다. */}
-          {data.partial && data.partial.peersOk < data.partial.peersRequested && (
-            <p style={{ margin: "-6px 4px 0", fontSize: "var(--fs-11)", color: C.muted }}>
-              대표 {data.partial.peersRequested}종목 중 {data.partial.peersOk}종목만 불러와 비교했습니다. 잠시 뒤 다시 열면 채워질 수 있습니다.
-            </p>
-          )}
-        </>
-      ) : (
-        <AbsentSheet
-          icon="hub"
-          title="테마 비교"
-          sub="같은 테마 대표 종목들과 지금 낙폭을 나란히 놓습니다"
-          body={
-            data.partial && (data.partial.lookupFailed || data.partial.peersRequested > 0)
-              ? "테마 대표 종목의 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오."
-              : "이 종목이 묶인 테마를 찾지 못했습니다. 테마 대표 종목 목록에 등록된 종목에서만 비교가 나옵니다."
-          }
-        />
+      </div>
+
+      {/* 업종 안에서 | 수익 · 손실 비율 — 위 두 줄과 같은 2 : 1 격자라 칸 경계가 위아래로 맞는다(2026-10-04 "위 두 카드와 같은 크기로").
+          키는 업종 칸(대표 종목 줄 수)이 정하고 수익 · 손실 칸은 그 키를 다 받는다.
+          업종 칸 줄을 누르면 그 종목으로 바뀌고 맨 위로 올라간다(MddExplorer pickFromResults).
+          '많이 빠진 대형주'(종목과 상관없는 시총 상위 고정 목록)였던 자리다 — 2026-10-03 "투자자가 궁금해할 것"으로 바꿨다. */}
+      <div className="v2-md-row is-21">
+        {data.theme ? (
+          <ThemeModule theme={data.theme} onPick={onPick} />
+        ) : (
+          <AbsentSheet
+            title="업종 안에서"
+            body={
+              data.partial && (data.partial.lookupFailed || data.partial.peersRequested > 0)
+                ? "테마 대표 종목의 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오."
+                : "이 종목이 묶인 테마를 찾지 못했습니다."
+            }
+          />
+        )}
+        {data.ladder ? (
+          <LadderModule ladder={data.ladder} market={data.market} />
+        ) : (
+          <AbsentSheet title="수익 · 손실 비율" body="거래량 기록이 짧아 가격대를 나누지 못했습니다." />
+        )}
+      </div>
+      {/* 대표 종목 일부만 받았으면 그렇다고 적는다 — 평균이 몇 종목으로 낸 것인지 읽는 사람이 알아야 한다. */}
+      {data.theme && data.partial && data.partial.peersOk < data.partial.peersRequested && (
+        <p style={{ margin: "-6px 4px 0", fontSize: "var(--fs-11)", color: C.muted }}>
+          대표 {data.partial.peersRequested}종목 중 {data.partial.peersOk}종목만 불러와 비교했습니다. 잠시 뒤 다시 열면 채워질 수 있습니다.
+        </p>
       )}
     </div>
   );

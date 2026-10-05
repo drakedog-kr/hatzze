@@ -71,6 +71,7 @@ from __future__ import annotations
 import argparse
 import http.client
 import json
+import re
 import sys
 import time
 import urllib.request
@@ -119,6 +120,32 @@ SEC_SA_GAP = 0.10
 
 # 기간 길이(일) → 종류
 DUR = {"month": (25, 35), "quarter": (80, 100), "half": (170, 190), "nine": (255, 285), "year": (350, 380)}
+
+
+# 영문 이름의 법인 꼬리 — 한글 표기가 없는 S&P500 종목은 영문명이 화면 이름인데, 'Rollins, Inc.' · 'Progressive Corporation' 처럼
+# 꼬리가 붙어 한글 이름 옆에서 길고 들쭉날쭉했다(2026-10-04 점검). 꼬리를 떼어 짧은 영문으로 꼴을 맞춘다.
+_EN_TAIL = re.compile(r"(?:,?\s+(?:&\s*)?(?:Inc\.?|Incorporated|Corporation|Corp\.?|Company|Co\.|plc|PLC|Ltd\.?|Group|Holdings))+$")
+
+
+# 꼬리를 떼면 일반 낱말 하나만 남는 이름 — 그대로 둔다('News Corp' 가 화면에 'News' 로 섰다, 2026-10-05 머지 전 점검).
+_KEEP_TAIL = {"News"}
+
+
+def short_en(name: str) -> str:
+    """'Coca-Cola Company (The)' → 'Coca-Cola', 'Lilly (Eli)' → 'Eli Lilly', 'Alphabet Inc. (Class A)' → 'Alphabet (Class A)'."""
+    n = name.strip()
+    n = re.sub(r"\s*\(The\)$", "", n)
+    cls = ""
+    m = re.match(r"^(.*?)\s*(\(Class [A-Z]\))$", n)
+    if m:
+        n, cls = m.group(1), f" {m.group(2)}"
+    m = re.match(r"^(.*?)\s*\((\w+)\)$", n)  # 'Lilly (Eli)' — 이름을 앞으로
+    if m:
+        n = f"{m.group(2)} {m.group(1)}"
+    short = _EN_TAIL.sub("", n).strip()
+    if short in _KEEP_TAIL:
+        short = n
+    return (short or n) + cls
 
 
 def kind_of(days: int) -> str | None:
@@ -400,7 +427,7 @@ def main() -> None:
     for t, ko in EXTRA_US_DIVIDEND.items():
         names.setdefault(t.upper(), (ko, None))
     for t, en in SP500.items():
-        names.setdefault(t.upper(), (en, en))  # 한글 표기가 없으면 영문명이 이름이다
+        names.setdefault(t.upper(), (short_en(en), en))  # 한글 표기가 없으면 짧은 영문명이 이름이다
     tickers = sorted(names)
     if args.only:
         tickers = [t.strip().upper() for t in args.only.split(",") if t.strip()]

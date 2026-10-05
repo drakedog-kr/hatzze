@@ -16,5 +16,7 @@
 @import "./styles/badges.css";
 @import "./styles/mobile.css";
 @import "./styles/tx.css";
+/* v2 리디자인(2.0.0). 맨 뒤라 앞의 결을 덮는다. 새 클래스(v2-*)만 쓰므로 옛 화면은 그대로다. */
+@import "./styles/v2.css";
 /* shadcn 부품 모양. 레이어(components) 안이라 위 차례와 상관없다(그 파일 머리말). */
 @import "./styles/shadcn.css";

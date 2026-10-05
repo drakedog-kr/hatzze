@@ -3,29 +3,18 @@ import { assertLoaded } from "@/lib/load-state";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 
-import { withSubjectParticle, withTopicParticle } from "@/lib/format";
-import {
-  STOCK_STAT_DAYS,
-  fmtKoDate,
-  getStockPage,
-  stockHref,
-  stockMddHref,
-  themePeerStocks,
-  type StockPageData,
-  type StockTrendPoint,
-} from "@/lib/stock-page";
+import { withSubjectParticle } from "@/lib/format";
+import { STOCK_STAT_DAYS, STOCK_TREND_DAYS, fmtKoDate, getStockPage, stockHref, stockMddHref, themePeerStocks, type StockTrendPoint } from "@/lib/stock-page";
 
 import { getStockDividend } from "@/lib/dividend";
-import { daysFromToday, eventDateLabel, getStockEvents, getStockMoveReason } from "@/lib/kadera-why";
+import { eventDateLabel, getStockEvents, getStockMoveReason, todayKst } from "@/lib/kadera-why";
 import { DIVIDEND_PUBLIC } from "../../screen-flags";
 import { DividendCard } from "./DividendCard";
-import { Pill } from "../../kadera/parts";
 import { PageJsonLd } from "../../JsonLd";
-import { SectionHead } from "../../kadera/SectionHead";
+import { CoverLinkCell, CoverMeta, Module, dayPill } from "../../kadera/V2Modules";
 import { StockLogo } from "../../StockLogo";
 import { KADERA_CARD } from "../../og-copy";
 import { pageMetadata } from "../../seo";
-import { AiMark, C, Icon, MONO, R } from "../../ui";
 import { BackTrail } from "@/components/back-trail";
 import { themeHref } from "@/lib/theme-href";
 
@@ -72,11 +61,7 @@ export async function generateStaticParams() {
 /** 이동 경로의 부모. 사이드바 NAV 의 라벨과 **같은 문자열**이어야 한다(JsonLd 머리말). */
 const PARENT = { name: "국장 카더라", path: "/kadera" };
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ code: string }>;
-}): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ code: string }> }): Promise<Metadata> {
   const { code } = await params;
   const d = await getStockPage(code.toUpperCase());
   // ⛔ 없는 종목에 **canonical 을 주지 않는다.** 예전엔 `/kadera` 를 가리켰는데, 그건
@@ -103,43 +88,26 @@ export async function generateMetadata({
 }
 
 /**
- * 언급 추이 막대. **SVG 도 라이브러리도 안 쓴다** — 30개짜리 막대는 div 로 충분하고,
- * 서버 컴포넌트로 남길 수 있어 클라이언트 번들이 안 는다(내부자 종목 상세와 같은 꼴).
+ * 언급 추이 막대. **SVG 도 라이브러리도 안 쓴다** — 막대 90개는 div 로 충분하고, 서버 컴포넌트로 남길 수 있어
+ * 클라이언트 번들이 안 는다. 꼴은 테마 한 장의 '30일 점유율 추이'와 같다(.v2-tm-trend) — 최근 사흘만 진한 파랑.
  *
- * ⚠️ 빈 날을 0 으로 메워 받는다. 안 메우면 언급 없는 날을 건너뛰어 막대 간격이 날짜와
- *    어긋나고, 추이가 실제보다 촘촘해 보인다.
+ * ⚠️ 빈 날을 0 으로 메워 받는다. 안 메우면 언급 없는 날을 건너뛰어 막대 간격이 날짜와 어긋나고, 추이가 실제보다 촘촘해 보인다.
  */
 function Trend({ points }: { points: StockTrendPoint[] }) {
-  const max = Math.max(1, ...points.map((p) => p.mentions));
+  // 바닥 10 — 그 종목의 최댓값으로만 나누면 30일에 한 번 1회 언급도 꽉 찬 막대라 삼성전자 314회와 같은 키였다(2026-10-04 점검).
+  const max = Math.max(10, ...points.map((p) => p.mentions));
+  const recentFrom = points.length >= 3 ? points[points.length - 3].date : "";
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 96, padding: "4px 0 0" }}>
+    <div className="v2-tm-trend" role="img" aria-label={`최근 ${points.length}일 언급 막대`}>
       {points.map((p, i) => {
-        // ⚠️⚠️ 손닿는 자리는 **막대가 아니라 칸 전체**다. 막대 높이로 호버를 받으면 언급이
-        //    적은 날은 높이가 3%(3px)뿐이라 사실상 못 짚는다.
         const at = i / Math.max(1, points.length - 1);
         const edge = at > 0.72 ? " hz-tip-end" : at < 0.28 ? " hz-tip-start" : "";
         return (
-          <span
-            key={p.date}
-            className={`hz-tip hz-vline${edge}`}
-            data-tip={`${fmtKoDate(p.date)} · 언급 ${p.mentions}회 · 채널 ${p.channels}곳`}
-            style={{
-              position: "relative",
-              flex: 1,
-              minWidth: 0,
-              height: "100%",
-              display: "flex",
-              alignItems: "flex-end",
-            }}
-          >
-            <span
-              style={{
-                width: "100%",
-                // 0 인 날도 1px 은 남긴다. 아예 없으면 "자료가 없는 날"과 구별이 안 된다.
-                height: `${Math.max(p.mentions ? 3 : 1, (p.mentions / max) * 100)}%`,
-                borderRadius: 2,
-                background: p.mentions ? C.blue : C.track,
-              }}
+          <span key={p.date} className={`hz-tip hz-vline${edge}`} data-tip={`${fmtKoDate(p.date)} · 언급 ${p.mentions}회 · 채널 ${p.channels}곳`}>
+            <i
+              className={!p.mentions ? "is-none" : p.date >= recentFrom ? "is-recent" : undefined}
+              // 0 인 날은 2px 바닥선(내부자 · 테마 추이와 같은 꼴, 2026-10-05).
+              style={{ height: p.mentions ? `${Math.max(3, (p.mentions / max) * 100)}%` : "2px" }}
             />
           </span>
         );
@@ -148,419 +116,266 @@ function Trend({ points }: { points: StockTrendPoint[] }) {
   );
 }
 
-/** 히어로 둘째 칸의 한 줄. 이름은 왼쪽, 값은 오른쪽 끝에 맞춘다. */
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-      <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{label}</span>
-      <span style={{ textAlign: "right", minWidth: 0 }}>
-        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-13)", fontWeight: 800, color: C.ink }}>{value}</strong>
-        {sub && <span style={{ fontSize: "var(--fs-11)", color: C.muted, marginLeft: 5 }}>{sub}</span>}
-      </span>
-    </div>
-  );
-}
-
-/**
- * 종가와 등락률. **야후가 아니라 `stocks` 표(KRX)에서 온 값**이다(머리말 참고).
- *
- * ⚠️ 오르내림 색은 이 저장소의 온도색 두 가지를 그대로 쓴다(--c-hot-ink · --c-cold-ink).
- *    빨강·초록을 새로 들이면 이 화면만 다른 색 체계를 갖게 된다. 화살표를 같이 두는
- *    것도 규칙이다 — 색만으로 방향을 말하면 색을 못 가르는 눈에는 아무 말도 아니다.
- *    (app/insider/parts.tsx 의 Quote 와 같은 꼴이다. 저쪽은 달러라 그대로 못 쓴다.)
- */
-function Quote({ d }: { d: StockPageData }) {
-  if (d.price == null) return null;
-  const chg = d.changeRate;
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
-          {d.price.toLocaleString("ko-KR")}
-        </strong>
-        <span style={{ fontSize: "var(--fs-13)", fontWeight: 600, color: C.sub }}>원</span>
-        {chg != null && (
-          <span
-            style={{
-              fontFamily: MONO,
-              fontSize: "var(--fs-13)",
-              fontWeight: 700,
-              whiteSpace: "nowrap",
-              color: chg > 0 ? "var(--c-hot-ink)" : chg < 0 ? "var(--c-cold-ink)" : C.sub2,
-            }}
-          >
-            {chg > 0 ? "▲" : chg < 0 ? "▼" : ""}
-            {Math.abs(chg).toFixed(2)}%
-          </span>
-        )}
-      </span>
-      {d.priceDate && <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{fmtKoDate(d.priceDate)} 종가</span>}
-    </div>
-  );
-}
-
-/**
- * 끝의 '다음에 볼 곳'. 이 화면은 '얼마나 회자되나'만 답한다 — 테마의 흐름, 고점에서의 거리, 오늘 무엇이 도는지는
- * 각 화면이 답한다. 예전의 'MDD 정밀분석에서 보기' 카드가 이 줄로 들어왔다(배당 계산은 바로 위 배당 카드의 단추가 잇는다).
- * ⭐ 서버 링크라 크롤러도 타고 간다 — 464장이 서로와 구역 화면으로 이어진다.
- */
-function NextLinks({ d }: { d: StockPageData }) {
-  const links: { href: string; icon: "hub" | "trending_down" | "forum"; title: string; sub: string }[] = [
-    ...(d.themes[0] ? [{ href: themeHref(d.themes[0]), icon: "hub" as const, title: `${d.themes[0]} 테마`, sub: "테마 판세에서 흐름 보기" }] : []),
-    { href: stockMddHref(d.code, d.market), icon: "trending_down", title: "MDD 정밀분석", sub: "고점에서 얼마나 내려와 있나" },
-    { href: PARENT.path, icon: "forum", title: PARENT.name, sub: "오늘 무엇이 회자되나" },
-  ];
-  return (
-    <nav className="hz-snext" aria-label="다음에 볼 곳">
-      <span className="hz-snext-cap">다음에 볼 곳</span>
-      <div className="hz-snext-row">
-        {links.map((l) => (
-          <Link key={l.href} href={l.href} className="hz-snext-i">
-            <span aria-hidden="true">
-              <Icon name={l.icon} style={{ fontSize: 20, color: "var(--c-cold-ink)" }} />
-            </span>
-            <span className="hz-snext-tx">
-              <b>{l.title}</b>
-              <span>{l.sub}</span>
-            </span>
-            <span aria-hidden="true" className="hz-snext-go">
-              <Icon name="chevron_right" style={{ fontSize: 18 }} />
-            </span>
-          </Link>
-        ))}
-      </div>
-    </nav>
-  );
-}
+const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
+/** "10월 3일(토)" — 날짜만 있는 값이라 UTC 자정으로 읽어 요일을 뽑는다. */
+const koDay = (iso: string) => `${fmtKoDate(iso)}(${WEEKDAY[new Date(`${iso}T00:00:00Z`).getUTCDay()]})`;
+const md = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
+const signPct = (v: number) => `${v > 0 ? "+" : v < 0 ? "-" : ""}${Math.abs(v).toFixed(2)}%`;
+const tone = (v: number | null | undefined) => (v == null || v === 0 ? "" : v > 0 ? " is-up" : " is-down");
 
 export default async function StockPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  // 종목코드에 대문자가 섞인 것이 80개 있다(0009K0 · 00088K 같은 새 체계). 그중 넷은
-  // 사이트맵에도 실린다. 소문자로 적힌 바깥 링크가 404 가 되지 않게 정본으로 넘긴다.
   const upper = code.toUpperCase();
   const d = await getStockPage(upper);
-  // ⚠️ notFound() **앞에서** 던진다. 조회가 5xx 로 죽으면 getStockPage 는 null 을 돌려주는데,
-  //    그걸 "없는 종목"으로 읽어 404 를 내면 그 404 가 사본(ISR)에 5분 담긴다 — DB 가 잠깐
-  //    아픈 동안 멀쩡한 종목이 404 로 굳는다(로컬 스텁으로 실제로 그렇게 됐다).
   assertLoaded("/stock/[code]");
-  // 없는 종목은 **넘기기 전에** 404 를 낸다. 순서를 바꾸면 `/stock/abcdef` 같은 쓰레기
-  // 주소가 308 을 한 번 거친 뒤에야 404 가 되어 크롤러에 헛걸음을 두 번 시킨다.
   if (!d) notFound();
   if (code !== upper) permanentRedirect(stockHref(upper));
 
-  const [peers, why, events, dividend] = await Promise.all([
+  const [peers, why, eventList, dividend] = await Promise.all([
     themePeerStocks(d.code, d.themes),
     getStockMoveReason(d.code, d.baseDate),
-    getStockEvents(d.code),
-    // 배당 카드 — 배당으로 살기가 열리기 전엔 안 그린다(링크가 404 로 간다). 기본키 조회 셋뿐이라 464장에도 가볍다.
+    // 열둘까지 — 여덟이면 '앞으로 14건' 아래 여덟 줄뿐이라 나머지로 갈 길이 없었다(2026-10-05 점검).
+    getStockEvents(d.code, 12),
     DIVIDEND_PUBLIC ? getStockDividend(d.code) : Promise.resolve(null),
   ]);
-  // 곁다리 넷도 실패하면 폴백(`[]` · `null`)을 돌려줘 그 칸만 빠진다 — 배당 카드가 빠지면 배당 자료가 없는 종목과 똑같이 보인다.
-  // 위의 검사는 이 조회들 **앞**이라 못 본다. 한 번 더 던져 칸 빠진 화면이 사본(ISR)에 한 시간 담기지 않게 한다
-  // (lib/load-state.ts — kadera 도 따로 받은 구간 뒤에 다시 부른다). 재생성이면 마지막 성공본이 그대로 나간다.
   assertLoaded("/stock/[code]");
-  // 그날 등락률. 파이프라인이 KRX 확정값을 채웠으면 그것, 아니면 stocks 의 값이 **그 날짜일 때만** 쓴다
-  // (이 화면은 야후를 안 부른다 — lib/stock-page.ts 머리말 ①). 둘 다 아니면 까닭만 보여준다.
+  const events = eventList.items;
   const whyRate = why ? (why.changeRate ?? (d.priceDate === why.date ? d.changeRate : null)) : null;
   const marketLabel = d.market === "KOSDAQ" ? "코스닥" : d.market === "KOSPI" ? "코스피" : null;
+  const today = todayKst();
+  const hasTalk = Boolean(d.narrative || why);
+
+  /* ── v2(2026-10-03) — 테마 한 장과 같은 부품 ──────────────────────────
+     뒤로 가기 줄 → 첫 줄 띠(종목 · 종가 · 테마 · MDD · 집계 기준) → 요즘 도는 얘기(판 폭) → [일별 언급 추이 | 다가오는 일정 또는 배당]
+     → 배당(판 폭, 위에서 안 쓴 날) → 같은 테마 종목(판 폭). 옛 히어로 판 · 시트 부제 · 아이콘 타일 · 바닥 '다음에 볼 곳' · 각주는 걷었다 —
+     다음에 볼 곳(테마 · MDD)은 첫 줄 띠의 링크 칸이, 국장 카더라는 뒤로 가기 줄이 맡는다. 집계 기준은 띠의 업데이트 자리로.
+     ⭐ 짝은 **안쪽이 늘어나는 모듈끼리만** 짓는다 — 추이(막대) · 일정(줄) · 배당(달 막대)은 키를 받아 늘어나도 빈 곳이 없지만,
+        요즘 도는 얘기(한두 문장) · 같은 테마 종목(알약)은 늘리면 안이 빈다. 그래서 그 둘은 판 폭 한 줄로 따로 선다.
+        한때 [요즘 도는 얘기 | 추이] 짝이었는데 삼성전자에서 문장 두 줄 아래 120px 가 비었다. */
+  const peersMod =
+    peers.length > 0 ? (
+      // ⭐ 화면 464장이 서로 안 이어져 있으면 크롤러가 못 닿는다. 사전이 이미 종목을 테마로 묶어 두고 있으니 새 자료 없이 이웃을 잇는다.
+      // ⚠️ 손으로 고른 대표 바스켓이라 "이 테마의 전부"라고 말하지 않는다.
+      <Module
+        title="같은 테마 종목"
+        meta={d.themes[0]}
+        aside={
+          d.themes[0] ? (
+            <Link href={themeHref(d.themes[0])} className="v2-more">
+              테마 판세
+            </Link>
+          ) : undefined
+        }
+      >
+        {/* 이름 · 종가 · 등락 줄 격자(판 폭 넷 · 짝 안과 폰 둘, v2.css .v2-sk-peers) — 이름만 든 알약이 판 폭의 절반만 채웠다(2026-10-05 점검). */}
+        <ul className="v2-sk-peers">
+          {peers.map((p) => (
+            <li key={p.code}>
+              <Link href={stockHref(p.code)} className="v2-sk-peer" data-ga="stock_peer_click">
+                <StockLogo code={p.code} name={p.name} market={p.market} size={20} lazy />
+                <span className="v2-sk-peer-n">{p.name}</span>
+                {p.price != null && <span className="v2-sk-peer-p">{p.price.toLocaleString("ko-KR")}원</span>}
+                {p.changeRate != null && <span className={`v2-sk-peer-c${tone(p.changeRate)}`}>{signPct(p.changeRate)}</span>}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Module>
+    ) : null;
+  // 이 종목을 1주 들면 1년에 얼마, 어느 달에 받나. 카더라(화제 · 일정 · 테마)가 먼저, 배당은 그다음(2026-09-15 지시).
+  const dividendMod = dividend ? <DividendCard s={dividend} /> : null;
+
+  const eventsMod =
+    events.length > 0 ? (
+      // 채널 글에서 뽑은 앞날의 일정. 카더라 카드와 달리 달 · 분기 · 연 단위도 보여준다 — 한 종목의 자리라 "10월 중" · "2027년"이 글로 서면 된다.
+      <Module title="다가오는 일정" meta={`${eventList.total}건`} className="v2-tm-events">
+        <ul className="v2-events">
+          {events.map((e) => (
+            <li key={`${e.date}-${e.precision}-${e.event}`}>
+              <div className="v2-ev-row">
+                <span className={`v2-daypill${e.precision === "day" && e.date === today ? " is-today" : ""}`}>
+                  {e.precision === "day" ? dayPill(e.date, today) : eventDateLabel(e)}
+                </span>
+                <span className="v2-event-txt">{e.event}</span>
+                {/* '채널 N곳' — 이유 줄의 '채널 88곳'과 같은 말(2026-10-05 점검). */}
+                <span className="v2-sk-evn">채널 {e.channels}곳</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Module>
+    ) : null;
+  // 추이의 짝 — 일정이 넉넉하면(넷 이상) 일정, 아니면 배당. 둘 다 안쪽이 늘어나는 모듈이다.
+  // ⚠️ 배당이 없는 종목('최근 12개월 현금배당이 없습니다' 한 줄)은 짝으로 세우지 않는다 — 추이 키에 맞춰 늘면 그 한 줄 아래가 통째로 빈다.
+  // ⚠️ 일정이 한두 건이면 짝으로 안 세운다 — 200px 칸 가운데 한 줄이 서고 위아래 58px 가 비었다(HLB, 2026-10-04 점검).
+  //    짧은 일정은 아래 '같은 테마 종목'과 한 줄 짝(둘 다 키가 낮다)으로 선다.
+  const dividendRich = Boolean(dividend && dividend.dps > 0);
+  const richEvents = events.length >= 4;
+  const partner = richEvents ? eventsMod : dividendRich ? dividendMod : null;
+  const shortEvents = eventsMod && !richEvents ? eventsMod : null;
+  // 짝이 없으면(일정 짧음 · 배당 없음) 짧은 일정과 같은 테마 종목을 오른쪽에 쌓아 추이의 짝으로 — 추이가 판 폭 1,144×56 띠가 되고
+  // 아래 [일정 한 줄 | 종목] 짝은 일정 줄 위아래가 26px 씩 비었다(2026-10-05 점검, HLB).
+  const sideStack =
+    !partner && shortEvents && peersMod ? (
+      <div className="v2-tm-side">
+        {shortEvents}
+        {peersMod}
+      </div>
+    ) : null;
+  // 배당이 판 폭 한 줄로 서면 넓은 꼴(숫자 칸 왼쪽 · 달 막대 오른쪽) — 숫자 셋이 왼쪽 210px 에 몰리고 900px 가 비었다.
+  const dividendWide = dividend ? <DividendCard s={dividend} wide /> : null;
 
   return (
-    // 뿌리의 hz-tx 가 이번 리디자인을 켠다(globals.css).
-    <div className="hz-tx">
-      {/* 셸이 이 주소의 이름을 모른다(위 머리말). 구조화 데이터도 여기서 낸다. */}
-      {/* ⚠️ 이름은 **화면에 보이는 것 그대로**여야 한다(JsonLd 머리말). h1 이 "삼성전자"
-          이므로 여기도 그것이다. `<title>` 의 긴 꼴을 넣으면 검색 결과의 이동 경로가
-          `hatzze.fun › 국장 카더라 › 삼성전자(005930) 상세 정보` 가 되어, 화면에
-          없는 이름을 구글에만 말하는 셈이 된다. */}
-      <PageJsonLd
-        title={d.name}
-        description={`${withSubjectParticle(d.name)} 주식 텔레그램에서 얼마나 회자되는지 봅니다.`}
-        path={stockHref(d.code)}
-        trail={[PARENT]}
-      />
+    <div className="hz-tx v2-kd v2-tm v2-sk">
+      {/* 구조화 데이터 · 이동 경로는 이 파일이 직접 낸다(머리말 '자기 제목을 자기가 그린다'). 제목은 종목 이름만 —
+          `<title>` 의 긴 꼴을 넣으면 검색 결과의 이동 경로에 화면에 없는 이름이 선다. */}
+      <PageJsonLd title={d.name} description={`${withSubjectParticle(d.name)} 주식 텔레그램에서 얼마나 회자되는지 봅니다.`} path={stockHref(d.code)} trail={[PARENT]} />
 
       <BackTrail parent={{ name: PARENT.name, href: PARENT.path }} current={d.name} />
 
-      {/* ── 히어로 ──────────────────────────────────────────────────
-          세 칸. **종목 정체 · 얼마나 회자됐나 · 일별 추이.**
-          가운데 칸이 이 화면의 주인공이다. 시세는 곁다리라 첫 칸 아래에 작게 둔다. */}
-      <section className="hz-sheet">
-        <div className="hz-kd-hero">
-          <div className="hz-kd-hero-q">
-            <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-              <StockLogo code={d.code} name={d.name} market={d.market} size={40} />
-              <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                {/* 이 화면의 h1. 셸의 헤더가 비어 있으므로 여기가 유일한 h1이다. */}
-                <h1
-                  style={{
-                    margin: 0,
-                    fontSize: "var(--fs-20)",
-                    fontWeight: 800,
-                    color: C.ink,
-                    letterSpacing: "-.02em",
-                    wordBreak: "keep-all",
-                  }}
-                >
-                  {d.name}
-                </h1>
-                <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub }}>
-                  {d.code}
-                  {marketLabel && <span style={{ fontFamily: "inherit", marginLeft: 6 }}>{marketLabel}</span>}
-                </span>
-              </span>
-            </div>
-            <Quote d={d} />
-          </div>
-
-          <div className="hz-kd-hero-q">
-            <div className="hz-kd-hero-title">
-              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
-                최근 {STOCK_STAT_DAYS}일
-              </span>
-            </div>
-            {/* ⛔ 못 읽은 날에 **0 을 찍지 않는다.** 옆 칸은 "못 불러왔다"고 말하는데 이 칸만
-                "0회 언급 · 언급된 날 0일" 이면 한 화면이 서로 다른 두 말을 하고, 그중 하나는
-                거짓이다. 고장은 고장이라고 적는다. */}
-            {d.loadFailed ? (
-              <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
-                집계를 지금 불러오지 못했습니다.
-              </p>
-            ) : (
-              <>
-                <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
-                <strong
-                  style={{ fontFamily: MONO, fontSize: "var(--fs-24)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}
-                >
-                  {d.totalMentions.toLocaleString("ko-KR")}
-                </strong>
-                <span style={{ fontFamily: MONO, fontSize: "var(--fs-22)", fontWeight: 600, color: C.sub }}>회</span>
-                <span style={{ fontSize: "var(--fs-17)", fontWeight: 600, color: C.sub }}>언급</span>
-              </span>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <Stat label="언급된 날" value={`${d.activeDays}일`} />
-                {d.peak && (
-                  <Stat label="가장 많던 날" value={`${d.peak.mentions.toLocaleString("ko-KR")}회`} sub={fmtKoDate(d.peak.date)} />
-                )}
-                {/* ⛔ '기간 채널 수'가 아니다. 날이 다르면 채널 명단도 달라서 일별 값으로는
-                    합집합을 못 만든다(lib/stock-page.ts 머리말 ②). 라벨이 **하루**라고
-                    말하고 있어야 이 값이 정확해진다. */}
-                {d.peakChannels && (
-                  <Stat
-                    label="하루 최다 채널"
-                    value={`${d.peakChannels.channels}곳`}
-                    sub={fmtKoDate(d.peakChannels.date)}
-                  />
-                )}
-              </div>
-              </>
-            )}
-          </div>
-
-          <div className="hz-kd-hero-h">
-            <div className="hz-kd-hero-title">
-              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
-                일별 언급 추이
-              </span>
-            </div>
-            {d.loadFailed ? (
-              /* ⛔ "잡힌 적이 없습니다" 로 적으면 안 된다. 못 읽은 것과 없는 것은 다르고,
-                 그 둘이 화면에서 같아지면 고장이 자료로 위장된다. */
-              <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
-                언급 자료를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.
-              </p>
-            ) : d.totalMentions === 0 ? (
-              <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, lineHeight: 1.7 }}>
-                {withTopicParticle(d.name)} 최근 {STOCK_STAT_DAYS}일 사이 주식 텔레그램에서 잡힌 적이 없습니다.
-              </p>
-            ) : (
-              <>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-                  <span style={{ fontSize: "var(--fs-12)", color: C.sub }}>
-                    최근 3일 {d.recentMentions.toLocaleString("ko-KR")}회
-                  </span>
-                  {/* ⚠️ "8월 2일부터 30일" 로 적었더니 끝날짜("8월 30일")로 읽혔다.
-                      기간은 양끝을 다 적어야 한 가지로만 읽힌다. */}
-                  <span style={{ fontSize: "var(--fs-11)", color: C.muted, whiteSpace: "nowrap" }}>
-                    {fmtKoDate(d.trend[0].date)} ~ {fmtKoDate(d.trend[d.trend.length - 1].date)}
-                  </span>
-                </div>
-                <Trend points={d.trend} />
-              </>
-            )}
-          </div>
+      {/* 첫 줄 — 종목(h1) · 종가 · 테마 · MDD · 집계 기준. ⚠️ h1 은 이 칸의 종목 이름이다(셸은 이 주소의 제목을 모른다). */}
+      <div className="v2-cover">
+        <div className="v2-cover-cell v2-sk-id">
+          <StockLogo code={d.code} name={d.name} market={d.market} size={20} />
+          <h1>{d.name}</h1>
+          <span className="v2-cover-k">
+            {d.code}
+            {marketLabel ? ` · ${marketLabel}` : ""}
+          </span>
         </div>
-      </section>
+        {d.price != null && (
+          // v2-cover-price — 폰에서 이 화면의 대표 숫자(가격)만 키운다(v2.css 모바일 묶음).
+          <div className="v2-cover-cell v2-cover-price">
+            <span className="v2-cover-k">{d.priceDate ? `${md(d.priceDate)} 종가` : "종가"}</span>
+            <span className="v2-cover-v">
+              <b>{d.price.toLocaleString("ko-KR")}원</b>
+              {d.changeRate != null && <span className={`v2-cover-chg${tone(d.changeRate)}`}>{signPct(d.changeRate)}</span>}
+            </span>
+          </div>
+        )}
+        {d.themes[0] && <CoverLinkCell c={{ cap: "테마", name: d.themes[0], href: themeHref(d.themes[0]), ga: "stock_cover_theme" }} />}
+        <CoverLinkCell c={{ cap: "MDD 정밀분석", name: "고점 대비 낙폭", href: stockMddHref(d.code, d.market), ga: "stock_cover_mdd" }} />
+        {/* 짧게 — 1,100 에서 띠가 두 줄(둘째 줄 왼쪽 560px 빔)이었다(2026-10-05 점검). */}
+        <CoverMeta updated={`${koDay(d.baseDate)} 기준`} basis="텔레그램 언급" />
+      </div>
 
-      {/* ── 왜 움직였나(LLM) ────────────────────────────────────────
-          그날 채널이 말한 까닭 한 줄(카더라 '급등 종목'과 같은 표. 이쪽은 **내린 날도 보여준다**).
-          3일 안의 것만 보여준다 —
-          지난주 까닭을 오늘 시세 옆에 두면 다른 날 이야기가 된다. 없는 게 정상이라 없으면 안 그린다. */}
-      {why && (
-        <section className="hz-sheet">
-          <SectionHead
-            /* ⚠️ trending_up 이었다. 카더라 '급등 종목' 카드에서 옮겨 온 값인데, 이 표는
-               **내린 날도 보여준다**(바로 위 주석). 아래 등락률이 ▼ 로 찍히는 날 아이콘만
-               혼자 올라가 있었다. 위아래 화살표는 방향을 말하지 않는다. */
-            icon="swap_vert"
-            title="왜 움직였나"
-            note={fmtKoDate(why.date)}
-            desc="그날 커뮤니티가 말한 이유입니다. 확인된 사실이 아니라 오간 이야기입니다."
-            level={2}
-          />
-          <div style={{ padding: "16px 22px 20px" }}>
-            <div style={{ fontSize: "var(--fs-13)", lineHeight: 1.7, display: "flex", gap: 9, background: C.soft, borderRadius: R.control, padding: "12px 13px" }}>
-              <AiMark size={15} style={{ flexShrink: 0 }} />
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
-                <p
-                  style={{
-                    margin: 0,
-                    color: why.reason ? C.inkSoft : C.sub2,
-                    textWrap: "pretty",
-                    wordBreak: "keep-all",
-                  }}
-                >
-                  {why.reason ?? "커뮤니티에서 이유를 말한 곳이 없습니다."}
-                </p>
-                {/* lineHeight 1.5: 상자가 ✨ 줄 맞춤 때문에 문장의 1.7 을 들고 있어 이 줄까지 물려받는다. */}
-                <span style={{ fontSize: "var(--fs-11-5)", lineHeight: 1.5, color: C.sub2 }}>
-                  {whyRate != null && (
-                    <>
-                      <span
-                        style={{
-                          fontFamily: MONO,
-                          fontWeight: 700,
-                          color: whyRate > 0 ? "var(--c-hot-ink)" : whyRate < 0 ? "var(--c-cold-ink)" : C.sub2,
-                        }}
-                      >
-                        {whyRate > 0 ? "▲" : whyRate < 0 ? "▼" : ""}
-                        {Math.abs(whyRate).toFixed(2)}%
-                      </span>
-                      {" · "}
-                    </>
-                  )}
-                  커뮤니티 {why.channelCount}곳이 말했습니다
+      {/* 둘째 줄 — 요즘 도는 얘기(최근 사흘 화제 · 움직인 날의 까닭), 판 폭. 없는 날은 안 그린다. */}
+      {hasTalk && (
+        <Module title="요즘 도는 얘기" ai meta="채널 글 요약">
+          <dl className="v2-brief3">
+            {d.narrative && (
+              <div className="v2-brief3-row">
+                {/* 아래 추이 범례와 같은 날짜로 — '최근 3일'과 '10/1~10/3'이 같은 사흘을 달리 불렀다(2026-10-05 점검). */}
+                <dt>{d.trend.length >= 3 ? `${md(d.trend[d.trend.length - 3].date)}~${md(d.trend[d.trend.length - 1].date)}` : "최근 3일"}</dt>
+                <dd>{d.narrative}</dd>
+              </div>
+            )}
+            {/* 움직인 날의 까닭 — 3일 안의 것만(지난주 까닭을 오늘 시세 옆에 두면 다른 날 이야기가 된다). 내린 날도 보여준다. */}
+            {why && (
+              <div className="v2-brief3-row">
+                <dt>
+                  {md(why.date)} {whyRate != null && <b className={tone(whyRate).trim() || undefined}>{signPct(whyRate)}</b>}
+                </dt>
+                <dd>
+                  {why.reason}
+                  <span className="v2-sk-src"> · 채널 {why.channelCount}곳</span>
+                </dd>
+              </div>
+            )}
+          </dl>
+        </Module>
+      )}
+
+      {/* 셋째 줄 — 일별 언급 추이 | 일정(없으면 배당). 짝이 없으면 추이가 판 폭. */}
+      <div className={`v2-tm-band is-brief${partner || sideStack ? "" : " is-solo"}`}>
+        <Module
+          title="일별 언급 추이"
+          meta={d.trend.length ? `${md(d.trend[0].date)}~${md(d.trend[d.trend.length - 1].date)}` : undefined}
+          className="v2-tm-trendmod"
+          // 날마다의 값은 막대 말풍선에만 있다 — 폰은 눌러야 열린다. 테마 화면 30일 점유율 추이와 같은 가르침(id 'trend-bar').
+          hint={!d.loadFailed && d.trend.some((p) => p.mentions) ? { id: "trend-bar", anchor: ".v2-tm-trend", at: "inside", text: "막대를 누르면 그날 값이 나옵니다" } : undefined}
+        >
+          {/* 실패와 '없음'을 다른 문장으로 — 같은 문장이면 고장이 자료로 위장된다. */}
+          {d.loadFailed ? (
+            <p className="v2-empty">언급 자료를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.</p>
+          ) : d.trend.every((p) => !p.mentions) ? (
+            // 판정도 문장도 막대와 같은 기간(30일) — 90일 합으로 보면 8월에만 말이 있던 종목에 빈 막대 30개와 '0회 · 0일'이 섰다(2026-10-04 점검).
+            <p className="v2-empty">
+              최근 {STOCK_TREND_DAYS}일 언급이 없습니다.
+            </p>
+          ) : (
+            <div className="v2-tm-trendbody">
+              {/* 위 숫자 넷은 아래 막대와 **같은 기간**(최근 30일)이다 — 90일 숫자를 두었더니 머리 '9월 4일 ~ 10월 3일' 아래에 '가장 많던 날 · 7월 21일'이
+                  서서 기간이 어긋나 보였다(2026-10-04 점검). 90일 값은 검색 설명(generateMetadata)에만 쓴다.
+                  하루 최다 채널 — 채널 합집합은 하루 단위로만 정확하다(lib/stock-page.ts 머리말 ②). 라벨이 '하루'라고 말해야 한다. */}
+              <TrendFigs points={d.trend} />
+              <Trend points={d.trend} />
+              <div className="v2-tm-legend">
+                {/* 날짜로 적는다 — 이 화면 · 카더라의 사흘은 기준일 앞 사흘이고, 테마 한 장은 기준일을 넣은 사흘이라(2026-09-29 결정)
+                    같은 '최근 3일'에 숫자가 달랐다(612회 · 318회, 2026-10-04 점검). */}
+                <span>
+                  <i className="is-recent" />
+                  {d.trend.length >= 3 ? `${md(d.trend[d.trend.length - 3].date)}~${md(d.trend[d.trend.length - 1].date)}` : "최근 3일"} {d.recentMentions.toLocaleString("ko-KR")}회
+                </span>
+                <span>
+                  <i />그 전
                 </span>
               </div>
             </div>
-          </div>
-        </section>
-      )}
-      {/* ── 다가오는 일정 ──────────────────────────────────────────
-          채널 글에서 뽑은 앞날의 일정. 카더라 카드와 달리 **달·분기·연 단위도** 보여준다 —
-          이 화면은 한 종목의 자리라 "10월 중"·"2027년"이 글로 서면 된다(eventDateLabel). */}
-      {events.length > 0 && (
-        <section className="hz-sheet">
-          <SectionHead
-            icon="calendar_month"
-            title="다가오는 일정"
-            note={`앞으로 ${events.length}건`}
-            desc="커뮤니티가 짚은 날입니다. 같은 일정을 두고 날짜가 갈리기도 합니다."
-            level={2}
-          />
-          {/* 한 건 한 줄 타임라인(2026-09-30). 예전엔 날짜가 머리, 그 아래 일이 한 줄씩이라 건마다 두 줄에 오른쪽이 비었다.
-              이 화면은 한 종목의 자리라 줄에 이름이 없고, 달·분기·해만 짚인 일정도 날짜 칸에 글로 선다("10월 중"). */}
-          <ol className="hz-stl">
-            {events.map((e) => (
-              <li key={`${e.date}-${e.precision}-${e.event}`} className="hz-stl-row">
-                <span className="hz-stl-dot" aria-hidden="true" />
-                <span className="hz-stl-date">{eventDateLabel(e)}</span>
-                <span className="hz-stl-dd">{e.precision === "day" ? daysFromToday(e.date) : ""}</span>
-                <span className="hz-stl-ev">{e.event}</span>
-                {e.channels >= 2 ? <Pill tone="blue">{e.channels}곳이 언급</Pill> : <span className="hz-stl-one">1곳</span>}
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
-      {/* ── 회자된 까닭(LLM) ────────────────────────────────────────
-          파이프라인이 기준일에 상위 몇 종목만 써 둔다. 없는 게 정상이라 없으면 안 그린다.
-          ⛔ 없는 자리를 그럴듯한 문장으로 메우지 말 것. */}
-      {d.narrative && (
-        <section className="hz-sheet">
-          {/* ⚠️ icon 을 auto_awesome 으로 되돌리지 말 것. 바로 아래 본문의 ✨(AiMark)가 같은
-              글리프라 머리와 본문에 같은 그림이 두 번 섰고, 무엇보다 ✨ 는 "생성형 AI가 썼다"는
-              **고지 표시**다(app/ui.tsx AiMark 머리말). 장식으로 같이 쓰면 그 뜻이 흐려진다.
-              확성기는 카더라의 '트렌딩 메시지'와 같은 뜻으로 쓴다 — 채널에서 떠들썩했던 것. */}
-          <SectionHead icon="campaign" title="무엇이 화제였나" note="최근 3일" level={2} />
-          {/* ⚠️ 고지 문구를 **글자로 깔지 않는다.** ✨ 하나가 고지를 품는 것이 이 저장소의
-              방식이다(app/ui.tsx AiMark 머리말: 문장마다 한 줄씩 깔면 정작 읽어야 할
-              요약보다 고지가 길어진다). 누르거나 마우스를 올리면 문구가 뜨고, 같은
-              문장이 aria-label 에도 들어간다.
-              틀은 카더라의 종목 서술과 같다(app/kadera/page.tsx). 같은 성격의 글이
-              화면마다 다른 꼴로 서면 독자가 매번 무엇인지 다시 읽어야 한다. */}
-          {/* 위 16 은 머리 헤어라인과 첫 내용 사이의 숨이다 — 다른 시트(.hz-tx .hz-panelgrid)와
-              같은 값이라 화면을 오갈 때 같은 자리에서 같은 간격을 만난다. */}
-          <div style={{ padding: "16px 22px 20px" }}>
-            <div
-              style={{ fontSize: "var(--fs-13)", lineHeight: 1.7, display: "flex", gap: 9, background: C.soft, borderRadius: R.control, padding: "12px 13px" }}
-            >
-              <AiMark size={15} style={{ flexShrink: 0 }} />
-              <p
-                style={{
-                  margin: 0,
-                  color: C.inkSoft,
-                  textWrap: "pretty",
-                  wordBreak: "keep-all",
-                }}
-              >
-                {d.narrative}
-              </p>
-            </div>
-          </div>
-        </section>
-      )}
+          )}
+        </Module>
+        {partner ?? sideStack}
+      </div>
 
-      {/* ── 함께 보는 종목 ──────────────────────────────────────────
-          ⭐ 화면 464장이 서로 안 이어져 있으면 크롤러가 못 닿는다. 사전이 이미 종목을
-          테마로 묶어 두고 있으니 새 자료 없이 이웃을 이어 준다(lib/stock-page.ts).
-          ⚠️ 손으로 고른 대표 바스켓이라 "이 테마의 전부"라고 말하지 않는다. */}
-      {peers.length > 0 && (
-        <section className="hz-sheet">
-          <SectionHead
-            icon="hub"
-            title="같은 테마 종목"
-            note={d.themes[0]}
-            desc="테마를 이루는 대표 종목입니다. 업종 전체가 아니라 손으로 고른 목록입니다."
-            level={2}
-          />
-          <div style={{ padding: "16px 22px 20px", display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {peers.map((p) => (
-              <Link
-                key={p.code}
-                href={stockHref(p.code)}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 11px",
-                  borderRadius: R.pill,
-                  background: C.chip,
-                  fontSize: "var(--fs-12)",
-                  fontWeight: 600,
-                  color: C.label,
-                  textDecoration: "none",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {p.name}
-              </Link>
-            ))}
-          </div>
-        </section>
+      {/* 넷째 줄부터 — 배당(추이 짝으로 안 쓴 날, 판 폭) · [짧은 일정 | 같은 테마 종목]. 없는 게 정상인 칸은 안 그린다.
+          배당이 없는 종목은 배당 모듈을 안 그린다 — '최근 12개월 현금배당이 없습니다' 한 줄짜리 판 폭 모듈이 열 종목 중 여덟에 섰다(2026-10-05 점검). */}
+      {partner !== dividendMod && dividendRich && dividendWide}
+      {sideStack ? null : shortEvents && peersMod ? (
+        <div className="v2-tm-band is-pair">
+          {shortEvents}
+          {peersMod}
+        </div>
+      ) : (
+        <>
+          {shortEvents}
+          {peersMod}
+        </>
       )}
+    </div>
+  );
+}
 
-      {/* ── 배당 ─────────────────────────────────────────────────────
-          이 종목을 1주 들면 1년에 얼마, 어느 달에 받나. 배당으로 살기와 같은 표를 읽어 서버가 그린다.
-          "삼성전자 배당" 같은 검색이 이 화면에 닿게 하는 자리이고, 주수를 넣는 셈은 저쪽으로 잇는다.
-          자리는 같은 테마 종목 아래(2026-09-15 지시) — 카더라(왜·화제·일정·테마)가 먼저, 배당은 그다음. */}
-      {dividend && <DividendCard s={dividend} />}
-
-      <NextLinks d={d} />
-
-      {/* 자료가 어디까지 찬 날인지. 카드마다 날짜를 적는 대신 바닥에 한 줄로 둔다. */}
-      <p style={{ margin: 0, fontSize: "var(--fs-11)", color: C.muted, textAlign: "right" }}>
-        집계 기준일 {fmtKoDate(d.baseDate)}. 언급은 주식 텔레그램 채널에서 셉니다.
-      </p>
+/** 일별 언급 추이 위 숫자 넷 — 막대(최근 30일)와 같은 기간으로 센다. 가장 많던 날 · 하루 최다 채널은 0 이면 안 세운다. */
+function TrendFigs({ points }: { points: StockTrendPoint[] }) {
+  const total = points.reduce((s, p) => s + p.mentions, 0);
+  const active = points.filter((p) => p.mentions > 0).length;
+  const peak = points.reduce<StockTrendPoint | null>((b, p) => (p.mentions > 0 && (!b || p.mentions > b.mentions) ? p : b), null);
+  const peakCh = points.reduce<StockTrendPoint | null>((b, p) => (p.channels > 0 && (!b || p.channels > b.channels) ? p : b), null);
+  // 언급된 날이 하루뿐이면 '가장 많던 날' · '하루 최다 채널'은 앞 두 칸과 같은 하루를 되풀이한다 — 세우지 않는다.
+  const single = active <= 1;
+  return (
+    <div className="v2-tm-figs">
+      <span>
+        <b>{total.toLocaleString("ko-KR")}회</b>
+        <em>최근 {STOCK_TREND_DAYS}일 언급</em>
+      </span>
+      <span>
+        <b>{active}일</b>
+        {/* '언급 일수' — '24일 · 언급된 날'은 날짜(24일)로, '30일'은 기간으로 읽혔다(2026-10-05 점검). */}
+        <em>언급 일수</em>
+      </span>
+      {peak && !single && (
+        <span>
+          <b>{peak.mentions.toLocaleString("ko-KR")}회</b>
+          <em>가장 많던 날 · {fmtKoDate(peak.date)}</em>
+        </span>
+      )}
+      {peakCh && !single && (
+        <span>
+          <b>{peakCh.channels}곳</b>
+          <em>하루 최다 채널 · {fmtKoDate(peakCh.date)}</em>
+        </span>
+      )}
     </div>
   );
 }

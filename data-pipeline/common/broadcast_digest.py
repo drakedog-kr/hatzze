@@ -807,7 +807,7 @@ DIGEST_FORMAT = """\
 - 한 채널만 떠든 이야기는 갈래로 세우지 마세요. 여러 발췌에 공통으로 나오는 이야기를 고르세요.
 - 발췌를 베끼지 말고 무슨 일인지를 자기 말로 옮기세요. 링크·홍보 문구·가격 알림은 무시하세요.
 - 등락률·조회 수 같은 숫자는 화면이 따로 찍으니 문장에 넣지 마세요.
-- [종목별 까닭] 자료의 종목이 어느 갈래에 속하면 그 까닭을 그 갈래의 문장에 녹이세요.
+- [종목별 이유] 자료의 종목이 어느 갈래에 속하면 그 이유를 그 갈래의 문장에 녹이세요.
 - 대괄호 라벨([갈래] 같은 것)은 출력하지 마세요."""
 
 TASKS = {
@@ -820,7 +820,7 @@ TASKS = {
     "evening2": """\
 [이번 글 — 오늘 채널 요약]
 오늘 장중부터 마감 뒤까지 채널이 붙잡은 이야기를 {n} 갈래로 정리합니다. 마감 뒤에 읽는
-글입니다. [종목별 까닭] 자료의 종목이 든 갈래는 그 종목이 왜 움직였는지가 문장에 있어야
+글입니다. [종목별 이유] 자료의 종목이 든 갈래는 그 종목이 왜 움직였는지가 문장에 있어야
 합니다. 오늘 처음 나온 이야기와 며칠째 이어지는 이야기를 구별해 적으세요.""",
     "midweek": """\
 [이번 글 — 주중 요약]
@@ -1142,7 +1142,7 @@ def build_morning2(db, llm, model: str, R: Render, as_of: date, now: datetime, s
         [f"[창] {span_label(lo, hi)} (KST)"]
         + excerpt_lines(mat, "밤사이 발췌")
         + [""]
-        + (reason_lines("종목별 까닭 · 미국 종목", us_reasons, 8, with_change=False) if us_d == hi.date().isoformat() else [])
+        + (reason_lines("종목별 이유 · 미국 종목", us_reasons, 8, with_change=False) if us_d == hi.date().isoformat() else [])
     )
     sections = compose_sections(llm, model, "morning2", digest, mat)
     # 국내 등락은 어제 종가라 개장 전 글에선 낡은 값이다. 미국 종목만 간밤 세션(뉴욕 날짜 =
@@ -1179,7 +1179,7 @@ def build_evening2(db, llm, model: str, R: Render, as_of: date, now: datetime, s
         [f"[창] {span_label(lo, hi)} (KST)"]
         + excerpt_lines(mat, "오늘 발췌")
         + [""]
-        + (reason_lines("종목별 까닭 · 오늘 움직인 종목", kr_reasons, 10, with_change=True) if kr_d == day.isoformat() else [])
+        + (reason_lines("종목별 이유 · 오늘 움직인 종목", kr_reasons, 10, with_change=True) if kr_d == day.isoformat() else [])
     )
     sections = compose_sections(llm, model, "evening2", digest, mat)
     if len(sections) < MIN_SECTIONS_TO_SEND:
@@ -1223,7 +1223,7 @@ def build_midweek(db, llm, model: str, R: Render, as_of: date, now: datetime, st
         + [""]
         + excerpt_lines(mat, "이번 주 발췌")
         + [""]
-        + (reason_lines("종목별 까닭 · 최근 움직인 종목", kr_reasons, 8, with_change=True) if kr_reasons else [])
+        + (reason_lines("종목별 이유 · 최근 움직인 종목", kr_reasons, 8, with_change=True) if kr_reasons else [])
     )
     sections = compose_sections(llm, model, "midweek", digest, mat)
     if len(sections) < MIN_SECTIONS_TO_SEND:
@@ -1279,7 +1279,7 @@ def build_us_weekend(db, llm, model: str, R: Render, as_of: date, now: datetime,
         + [""]
         + excerpt_lines(mat, "이번 주 미국 종목 발췌", week.excerpts)
         + [""]
-        + (reason_lines("종목별 까닭 · 미국 종목", us_reasons, 8, with_change=False) if us_fresh else [])
+        + (reason_lines("종목별 이유 · 미국 종목", us_reasons, 8, with_change=False) if us_fresh else [])
     )
     sections = compose_sections(llm, model, "us_week", digest, mat)
     if len(sections) < MIN_SECTIONS_TO_SEND:
@@ -1320,7 +1320,7 @@ def build_weekly2(db, llm, model: str, R: Render, as_of: date, now: datetime, st
         + [""]
         + excerpt_lines(mat, "이번 주 발췌")
         + [""]
-        + (reason_lines("종목별 까닭 · 이번 주 움직인 종목", kr_reasons, 8, with_change=True) if kr_reasons else [])
+        + (reason_lines("종목별 이유 · 이번 주 움직인 종목", kr_reasons, 8, with_change=True) if kr_reasons else [])
     )
     sections = compose_sections(llm, model, "weekly2", digest, mat)
     if len(sections) < MIN_SECTIONS_TO_SEND:

@@ -1,21 +1,5 @@
 /* MDD 시트·내부자 차트·반쪽 카드·애널리스트 줄·52주 막대·전체보기·마커·툴팁·테마 로테이션. app/globals.css 에서 줄 그대로 옮겨 왔다(그쪽 머리말 참고). */
 
-/* MDD 정밀분석 — 시트 두 장이 나란히 서는 줄(역대 낙폭 ↔ 회복 · 시장탓 ↔ 성격).
-   align-items:stretch(기본)로 같은 줄 두 시트의 높이를 맞춘다 — 짧은 쪽에 아래 여백이
-   생기더라도 세로 길이를 맞추는 게 낫다. 안쪽이 답답해지는 폭에서는 1열로 접는다.
-
-   ⚠️ flex-basis 를 calc(50% - 8px) 로 두면 gap 과 합이 어긋나 좁은 폭에서 넘친다.
-   grid 로 두면 minmax(0,1fr) 이 그 계산을 대신 해 준다. */
-.mdd-pair {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  align-items: stretch;
-}
-@media (max-width: 1024px) {
-  .mdd-pair { grid-template-columns: minmax(0, 1fr); }
-}
-
 /* MDD 통계 칸의 이름·보조 줄 — 넓은 화면은 한 줄 + 말줄임. 폰에선 접는다: 글자가 12 가 되자 320px 에서
    "이보다 깊었던 날"(85px)이 77px 칸에서 잘렸다(2026-09-23 머지 전 점검). */
 .mdd-stat-clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -28,26 +12,9 @@
 .mdd-search-input { font-size: var(--fs-15); }
 @media (max-width: 560px) {
   .mdd-search-input { font-size: 16px; }
-  /* 폰에선 11px대 글자가 12 가 된다(mobile.css 폰 최적화). 막대 줄의 고정 칸이 그만큼 넓어야 "2021.11"(12px/700 약 50px) ·
-     "+280%" · "11개월" 이 칸을 안 넘는다. 역대 낙폭 Top 5 의 깊이 칸("−66.4%")도 같다. */
-  :root { --mdd-mirror-label: 52px; --mdd-mirror-left: 44px; --mdd-mirror-right: 48px; --mdd-top-depth: 48px; }
 }
 
 /* MDD 기간 토글의 호버는 세그먼트 한 벌의 .hz-seg-hover(tx.css)가 맡는다(2026-09-26). */
-
-/* 역대 낙폭 Top 5 의 열 —— **인라인이 아니라 여기 둔다**. 인라인 grid-template-columns 는
-   아래 미디어쿼리를 이겨서 좁은 폭에서 열이 안 줄어든다.
-   375px 실측: 구간 열이 73px 로 눌려 "2021-02 ~ 2024-02"(118px)가 넘쳤다. */
-.mdd-top-row {
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.3fr) 56px 62px;
-  gap: 11px;
-}
-@media (max-width: 640px) {
-  /* 상태 열('회복'/'진행 중')을 접는다 — 회복 열이 '—' 면 진행 중이라 같은 말이고,
-     진행 중 행은 배경·파란 잉크로 이미 갈린다. 그 62px 을 구간 열이 가져간다. */
-  .mdd-top-row { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.1fr) 52px; }
-  .mdd-top-status { display: none; }
-}
 
 /* 언더워터 차트의 크로스헤어(호버 기준선 + 툴팁) 띠.
    ⚠️ 좁은 폭에서는 끈다. 툴팁(.hz-tip::after)은 opacity:0 이어도 absolute 라 **스크롤
@@ -106,62 +73,14 @@
   background: var(--c-card);
   color: var(--c-sub);
   font-size: var(--fs-11);
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 .hz-mkfilter-set label:hover { background: var(--c-chip); }
 
-/* ── 반쪽 카드의 세 칸 줄 ──────────────────────────────────────────
-   이름 · 한 줄 설명 · 값. 넓은 표(.hz-wide)와 같은 문법을 폭만 줄여 쓴다.
-
-   ⚠️ 두 칸으로 두면 사실이 오른쪽에 쌓인다. 실제로 그렇게 갔다가 금액·주식 수·날짜
-      셋이 오른쪽 끝에 붙어 **해독해야 읽히는 덩어리**가 됐다. 칸을 하나 더 내주고
-      칸마다 하나씩만 두는 편이 같은 정보를 훨씬 빨리 읽힌다.
-
-   ⚠️ 값 칸의 폭을 못박지 말 것 — 원화로 바꾸면 "$1K~$15K" 가 "142만원~2,121만원" 으로
-      두 배가 된다. 하한만 주고 위는 열어 둔다. */
-.hz-halfrow {
-  /* ⚠️⚠️ **설명 칸을 fr 로 두지 말 것.** 이름이 73~165px 로 들쭉날쭉해서, 이름 칸을
-     fr 로 잡으면 짧은 이름 뒤에 빈 자리가 남고 설명이 **양옆이 빈 채 가운데에 떠 보인다.**
-     실제로 그렇게 뒀다가 "가운데 위치가 안 어울린다"는 말을 들었다.
-
-     대신 설명을 auto 로 두고 오른쪽으로 붙인다. 그러면 빈 자리가 **이름 뒤 한 군데로
-     모이고**, 설명의 오른쪽 끝과 값의 오른쪽 끝이 각각 세로로 선다. 줄이 "이름 …
-     무엇을 언제 · 얼마"로 읽힌다.
-
-     ⚠️ 이름이 넘치면 이름이 잘린다(블랙스톤의 51자짜리 펀드 이름). 그게 맞는 순서다 —
-        설명·금액을 지키고 이름을 줄여야지, 반대로 가면 무슨 거래인지가 사라진다.
-
-     ⚠️ 값 칸에 96px 하한을 둔다. 한 줄은 저마다 독립된 격자라, 하한이 없으면 "$27K"
-        줄과 "673,200주" 줄의 칸 폭이 달라져 **설명의 오른쪽 끝이 줄마다 어긋난다.**
-        실측 대부분의 값이 96px 안에 들어와 이 하한 하나로 카드 전체가 나란히 선다. */
-  grid-template-columns: minmax(0, 1fr) auto minmax(96px, auto);
-}
-.hz-halfrow > *:nth-child(2) {
-  text-align: right;
-  /* 값과 사이를 한 칸 더 벌린다. 격자 간격 12px 만으로는 "8/11 접수 673,200주" 가
-     한 덩이로 붙어 읽힌다. */
-  padding-right: 14px;
-}
-
-/* 카드가 한 폭을 다 쓰는 좁은 화면에서는 가운데 칸이 뭉개진다. 설명을 이름 아래로
-   내리고 값만 오른쪽에 남긴다(.hz-wide 가 980 아래에서 하는 것과 같은 접기다). */
-@media (max-width: 560px) {
-  .hz-halfrow {
-    grid-template-columns: minmax(0, 1fr) auto;
-    row-gap: 3px;
-  }
-  .hz-halfrow > *:nth-child(2) {
-    grid-column: 1;
-    /* 이름 아래로 내려오면 이름과 왼쪽 끝을 맞춘다 — 오른쪽 정렬이면 허공에 뜬다. */
-    text-align: left;
-    padding-right: 0;
-  }
-}
-
 /* ── 애널리스트 의견 한 줄 ────────────────────────────────────────
-   증권사·애널리스트 | 행동·등급 | 목표가. 반쪽 카드 줄(.hz-halfrow)과 같은 문법인데,
+   증권사·애널리스트 | 행동·등급 | 목표가. 상세 화면 한 줄(V2DetailRows)과 같은 문법인데,
    여기는 왼쪽이 두 줄이다 — 증권사와 애널리스트 이름을 한 줄에 이으면 40자를 넘긴다
    ("Bank of America Securities · Wamsi Mohan"). 이름이 주인공이 아니라 **증권사**가
    주인공이라 그쪽을 위에 세운다.
@@ -292,6 +211,9 @@
 #hz-mkf-insider:checked ~ .hz-mkfilter-chart .hz-mk:not(.hz-mk-insider) { opacity: 0.12; }
 #hz-mkf-manager:checked ~ .hz-mkfilter-chart .hz-mk:not(.hz-mk-manager) { opacity: 0.12; }
 #hz-mkf-congress:checked ~ .hz-mkfilter-chart .hz-mk:not(.hz-mk-congress) { opacity: 0.12; }
+/* 겹친 표식 — 위에 선 것(is-over, parts.tsx PriceChart)을 흐려 아래 것이 비쳐 보이게. '전체'일 때만 — 한 축을 고르면 다른 축이 흐려져
+   겹침이 사라지므로 고른 축은 진하게 남는다(2026-10-05 운영자 판단). */
+#hz-mkf-all:checked ~ .hz-mkfilter-chart .hz-mk.is-over { opacity: 0.5; }
 
 /* 초점 링 — 라디오를 숨겼으니 라벨이 대신 받는다. 안 그리면 키보드로 어디 있는지 모른다. */
 .hz-mkfilter > input[type="radio"]:focus-visible ~ * .hz-mkfilter-set label { outline: 1px dashed var(--c-blue); }
@@ -437,6 +359,12 @@ main.hz-scroll { overflow-x: clip; }
      auto 에 맡기지 않는 이유: 안에 글자가 있는 hover 영역(막대 밑 날짜 라벨 등)에서
      auto 는 I 빔(텍스트 커서)으로 풀린다 — 60곳 가까이가 그 상태였다. */
   cursor: default;
+}
+/* 단, 누르면 가는 링크 · 단추에 툴팁을 단 곳은 손 모양 — 위 한 줄이 링크의 손 모양까지 지워, 카더라 테마 점유율 줄(대장 종목 툴팁)에
+   마우스를 올려도 화살표였다(2026-10-04). 자리마다 cursor: pointer 를 덧적던 것(kadera.css 지도 칸 등)을 여기 한 곳에서. */
+a.hz-tip[href],
+button.hz-tip:not(:disabled) {
+  cursor: pointer;
 }
 .hz-tip::after {
   /* ⚠️ 숨어 있는 동안엔 상자 자체를 안 만든다(content: none). 전엔 opacity:0 으로만 숨겨서 페이지의 툴팁 수십~백여 개가
@@ -668,7 +596,7 @@ main.hz-scroll { overflow-x: clip; }
 /* 생성형 AI 표시(✨)의 눌리는 자리.
    아이콘이 13~22px 뿐이라 그대로 두면 손가락으로 못 누른다. padding 으로 누를 곳을
    키우고 같은 크기의 음수 margin 으로 되돌려, 주변 배치는 아이콘 크기 그대로 두면서
-   hit 영역만 넓힌다(.hz-yrpop-btn 과 같은 수법). */
+   hit 영역만 넓힌다. */
 .hz-ai-mark {
   display: block;
   padding: 9px;
@@ -698,23 +626,3 @@ main.hz-scroll { overflow-x: clip; }
 
    목록이 줄에 붙어 있어서 마우스를 목록으로 옮겨도 :hover 가 유지된다 —
    :hover 는 조상까지 함께 걸리고, 목록은 줄의 자식이다. */
-
-/* 배경만 카드 안쪽 여백까지 번지게 한다. 음수 마진을 패딩과 같은 값으로 둬 margin box
-   치수는 그대로 남긴다 — 이 목록은 space-between 으로 남는 높이를 줄들이 나눠 갖는
-   구조라, 줄의 외곽 치수가 바뀌면 그 배분이 흔들린다. 줄 사이 간격만 10px 좁아 보인다. */
-.hz-theme-row {
-  position: relative;
-  margin: -5px -12px;
-  padding: 5px 12px;
-  border-radius: var(--r-control);
-  transition: background 0.13s ease;
-}
-.hz-theme-row:hover,
-.hz-theme-row:focus-within {
-  background: var(--c-blue-tint);
-}
-/* 마우스 없이도 열 수 있어야 한다(줄에 tabindex 를 준다). 터치에서도 이 경로로 열린다. */
-.hz-theme-row:focus-visible {
-  outline: 2px solid var(--c-blue);
-  outline-offset: -1px;
-}

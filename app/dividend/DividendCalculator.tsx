@@ -1,27 +1,27 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { gaStockCode, track } from "@/lib/ga";
-import { Icon } from "../ui";
 import { SectionHead } from "../kadera/SectionHead";
-import { SectionIntro } from "../SectionIntro";
 import { LoadFailedNote } from "../LoadFailedNote";
 import { inflate, type BasketLite, type MoreLists, type StockLite, type StockWire } from "./types";
 import { newId, holdingsStore, writeHoldings } from "./store";
 import type { Holding } from "./store";
-import { won, wonShort, pct } from "./format";
-import { IRP_RISK_MAX, isSafeAsset, ACCOUNTS, TAX_HELP, taxNote } from "./tax";
+import { IRP_RISK_MAX, isSafeAsset, TAX_SHORT, taxNote } from "./tax";
 import type { Account, TaxMode } from "./tax";
-import { accountTag, DEFAULT_SHARES, GOAL_DEFAULT_MAN, ADD_DEFAULT_MAN, BASKET_ROWS, AMOUNT_DEFAULT, SCOPES, scopeOf, computeLines, basketCodes, nextAccountFor, basketShares } from "./shared";
+import { DEFAULT_SHARES, GOAL_DEFAULT_MAN, ADD_DEFAULT_MAN, AMOUNT_DEFAULT, SCOPES, scopeOf, computeLines, basketCodes, nextAccountFor, basketShares } from "./shared";
 import type { Scope } from "./shared";
 import { goalBasis, monthlyOf } from "./calc";
 import { SearchBox, QuickChips, MoreRows } from "./Search";
-import { HoldingsTable } from "./Holdings";
+import { HoldingsBar, HoldingsTable } from "./Holdings";
+import { BandSkeleton } from "./BandSkeleton";
 import type { SortKey } from "./Holdings";
-import { MonthCalendar, Upcoming, MonthFill } from "./Calendar";
-import { GoalBox, AmountControl } from "./Goal";
-import { BasketSheet } from "./Basket";
+import { MonthFill, upcomingOf } from "./Calendar";
+import { GoalBox } from "./Goal";
+import { BasketBoard } from "./V2Baskets";
+import { V2Hint } from "../V2Hint";
+import { CalendarModule, DvCover, UpcomingModule, YearlyModule } from "./V2Parts";
 
 // '모두 빼기' 확인 판(Base UI 대화상자, gzip 약 20KB)은 처음 누를 때 받아 온다(ClearDialog.tsx).
 const ClearDialog = dynamic(() => import("./ClearDialog").then((m) => m.ClearDialog), { ssr: false });
@@ -60,6 +60,9 @@ export function DividendCalculator({
   more,
   usdkrw,
   failedSources,
+  counts,
+  priceDate,
+  usPriceDate,
 }: {
   stocks: StockWire[];
   baskets: BasketLite[];
@@ -70,11 +73,16 @@ export function DividendCalculator({
   usdkrw: { rate: number; date: string | null } | null;
   /** 조회에 실패한 자료의 이름(lib/dividend.ts 의 DividendData.failedSources). 비면 안 그린다. */
   failedSources: string[];
+  /** 첫 줄 띠 — 담을 수 있는 종목 수(검색에 걸리는 전부)와 종가 기준일. */
+  counts: { kr: number; us: number; etf: number };
+  priceDate: string | null;
+  usPriceDate: string | null;
 }) {
   // 서버는 null 칸을 뺀 꼴(StockWire)로 보낸다 — 4,366개라 HTML 이 2.2MB 였다. 여기서 한 번 채워 두면 아래는 전부 StockLite.
   const stocks = useMemo(() => wire.map(inflate), [wire]);
   const byCode = useMemo(() => new Map(stocks.map((s) => [s.code, s])), [stocks]);
   const holdings = useSyncExternalStore(holdingsStore.subscribe, holdingsStore.getSnapshot, holdingsStore.getServerSnapshot);
+  const holdingsLoaded = useSyncExternalStore(holdingsStore.subscribe, holdingsStore.isLoaded, holdingsStore.isLoadedServer);
   const setHoldings = writeHoldings;
   // 머리의 칸은 세후·세전 둘뿐이다(2026-09-13 지적: "일반 유저에겐 세후·세전이 쉽다"). 어느 계좌로 세는지는
   // 세후일 때만 히어로 아래 작은 칸에서 고른다 — 세전이면 계좌가 뜻이 없다.
@@ -86,6 +94,15 @@ export function DividendCalculator({
   const [addMan, setAddMan] = useState(ADD_DEFAULT_MAN);
   // 달력에서 누른 달 — 그 달에 주는 종목을 아래에 세운다(빈 달 채우기).
   const [fillMonth, setFillMonth] = useState<number | null>(null);
+  // 달 칸으로 새 달을 열었을 때만 그 판까지 내려간다 — 폰에선 판이 화면 밖(아래 1,000px 남짓)에 열려 누른 칸 색만 바뀌었다
+  // (2026-10-05 모바일 점검 P1). 넓은 화면은 판이 이미 보여 'nearest' 가 움직이지 않는다. 같은 달을 다시 눌러 닫을 땐 안 움직인다.
+  const fillScroll = useRef(false);
+  useEffect(() => {
+    if (fillMonth == null || !fillScroll.current) return;
+    fillScroll.current = false;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.querySelector(".v2-dv-fill")?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+  }, [fillMonth]);
   const [amount, setAmount] = useState(AMOUNT_DEFAULT);
   const chipsBy: Record<Scope, string[]> = { kr: popular, us: popularUs, etf: popularEtf };
   // 빈 달 채우기의 후보 순서 — 칩과 '더 보기' 묶음에 선 것(서버가 고른 순)이 먼저, 그다음은 나머지 전부를
@@ -165,25 +182,23 @@ export function DividendCalculator({
   // 환율이 없으면(미국 표가 비었을 때) 미국 종목 자체가 목록에 없다(lib/dividend.ts). 1 은 자리값.
   const fx = usdkrw?.rate ?? 1;
   const lines = useMemo(() => computeLines(holdings, byCode, fx, taxMode, account), [holdings, byCode, fx, taxMode, account]);
+  // 고른 계좌로 세금을 뗀 줄 — 세전을 보고 있을 때도 '1년에 받는 배당' 칸의 갈림 막대(받는 돈 | 세금)가 쓴다.
+  const taxedLines = useMemo(() => (afterTax ? lines : computeLines(holdings, byCode, fx, account, account)), [afterTax, lines, holdings, byCode, fx, account]);
   // 체크를 푼 줄은 표에만 남고 셈에서 빠진다 — 아래 합계·달력·일정·목표·세금 안내는 전부 이 목록으로. 표만 lines 를 본다.
   const active = useMemo(() => lines.filter((l) => !l.off), [lines]);
   // 줄마다 계좌가 다를 수 있다 — 라벨 꼬리·툴팁·주의 문구는 줄의 계좌로 센다.
   const mixed = afterTax && new Set(active.map((l) => l.account)).size > 1;
   const byAccount = (a: Account) => active.filter((l) => l.account === a);
-  const total = active.reduce((s, l) => s + l.netKrw, 0);
   const invest = active.reduce((s, l) => s + (l.investKrw ?? 0), 0);
-  const priced = active.filter((l) => l.investKrw != null);
-  const yieldPct = invest > 0 ? (priced.reduce((s, l) => s + l.grossKrw, 0) / invest) * 100 : null;
   // 목표까지 칸도 투자금을 아는 줄로만 센다 — 종가 없는 줄의 배당까지 넣으면 수익률이 부풀어 필요한 투자금이 몇 분의 1로 적혔다.
   const goalIn = goalBasis(active);
   // 금융소득 종합과세 문턱과 고배당기업(분리과세 대상) 배당의 몫 — **일반 계좌 줄만** 합친다(ISA·연금 계좌 안 소득은 금융소득에
   // 안 합친다). 못 담아 일반 세율로 센 줄(outside)도 실제론 일반 계좌라 넣는다. 세전 합이 문턱 근처인 사람에게만 뜻이 있어 그때만 적는다.
   const generalLines = active.filter((l) => l.account === "general" || l.outside);
-  // 문턱은 과세되는 몫으로 — ETF 과표·감액배당을 뺀 값. 세전 합은 문장에서 그 차이를 밝히는 데 쓴다.
+  // 문턱은 과세되는 몫으로 — ETF 과표·감액배당을 뺀 값. 세전 합은 문턱 조각을 적을지(1,000만원 넘나) 가르는 데 쓴다.
   const sepGross = generalLines.filter((l) => l.stock.highDiv).reduce((s, l) => s + l.taxableKrw, 0);
   const grossAll = generalLines.reduce((s, l) => s + l.grossKrw, 0);
   const taxableAll = generalLines.reduce((s, l) => s + l.taxableKrw, 0);
-  const outsideCount = active.filter((l) => l.outside).length;
   // IRP 위험자산 비율 — IRP 로 세는 줄(outside 아님)의 투자금 가운데 안전자산이 아닌 몫. 30% 를 채우려면 안전자산이
   // x 더 있어야 한다: (safe + x) / (total + x) = 0.3 → x = (0.3·total − safe) / 0.7.
   const irpInfo = (() => {
@@ -196,11 +211,22 @@ export function DividendCalculator({
     return { riskPct, needKrw: Math.max(0, ((1 - IRP_RISK_MAX) * total - safe) / IRP_RISK_MAX) };
   })();
   const exemptInvested = afterTax ? byAccount("exempt").filter((l) => !l.outside).reduce((s, l) => s + (l.investKrw ?? 0), 0) : 0;
-  const heroNote = taxNote(taxMode, grossAll, taxableAll, sepGross, outsideCount, irpInfo, mixed, { invested: exemptInvested });
+  const heroNote = taxNote(taxMode, grossAll, taxableAll, sepGross, irpInfo, mixed, { invested: exemptInvested });
   // 달력에 못 드는 줄 — 지급일 기록(pays)이 없는 것(stockanalysis 에 없는 미국 종목 등). 배당이 있는 줄만 센다.
   const noCalCount = active.filter((l) => l.stock.dps > 0 && !l.stock.pays.length).length;
   // 달력은 지급 달을 아는 줄만. 세후는 줄의 세후 ÷ 세전으로 — 히어로·표와 같은 값(calc.ts 의 monthlyOf).
   const monthly = useMemo(() => monthlyOf(active, fx), [active, fx]);
+
+  // 둘째 줄 결과 셋의 재료 — 담은 종목(active)만.
+  // ⛔ 담은 종목이 없는 날 첫 바스켓을 1,000만원어치 담은 셈으로 미리 그리던 '예시'는 걷었다(2026-10-03 "선택한 거 없는데 왜 미리
+  //    계산이 되지?") — '예시' 표시가 칸 머리에 작게만 있어 고른 것처럼 읽혔고, 그 금액은 아래 바스켓 표 첫 줄과 같은 숫자였다.
+  //    이제 결과 셋은 종목을 담았을 때만 선다(아래 렌더).
+  const bandTotal = active.reduce((s, l) => s + l.netKrw, 0);
+  const bandInvest = active.reduce((s, l) => s + (l.investKrw ?? 0), 0);
+  // 수익률은 바로 위 큰 숫자와 같은 쪽(세후면 세후) — 세후 합 아래에 세전 수익률이 서서 세 숫자의 셈이 안 맞았다(2026-10-04 점검).
+  const bandYield =
+    bandInvest > 0 ? (active.filter((l) => l.investKrw != null).reduce((s, l) => s + (afterTax ? l.netKrw : l.grossKrw), 0) / bandInvest) * 100 : null;
+  const upcoming = upcomingOf(active, fx, taxMode);
 
   const add = (code: string, source: string) => {
     if (!byCode.has(code)) return;
@@ -352,99 +378,92 @@ export function DividendCalculator({
 
   // 히어로 라벨 옆 물음표는 세금을 어떻게 뗐는지 한 줄만 말한다. 시세 기준일·배당 기록 기준·'배당은 바뀔 수 있다'까지
   // 세 줄이던 것을 2026-09-30 에 줄였다(툴팁은 한 문장 — 이용자 지적 "너무 복잡해").
-  // 출처 이름은 여기 안 적는다(2026-09-13 지적) — 사이트 바닥글의 '데이터 출처'가 그 자리다(app/Footer.tsx,
-  // stockanalysis 는 약관이 출처 표기를 조건으로 발췌를 허용하므로 거기서 지우지 말 것).
-  const helpText = mixed
-    ? `세금: 줄마다 고른 계좌로 — ${ACCOUNTS.map((a) => [a, byAccount(a.key).length] as const).filter(([, n]) => n > 0).map(([a, n]) => `${a.label} ${n}`).join(" · ")}`
-    : TAX_HELP[taxMode];
+  // 출처 이름은 여기 안 적는다(2026-09-13 지적) — 투자 유의사항의 '데이터 출처'가 그 자리다(app/disclaimer/page.tsx.
+  // 전 화면 푸터가 거기로 건너간다. stockanalysis 는 약관이 출처 표기를 조건으로 발췌를 허용하므로 거기서 지우지 말 것).
+  // 세후 버튼 말풍선 — 고른 계좌의 세율. 계좌가 섞였으면 줄마다 고른 계좌대로 뗀다(표의 줄마다 계좌가 보인다).
+  // 세전을 보고 있을 때도 '세후면 얼마를 떼나'를 말한다(그래서 taxMode 가 아니라 account).
+  const taxTip = mixed ? "줄마다 고른 계좌대로 뗀 값" : `${TAX_SHORT[account]}를 뗀 값`;
 
   return (
-    <div className="hz-tx">
+    // v2(2026-10-03) — 카더라 · MDD 와 같은 범위(v2-kd 토큰 · 폭 단계, v2-dv 는 이 화면 전용 덮기 · v2.css).
+    // 큰 구간 제목('01 내 종목으로 계산' · '02 성향별 바스켓')은 걷었다 — 모듈 머리가 이름을 말한다.
+    <div className="hz-tx v2-kd v2-dv">
       <LoadFailedNote sources={failedSources} />
-      <SectionIntro n={1} title="내 종목으로 계산" />
+      <DvCover counts={counts} usdkrw={usdkrw} priceDate={priceDate} usPriceDate={usPriceDate} />
+
+      {/* 저장소를 읽기 전 — 담은 종목이 있는 사람에게만 결과 셋 자리를 잡아 둔다(BandSkeleton 머리말 · v2.css .v2-dv-band-ph). */}
+      {!holdingsLoaded && <BandSkeleton />}
+      {/* 둘째 줄 — 결과 셋. 예전엔 한 시트 안에서 검색 · 칩 · 표 아래로 내려가야 달력 · 일정이 보였다. 담은 종목이 있을 때만 선다. */}
+      {lines.length > 0 && (
+        <div className="v2-dv-band">
+          <YearlyModule
+            total={bandTotal}
+            gross={active.reduce((s, l) => s + l.grossKrw, 0)}
+            net={taxedLines.filter((l) => !l.off).reduce((s, l) => s + l.netKrw, 0)}
+            invest={bandInvest}
+            yieldPct={bandYield}
+            onCostNote={lines.some((l) => l.onCost)}
+            afterTax={afterTax}
+            onTax={(v) => {
+              track("dividend_tax_toggle", { after_tax: v });
+              setAfterTax(v);
+            }}
+            account={account}
+            onAccount={(a) => {
+              track("dividend_account", { account: a });
+              setAccount(a);
+            }}
+            mixed={mixed}
+            taxTip={taxTip}
+          />
+          <CalendarModule
+            monthly={monthly}
+            noCalCount={noCalCount}
+            selected={fillMonth}
+            onPick={(m) => {
+              setFillMonth((cur) => (cur === m ? null : m));
+              if (fillMonth !== m) {
+                fillScroll.current = true;
+                track("dividend_fill_month", { month: m });
+              }
+            }}
+          />
+          <UpcomingModule items={upcoming.items} sureKrw={upcoming.sureKrw} expectedKrw={upcoming.expectedKrw} />
+        </div>
+      )}
+      {/* 세금 단서(못 담은 종목 · 한도 · 종합과세 문턱) — 둘째 줄 아래 판 폭 한 줄. 첫 칸(판의 25%) 안에 두면 계좌를 바꿀 때마다
+          그 칸이 여섯 줄까지 길어져 달력 · 일정 칸까지 같이 늘었다(2026-10-04 점검). */}
+      {lines.length > 0 && heroNote && <p className="v2-dv-notebar">{heroNote}</p>}
+      {/* 달력에서 누른 달 — 그 달에 주는 종목(빈 달 채우기). 둘째 줄 바로 아래 판 폭으로. */}
+      {/* 종목을 다 빼면 달력이 사라지니 그 달 판도 같이 걷는다. */}
+      {lines.length > 0 && fillMonth != null && <MonthFill month={fillMonth} order={fillOrder} holdings={holdings} onPick={(code) => add(code, "fill_month")} onClose={() => setFillMonth(null)} />}
+
       <section
         ref={calcRef}
-        className={`hz-sheet dv-calc${dragOver ? " dv-drop-on" : ""}`}
+        className={`v2-mod v2-dv-mine v2-has-hint${dragOver ? " dv-drop-on" : ""}`}
         onDragOver={onDragOver}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
         aria-label="내 종목 계산기"
       >
-        <SectionHead
-          icon="calculate"
-          title="내 종목"
-          desc="종목을 담고 주수를 적으면 바로 계산됩니다."
-          right={<TaxToggle afterTax={afterTax} onChange={(v) => { track("dividend_tax_toggle", { after_tax: v }); setAfterTax(v); }} />}
-        />
-
-        {/* 결과가 먼저 선다. 종목이 없을 때도 이 자리는 비워 두지 않는다 — 무엇을 하면 되는지 적는다. */}
-        <div className="dv-hero">
-          {lines.length ? (
-            <>
-              <p className="dv-hero-label">
-                1년에 받는 배당{mixed ? " (계좌별)" : accountTag(taxMode)}
-                <span className="hz-tip hz-tip-wide dv-help" data-tip={helpText} style={{ cursor: "help" }} aria-label="세금 설명">
-                  <Icon name="help" style={{ fontSize: "var(--fs-14)" }} />
-                </span>
-              </p>
-              <p className="dv-hero-main">{won(total)}</p>
-              {/* 셋은 큰 숫자 다음으로 중요한 값이라 한 줄 문장이 아니라 라벨 달린 칸 셋으로(2026-09-13 지적). */}
-              {/* 카더라 히어로의 현황 타일(.hz-tx-stat)과 같은 부품 — 화면마다 딴 모양을 만들지 않는다. */}
-              <div className="hz-tx-stats dv-hero-stats">
-                <div className="hz-tx-stat">
-                  <span className="hz-tx-stat-l">한 달 평균</span>
-                  <span className="hz-tx-stat-v">{won(total / 12)}</span>
-                </div>
-                {invest > 0 && (
-                  <div className="hz-tx-stat">
-                    <span className="hz-tx-stat-l">투자금{lines.some((l) => l.onCost) ? " · 평단 넣은 종목은 평단 기준" : ""}</span>
-                    <span className="hz-tx-stat-v">{wonShort(Math.round(invest / 1e4) * 1e4)}</span>
-                  </div>
-                )}
-                {yieldPct != null && (
-                  <div className="hz-tx-stat">
-                    <span className="hz-tx-stat-l">배당수익률</span>
-                    <span className="hz-tx-stat-v">{pct(yieldPct)}</span>
-                  </div>
-                )}
-              </div>
-              {afterTax && (
-                <div className="dv-account">
-                  <span className="dv-account-label">계좌 유형</span>
-                  {/* 바로 위 세후·세전과 같은 세그먼트. 좁으면 트랙 안에서 두 줄로 접힌다. */}
-                  <div className="hz-seg hz-seg-hover dv-account-seg" role="group" aria-label="어느 계좌로 세나">
-                    {ACCOUNTS.map((o) => (
-                      <button
-                        key={o.key}
-                        type="button"
-                        aria-pressed={account === o.key}
-                        onClick={() => {
-                          track("dividend_account", { account: o.key });
-                          setAccount(o.key);
-                        }}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {heroNote && <p className="dv-hero-note">{heroNote}</p>}
-            </>
-          ) : (
-            <>
-              <p className="dv-hero-label">1년에 받는 배당</p>
-              <p className="dv-hero-main dv-hero-empty">아직 담은 종목이 없습니다</p>
-              <p className="dv-hero-sub">아래에서 종목을 찾아 담거나, 바스켓을 통째로 담아 보세요.</p>
-            </>
-          )}
-        </div>
-
+        {/* 처음 온 사람(담은 종목 없음)에게 한 번 — 칩을 누르면 담긴다는 것. 칸 안 어디를 눌러도(검색 · 칩) '봤음'이 된다(app/V2Hint.tsx).
+            저장소를 읽기 전엔 띄우지 않는다 — 담은 종목이 있는 사람에게 잠깐 섰다 사라진다. */}
+        {holdingsLoaded && lines.length === 0 && (
+          <V2Hint id="dividend-pick" anchor=".dv-groups .dv-chip" text="종목을 누르면 담기고 배당이 계산됩니다" />
+        )}
+        <header className="v2-mod-head">
+          <h2>내 종목</h2>
+          {lines.length > 0 && <HoldingsBar lines={lines} onSort={sortLines} onClear={clearAll} />}
+        </header>
         <div className="dv-body">
           <SearchBox stocks={stocks} onPick={(code) => add(code, "search")} />
-          {/* 세 갈래가 늘 나란히 선다. 판마다 제목·설명·칩 여덟·'더 보기'. 좁으면 한 판씩 쌓인다.
-              '더 보기'를 열면 그 판의 묶음들이 세 판 **아래에 가로로** 펼쳐진다(좁은 판 안에 여덟씩 네 줄을
-              넣으면 열 줄 넘게 늘어난다). 폰에서는 CSS order 로 그 판 바로 아래에 붙는다. */}
+          {/* 담은 종목이 있으면 표가 검색 바로 아래 — 칩 세 판(1,100 에서 433px) 아래에 있으면 이미 담은 사람에게 자기 표보다
+              담을 후보가 먼저 보였다(2026-10-04 점검). */}
+          {lines.length > 0 && (
+            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onToggle={setLineOn} onMove={moveLine} onAccount={setLineAccount} onSplit={splitLine} onShares={setShares} onCost={setCost} onRemove={remove} />
+          )}
+          {/* 세 갈래가 늘 나란히 선다. 갈래마다 이름 · 근거 · 칩 여덟 · '더 보기'. 좁으면 한 갈래씩 쌓인다.
+              '더 보기'를 열면 그 갈래의 묶음들이 세 갈래 **아래에 가로로** 펼쳐진다. 폰에서는 CSS order 로 그 갈래 바로 아래에 붙는다. */}
           <div className="dv-groups">
             {SCOPES.map((o) => (
               <section key={o.key} className="dv-group" data-scope={o.key} aria-label={o.label}>
@@ -453,10 +472,10 @@ export function DividendCalculator({
                   <span className="dv-group-desc">{o.desc}</span>
                 </div>
                 <QuickChips codes={chipsBy[o.key]} byCode={byCode} holdings={holdings} onPick={(code) => add(code, `chip_${o.key}`)} />
-                {/* 판 맨 아래에 붙는 버튼 — 세 판의 높이가 달라도 같은 줄에 선다(margin-top: auto). */}
                 {more[o.key].rows.length > 0 && (
+                  // 열린 동안에도 이름은 그대로 — '접기'로 바꾸면 펼친 판 머리의 '접기'와 둘이 섰다(2026-10-04 점검). 열림은 색으로만.
                   <button type="button" className="dv-more-btn" aria-expanded={moreOpen === o.key} onClick={() => toggleMore(o.key)}>
-                    {moreOpen === o.key ? "접기" : `${o.label} 더 보기`}
+                    {`${o.label} 더 보기`}
                   </button>
                 )}
               </section>
@@ -473,71 +492,15 @@ export function DividendCalculator({
               />
             )}
           </div>
-          {lines.length > 0 && (
-            <HoldingsTable lines={lines} inputs={inputs} totalInvest={invest} mode={taxMode} onClear={clearAll} onToggle={setLineOn} onMove={moveLine} onSort={sortLines} onAccount={setLineAccount} onSplit={splitLine} onShares={setShares} onCost={setCost} onRemove={remove} />
-          )}
-          {clearUsed && <ClearDialog open={clearAsk} onOpenChange={setClearAsk} count={distinct} onConfirm={clearConfirmed} />}
-          {lines.length > 0 && (
-            <MonthCalendar
-              monthly={monthly}
-              noCalCount={noCalCount}
-              selected={fillMonth}
-              onPick={(m) => {
-                setFillMonth((cur) => (cur === m ? null : m));
-                if (fillMonth !== m) track("dividend_fill_month", { month: m });
-              }}
-            />
-          )}
-          {lines.length > 0 && fillMonth != null && (
-            <MonthFill month={fillMonth} order={fillOrder} holdings={holdings} onPick={(code) => add(code, "fill_month")} onClose={() => setFillMonth(null)} />
-          )}
-          {lines.length > 0 && <Upcoming lines={active} fx={fx} mode={taxMode} />}
-          {lines.length > 0 && goalIn.invest > 0 && goalIn.net > 0 && (
-            <GoalBox invest={goalIn.invest} net={goalIn.net} skipped={goalIn.skipped} goalMan={goalMan} addMan={addMan} onGoal={setGoalMan} onAdd={setAddMan} />
-          )}
         </div>
-
       </section>
+      {clearUsed && <ClearDialog open={clearAsk} onOpenChange={setClearAsk} count={distinct} onConfirm={clearConfirmed} />}
+      {lines.length > 0 && goalIn.invest > 0 && goalIn.net > 0 && (
+        <GoalBox invest={goalIn.invest} net={goalIn.net} skipped={goalIn.skipped} goalMan={goalMan} addMan={addMan} onGoal={setGoalMan} onAdd={setAddMan} />
+      )}
 
-      <SectionIntro n={2} title="성향별 바스켓" />
-      <AmountControl amount={amount} onChange={setAmount} />
-      {/* 열두 장이 세로로 길어 국내 줄까지 스크롤이 길다(2026-09-15 지적) — 줄 이름 넷을 누르면 그 줄로 내려간다. */}
-      <nav className="dv-jump" aria-label="바스켓 묶음으로 이동">
-        <span className="dv-jump-label">바로 가기</span>
-        {BASKET_ROWS.map((cap, i) => (
-          <button key={cap} type="button" className="dv-jump-btn" onClick={() => document.getElementById(`dv-basket-row-${i}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}>
-            {cap}
-          </button>
-        ))}
-      </nav>
-      {/* 열둘을 3개씩 네 줄로. 줄마다 무엇을 묶은 줄인지 한 마디(기본 · 현금흐름 · 질 · 세금과 업종) — 셋씩 번갈아
-          읽을 때 길잡이가 된다. 서버가 주는 순서가 곧 줄 순서다. */}
-      <div className="dv-baskets">
-        {BASKET_ROWS.map((cap, i) => (
-          <Fragment key={cap}>
-            <p className="dv-basket-cap" id={`dv-basket-row-${i}`}>{cap}</p>
-            {baskets.slice(i * 3, i * 3 + 3).map((b) => (
-              <BasketSheet key={b.key} basket={b} amount={amount} byCode={byCode} mode={taxMode} fx={fx} onApply={() => applyBasket(b)} onPick={(code) => add(code, "basket")} />
-            ))}
-          </Fragment>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ── 세후·세전 ────────────────────────────────────────────────────── */
-function TaxToggle({ afterTax, onChange }: { afterTax: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <div className="hz-seg hz-seg-hover" role="group" aria-label="세금 반영">
-      {[
-        { on: true, label: "세후" },
-        { on: false, label: "세전" },
-      ].map((o) => (
-        <button key={o.label} type="button" aria-pressed={afterTax === o.on} onClick={() => onChange(o.on)}>
-          {o.label}
-        </button>
-      ))}
+      {/* 성향별 바스켓 — 표 한 판 + 읽기 칸(V2Baskets.tsx). 예전 카드 열두 장(2,766px)과 '바로 가기' 줄을 대신한다. */}
+      <BasketBoard baskets={baskets} amount={amount} onAmount={setAmount} byCode={byCode} mode={taxMode} fx={fx} onApply={applyBasket} onPick={(code) => add(code, "basket")} />
     </div>
   );
 }

@@ -73,3 +73,19 @@ def test_share_rounds_like_the_table():
     text = "\n".join(US.theme_lines(rows, END))
     assert "AI반도체 · 최근 3일 점유율 25.0%" in text
     assert "금융 · 최근 3일 점유율 12.3%" in text
+
+
+def test_thin_base_day_is_left_out():
+    # 기준일 아침 테마 언급이 11건뿐이면(2026-10-04) 그날 몫(우주·방산 31.6%)이 사흘 평균에 들지 않는다 — 화면 usableDays 와 같다.
+    def r(d, t, s, m):
+        return {"date": d, "theme": t, "share_pct": s, "rank": 1, "mention_count": m}
+
+    rows = [
+        r("2026-10-01", "A", 10, 140), r("2026-10-01", "B", 90, 1260),
+        r("2026-10-02", "A", 10, 142), r("2026-10-02", "B", 90, 1279),
+        r("2026-10-03", "A", 10, 51), r("2026-10-03", "B", 90, 457),
+        r("2026-10-04", "A", 100, 11),
+    ]
+    shares = US.theme_window_shares(rows)
+    assert abs(shares["A"] - 10.0) < 1e-9
+    assert abs(shares["B"] - 90.0) < 1e-9

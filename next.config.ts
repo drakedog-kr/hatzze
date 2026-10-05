@@ -58,6 +58,9 @@ const nextConfig: NextConfig = {
       // 기본 기간에는 경로가 따로 없다(기본 주소 하나가 그 화면이다). 손으로 친 `/…/6m` 을 넘긴다. 페이지에서
       // permanentRedirect 로 하면 loading.tsx 때문에 이미 흐르기 시작한 뒤라 308 이 아니라 meta refresh 가 된다.
       { source: "/insider/stock/:ticker/6m", destination: "/insider/stock/:ticker", permanent: true },
+      // 걷은 내부자 목록 두 장(app/insider/lists.ts RETIRED_INSIDER_LISTS) — 사이트맵에 남아 있던 옛 주소를 본 화면으로.
+      // 페이지의 permanentRedirect 는 위와 같은 까닭(loading.tsx)으로 308 이 아니라 meta refresh 가 된다.
+      { source: "/insider/list/:kind(hot|holders)", destination: "/insider", permanent: true },
     ];
   },
 

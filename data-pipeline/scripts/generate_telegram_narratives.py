@@ -1,7 +1,7 @@
 """집계 결과를 LLM(Claude Haiku)으로 문장화해 카더라 리포트 카드에 넣는다.
 
   telegram_daily_brief.sentiment_summary : 히어로 '오늘의 요약' 총평(빈 줄로 이어 붙인다)
-  telegram_stock_narrative.narrative     : 주요 종목 리포트의 흐름 요약(종목당 75~80자)
+  telegram_stock_narrative.narrative     : 주요 종목 리포트의 흐름 요약(종목당 95~105자)
 
 총평의 대목들은 각자 다른 재료를 맡는다. 한 대목을 늘리려 하지 말고, 남는 재료가
 있으면 대목을 새로 낼 것 — 재료가 없는 대목은 길이를 올려도 안 늘어난다(BRIEF_*_LEN 주석).
@@ -80,6 +80,7 @@ from common.market_sentiment import MARKET_MIN_MESSAGES, load_market_daily  # no
 from common.prompt_style import PLAIN_PROSE_RULE  # noqa: E402
 from common.supabase_client import (  # noqa: E402
     PAGE_SIZE,
+    execute_with_retry,
     get_client,
     load_all_keyset,
     load_keyset,
@@ -104,17 +105,21 @@ MODEL = "claude-haiku-4-5"
 #    추출·등락 까닭·국장/미장 테마 요약)이 같이 따라온다.
 BRIEF_MODEL = "claude-opus-5-5"
 
-# 요약을 만들 종목 수. 카드는 상위 3종목만 보여주지만, 프론트는 페이지 요청 시점에
-# 상위 종목을 다시 뽑는다 — 파이프라인 실행 이후 순위가 바뀌어도 문장이 비지 않도록
-# 여유를 둔다(추가 3건은 하루 2회 호출이라 비용상 무의미한 수준).
-NARRATIVE_TOP_N = 6
+# 요약을 만들 종목 수. 화면 '많이 언급' 표가 열 줄이라(lib/kadera-why.ts BOARD_TILES) 열에 여유 둘을 더한다 —
+# 프론트는 페이지 요청 시점에 상위 종목을 다시 뽑아 파이프라인 실행 뒤 순위가 바뀌어도 문장이 비지 않게.
+# 여섯이던 때 표를 열 줄로 늘리고 이 값을 안 올려 7~10행이 늘 비었다(2026-10-04 점검). ⚠️ BOARD_TILES 와 짝이다.
+NARRATIVE_TOP_N = 12
 # 급부상 종목 중 몇 개까지 요약을 더 만들어 둘지. 텔레그램 채널이 싣는 수와 맞춘다
 # (send_telegram_broadcast.SURGING_SHOW). 상위 N개와 겹치는 만큼 실제 추가 호출은
 # 보통 1~2건이라 비용은 무시할 수준이다.
 SURGING_NARRATIVE_N = 3
 
-# 종목 요약 길이. 카드가 세로로 쌓이는데 **줄 수가 갈리면 카드 높이가 어긋난다**.
+# 종목 요약 길이 — 95~105자(공백 포함). 2026-10-05 운영자 판단으로 75~80 에서 올렸다: v2 에선 카더라 '많이 언급된 종목' 표의
+# 흐름 요약 칸(1440 에서 772px · 한 줄 59자 남짓)에 전문을 싣는데, 사람들이 가장 관심 있는 종목들인데 80자면 칸이 비었다.
+# 100자 안팎이면 PC 두 줄 · 폰 다섯 줄 안이다. 하한(85)은 목표보다 넉넉히 낮춰, 다시 써도 못 맞춘 날 문단이 통째로 비는 일을
+# 예전(70)만큼 드물게 둔다. 미장(generate_us_telegram_narratives.py)도 이 값을 그대로 가져다 쓴다.
 #
+# ── 아래는 v1 카드 시절 근거(2026-07-26) — 지금 화면엔 맞지 않지만 이력으로 둔다.
 # 실측(2026-07-26, 1280px / 카드 폭 430px): 61~82자가 2줄(카드 239px), 83자부터 3줄(258px).
 # 경계가 82와 83 사이에 딱 있다. 그래서 허용 상한을 83 → 82 로 한 칸 내려, 목표든 폴백이든
 # **어떤 값이 나와도 2줄 안**에 들어오게 한다.
@@ -125,8 +130,8 @@ SURGING_NARRATIVE_N = 3
 # 목표를 벗어나면 다시 쓰게 하되 끝내 못 맞추면 허용 범위 안에서는 그냥 저장한다 —
 # 가장 많이 언급된 종목의 문단이 통째로 비는 게 몇 자 짧은 것보다 나쁘기 때문
 # (실제로 SK하이닉스가 66자로 탈락한 적이 있다).
-LEN_MIN, LEN_MAX = 75, 80
-LEN_HARD_MIN, LEN_HARD_MAX = 70, 82
+LEN_MIN, LEN_MAX = 95, 105
+LEN_HARD_MIN, LEN_HARD_MAX = 85, 110
 MAX_RETRIES = 3
 
 # 집계 창. 2026-07-26 에 7 → 3 으로 내렸다 — 일주일치는 이미 지나간 얘기가
@@ -511,7 +516,7 @@ STOCK_SYSTEM = COMMON + f"""
   "최근 3일", "요 며칠"처럼 **가까운 며칠로 범위를 못박으세요.** "주 중반에 몰렸다"처럼
   더 앞을 가리키는 말은 쓰면 안 됩니다 — 여기 준 숫자로는 확인할 수 없는 얘기입니다.
 - **그 종목의 이름으로 문장을 시작하지 마세요.** 카드 머리에 종목명과 코드가 이미 크게
-  적혀 있어 되풀이입니다(75~80자에서 그 자리가 아깝습니다). 바로 본론으로 들어가세요.
+  적혀 있어 되풀이입니다({LEN_MIN}~{LEN_MAX}자에서 그 자리가 아깝습니다). 바로 본론으로 들어가세요.
   다른 회사 이름은 필요하면 씁니다 — 금지되는 건 이 카드 주인공의 이름뿐입니다.
 - 대표 메시지 발췌는 '무엇이 화제였는지'의 근거로만 쓰고, 그대로 베끼지 마세요.
 - ⚠️ 발췌 가운데 있는 `[…]` 는 **중간을 줄인 표시**입니다(앞부분과 이 종목이 언급된 대목을
@@ -1556,17 +1561,15 @@ def build_brief_digest(db, latest: str, msgs: list[dict]) -> str | None:
         lines.append(cmp)
 
     kws = load_all(db, "telegram_keyword_daily", "date,keyword,mention_count")
-    recent = Counter()
-    for r in kws:
-        # 위 낙관도와 같은 구간을 쓴다(오늘 제외). 여기만 오늘을 넣으면 화제어가 반쪽짜리
-        # 하루에 끌려, 문장이 인용하는 주제와 낙관도가 다른 기간을 말하게 된다.
-        if since <= r["date"] <= end:
-            recent[r["keyword"]] += r["mention_count"]
-    if recent:
+    # 화면 이슈 키워드 표(telegram_issue_keyword — 이 실행 앞 calculate_telegram_sentiment 가 쓴다)를 그대로 준다. 미장 총평과 같다.
+    # 예전엔 여기서 '오늘이 빠진 앞 사흘'을 따로 세어 요약이 '하락세 211회'처럼 화면 표에 없는 숫자를 적었다(2026-10-04 점검 —
+    # 표는 오늘을 넣은 사흘이라 하락세가 상위 열에 없었다). 저장된 문장과 화면 숫자는 끝점까지 같아야 한다.
+    issue = execute_with_retry(db.table("telegram_issue_keyword").select("keyword,mention_count").order("rank").limit(10)).data or []
+    if issue:
         lines.append("")
         lines.append(
-            f"[최근 {WINDOW_DAYS}일 화제어] (오늘이 빠진 앞 사흘입니다) "
-            + ", ".join(f"{w} {n}회" for w, n in recent.most_common(10))
+            f"[최근 {WINDOW_DAYS}일 화제어] (화면의 이슈 키워드 표와 같은 값입니다) "
+            + ", ".join(f"{r['keyword']} {r['mention_count']}회" for r in issue)
         )
 
     # 오늘치는 섞지 않고 나란히 둔다 — 문장이 인용할 숫자는 위 창 것, 말할 주제는
@@ -1584,6 +1587,16 @@ def build_brief_digest(db, latest: str, msgs: list[dict]) -> str | None:
 def reach(m: dict) -> int:
     """널리 퍼진 정도 = 조회 + 확산×3."""
     return (m.get("views") or 0) + (m.get("forwards") or 0) * 3
+
+
+def newest_first(msgs: list[dict], day_of, score) -> list[dict]:
+    """최근 날 글부터, 같은 날 안에서는 score(도달 · 조회) 큰 순.
+
+    표본은 기준일이 얇을 때 뒤로 넓힌다(NEWS_MIN_MSGS). 넓힌 표본을 도달 순으로만 세우면 조회가 쌓인 앞 날 글이 앞에 서서,
+    휴일 아침 요약 셋째 대목이 전날 요약과 같은 이야기(JP모건 마이크론 · 엑시노스 2700)를 되풀이했다(2026-10-05 운영자 지적
+    "오늘의 요약은 최대한 가장 최근의 일들 위주로"). 앞 날 글은 기준일 글로 자리가 다 안 찰 때만 들어간다. 국장 · 미장 같은 규칙.
+    """
+    return sorted(msgs, key=lambda m: (day_of(m), score(m)), reverse=True)
 
 
 def choose_excerpts(first: list[dict], rest: list[dict], n: int, first_slots: int) -> list[dict]:
@@ -1641,8 +1654,8 @@ def build_news_block(db, latest: str, window_since: str, msgs: list[dict]) -> li
     span = "오늘" if used == [latest] else f"{used[0][5:]}~{used[-1][5:]}"
 
     # 널리 퍼진 순 = 조회 + 확산×3. 종목 리포트의 [대표 메시지 발췌]와 같은 가중치라
-    # 두 문장이 같은 기준으로 '화제'를 고른다.
-    picked.sort(key=reach, reverse=True)
+    # 두 문장이 같은 기준으로 '화제'를 고른다. 날짜가 먼저다 — 최근 날 글부터(newest_first).
+    picked = newest_first(picked, lambda m: kst_date(m["posted_at"]), reach)
     # 국내 종목 글을 먼저 싣고 미국 종목만 다룬 글은 뺀다(NEWS_KR_SLOTS 주석). 태그를 못 읽으면
     # 예전처럼 도달 순으로만 고른다.
     ranked = picked[:NEWS_TAG_CANDIDATES]
@@ -1890,13 +1903,16 @@ def build_stock_digests(
     since = (end_d - timedelta(days=WINDOW_OFFSET)).isoformat()
     until = end_d.isoformat()
 
-    daily = [
-        r
-        for r in load_all(
-            db, "telegram_stock_daily", "date,stock_code,mention_count,weighted_score"
-        )
-        if since <= r["date"] <= until
-    ]
+    all_daily = load_all(db, "telegram_stock_daily", "date,stock_code,mention_count,weighted_score")
+    daily = [r for r in all_daily if since <= r["date"] <= until]
+    # 같은 길이 직전 기간의 언급 합 — [일별 추이]에 붙인다. 사흘 안 모양만 주었더니 화면(사흘 대 그 전)과 반대로
+    # '최근 3일 크게 줄었다'고 썼다(브릴스: 사흘 71회 대 직전 9회, 2026-10-05 점검).
+    prev_until = (date.fromisoformat(since) - timedelta(days=1)).isoformat()
+    prev_since = (date.fromisoformat(since) - timedelta(days=WINDOW_OFFSET + 1)).isoformat()
+    prev_m: dict[str, int] = defaultdict(int)
+    for r in all_daily:
+        if prev_since <= r["date"] <= prev_until:
+            prev_m[r["stock_code"]] += r["mention_count"] or 0
     if not daily:
         # 창에 집계가 아예 없으면 어떤 종목도 digest 를 못 만든다. 검사할 대상도 없다.
         return [], []
@@ -1907,6 +1923,8 @@ def build_stock_digests(
         a["w"] += float(r["weighted_score"] or 0)
         a["m"] += r["mention_count"] or 0
         a["by_date"][r["date"]] = r["mention_count"] or 0
+    for c, a in agg.items():
+        a["prev"] = prev_m.get(c, 0)
     top = sorted(agg.items(), key=lambda kv: kv[1]["w"], reverse=True)[:NARRATIVE_TOP_N]
 
     # 주목도 상위 N개에 더해 **급부상 종목**과 **주간 결산이 세우는 종목**도 대상에 넣는다.
@@ -2009,7 +2027,7 @@ def build_stock_digests(
         # 일별 추이는 '모양'을 말하려면 있어야 해서 남기되, 숫자를 베끼지 말라고 적어 둔다.
         lines = [
             f"[종목] {name} ({code})",
-            f"[일별 추이] {series}  ※ 모양 파악용입니다. 이 숫자와 날짜를 문장에 옮기지 마세요",
+            f"[일별 추이] {series} · 직전 {WINDOW_OFFSET + 1}일 합 {a.get('prev', 0)}회  ※ 모양 파악용입니다. 이 숫자와 날짜를 문장에 옮기지 마세요",
         ]
 
         keys = [k for k in by_code.get(code, []) if k in msgs]

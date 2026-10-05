@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "./supabase-server";
 import { addDaysISO, LLM_TEXT_CARRY_DAYS } from "./telegram-data";
 import { todayKst, type DatePrecision, type UpcomingEvent } from "./kadera-why";
 import { byPeriodEnd, periodFloor, stillAhead } from "./event-period";
+import { dropAlreadyHappened, groupEventRows } from "./event-group";
 import { LOAD_FAILED, type MaybeFailed } from "./load-state";
 import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
 
@@ -46,9 +47,14 @@ export type UsMoveReasonRow = {
   quotedChange: number | null;
 };
 
+/**
+ * rows = 오른 줄(오름폭 순) · down = **크게 내린 줄**(내림폭 순). 국내 짝(lib/kadera-why.ts MoveReasonBoard)과 같은 꼴 ·
+ * 같은 문턱이다(v2 '크게 움직인 종목' 표, 2026-10-03 국장 · 미장 같이). down 은 세션 등락률을 실제로 구한 줄만 담는다.
+ */
 export type UsMoveReasonBoard = {
   date: string;
   rows: UsMoveReasonRow[];
+  down: UsMoveReasonRow[];
   /** 평소 거슬러 보는 사흘(BOARD_STALE_DAYS)보다 오래된 판. 화면이 '직전 미국장'이라 적지 않는다 */
   stale: boolean;
 };
@@ -68,7 +74,9 @@ const QUOTE_ROWS = 24;
  * 라이브러리가 들고 있는 이유는 2차 조회가 "화면에 실제로 설 줄"을 알아야 하기 때문이다.
  * 화면 쪽에 숫자를 따로 두면 둘이 갈리는 순간 2차 조회가 엉뚱한 줄을 채운다.
  */
-export const US_BOARD_TILES = 9;
+export const US_BOARD_TILES = 10;
+/** '크게 내렸다'로 세우는 문턱(%). 국내(lib/kadera-why.ts DOWN_MIN)와 같은 값 · 같은 까닭 — 덜 내린 줄엔 오를 까닭이 붙어 있었다. */
+const DOWN_MIN = -5;
 /** 기준일에서 이 안이면 평소 판이다(주말이 끼어도 사흘이면 닿는다). 넘으면 board.stale */
 const BOARD_STALE_DAYS = 3;
 /**
@@ -152,11 +160,8 @@ async function lastUsSession(
 }
 
 /**
- * 미장 '급등 종목' 카드 — 가장 최근 날짜가 가리키는 미국장의 까닭 목록(같은 장을 가리키는 판은 합친다),
- * **오른 종목만** 오름폭 순.
- *
- * ⛔ 파이프라인은 양방향을 만든다. 내린 종목의 까닭은 표에 남는다 — 지금은 읽는 화면이
- *    없지만(미국 종목엔 아직 실주소가 없다) 국내와 같은 규칙으로 둔다.
+ * 미장 '크게 움직인 종목' 표 — 가장 최근 날짜가 가리키는 미국장의 까닭 목록(같은 장을 가리키는 판은 합친다).
+ * rows 는 오른 종목(오름폭 순), down 은 DOWN_MIN 넘게 내린 종목(내림폭 순). 국내 짝과 같은 꼴이다.
  * ⭐ **까닭이 없는 줄도 뺀다.** 국내 짝과 같은 규칙이다 — 자세한 사정은 아래 조회 뒤 주석에.
  */
 export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReasonBoard | null>> => {
@@ -218,7 +223,7 @@ export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReason
     if (!firstByTicker.has(r.ticker)) firstByTicker.set(r.ticker, r);
   }
   const rows = [...firstByTicker.values()];
-  if (!rows.length) return { date, rows: [], stale };
+  if (!rows.length) return { date, rows: [], down: [], stale };
 
   const names = await usNames(rows.map((r) => r.ticker));
   // 야후를 부를 줄 고르기 — 채널 글의 표기로 어림한다. 부호를 살려 많이 오른 줄부터.
@@ -229,6 +234,10 @@ export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReason
       .slice(0, QUOTE_ROWS)
       .map((r) => r.ticker),
   );
+  // 내린 줄 몫 — 표기상 많이 내린 줄. 하루 몇 줄 안 돼 왕복이 얼마 안 는다(국내 짝과 같다).
+  for (const r of [...rows].filter((r) => hint(r) < 0).sort((a, b) => hint(a) - hint(b)).slice(0, US_BOARD_TILES)) {
+    willQuote.add(r.ticker);
+  }
   const out: UsMoveReasonRow[] = rows.map((r) => ({
     ticker: r.ticker,
     name: names.get(r.ticker) ?? r.ticker,
@@ -292,7 +301,17 @@ export const getUsMoveReasons = cache(async (): Promise<MaybeFailed<UsMoveReason
     if (!(await fillFromYahoo(boardOf().slice(0, US_BOARD_TILES)))) break;
   }
 
-  return { date, rows: boardOf(), stale };
+  /** 내린 줄 후보 — 등락률을 아직 못 구했으면 표기가 마이너스인 줄도 후보로 둔다(채워 보고 가른다). */
+  const downCandidates = (): UsMoveReasonRow[] =>
+    out
+      .filter((r) => (r.changeRate !== null ? r.changeRate <= DOWN_MIN : (r.quotedChange ?? 0) < 0))
+      .sort((a, b) => (a.changeRate ?? a.quotedChange ?? 0) - (b.changeRate ?? b.quotedChange ?? 0));
+  for (let round = 0; round < BOARD_MAX; round++) {
+    if (!(await fillFromYahoo(downCandidates().slice(0, US_BOARD_TILES)))) break;
+  }
+  const down = downCandidates().filter((r) => r.changeRate !== null && r.changeRate <= DOWN_MIN);
+
+  return { date, rows: boardOf(), down, stale };
 });
 
 // ─── 다가오는 일정 ─────────────────────────────────────────────────────────
@@ -309,37 +328,33 @@ type UsEventRow = {
 /** 한 날짜의 최대 줄 수. 달력은 하루씩 보여주므로 사실상 안 자른다(폭주만 막는다). */
 const EVENTS_PER_DATE = 30;
 
-/**
- * (티커, 날짜, 정밀도)로 묶는다. 행사 문구는 채널마다 조금씩 달라 가장 많이 쓰인 표기를 대표로 삼는다.
- * 국내 groupEvents(lib/kadera-why.ts)와 같은 규칙이다.
- */
+/** 일정 행 → 줄(lib/event-group.ts — 국내 groupEvents 와 같은 규칙). */
 function groupUsEvents(rows: UsEventRow[]): Omit<UpcomingEvent, "name">[] {
-  const groups = new Map<string, UsEventRow[]>();
-  for (const r of rows) {
-    const k = `${r.ticker}|${r.event_date}|${r.date_precision}`;
-    const g = groups.get(k);
-    if (g) g.push(r);
-    else groups.set(k, [r]);
+  return groupEventRows(rows.map((r) => ({ code: r.ticker, channel: r.channel_handle, date: r.event_date, precision: r.date_precision, event: r.event, postedAt: r.posted_at }))).map(
+    (e) => ({ ...e, market: "US" as const }),
+  );
+}
+
+/** 이미 지나간 같은 이야기를 볼 날 수(국내 lib/kadera-why.ts PAST_DAYS 와 같다). */
+const PAST_DAYS = 14;
+
+/** 앞으로의 줄에서 이미 지나간 같은 이야기를 뺀다 — 한 채널 줄의 티커만 지난 PAST_DAYS 일 day 일정을 묻는다(국내 withoutHappened 와 같다). */
+async function withoutHappened<T extends Omit<UpcomingEvent, "name">>(future: T[], from: string): Promise<T[]> {
+  const single = [...new Set(future.filter((e) => e.channels < 2).map((e) => e.code))];
+  if (!single.length) return future;
+  const { data, error } = await getSupabaseAdmin()
+    .from("telegram_us_stock_event")
+    .select("channel_handle,ticker,event_date,date_precision,event,posted_at")
+    .in("ticker", single)
+    .eq("date_precision", "day")
+    .gte("event_date", addDaysISO(from, -PAST_DAYS))
+    .lt("event_date", from)
+    .limit(1000);
+  if (error) {
+    console.error("[withoutHappened] 지난 미장 일정을 못 읽었습니다 — 거르지 않습니다", error);
+    return future;
   }
-  return [...groups.values()].map((g) => {
-    const texts = new Map<string, { text: string; n: number }>();
-    for (const r of g) {
-      const key = r.event.replace(/[\s·,.()]/g, "");
-      const cur = texts.get(key);
-      if (cur) cur.n += 1;
-      else texts.set(key, { text: r.event, n: 1 });
-    }
-    const top = [...texts.values()].sort((a, b) => b.n - a.n)[0];
-    return {
-      code: g[0].ticker,
-      market: "US" as const,
-      date: g[0].event_date,
-      precision: g[0].date_precision,
-      event: top.text,
-      channels: new Set(g.map((r) => r.channel_handle)).size,
-      firstSeen: g.map((r) => r.posted_at).sort()[0],
-    };
-  });
+  return dropAlreadyHappened(future, groupUsEvents((data ?? []) as UsEventRow[]));
 }
 
 /**
@@ -365,7 +380,7 @@ export const getUsUpcomingEvents = cache(async (days = 35, limit = 400): Promise
     console.error("[getUsUpcomingEvents] 일정을 못 읽었습니다", error);
     return LOAD_FAILED;
   }
-  const grouped = groupUsEvents((data ?? []) as UsEventRow[]);
+  const grouped = await withoutHappened(groupUsEvents((data ?? []) as UsEventRow[]), from);
   grouped.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.channels - a.channels));
   const perDate = new Map<string, number>();
   const capped = grouped.filter((e) => {
@@ -399,7 +414,7 @@ export async function getUsEventsForTickers(tickers: string[], limit = 12): Prom
     console.error(`[getUsEventsForTickers] 일정을 못 읽었습니다`, error);
     return [];
   }
-  const grouped = groupUsEvents((data ?? []) as UsEventRow[]).filter((e) => stillAhead(e, from));
+  const grouped = await withoutHappened(groupUsEvents((data ?? []) as UsEventRow[]).filter((e) => stillAhead(e, from)), from);
   grouped.sort(byPeriodEnd);
   const picked = grouped.slice(0, limit);
   const names = await usNames([...new Set(picked.map((e) => e.code))]);

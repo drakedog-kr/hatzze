@@ -340,6 +340,29 @@ def _fixed_slips(text: str) -> list[str]:
     return found
 
 
+# 붙은 이름 — 원문의 긴 낱말(종목 이름 따위) 앞에 한 음절이 붙어 원문에 없는 어절이 된 꼴. 2026-10-04 테마 요약에
+# '오삼성전자의 DDR5 후공정…'('오킨스전자는 삼성전자의…'가 뭉개진 것)이 그대로 실렸다 — 어절 점수 검사([3])는 '오' + 아는 낱말이라
+# 통과시켰다. 흔한 접두(대 · 신 · 전 …)는 뺀다('전반도체' · '신고가'처럼 말이 된다).
+_GLUE_PREFIX_OK = set("대신총전비탈친반초재고저무미불최준차다양")
+_JOSA_TAIL = re.compile(r"(?:에서|으로|의|은|는|이|가|을|를|과|와|도|에|로|만)$")
+
+
+def glued_names(text: str, source: str) -> list[str]:
+    """원문에 없는데, 첫 음절을 떼면 원문에 있는 네 음절 넘는 낱말이 되는 어절."""
+    found: list[str] = []
+    for word in _SPLIT.split(text):
+        if not _HANGUL_WORD.match(word):
+            continue
+        stem = _JOSA_TAIL.sub("", word)
+        if len(stem) < 5 or stem in source or stem[0] in _GLUE_PREFIX_OK:
+            continue
+        # 떼어 낸 낱말이 원문에서 **낱말 머리**로 나와야 한다 — 그냥 부분 문자열로 보면 '늘었습니다'가 원문 '좋았었습니다'의
+        # '었습니다'에 걸리는 식으로 흔한 합쇼체 어미가 모두 오타로 잡혔다(2026-10-05 머지 전 점검, 화면 문장 3%).
+        if re.search(r"(?<![가-힣])" + re.escape(stem[1:]), source):
+            found.append(f"붙은 이름 '{stem}'(원문은 '{stem[1:]}')")
+    return found
+
+
 def problems(text: str, source: str | None = None, *, slips: bool = True) -> list[str]:
     """이 문장의 문제 목록. 비어 있으면 통과다(사람이 읽는 문자열로 돌려준다).
 
@@ -364,6 +387,8 @@ def problems(text: str, source: str | None = None, *, slips: bool = True) -> lis
         found.append(f"한글 사이 라틴({_LATIN_IN_HANGUL.search(text).group()})")
     if _control_chars(text):
         found.append("제어문자")
+    if source:
+        found.extend(glued_names(text, source))
 
     kiwi = _get_kiwi()
     if kiwi is None:
@@ -395,3 +420,13 @@ def problems(text: str, source: str | None = None, *, slips: bool = True) -> lis
 def is_clean(text: str, source: str | None = None, *, slips: bool = True) -> bool:
     """문제가 하나도 없으면 True. 호출부의 재시도 루프 합격 조건에 쓴다."""
     return not problems(text, source, slips=slips)
+
+
+# 한글 낱말 + 조사 '와 · 과' 바로 뒤에 라틴 글자가 붙은 자리 — '삼성전자와SK하이닉스를'(2026-10-05 점검, 테마 요약).
+# 모델이 띄어쓰기를 흘린 것이라 다시 묻지 않고 기계로 띄운다. 라틴 글자 **뒤** 조사는 붙여 쓰는 게 맞으니('SK하이닉스와') 건드리지 않는다.
+_GLUED_JOSA_LATIN = re.compile(r"([가-힣](?:와|과))([A-Za-z])")
+
+
+def fix_glued_josa_latin(text: str) -> str:
+    """'…와SK' · '…과AI' 를 '…와 SK' · '…과 AI' 로 띄운다."""
+    return _GLUED_JOSA_LATIN.sub(r"\1 \2", text)

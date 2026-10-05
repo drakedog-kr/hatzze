@@ -77,8 +77,9 @@
   .cn-command-input-group {
     @apply bg-input/50 h-8!;
   }
+  /* 폰(640 미만)은 16px — iOS 사파리가 16px 미만 입력칸에 초점이 가면 화면을 확대하고, 창을 닫아도 확대가 남는다(2026-10-05 모바일 점검). */
   .cn-command-input {
-    @apply w-full text-sm;
+    @apply w-full text-base sm:text-sm;
   }
   .cn-command-input-icon {
     @apply size-4 shrink-0 opacity-50;
@@ -97,11 +98,13 @@
   }
   /* 고른 줄은 rhea 의 bg-muted 가 아니라 사이드바 '지금 보는 항목'과 같은 파란 틴트다. muted(--c-soft)는
      흰 창 위에서 1.06 이라 Enter 로 열릴 줄이 거의 안 보였다(실측). */
+  /* 폰 대화상자 안 줄은 44 — 32 줄이 간격 0 으로 붙어 엄지로 옆 줄을 잘못 눌렀다(2026-10-05 모바일 점검). 목록은 이미 안에서 굴러간다. */
   .cn-command-item {
-    @apply data-selected:bg-(--c-blue-tint) data-selected:text-(--c-cold-ink) relative flex min-h-7 cursor-default items-center gap-2 rounded-xl px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-2xl;
+    @apply data-selected:bg-(--c-blue-tint) data-selected:text-(--c-cold-ink) relative flex min-h-7 cursor-default items-center gap-2 rounded-xl px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-2xl in-data-[slot=dialog-content]:max-sm:min-h-11;
   }
+  /* 오른쪽 값(+6.8%p 같은 유입 증가)은 고른 줄에서도 잉크 — 파랑이면 2색 체계에서 '내림'으로 읽혔다(폰은 첫 줄이 저절로 골라진다). */
   .cn-command-shortcut {
-    @apply text-muted-foreground group-data-selected/command-item:text-(--c-cold-ink) ml-auto text-xs tracking-widest;
+    @apply text-muted-foreground group-data-selected/command-item:text-(--c-ink) ml-auto text-xs tracking-widest;
   }
 
   /* ── InputGroup(검색칸 틀) ── */
@@ -276,6 +279,8 @@
 
 /* 차트 크로스헤어 툴팁은 shadcn ChartTooltip 꼴 — 흰 카드 · 옅은 테두리 · 큰 그림자 · 숫자 폭 고정.
    도움말 툴팁(진한 알약 = shadcn Tooltip 꼴, 원래 모양 그대로)과 한눈에 갈린다. 일곱 차트가 이 한 규칙을 쓴다. */
+/* 터치로 옆으로 끌면 말풍선이 손가락을 따라간다(app/TipTap.tsx 끌어 읽기) — 세로 이동 · 확대는 브라우저에 남긴다. */
+.hz-vline { touch-action: pan-y pinch-zoom; }
 .hz-vline::after {
   background: var(--popover);
   color: var(--popover-foreground);
@@ -383,7 +388,7 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
    · 마우스를 올린 줄에 옅은 띠가 깔린다(shadcn 툴팁 커서 fill-muted 자리). 툴팁은 달지 않는다(값이 이미 적혀 있다).
      ⚠️ 막대를 밝히지 않는다 — 한때 brightness(1.08) 로 밝혔더니 옅은 파랑 막대가 회색 트랙과 같아져 사라졌다
         (코스피 막대 대비 1.15 → 1.01, 09-27 지적).
-   쓰는 곳: MDD MeterRow(시장 탓·회복 분포·같은 테마 종목) · 역대 낙폭 Top 5(-md) · 홈 카드 목록 막대(-md).
+   쓰는 곳: 홈 카드 목록 막대(-md). MDD 는 v2 막대(.v2-dd-bar)로 옮겼다(2026-10-03).
    ⚠️ 이름이 hz-hbar-* 인 까닭: `.hz-bar` 는 카더라·내부자·서학의 트랙형 알약 막대가 먼저 쓰는 이름이다(kadera.css).
       같은 이름을 쓰면 이 파일이 맨 뒤에 실려 그쪽 막대의 모서리·높이를 덮는다(한때 그랬다, 09-27). */
 .hz-hbar-row {
@@ -457,9 +462,10 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
 .hz-chart-y > span,
 .hz-chart-x > span {
   position: absolute;
-  /* 11px · 400 · --c-muted 는 너무 흐렸다(09-27) — shadcn 축 글자 크기(12px)에 굵기 600, 한 단 진한 --c-sub(5.55:1). */
+  /* 11px · 400 · --c-muted 는 너무 흐렸다(09-27) — shadcn 축 글자 크기(12px)에 한 단 진한 --c-sub(5.55:1).
+     굵기는 500 — 600 이던 땐 축 글자가 그림의 값보다 먼저 눈에 걸렸다(2026-10-04). */
   font-size: var(--fs-12);
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1;
   color: var(--c-sub);
   font-variant-numeric: tabular-nums;
@@ -478,6 +484,9 @@ html[data-sidebar="icon"] .hz-sidebar [data-label]:hover::after {
   top: 6px;
   transform: translateX(-50%);
 }
+/* 판 양 끝의 글자 — 가운데 맞춤이면 반이 판 밖으로 나가 잘린다(내부자 종목 차트 '10월'). */
+.hz-chart-x > span[data-edge="end"] { transform: translateX(-100%); }
+.hz-chart-x > span[data-edge="start"] { transform: none; }
 @container (max-width: 480px) {
   .hz-chart-x > span[data-minor] {
     display: none;

@@ -25,7 +25,8 @@ export function BackTrail({ parent, current }: { parent: { name: string; href: s
             {parent.name}
           </BreadcrumbLink>
         </BreadcrumbItem>
-        <BreadcrumbSeparator />
+        {/* 구분은 글자 '/' — 기본 화살표(chevron_right)면 첫 줄 띠의 링크 칸 화살표와 한 화면에 같은 아이콘이 셋이었다(2026-10-04 점검). */}
+        <BreadcrumbSeparator>/</BreadcrumbSeparator>
         <BreadcrumbItem>
           <BreadcrumbPage>{current}</BreadcrumbPage>
         </BreadcrumbItem>

@@ -31,10 +31,17 @@ export function mentionTrend(
   rows: MentionPoint[],
   latest: string | null,
   days: number,
-): { trend: MentionPoint[]; today: MentionPoint | null; date: string | null } {
-  if (!rows.length) return { trend: [], today: null, date: null };
+  todayIso?: string,
+): { trend: MentionPoint[]; today: MentionPoint | null; date: string | null; partial: boolean } {
+  if (!rows.length) return { trend: [], today: null, date: null, partial: false };
   const last = rows.reduce((m, r) => (r.date > m ? r.date : m), rows[0].date);
   const end = latest && latest > last ? latest : last;
   const trend = fillDays(rows, end, days);
-  return { trend, today: trend[trend.length - 1], date: end };
+  // ⚠️ 끝점이 오늘(KST)이면 아직 안 끝난 날이다 — 아침 실행이 0~8시분만 센 '2회'를 '하루 언급'으로 크게 적어 관심이 꺼진 것처럼
+  //    읽혔다(NVDA 10/4 2회 · 전날 46회, 2026-10-04 점검). 머리 숫자는 전날로, 막대는 그대로 두되 화면이 마지막 칸을 옅게 그린다.
+  if (todayIso && end === todayIso && trend.length >= 2) {
+    const prev = trend[trend.length - 2];
+    return { trend, today: prev, date: prev.date, partial: true };
+  }
+  return { trend, today: trend[trend.length - 1], date: end, partial: false };
 }

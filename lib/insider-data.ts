@@ -42,6 +42,7 @@ import { usQuotes } from "@/lib/us-telegram-data";
 import { displayName } from "@/lib/us-ticker-names";
 import { canonicalTicker } from "@/lib/us-ticker-spellings";
 import { holdersByTicker, managerMoves, type MoveSide } from "@/lib/insider-13f";
+import { TARGET_DAYS, targetMoves } from "@/lib/insider-brief";
 
 /**
  * 공시 집계 창. 파이프라인(fetch_us_insider.py 의 WINDOW_DAYS)과 **반드시 같아야 한다.**
@@ -155,6 +156,12 @@ export type InsiderActivity = {
   codes: { code: string; n: number }[];
   /** 창 안에서 가장 늦은 접수일. */
   filedDate: string;
+  /**
+   * 방향별 가장 늦은 접수일 — 장내 매수(P) · 처분(D). 매수 카드에 처분 접수일이 서면 안 된다(2026-10-04 점검 — CBRS 처분
+   * 카드에 마지막 처분 9/30 이 아니라 다른 신고의 10/2 가 섰다). 그 방향 신고가 없으면 null.
+   */
+  boughtFiled: string | null;
+  disposedFiled: string | null;
   /** 정렬·표시에 쓰는 금액. 아래 direction 이 이 숫자의 뜻을 정한다. */
   value: number;
   /** value 가 장내 매수인지 처분인지. 화면이 색과 말을 이걸로 고른다. */
@@ -186,6 +193,12 @@ export type CongressTicker = {
   buyMembers: string[];
   sellMembers: string[];
   latest: string | null;
+  /**
+   * 방향별 마지막 거래일 — 산 종목 카드엔 마지막 매수일, 판 종목 카드엔 마지막 매도일(2026-10-04 점검 — AAPL 산 종목 카드에
+   * 매도일 9/22 가 섰다). 그 방향 신고가 없으면 null.
+   */
+  buyLatest: string | null;
+  sellLatest: string | null;
   /** ⚠️ 이 블록의 모집단은 650종목이고 대부분 카더라 밖이다. 그래서 안쪽을 표시한다. */
   inKadera: boolean;
 };
@@ -259,6 +272,8 @@ export type InsiderOverview = {
    *   갈리는 순간 개수가 조용히 0 이 된다. 받아 온 행의 최대 접수일에서 직접 센다.
    */
   latestInsiderFilings: { date: string | null; count: number };
+  /** 증권가가 최근 7일 목표가를 올린 · 내린 건수(lib/insider-brief.ts targetMoves). 본 화면 '매매 방향'의 셋째 줄이다(2026-10-04). */
+  targetMoves: { up: number; down: number; end: string | null };
   /** 위와 같은 규칙, 의원 쪽(PTR 문서 수). */
   latestCongressFilings: { date: string | null; count: number };
   /** 추적 중인 거물 수. 화면의 "N명 중" 분모다. */
@@ -293,6 +308,11 @@ export type InsiderOverview = {
   managerAdds: ManagerMove[];
   /** 줄인 종목(많이 줄인 순). */
   managerTrims: ManagerMove[];
+  /**
+   * 거물이 종목을 늘린 · 줄인 **전체** 건수(거물 한 명 · 종목 하나가 한 건). managerAdds · managerTrims 는 순증감으로 가른 목록이라
+   * 그 movers 를 더하면 순으로 반대쪽인 종목(MSFT 에서 늘린 거물)과 늘린 수 = 줄인 수인 종목이 빠져 30% 작았다(2026-10-04 점검).
+   */
+  managerMoveTotals: { up: number; down: number };
   /**
    * 비교에 쓴 두 분기 중 **가장 흔한 짝**. [직전, 최신] 순. 하나도 없으면 비교가 안 된다.
    *
@@ -392,6 +412,7 @@ const EMPTY: InsiderOverview = {
   buys: [],
   mentionedCount: 0,
   latestInsiderFilings: { date: null, count: 0 },
+  targetMoves: { up: 0, down: 0, end: null },
   latestCongressFilings: { date: null, count: 0 },
   managerCount: 0,
   failedSources: [],
@@ -402,6 +423,7 @@ const EMPTY: InsiderOverview = {
   congressTickers: [],
   managerAdds: [],
   managerTrims: [],
+  managerMoveTotals: { up: 0, down: 0 },
   compareQuarters: [],
   offQuarter: 0,
   scale: { officers: 0, members: 0, managers: 0, windowDays: INSIDER_WINDOW_DAYS },
@@ -436,9 +458,10 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     console.error(`[insider] ${label} 조회 실패`, e);
   };
 
-  const [rawAsOf, rawMentionDate] = await Promise.all([
+  const [rawAsOf, rawMentionDate, rawCongressLast] = await Promise.all([
     latestDate("us_insider_daily", "as_of_date"),
     latestDate("telegram_us_stock_daily", "date"),
+    latestDate("us_congress_trade", "filed_date"),
   ]);
   if (isLoadFailed(rawMentionDate)) return { ...EMPTY, failedSources: ["언급 기준일"] };
   const mentionDate = rawMentionDate;
@@ -446,13 +469,23 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
   if (isLoadFailed(rawAsOf)) failedSources.push("공시 기준일");
   const asOf = isLoadFailed(rawAsOf) ? null : rawAsOf;
 
+  // 의원 90일의 끝점은 **의원 신고의 마지막 접수일**이다 — 언급 기준일(오늘)에서 세면 라벨('10/1까지 90일', 7/4~)과 실제 기간(7/7~)이
+  // 어긋났고, 신고가 며칠 끊기면 라벨은 그대로인데 기간이 조용히 줄었다(2026-10-04 점검). 못 읽으면 예전처럼 언급 기준일.
+  const congressEnd = !isLoadFailed(rawCongressLast) && rawCongressLast ? rawCongressLast : mentionDate;
   const congressFrom = (() => {
-    const d = new Date(`${mentionDate}T00:00:00Z`);
+    const d = new Date(`${congressEnd}T00:00:00Z`);
     d.setUTCDate(d.getUTCDate() - (CONGRESS_WINDOW_DAYS - 1));
     return d.toISOString().slice(0, 10);
   })();
 
-  const [mentionRows, insiderRows, stockRows, managerRows, holdingRows, congressRows, consensusRows] =
+  // 증권가 의견 — 목표가 올림 · 내림만 센다. 마지막 의견 날이 언급 기준일보다 며칠 늦거나 이를 수 있어 두 배 기간을 받는다.
+  const actionFrom = (() => {
+    const d = new Date(`${mentionDate}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - (TARGET_DAYS * 2 - 1));
+    return d.toISOString().slice(0, 10);
+  })();
+
+  const [mentionRows, insiderRows, stockRows, managerRows, holdingRows, congressRows, consensusRows, actionRows] =
     await Promise.all([
     fetchAllRows<{ ticker: string; mention_count: number | null; channel_count: number | null }>(
       "ticker",
@@ -533,6 +566,19 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
       () => db.from("us_analyst_consensus").select("ticker,as_of_date,consensus,analyst_count,strong_buy"),
       { onError: failed("애널리스트 컨센서스") },
     ),
+    // ⚠️ 정렬 키가 유일해야 쪽 경계에서 줄이 빠지거나 겹치지 않는다 — build 가 (날, 종목, 증권사)를 걸고 fetchAllRows 가 애널리스트를 얹는다.
+    fetchAllRows<{ action_date: string; target_now: number | null; target_old: number | null }>(
+      "analyst",
+      () =>
+        db
+          .from("us_analyst_action")
+          .select("action_date,target_now,target_old")
+          .gte("action_date", actionFrom)
+          .order("action_date")
+          .order("ticker")
+          .order("firm"),
+      { onError: failed("애널리스트 의견") },
+    ),
   ]);
 
   // ⚠️ 카더라 사전(us_stocks)은 178종목뿐인데 의원·발굴 축은 그 밖까지 담는다.
@@ -569,6 +615,8 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     buyers: Map<string, number>;
     sellers: Map<string, number>;
     latest: string | null;
+    buyLatest: string | null;
+    sellLatest: string | null;
   };
   const congressOf = new Map<string, Cg>();
   for (const c of congressRows) {
@@ -583,6 +631,8 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
         buyers: new Map<string, number>(),
         sellers: new Map<string, number>(),
         latest: null,
+        buyLatest: null,
+        sellLatest: null,
       };
     if (c.transaction_type === "P") {
       cur.buys += 1;
@@ -594,6 +644,8 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     cur.members.set(c.member, (cur.members.get(c.member) ?? 0) + 1);
     const d = c.transaction_date ?? c.filed_date;
     if (d && (!cur.latest || d > cur.latest)) cur.latest = d;
+    if (d && c.transaction_type === "P" && (!cur.buyLatest || d > cur.buyLatest)) cur.buyLatest = d;
+    if (d && c.transaction_type === "S" && (!cur.sellLatest || d > cur.sellLatest)) cur.sellLatest = d;
     congressOf.set(key, cur);
   }
   const ins = new Map(insiderRows.map((r) => [String(r.ticker), r]));
@@ -665,14 +717,19 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     inKadera: ourTickers.has(canonicalTicker(ticker)),
   });
   const entries = [...moveOf.entries()];
+  // 줄 순서는 **움직인 거물 수**(머리 '늘린 거물 수 순'이 말하는 대로, 값 칸이 위에서 아래로 준다). 같으면 순증감 · 티커.
+  // 순증감 순이던 땐 값 칸이 12 · 10 · 8 · 15 · 8명으로 들쭉날쭉해 표가 틀린 것처럼 읽혔다(2026-10-04 점검).
+  // 어느 카드에 서느냐(가르기)는 그대로 순증감이다 — 한 종목이 두 카드에 같이 뜨지 않게.
+  const byMovers = (a: ManagerMove, b: ManagerMove) => b.movers - a.movers || b.movers - b.against - (a.movers - a.against) || a.ticker.localeCompare(b.ticker);
   const managerAdds = entries
     .filter(([, mv]) => mv.up.count > mv.down.count)
     .map(([t, mv]) => toMove(t, mv.up, mv.down))
-    .sort((a, b) => b.movers - b.against - (a.movers - a.against) || b.movers - a.movers);
+    .sort(byMovers);
   const managerTrims = entries
     .filter(([, mv]) => mv.down.count > mv.up.count)
     .map(([t, mv]) => toMove(t, mv.down, mv.up))
-    .sort((a, b) => b.movers - b.against - (a.movers - a.against) || b.movers - a.movers);
+    .sort(byMovers);
+  const managerMoveTotals = entries.reduce((t, [, mv]) => ({ up: t.up + mv.up.count, down: t.down + mv.down.count }), { up: 0, down: 0 });
   // ⚠️ 전체 분기 목록에서 최신 둘을 집으면 안 된다. 제출이 늦는 곳(퍼싱 스퀘어)이
   //    자기 짝을 못 찾고, 라벨이 그 운용사에 대해 거짓이 된다. **실제로 견준 짝**을
   //    운용사별로 세어 가장 흔한 것을 쓴다.
@@ -696,6 +753,8 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
       buyMembers: [...c.buyers].sort((a, b) => b[1] - a[1]).map(([n]) => n),
       sellMembers: [...c.sellers].sort((a, b) => b[1] - a[1]).map(([n]) => n),
       latest: c.latest,
+      buyLatest: c.buyLatest,
+      sellLatest: c.sellLatest,
       inKadera: ourTickers.has(ticker),
     }))
     // 여러 의원이 건드린 종목을 먼저. 한 사람이 여러 종목을 산 것보다 여럿이 한 종목을
@@ -800,6 +859,8 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
       sellers: Set<string>;
       codes: Map<string, number>;
       filed: string;
+      boughtFiled: string | null;
+      disposedFiled: string | null;
     };
     const byTicker = new Map<string, Acc>();
     for (const r of rows) {
@@ -814,16 +875,20 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
           sellers: new Set<string>(),
           codes: new Map(),
           filed: r.filed_date,
+          boughtFiled: null,
+          disposedFiled: null,
         };
       const value = (r.shares ?? 0) * (r.price ?? 0);
       if (r.acquired_disposed === "D") {
         acc.disposed += value;
         if (r.owner_name) acc.sellers.add(r.owner_name);
+        if (!acc.disposedFiled || r.filed_date > acc.disposedFiled) acc.disposedFiled = r.filed_date;
       }
       if (r.transaction_code === "P") {
         acc.bought += value;
         acc.buyCount += 1;
         if (r.owner_name) acc.buyers.add(r.owner_name);
+        if (!acc.boughtFiled || r.filed_date > acc.boughtFiled) acc.boughtFiled = r.filed_date;
       }
       if (r.owner_name) acc.who.set(r.owner_name, (acc.who.get(r.owner_name) ?? 0) + value);
       const code = r.transaction_code ?? "?";
@@ -849,6 +914,8 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
           names: [...a.who.entries()].sort((x, y) => y[1] - x[1]).map(([n]) => n),
           codes: [...a.codes.entries()].sort((x, y) => y[1] - x[1]).map(([code, n]) => ({ code, n })),
           filedDate: a.filed,
+          boughtFiled: a.boughtFiled,
+          disposedFiled: a.disposedFiled,
           value: buyLed ? a.bought : a.disposed,
           direction: (buyLed ? "buy" : "disposed") as "buy" | "disposed",
         };
@@ -920,6 +987,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     buys,
     mentionedCount: rows.length,
     latestInsiderFilings,
+    targetMoves: targetMoves(actionRows),
     latestCongressFilings,
     managerCount: managerRows.length,
     usdKrw: fx?.now ?? null,
@@ -929,6 +997,7 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     congressTickers,
     managerAdds,
     managerTrims,
+    managerMoveTotals,
     compareQuarters,
     offQuarter,
     managerRanks,

@@ -18,9 +18,12 @@ import type { IconName } from "@/lib/icon-names";
  */
 export function overheatColor(pct: number | null): string {
   if (pct === null) return C.sub;
-  if (pct >= 75) return C.mania;
-  if (pct >= 50) return C.hot;
-  if (pct >= 25) return C.neutral;
+  // 화면에 찍히는 정수로 가른다 — 구간 이름(stageForScore)과 같은 잣대. 24.91 이 '25'로 찍히고 상온 목록에 서는데 색만
+  // 저온이었다(2026-10-04 머지 전 점검).
+  const v = Math.round(pct);
+  if (v >= 75) return C.mania;
+  if (v >= 50) return C.hot;
+  if (v >= 25) return C.neutral;
   return C.cold;
 }
 
@@ -44,9 +47,6 @@ export type Pick = {
   unit: string;
   /** 진행률 100 지점(매핑 상한). 유튜브 '평소 대비 N배'처럼 이 값이 필요한 카드만 쓴다. */
   thDisp: string | null;
-  /** 카드에 "기준선"으로 적는 값 = 초고온 진입선. 이걸 넘으면 배지가 켜진다. */
-  hotDisp: string | null;
-  dirLabel: string;
   details: Record<string, number> | null;
   history: number[];
   historyPoints: { date: string; value: number }[];
@@ -72,22 +72,12 @@ export function pick(ind: Ind | undefined): Pick {
   const score = ind?.latest?.normalized_score ?? null;
   const capped = score === null ? null : Math.min(Math.max(score, 0), 100);
   const threshold = ind?.latest?.threshold ?? null;
-  // 카드에 "기준선"으로 적는 값은 진행률 100 지점이 아니라 **초고온 진입선**(진행률 75)이다.
-  // 파이프라인이 details.hot_threshold에 넣어준다(calculate_score.raw_at_progress).
-  // 이 값을 넘는 순간 초고온 배지가 켜지므로 표시와 판정이 같은 지점을 가리킨다.
-  //
-  // 없으면 threshold로 폴백하지 **않는다** — 그게 정확히 고치려던 그 문제이기 때문이다.
-  // (threshold는 진행률 100 지점이라, 그걸 기준선이라 적으면 "기준선에 못 미쳤는데
-  //  초고온" 표시가 그대로 남는다.) 새 코드로 파이프라인이 한 번 돌기 전까지는
-  //  기준선 줄을 아예 숨겨서 틀린 숫자를 보여주지 않는다.
-  const hotThreshold = ind?.latest?.details?.hot_threshold ?? null;
   const unit = ind?.unit ?? "";
   const f =
     raw !== null
       ? formatIndicatorValue(raw, unit)
       : { display: "-", displayUnit: unit };
   const tf = threshold !== null ? formatIndicatorValue(threshold, unit) : null;
-  const hf = hotThreshold !== null ? formatIndicatorValue(hotThreshold, unit) : null;
   return {
     ind,
     name: ind?.name ?? "",
@@ -98,22 +88,20 @@ export function pick(ind: Ind | undefined): Pick {
     capped,
     threshold,
     // 초고온 = 진행률 ≥ 75. 모든 지표의 진행률이 '과열도(0~100)'로 통일돼 있어
-    // (youtube는 surge_map으로 평균 대비 급증을 매핑) 예외 없이 동일 기준이고,
-    // 이 지점이 곧 카드에 적히는 기준선(hotDisp)이다.
-    isHit: (capped ?? 0) >= 75,
+    // (youtube는 surge_map으로 평균 대비 급증을 매핑) 예외 없이 동일 기준이다.
+    // 반올림한 값으로 — 구간 이름 · 색과 같은 잣대(stageForScore · overheatColor).
+    isHit: Math.round(capped ?? 0) >= 75,
     // 고온 이상(진행률 ≥ 50). 카드에 붙는 보조 배지의 색을 가르는 값이다 — 배지가 늘
     // 파랑이면 "콜 우세"(= 지금 뜨겁다)가 차분한 색으로 떠서 큰 수치와 반대말을 한다.
     // isHit(≥75)과 따로 두는 이유: 초고온 배지와 셀 상단 라인은 75 가 맞고 색만 50 에서
     // 갈려야 한다. 하나로 묶으면 고온 카드가 파란 배지를 달거나 초고온 표시가 헐거워진다.
-    warm: (capped ?? 0) >= 50,
+    warm: Math.round(capped ?? 0) >= 50,
     // 캡핑 전 원본이 아니라 capped(0~100)를 쓴다 — 색 경계가 0~100 척도 위에 있고,
     // 원본은 −226%나 118% 같은 값이 나와 구간 밖으로 벗어난다.
     color: overheatColor(capped),
     disp: f.display,
     unit: f.displayUnit,
     thDisp: tf ? `${tf.display}${tf.displayUnit}` : null,
-    hotDisp: hf ? `${hf.display}${hf.displayUnit}` : null,
-    dirLabel: ind?.direction === "low" ? "이하" : "이상",
     details: ind?.latest?.details ?? null,
     history: ind?.history ?? [],
     historyPoints: ind?.historyPoints ?? [],
@@ -147,6 +135,7 @@ export function Shell({
   slug,
   hit = false,
   warm = false,
+  wide = false,
   minH = 230,
   children,
 }: {
@@ -159,6 +148,12 @@ export function Shell({
   hit?: boolean;
   /** 고온 이상(진행률 ≥ 50). 카드에 붙는 보조 배지의 색을 가른다(pick 의 warm 주석). */
   warm?: boolean;
+  /**
+   * 두 칸 폭(v2, 2026-10-03). 시장 지표 14장 · 감성 10장이라 4열 · 2열 어디서든 끝 줄이 두 칸 빈다 — 판마다 끝의 자리 채움 칸
+   * (준비 중 · 지표 제보)을 두 칸으로 펴서 16 · 12 로 맞춘다. ⛔ 지표 칸은 늘리지 않는다 — 아시아 · 여윳돈을 늘려 봤다가
+   * "이상하다"로 되돌렸다. 폭이 갈리는 자리는 v2.css .hz-cell-wide.
+   */
+  wide?: boolean;
   minH?: number;
   children: React.ReactNode;
 }) {
@@ -182,7 +177,7 @@ export function Shell({
       // 2026-08 콘솔 리디자인: 카드가 아니라 **시트 안의 셀**이다. 배경·격자선·최소
       // 높이는 globals.css 의 .hz-cards > * 가 준다 — 여기서 인라인으로 주면 초고온
       // 셀의 상단 라인(.hz-cell-hot)을 덮어써 버린다.
-      className={hit ? "hz-cell-hot" : undefined}
+      className={[hit ? "hz-cell-hot" : "", wide ? "hz-cell-wide" : ""].filter(Boolean).join(" ") || undefined}
       style={{
         // 모든 카드의 divider(Foot 등) 가로 위치가 동일하도록 안쪽 여백을 통일한다.
         // 값은 폭에 따라 22 → 18 (globals.css 의 --hz-card-pad).
@@ -233,6 +228,7 @@ function HitBadge({ label = "초고온" }: { label?: string }) {
     // (예전엔 배지에 top을 직접 줬는데, 그 값은 테두리 기준이고 제목은 여백 기준이라 서로
     //  어긋났다 — 1칸 카드에서 배지가 제목보다 6px 위에 떠 있었다.)
     <span
+      className="hz-hit-badge"
       style={{
         position: "absolute",
         top: "var(--hz-card-pad)",
@@ -251,7 +247,7 @@ function HitBadge({ label = "초고온" }: { label?: string }) {
           background: "var(--c-mania-tint)",
           /* tint 위에 C.mania 를 그대로 얹으면 명암비 4.21 이라 배지 글자가 안 읽힌다. */
           color: "var(--c-hot-ink)",
-          fontWeight: 800,
+          fontWeight: 600,
           fontSize: "var(--fs-11)",
           lineHeight: 1.2,
           padding: "5px 10px",
@@ -311,6 +307,7 @@ export function TitleRow({
     <div className="hz-cell-head" style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
       <Icon
         name={icon}
+        className="hz-cell-icon"
         style={{
           fontSize: iconSize,
           lineHeight: "18px",
@@ -331,14 +328,15 @@ export function TitleRow({
             justifyContent: right ? "space-between" : undefined,
           }}
         >
-          <span className="hz-clamp2" style={{ fontSize: "var(--fs-13-5)", fontWeight: 800, color: C.ink, lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
+          <span className="hz-clamp2 hz-cell-name" style={{ fontSize: "var(--fs-13)", fontWeight: 700, color: C.ink, lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
             {name}
           </span>
           {badge && (
             <span
+              className="hz-cell-badge"
               style={{
                 fontSize: "var(--fs-11)",
-                fontWeight: 700,
+                fontWeight: 600,
                 color: C.sub,
                 background: C.chip,
                 padding: "3px 8px",
@@ -352,7 +350,7 @@ export function TitleRow({
           {right && <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>{right}</div>}
         </div>
         {desc && (
-          <p className="hz-clamp2" style={{ margin: 0, fontSize: "var(--fs-12-5)", lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{desc}</p>
+          <p className="hz-clamp2 hz-cell-desc" style={{ margin: 0, fontSize: "var(--fs-12)", lineHeight: 1.45, color: C.sub2, wordBreak: "keep-all" }}>{desc}</p>
         )}
       </div>
     </div>
@@ -377,10 +375,11 @@ export function Big({
     // 내린다. 예전엔 nowrap 이라 sub 가 자리를 차지한 채 숫자 쪽만 눌렸다.
     <div style={{ display: "flex", alignItems: "baseline", gap: 8, rowGap: 4, flexWrap: "wrap" }}>
       <span
+        className="hz-big"
         style={{
           fontFamily: MONO,
           fontSize: size,
-          fontWeight: 800,
+          fontWeight: 700,
           color,
           lineHeight: 1,
           letterSpacing: "-0.03em",
@@ -390,11 +389,11 @@ export function Big({
         }}
       >
         {disp}
-        {unit && <span style={{ fontSize: size * 0.5 }}>{unit}</span>}
+        {unit && <span className="hz-big-unit" style={{ fontSize: size * 0.5 }}>{unit}</span>}
       </span>
       {/* 곁말은 목업에서 **강조색이 아니라 회색**이다(12.5 / --c-sub2). 큰 수치와 같은
           색이면 둘이 한 덩어리로 읽혀 어느 쪽이 결론인지 흐려진다. */}
-      {sub && <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>{sub}</span>}
+      {sub && <span className="hz-big-sub" style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2, whiteSpace: "nowrap" }}>{sub}</span>}
     </div>
   );
 }
@@ -404,7 +403,7 @@ export function Foot({ text, color = C.sub }: { text: string; color?: string }) 
     // ④ 각주 슬롯 — 늘 셀 바닥이다. 위 그래픽 존이 flex:1 이라 대개 여기까지 밀려
     // 내려오지만, 그래픽이 140 을 넘겨 존이 늘어난 셀에서는 marginTop:auto 가 있어야
     // 각주가 바닥에 붙는다. 25칸의 각주 밑선이 한 줄로 맞아야 시트가 표로 읽힌다.
-    <div style={{ marginTop: "auto" }}>
+    <div className="hz-cell-foot" style={{ marginTop: "auto" }}>
       <p
         style={{
           margin: 0,
@@ -481,27 +480,61 @@ export function HeatFill({ pct, height = 10 }: { pct: number; height?: number })
   );
 }
 
-export function HeatBar({ v, hideThreshold = false }: { v: Pick; hideThreshold?: boolean }) {
+export function HeatBar({ v }: { v: Pick }) {
   if (v.capped === null) return null;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 700, color: C.muted }}>과열도</span>
-        <span style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 800, color: v.color }}>
+        <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.muted }}>과열도</span>
+        <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: v.color }}>
           {Math.round(v.capped)}
-          <span style={{ color: C.sub, fontWeight: 600 }}>/100</span>
+          <span style={{ color: C.sub, fontWeight: 500 }}>/100</span>
         </span>
       </div>
       <HeatFill pct={v.capped} />
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>안심</span>
-        <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>과열 100</span>
-      </div>
-      {v.hotDisp && !hideThreshold && (
-        <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub2, background: C.soft, borderRadius: R.control, padding: "8px 10px" }}>
-          초고온 기준선 {v.hotDisp} {v.dirLabel}
-        </span>
-      )}
+      <HeatScale />
+    </div>
+  );
+}
+
+/** 과열도 막대 양 끝 글자. 레버리지 · 코인 · 일반 카드가 같은 두 말(안심 · 과열)을 쓴다(2026-10-04 점검 — '과열 100' · 눈금 없음이 섞였다). */
+export function HeatScale() {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between" }}>
+      <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>안심</span>
+      <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>과열</span>
+    </div>
+  );
+}
+
+/* ⛔ 초고온 기준 알약('1.83배부터 초고온' · '6.00%부터 초고온')과 그걸 큰 숫자 옆에 세우던 BigWithHot 은 걷었다(2026-10-05 운영자 판단 —
+   초고온이 언제부터인지 말해 주는 글은 빼고 큰 숫자 · 막대 색이 말하게). 금 대비 코스피 · 경제 베스트셀러 · 깃헙 거래봇 세 카드에만 섰다.
+   파이프라인의 details.hot_threshold 는 그대로 남아 있다(배지 판정은 진행률 75). */
+
+/**
+ * 근거 두 칸 — 레버리지 · 코인 · 실물–증시 괴리가 큰 숫자 아래 근거 둘을 나란히 둔다.
+ * 회색 타일 둘이었는데(v2, 2026-10-03) 위 가는 선 하나 · 가운데 세로선 하나로 나눈 두 칸으로 바꿨다 —
+ * 칸 안에 칸을 또 띄우면 시트 격자 위에 상자가 한 겹 더 앉는다(MDD · 배당에서 걷은 것과 같다). 꼴은 v2.css .hz-split.
+ */
+export function SplitStats({
+  items,
+}: {
+  items: { label: React.ReactNode; value: React.ReactNode; color?: string; sub?: React.ReactNode; tip?: string }[];
+}) {
+  return (
+    <div className="hz-split">
+      {items.map((it, i) => (
+        <div key={i} className="hz-split-cell">
+          {/* 툴팁이 있는 이름은 점선 밑줄로 표시한다 — 물음표 아이콘을 칸마다 달면 한 칸에 같은 아이콘이 둘 선다. */}
+          <span className={it.tip ? "hz-split-k hz-tip hz-tip-wide hz-tip-start is-tip" : "hz-split-k"} data-tip={it.tip}>
+            {it.label}
+          </span>
+          <strong className="hz-split-v" style={it.color ? { color: it.color } : undefined}>
+            {it.value}
+          </strong>
+          {it.sub && <span className="hz-split-sub">{it.sub}</span>}
+        </div>
+      ))}
     </div>
   );
 }
@@ -531,7 +564,7 @@ export function renderRichSummary(text: string): React.ReactNode {
       const tempColor = STAGE_META[seg]?.color;
       if (tempColor) {
         return (
-          <b key={`${pi}-${si}`} style={{ color: tempColor, fontWeight: 700 }}>
+          <b key={`${pi}-${si}`} style={{ color: tempColor, fontWeight: 600 }}>
             {seg}
           </b>
         );

@@ -1,28 +1,20 @@
 import type { Metadata } from "next";
 import { assertLoaded } from "@/lib/load-state";
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { Fragment } from "react";
 
 import { getManagerDetail } from "@/lib/insider-detail";
 import { isCik } from "@/lib/insider-13f";
 
-import { SectionHead } from "../../../kadera/SectionHead";
+import { CoverMeta, Module } from "../../../kadera/V2Modules";
+import { CurrencyToggle } from "../../../AppShell";
 import { PageJsonLd } from "../../../JsonLd";
 import { INSIDER_CARD } from "../../../og-copy";
 import { pageMetadata } from "../../../seo";
-import { C, Icon, MONO } from "../../../ui";
 import { LoadFailedNote } from "../../../LoadFailedNote";
-import { ExpandableList } from "../../../kadera/ExpandableList";
-import {
-  Empty,
-  GroupTitle,
-  Money,
-  T,
-  WIDE_COLS,
-  WideHead,
-  quarterLabel,
-  wideManagerExitedRows,
-  wideManagerHoldingRows,
-} from "../../parts";
+import { Money, moveKind, quarterLabel } from "../../parts";
+import { DetailList, exitedLines, holdingLines } from "../../V2DetailRows";
 import { BackTrail } from "@/components/back-trail";
 
 /**
@@ -42,7 +34,7 @@ import { BackTrail } from "@/components/back-trail";
  * ## ⭐ 줄의 생김새는 **종목 상세의 거물 표와 같다**
  *
  * 두 화면이 같은 자료(13F)를 사람 쪽·종목 쪽에서 보는 것이라, 줄이 갈리면 독자가 다른
- * 표로 읽는다. `WIDE_COLS.managerHoldings` 가 `stockHolders` 와 같은 값인 것도 그래서다.
+ * 표로 읽는다. 둘 다 V2DetailRows 의 한 줄 네 칸(종목 · 거물 | 분기 움직임 | 비중 | 금액)을 쓰는 것도 그래서다.
  *
  * ## ⚠️⚠️ 히어로가 "운용자산"이라 적는다 — 물음표가 그 값을 치른다
  *
@@ -78,29 +70,10 @@ export async function generateStaticParams() {
 }
 
 /**
- * 처음 펴는 줄 수 · '더 보기' 증가분 · 실어 보내는 상한.
- *
- * ⚠️ 처음부터 다 펴면 화면이 자료에 파묻힌다(소로스가 258종목). 다섯 줄로 열고
- *    눌러서 늘린다. 안 보이는 줄도 전송되므로 상한이 따로 필요하다.
+ * 실어 보내는 줄 수 상한. 처음 펴는 줄 수와 '더 보기' 증가분은 V2DetailRows(DetailList)가 정한다.
+ * ⚠️ 처음부터 다 펴면 화면이 자료에 파묻힌다(소로스가 258종목). 안 보이는 줄도 전송되므로 상한이 따로 필요하다.
  */
-const ROWS_OPEN = 5;
-const ROWS_STEP = 10;
 const ROWS_MAX = 60;
-
-/** 시트의 줄 목록 + 바닥의 '더 보기'. 두 시트가 같은 꼴을 쓴다. */
-function Rows({ items, name }: { items: React.ReactNode[]; name: string }) {
-  return (
-    <ExpandableList
-      items={items}
-      name={name}
-      initial={ROWS_OPEN}
-      step={ROWS_STEP}
-      listStyle={{ padding: 0, display: "block" }}
-      footerClassName="hz-sheet-foot-row"
-      footerStyle={{ marginTop: "auto" }}
-    />
-  );
-}
 
 /** 이동 경로의 부모. 화면 맨 위 줄(BackTrail)과 구조화 데이터가 **같은 문자열**을 쓴다(JsonLd 머리말). */
 const PARENT = { name: "내부자 리포트", path: "/insider" };
@@ -132,12 +105,17 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
   assertLoaded("/insider/investor/[cik]");
   if (!d) notFound();
 
-  const counts = {
-    new: d.holdings.filter((h) => h.move === "new").length,
-    add: d.holdings.filter((h) => h.move === "add").length,
-    trim: d.holdings.filter((h) => h.move === "trim").length,
-    exit: d.exited.length,
-  };
+  // 이번 분기에 한 것 — 갈래마다 종목(비중 큰 순). 줄 글자와 같은 잣대(parts.tsx moveKind)라 표의 '유지' 줄은 늘림 · 줄임에 안 든다.
+  const byKind = (k: "new" | "add" | "trim") => d.holdings.filter((h) => moveKind(h.move, h.sharesChange) === k).map((h) => h.ticker);
+  // 전량 정리가 둘 이하면 모듈을 안 세운다 — 한두 줄 모듈이 옆 칸 키로 늘어 바닥 100px 가 비었다(버핏 1,100, 2026-10-05 점검).
+  // 그때는 '분기에 한 것'의 전량 정리 줄이 종목을 말한다.
+  const exitedMod = d.exited.length > 2;
+  const moves = [
+    { label: "새로 담음", list: byKind("new") },
+    { label: "늘림", list: byKind("add") },
+    { label: "줄임", list: byKind("trim") },
+    { label: "전량 정리", list: d.exited.map((e) => e.ticker) },
+  ];
   const kaderaCount = d.holdings.filter((h) => h.inKadera).length;
   /**
    * 직전 분기 대비 신고 합계 증감(%). ⚠️ 수익률이 아니다 — 머리말의 AUM 절을 볼 것.
@@ -146,29 +124,14 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
    *    "그대로였다"는 없는 사실이 된다.
    */
   const aumChange = d.priorDate && d.priorAum > 0 ? (d.aum / d.priorAum - 1) * 100 : null;
-  /**
-   * 집중도 막대의 칸 — 상위 다섯 종목 + 나머지.
-   *
-   * ⚠️ 비중은 이미 100% 를 분모로 하는 값이라 **여기서는 다시 눈금을 바꾸지 않는다.**
-   *    목록 표의 막대와 반대다(거기는 서로 견주는 자, 여기는 전체 중 몫).
-   * ⚠️ 보유가 다섯 이하면 "나머지" 칸은 만들지 않는다 — 0% 짜리 빈 칸이 남는다.
-   */
-  const head = d.holdings.slice(0, 5);
-  const top5 = head.reduce((s, h) => s + h.weight, 0);
-  const conc = head.length
-    ? [
-        ...head.map((h) => ({ key: h.ticker, weight: h.weight, rest: false })),
-        ...(d.holdings.length > head.length
-          ? [{ key: `나머지 ${d.holdings.length - head.length}종목`, weight: Math.max(0, 100 - top5), rest: true }]
-          : []),
-      ]
-    : [];
+  // 상위 다섯 종목의 몫 — 첫 줄 띠의 '상위 5종목 %'. 이 사람이 몇 종목에 몰아 거는지 한 숫자로 말한다.
+  const top5 = d.holdings.slice(0, 5).reduce((s, h) => s + h.weight, 0);
 
   return (
     // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고,
     // 원화는 크기를 가늠하라고 얹은 것이다. 쿠키로 한 번이라도 고르면 그 선택이 이긴다
     // (규칙은 globals.css 의 `[data-cur-default]`).
-    <div className="hz-tx" data-cur-default="usd">
+    <div className="hz-tx v2-kd v2-in" data-cur-default="usd">
       <LoadFailedNote sources={d.failedSources} />
       {/* 셸은 이 화면의 이름을 몰라 구조화 데이터를 안 낸다(AppShell PageHeader 의 named). 여기서 낸다. */}
       <PageJsonLd
@@ -179,227 +142,138 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
       />
       <BackTrail parent={{ name: PARENT.name, href: PARENT.path }} current={d.person} />
 
-      <section className="hz-sheet">
-        <div className="hz-kd-hero">
-          <div className="hz-kd-hero-q">
-            {/* 이 화면의 h1(인물과 회사). 셸의 제목 칸은 비어 있다(AppShell SELF_TITLED_PREFIXES). */}
-            <h1 style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, margin: 0, fontSize: "inherit", fontWeight: "inherit" }}>
-              <strong style={{ fontSize: "var(--fs-20)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>{d.person}</strong>{" "}
-              <span style={{ fontSize: T.body, color: C.sub }}>{d.firm}</span>
-            </h1>
-            {/* ⭐ **라벨 → 값 → 끝.** 예전엔 값 아래에 회색 두 줄("신고한 미국 상장주 합계 ·
-                2026 Q1" 과 "직전 2025 Q4 $15.5B")이 겹쳐 있었다. 굵기도 색도 같은 두 줄이라
-                어느 쪽이 이 숫자의 이름인지 안 보였다. 이름은 위로 올리고, 단서는 물음표
-                안으로 넣는다 — 히어로에 남는 글자는 이름·값·분기 셋뿐이다. */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span
-                style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: T.small, fontWeight: 700, color: C.sub }}
-              >
-                운용자산 · {quarterLabel(d.reportDate)}
-                {/* ⚠️⚠️ **"운용자산"은 엄밀히는 과장이다.** 13F 는 미국 상장주 롱만 신고해서
-                    버핏이 $299.3B 로 나오는데 버크셔의 실제 운용자산은 그보다 훨씬 크다.
-                    그래도 2026-08-23 에 이 말을 쓰기로 한 것은, 앞의 "신고한 미국 상장주
-                    합계"가 히어로에서 읽히지 않아서다. **대신 물음표가 그 차이를 반드시
-                    말해야 한다** — 이 툴팁을 지우면 화면이 거짓말이 된다. */}
-                <span
-                  className="hz-tip hz-tip-wide"
-                  data-tip="미국 상장주만 집계"
-                  style={{ display: "inline-flex", cursor: "help" }}
-                >
-                  <Icon name="help" style={{ fontSize: "var(--fs-12)", color: C.muted }} />
-                </span>
-              </span>
-              <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                <strong style={{ fontFamily: MONO, fontSize: "var(--fs-24)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
-                  <Money usd={d.aum} rate={d.usdKrw} />
-                </strong>
-                {aumChange != null && (
-                  <span
-                    className="hz-tip hz-tip-wide"
-                    data-tip="직전 분기 대비"
-                    style={{
-                      fontFamily: MONO,
-                      fontSize: "var(--fs-13)",
-                      fontWeight: 700,
-                      whiteSpace: "nowrap",
-                      cursor: "help",
-                      color:
-                        aumChange > 0 ? "var(--c-hot-ink)" : aumChange < 0 ? "var(--c-cold-ink)" : C.sub2,
-                    }}
-                  >
-                    {aumChange > 0 ? "▲" : aumChange < 0 ? "▼" : ""}
-                    {Math.abs(aumChange).toFixed(1)}%
-                  </span>
-                )}
-              </span>
-              {/* ⭐ 견준 상대는 **각주 자리**다. 예전엔 이 줄이 라벨 줄과 같은 굵기·같은
-                  색으로 나란히 서서 어느 쪽이 숫자의 이름인지 안 보였다. 라벨을 위로
-                  올린 지금은 아래 한 줄만 남아 역할이 겹치지 않는다.
-                  ⚠️ 분기 이름을 다시 적지 않는다 — 위 라벨이 이미 이번 분기를 말했고,
-                  늦게 내는 곳도 "직전"은 자기 앞 신고를 가리켜 늘 맞는다. */}
-              {aumChange != null && (
-                <span style={{ fontSize: T.small, color: C.muted, marginTop: 1 }}>
-                  직전 분기 <Money usd={d.priorAum} rate={d.usdKrw} />
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="hz-kd-hero-q">
-            <div className="hz-kd-hero-title">
-              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>
-                이번 분기에 한 것
-              </span>
-            </div>
-            {d.priorDate ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {[
-                  { label: "새로 담음", n: counts.new },
-                  { label: "늘림", n: counts.add },
-                  { label: "줄임", n: counts.trim },
-                  { label: "전량 정리", n: counts.exit },
-                ].map((s) => (
-                  <div key={s.label} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-                    <span style={{ fontSize: "var(--fs-11-5)", fontWeight: 600, color: C.sub }}>{s.label}</span>
-                    <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: s.n ? C.ink : C.muted }}>
-                      {s.n}
-                      <span style={{ fontSize: "var(--fs-11)", fontWeight: 700, color: C.sub2, marginLeft: 2 }}>종목</span>
-                    </strong>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p style={{ margin: 0, fontSize: T.body, color: C.sub, lineHeight: 1.7 }}>
-                견줄 직전 분기가 아직 없습니다.
-              </p>
-            )}
-          </div>
-
-          <div className="hz-kd-hero-h">
-            <div className="hz-kd-hero-title">
-              <span style={{ fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>한눈에</span>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ display: "flex", gap: 26, flexWrap: "wrap" }}>
-                {[
-                  { n: `${d.holdings.length}`, unit: "종목", label: "보유" },
-                  { n: `${top5.toFixed(0)}%`, unit: "", label: "상위 5종목 몫" },
-                  { n: `${kaderaCount}`, unit: "종목", label: "카더라에 오른 것" },
-                ].map((s) => (
-                  <div key={s.label} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-                      <strong style={{ fontFamily: MONO, fontSize: "var(--fs-21)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
-                        {s.n}
-                      </strong>
-                      {s.unit && <span style={{ fontSize: T.small, fontWeight: 700, color: C.sub2 }}>{s.unit}</span>}
-                    </span>
-                    <span style={{ fontSize: T.small, color: C.sub, fontWeight: 600 }}>{s.label}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* ⭐ 이 자리는 종목 상세에서 **언급 추이 막대**가 서는 칸이다(히어로의 절반 폭).
-                  거기가 그림이면 여기도 그림이어야 화면 둘이 한 벌로 읽힌다.
-
-                  ⭐ 그린 것은 **집중도**다. 표를 다섯 줄 훑어서는 안 보이고, 이 사람이 어떤
-                  운용을 하는지 한눈에 말한다 — 히말라야는 8종목에 다 걸고 국민연금은 541종목에
-                  펴 놓는다. 위의 "보유 N종목"과 짝이 되는 그림이다. */}
-              {conc.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                  <span style={{ display: "flex", height: 12, borderRadius: 3, overflow: "hidden", background: "var(--c-track)" }}>
-                    {conc.map((c, i) => (
-                      <span
-                        key={c.key}
-                        title={`${c.key} ${c.weight.toFixed(1)}%`}
-                        style={{
-                          width: `${c.weight}%`,
-                          // 다섯 칸이 같은 파랑이면 경계가 안 보인다. 순서대로 옅어지게 두고
-                          // 나머지는 트랙 색으로 남긴다 — 남은 자리가 곧 "펴 놓은 몫"이다.
-                          background: c.rest ? "transparent" : `color-mix(in srgb, var(--c-blue) ${100 - i * 15}%, var(--c-card))`,
-                        }}
-                      />
-                    ))}
-                  </span>
-                  <span style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: T.small, color: C.sub2, fontWeight: 600 }}>
-                    {conc
-                      .filter((c) => !c.rest)
-                      .map((c) => (
-                        <span key={c.key} style={{ whiteSpace: "nowrap" }}>
-                          <span style={{ fontFamily: MONO, color: C.ink }}>{c.key}</span> {c.weight.toFixed(1)}%
-                        </span>
-                      ))}
-                  </span>
-                </div>
-              )}
-
-              {/* ⭐ 네 문장이었다가 한 문장으로 줄였다. 나머지 셋이 다른 데서 이미 나온다 —
-                  "미국 상장주만 · 채권·현금·해외는 빠짐"은 왼쪽 칸 운용자산의 물음표가,
-                  "무엇과 견줬나"는 그 아래 `직전 분기 $15.5B` 한 줄이 말한다. 같은 말을
-                  두 번 하면 둘 다 안 읽힌다.
-                  ⚠️ 남긴 문장은 **다른 화면과 글자까지 같아야 한다**(app/insider/lists.ts 의
-                     `help` · 메인의 거물 카드 · 종목 상세의 거물 표가 같은 문장이다).
-                     여기만 새로 지으면 같은 사실이 화면마다 다른 말로 나간다.
-                  ⚠️⚠️ 예전엔 **"최대 넉 달까지 낡을 수 있습니다"** 였다. 최악만 적어서
-                     자료가 실제보다 훨씬 뒤떨어진 것처럼 읽혔다 — 실측(2026-08-23)으로
-                     63곳 중 62곳이 54일이고 넉 달을 넘긴 건 한 곳(늦게 내는 퍼싱)뿐이다.
-                     ⛔ 그렇다고 "45일" 같은 **작은 숫자로 바꾸지 말 것.** 그건 신고 마감
-                     규칙이지 화면에 뜬 자료의 나이가 아니다(퍼싱은 145일이다). 숫자를 빼고
-                     "지금과 다를 수 있다"만 남기면 어느 쪽으로도 안 틀린다 — 크기는 옆에
-                     붙은 분기 이름이 말한다. */}
-              <p style={{ margin: 0, fontSize: T.small, color: C.sub2, lineHeight: 1.6, wordBreak: "keep-all" }}>
-                13F는 분기말 기준이라 지금과 다를 수 있습니다.
-              </p>
-            </div>
-          </div>
+      {/* ── 첫 줄 띠 · 둘째 줄(v2, 2026-10-03) ─────────────────────────────
+          옛 히어로 세 칸(이름 · 운용자산 / 이번 분기에 한 것 / 한눈에)을 v2 꼴로 — 이름 · 운용자산 · 보유 규모 · 통화는 첫 줄 띠로,
+          이번 분기에 한 것 · 집중도는 둘째 줄 짝으로. 히어로 바닥의 "13F는 분기말 기준이라 지금과 다를 수 있습니다"는 띠의 업데이트
+          자리('2026 Q2 13F · 분기말 기준')가 말한다(설명 문장은 걷는다).
+          ⚠️ 이름표를 '운용자산'으로 되돌리지 말 것 — 버크셔의 실제 운용자산은 이보다 훨씬 크다. '미국 주식 보유액'이라 적어야 화면이 거짓말을 안 한다
+             (예전엔 '운용자산' 옆 물음표가 '미국 상장주만 집계'라고 말했다 — 2026-10-04 물음표를 걷고 이름표가 말하게 했다). */}
+      <div className="v2-cover">
+        <div className="v2-cover-cell v2-sk-id">
+          <h1>{d.person}</h1>
+          {/* 소속이 이름으로 시작하면('국민연금 국민연금공단') 같은 말이 두 번 — 뺀다(2026-10-05 점검). */}
+          {d.firm && !d.firm.startsWith(d.person) && <span className="v2-cover-k">{d.firm}</span>}
         </div>
-      </section>
-
-      <GroupTitle>이 사람의 포트폴리오</GroupTitle>
-
-      <section className="hz-sheet">
-        <SectionHead
-          icon="donut_large"
-          title="보유 종목"
-          note={`${d.holdings.length}종목 · ${quarterLabel(d.reportDate)}`}
-          noteHelp="비중은 운용자산 기준"
-          desc="비중이 큰 순입니다. 종목을 누르면 그 종목의 공시로 갑니다."
-        />
-        {d.holdings.length === 0 ? (
-          <Empty>신고된 보유가 없습니다.</Empty>
-        ) : (
-          <>
-            <WideHead cols={WIDE_COLS.managerHoldings} labels={["종목", "주식 수", "포트폴리오 비중", "금액"]} />
-            <Rows name="investor_holdings" items={wideManagerHoldingRows(d.holdings.slice(0, ROWS_MAX), d.usdKrw)} />
-          </>
-        )}
-        {d.holdings.length > ROWS_MAX && (
-          <div className="hz-sheet-foot">
-            <span style={{ fontSize: T.small, color: C.sub2, lineHeight: 1.5 }}>
-              비중이 큰 {ROWS_MAX}종목까지 그렸습니다. 전체는 {d.holdings.length}종목입니다.
-            </span>
+        <div className="v2-cover-cell">
+          {/* '운용자산 ?(미국 상장주만 집계)'였다 — 이름표가 글자 그대로 그 값을 말하게(2026-10-04 "헬프 툴팁이 필요하면 심플하지 않다"). */}
+          <span className="v2-cover-k">미국 주식 보유액</span>
+          <span className="v2-cover-v">
+            <b>
+              <Money usd={d.aum} rate={d.usdKrw} />
+            </b>
+            {/* 무엇과 견준 값인지 글자로 — 말풍선에만 있어 현재가 옆 등락처럼 수익률로 읽혔다(2026-10-04 점검). */}
+            {aumChange != null && (
+              <>
+                <span className="v2-cover-k">전 분기보다</span>
+                <span className={`v2-cover-chg${aumChange > 0 ? " is-up" : aumChange < 0 ? " is-down" : ""}`}>
+                  {aumChange > 0 ? "+" : aumChange < 0 ? "-" : ""}
+                  {Math.abs(aumChange).toFixed(1)}%
+                </span>
+              </>
+            )}
+          </span>
+        </div>
+        <div className="v2-cover-cell v2-cover-idx">
+          <span className="v2-cover-k">보유</span>
+          <span className="v2-cover-v">
+            <b>{d.holdings.length}종목</b>
+          </span>
+          <span className="v2-cover-v">
+            {/* 보유가 다섯 아래면 그 수로 — 4종목인데 '상위 5종목 100%'였다(2026-10-05 점검). */}
+            <em>상위 {Math.min(5, d.holdings.length)}종목</em>
+            <b>{top5.toFixed(0)}%</b>
+          </span>
+          <span className="v2-cover-v">
+            {/* 짧게 — 폰에서 값 셋이 한 줄에 들게(2026-10-04 점검). */}
+            {/* '카더라 언급' — 무엇을 센 수인지(보유 중 카더라에서 언급된 종목, 2026-10-05 점검). */}
+            <em>카더라 언급</em>
+            <b>{kaderaCount}종목</b>
+          </span>
+        </div>
+        {d.usdKrw != null && (
+          <div className="v2-cover-cell v2-in-cur">
+            <span className="v2-cover-k">통화</span>
+            <CurrencyToggle fallback="usd" />
           </div>
         )}
-      </section>
+        <CoverMeta updated={`${quarterLabel(d.reportDate)} 13F · 분기말 기준`} />
+      </div>
 
-      {d.exited.length > 0 && (
-        <section className="hz-sheet">
-          <SectionHead
-            icon="remove_circle_outline"
-            title="이번 분기에 전량 정리한 종목"
-            note={`${d.exited.length}종목`}
-            noteHelp="직전 분기엔 있던 종목"
-            desc={`${quarterLabel(d.priorDate)} 기준 금액이 큰 순입니다.`}
-          />
-          <WideHead cols={WIDE_COLS.managerExited} labels={["종목", "정리 전 포트폴리오 비중", "정리 전 금액"]} />
-          <Rows name="investor_exited" items={wideManagerExitedRows(d.exited.slice(0, ROWS_MAX), d.usdKrw)} />
-        </section>
-      )}
+      {/* 둘째 줄 — [보유 종목 | 이번 분기에 한 것 · 전량 정리한 종목](v2, 2026-10-04).
+          ⭐ 보유 종목이 이 화면의 본문이라 넓은 칸을 준다. 옆 칸은 그 표를 읽는 실마리(무엇이 바뀌었나 · 무엇을 다 팔았나).
+          ⛔ '상위 종목 몫'(집중도 막대) 모듈은 걷었다 — 다섯 칸이 보유 종목 표 위 다섯 줄과 같은 숫자였고, 집중도 자체는 첫 줄 띠의
+             '상위 5종목 %'가 말한다(한 화면에 같은 숫자 세 번). 옛 시트 둘(보유 · 전량 정리)도 모듈로 옮겼다. */}
+      <div className="v2-tm-band is-hot v2-isd-inv">
+        <Module
+          title="보유 종목"
+          meta={`${d.holdings.length > ROWS_MAX ? `상위 ${ROWS_MAX} / ` : ""}${d.holdings.length}종목`}
+          className="v2-isd-mod"
+        >
+          {d.holdings.length === 0 ? (
+            <p className="v2-empty">신고된 보유가 없습니다.</p>
+          ) : (
+            <DetailList name="investor_holdings" cols="holding" open={10} items={holdingLines(d.holdings.slice(0, ROWS_MAX), d.usdKrw)} />
+          )}
+        </Module>
+        <div className="v2-tm-side">
+          {/* '이번 분기'는 오늘의 분기로 읽혔다 — 13F 분기 이름으로(2026-10-04 점검). */}
+          <Module
+            title={d.reportDate ? `${Math.ceil(Number(d.reportDate.slice(5, 7)) / 3)}분기에 한 것` : "분기에 한 것"}
+            // 분기는 띠(업데이트 칸)와 제목이 말한다 — 머리에 분기가 두 번이었다(2026-10-05 점검).
+            meta={d.priorDate ? "직전 분기 대비" : undefined}
+            className="v2-isd-facts-mod"
+          >
+            {d.priorDate ? (
+              <dl className="v2-isd-facts">
+                {moves.map((s) => (
+                  <div key={s.label}>
+                    {/* 갈래 이름 아래 종목 — 표를 다 훑지 않아도 무엇을 바꿨는지 보인다. 종목은 그 종목 화면 링크.
+                        판 1,000 이상은 여섯까지, 그 밑은 넷까지 · 나머지는 수로(v2.css .v2-isd-wide · .v2-isd-narrow). */}
+                    <dt>
+                      {s.label}
+                      {/* 전량 정리는 아래 모듈이 종목을 말하면 이 줄은 수만 — 같은 사실이 한 화면에 두 번 섰다(2026-10-05 점검). */}
+                      {s.list.length > 0 && !(s.label === "전량 정리" && exitedMod) && (
+                        <em>
+                          {/* 넓은 판은 여섯까지 — 여덟이면 '353종 / 목' · 'AMD 외 / 345'로 꺾였다(국민연금 1,440, 2026-10-05 점검). */}
+                          {s.list.slice(0, 6).map((t, i) => (
+                            <Fragment key={t}>
+                              {i > 0 && <span className={i >= 4 ? "v2-isd-wide" : undefined}> · </span>}
+                              <Link href={`/insider/stock/${encodeURIComponent(t)}`} className={`v2-isd-tk${i >= 4 ? " v2-isd-wide" : ""}`} data-ga="insider_investor_move_click">
+                                {t}
+                              </Link>
+                            </Fragment>
+                          ))}
+                          {s.list.length > 4 && <span className="v2-isd-narrow"> 외 {s.list.length - 4}</span>}
+                          {s.list.length > 6 && <span className="v2-isd-wide"> 외 {s.list.length - 6}</span>}
+                        </em>
+                      )}
+                    </dt>
+                    <dd>
+                      <b className={s.list.length ? undefined : "is-zero"}>
+                        {s.list.length}
+                        <span>종목</span>
+                      </b>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p className="v2-empty">견줄 직전 분기가 아직 없습니다.</p>
+            )}
+          </Module>
+          {exitedMod && (
+            <Module title="전량 정리한 종목" meta={`${quarterLabel(d.priorDate)} 비중 · 금액`} className="v2-isd-mod">
+              <DetailList name="investor_exited" cols="exited" open={5} items={exitedLines(d.exited.slice(0, ROWS_MAX), d.usdKrw)} />
+            </Module>
+          )}
+        </div>
+      </div>
 
       {/* ⛔ 여기 있던 "SEC와 미 하원이 공개한 공시를 그대로 옮긴 것입니다 …" 각주는
-          2026-08-23 에 뺐다. **전역 푸터(app/Footer.tsx)가 이미 같은 고지를 한다** —
-          "투자 조언이나 매수·매도 추천이 아닙니다. 모든 투자 판단과 책임은 이용자 본인에게
-          있습니다." 그 푸터는 AppShell 이 모든 화면에 붙이므로 이 화면에도 뜬다.
-          ⚠️ 다시 넣지 말 것. 넣더라도 **푸터가 그 고지를 잃은 뒤에만** 넣는다. */}
+          2026-08-23 에 뺐다. 같은 고지("투자 조언이나 매수·매도 추천이 아닙니다. 모든 투자 판단과
+          책임은 이용자 본인에게 있습니다")는 투자 유의사항(/disclaimer)이 한다. 2026-10-02 까지는 전역
+          푸터가 그 문장을 들었고, 지금은 모든 화면의 푸터가 투자 유의사항으로 건너가는 링크를 든다.
+          ⚠️ 다시 넣지 말 것 — 고지를 화면마다 적지 않고 한 페이지에 모으기로 했다(2026-10-02). */}
     </div>
   );
 }

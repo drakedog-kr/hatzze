@@ -89,10 +89,13 @@ export const R = {
 // 햇쩨 지수(0~100)를 4구간 라벨로 매핑 — 파이프라인 calculate_score.py의
 // stage_for_score와 동일 경계(25/50/75). 프론트는 저장된 stage 문자열 대신
 // 점수에서 직접 계산해, 표시가 데이터와 항상 일치하고 라벨 변경에도 견고하다.
+// 화면에 찍히는 정수(Math.round)로 가른다. 24.72 는 '25℃'로 찍히므로 상온이다 — 소수로 가르면 같은 25℃ 가
+// 어제는 저온, 오늘은 상온으로 갈렸다(2026-10-04 점검). 파이프라인 네 벌도 js_round 로 같은 규칙이다.
 export function stageForScore(score: number): string {
-  if (score < 25) return "저온";
-  if (score < 50) return "상온";
-  if (score < 75) return "고온";
+  const s = Math.round(score);
+  if (s < 25) return "저온";
+  if (s < 50) return "상온";
+  if (s < 75) return "고온";
   return "초고온";
 }
 

@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "./supabase-server";
 import { addDaysISO, kaderaBaseDate } from "./telegram-data";
 import { LOAD_FAILED, type MaybeFailed } from "./load-state";
 import { byPeriodEnd, periodFloor, stillAhead, type DatePrecision } from "./event-period";
+import { dropAlreadyHappened, groupEventRows, type GroupedEvent } from "./event-group";
 import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
 
 /**
@@ -50,19 +51,34 @@ export type MoveReasonRow = {
 //    yahooBars 응답에서 `date` 이하 22거래일(한 달)의 종가를 잘라 넘기면 된다 — 일주일(5칸)은
 //    선이 되기엔 너무 짧아 한 달로 잡았었다. 야후 호출은 등락률 때문에 어차피 도므로 공짜다.
 
-export type MoveReasonBoard = { date: string; rows: MoveReasonRow[] };
+/**
+ * rows = 오른 줄(오름폭 순) · down = **크게 내린 줄**(내림폭 순, v2 '급락 이유' 탭, 2026-10-02).
+ * down 은 등락률을 실제로 구한 줄만 담는다 — 채널 글의 등락 표기는 크기·부호가 틀리는 날이 있어서다
+ * (SK하이닉스: 09-30 표기 +29.98 · KRX +0.62, 10-01 표기 -30).
+ */
+export type MoveReasonBoard = { date: string; rows: MoveReasonRow[]; down: MoveReasonRow[] };
+
+/**
+ * '급락'으로 세우는 문턱(%). 이보다 덜 내린 줄은 급락 탭에 안 올린다.
+ *
+ * 파이프라인이 내린 종목의 까닭도 만들지만(후보는 채널 글의 등락 표기 절댓값 순), 2026-09-16~10-01 열흘을 재 보니
+ * 하루 40줄 중 내린 줄은 0~6줄뿐이었고, 2~4% 내린 줄에는 '수혜 기대'·'공급 기대' 같은 **오를 까닭**이 붙어 있었다
+ * (그 종목이 회자된 까닭이지 내린 까닭이 아니다). 크게 내린 줄은 '매출 허위계상 의혹'·'임상 중단'·'합병 철회'처럼
+ * 내린 까닭이 맞는 편이라 문턱을 둔다. 문턱 위에도 어긋난 줄이 남는다 — 고치는 자리는 파이프라인 프롬프트다.
+ */
+const DOWN_MIN = -5;
 
 /** 표에서 읽어 오는 최대 줄 수. 파이프라인 상한(CAP=40)과 같다 */
 const BOARD_MAX = 40;
 /**
  * 그중 **야후 일봉을 실제로 부르는** 줄 수.
  *
- * 화면은 아홉 장뿐인데(page.tsx WHY_TILES) 마흔 줄에 다 부르면 렌더마다 바깥 왕복이 마흔 번이다.
+ * 화면은 열 줄뿐인데(BOARD_TILES) 마흔 줄에 다 부르면 렌더마다 바깥 왕복이 마흔 번이다.
  * 그래서 KRX 확정값이나 채널 글의 등락 표기(quoted)로 **먼저 줄을 세우고** 위에서 이만큼만 부른다.
  * ⭐ 정렬은 절댓값이 아니라 **부호 있는 값의 내림차순**이다 — 카드가 오른 종목만 담으므로
  *    많이 내린 줄에 시세를 물어 봐야 어차피 안 쓴다(내린 줄의 까닭은 표에 남아 종목 화면이 쓴다).
- * 아홉이 아니라 스물넷인 이유: quoted 는 장중 값이라 실제 종가 등락과 순위가 조금 뒤집히고,
- * 장중에 오른 줄이 종가로는 내리기도 해서 걸러지고 나면 아홉이 안 남는다.
+ * 화면 줄 수보다 넉넉히 잡는 이유: quoted 는 장중 값이라 실제 종가 등락과 순위가 조금 뒤집히고,
+ * 장중에 오른 줄이 종가로는 내리기도 해서 걸러지고 나면 화면 줄 수가 안 남는다.
  *
  * ⚠️ **이 값만으로는 빈 칸을 못 막는다.** 여유를 얼마로 잡든, 고르는 잣대와 화면이 줄 세우는
  *    잣대가 같은 값(quoted)이라 시세를 안 물어본 줄이 화면에 올라설 수 있다. 그래서 아래
@@ -70,12 +86,13 @@ const BOARD_MAX = 40;
  */
 const QUOTE_ROWS = 24;
 /**
- * 화면이 그리는 장수. **app/kadera/page.tsx 가 이 값을 가져다 쓴다.**
+ * 화면이 그리는 줄 수. **app/kadera/page.tsx 가 이 값을 가져다 쓴다.**
  *
  * 라이브러리가 들고 있는 이유는 위 2차 조회가 "화면에 실제로 설 줄"을 알아야 하기 때문이다.
  * 화면 쪽에 숫자를 따로 두면 둘이 갈리는 순간 2차 조회가 엉뚱한 줄을 채운다.
+ * 아홉(3×3 카드 격자)에서 열로 올렸다(2026-10-03 v2) — 표가 열 줄을 다 펼친다.
  */
-export const BOARD_TILES = 9;
+export const BOARD_TILES = 10;
 /** 종목 화면의 '왜 움직였나'는 기준일에서 사흘 안의 까닭만 쓴다(주말이 끼어도 사흘이면 닿는다) */
 const BOARD_STALE_DAYS = 3;
 /**
@@ -190,7 +207,7 @@ export const getMoveReasons = cache(async (): Promise<MaybeFailed<MoveReasonBoar
   const rows = ((data ?? []) as ReasonRow[])
     .map((r) => ({ ...r, reason: (r.reason ?? "").trim() }))
     .filter((r) => r.reason !== "");
-  if (!rows.length) return { date, rows: [] };
+  if (!rows.length) return { date, rows: [], down: [] };
 
   const info = await stockRows(rows.map((r) => r.stock_code));
   // 야후를 부를 줄 고르기 — KRX 확정값이 있으면 그것, 없으면 채널 글의 표기로 어림한다.
@@ -202,6 +219,10 @@ export const getMoveReasons = cache(async (): Promise<MaybeFailed<MoveReasonBoar
       .slice(0, QUOTE_ROWS)
       .map((r) => r.stock_code),
   );
+  // 급락 탭 몫 — 표기상 많이 내린 줄. 하루에 몇 줄 안 돼(DOWN_MIN 주석) 왕복이 얼마 안 는다.
+  for (const r of [...rows].filter((r) => hint(r) < 0).sort((a, b) => hint(a) - hint(b)).slice(0, BOARD_TILES)) {
+    willQuote.add(r.stock_code);
+  }
   const out: MoveReasonRow[] = rows.map((r) => {
     const s = info.get(r.stock_code);
     let changeRate: number | null = num(r.change_rate);
@@ -280,7 +301,7 @@ export const getMoveReasons = cache(async (): Promise<MaybeFailed<MoveReasonBoar
    * ## 한 바퀴로 안 끝나는 까닭
    *
    * 새로 채운 값이 0 이하면 그 줄은 목록에서 빠지고 그 자리에 다음 줄이 올라온다. 그 줄도
-   * 비어 있을 수 있다. 그래서 위 아홉 장이 다 채워지거나 더 부를 줄이 없을 때까지 돈다.
+   * 비어 있을 수 있다. 그래서 위 BOARD_TILES 줄이 다 채워지거나 더 부를 줄이 없을 때까지 돈다.
    * 한 종목은 한 번만 부르므로(asked) 바퀴는 BOARD_MAX 를 못 넘는다.
    *
    * ## 왕복이 얼마나 느나
@@ -292,19 +313,33 @@ export const getMoveReasons = cache(async (): Promise<MaybeFailed<MoveReasonBoar
     if (!(await fillFromYahoo(boardOf().slice(0, BOARD_TILES)))) break;
   }
 
-  return { date, rows: boardOf() };
+  /** 급락 후보 — 등락률을 아직 못 구했으면 표기가 마이너스인 줄도 후보로 둔다(채워 보고 가른다). */
+  const downCandidates = (): MoveReasonRow[] =>
+    out
+      .filter((r) => (r.changeRate !== null ? r.changeRate <= DOWN_MIN : (r.quotedChange ?? 0) < 0))
+      .sort((a, b) => (a.changeRate ?? a.quotedChange ?? 0) - (b.changeRate ?? b.quotedChange ?? 0));
+  for (let round = 0; round < BOARD_MAX; round++) {
+    if (!(await fillFromYahoo(downCandidates().slice(0, BOARD_TILES)))) break;
+  }
+  const down = downCandidates().filter((r) => r.changeRate !== null && r.changeRate <= DOWN_MIN);
+
+  return { date, rows: boardOf(), down };
 });
 
 export type StockMoveReason = {
   date: string;
-  reason: string | null;
+  reason: string;
   channelCount: number;
   mentionCount: number;
   /** KRX 확정 등락률(파이프라인이 다음 날 채운 것). 없으면 null — 화면은 stocks 의 값과 날짜를 맞춰 본다 */
   changeRate: number | null;
 };
 
-/** 종목 화면용 — 기준일에서 사흘 안의 가장 최근 까닭 한 줄. 없으면 null(정상). */
+/**
+ * 종목 화면용 — 기준일에서 사흘 안의 **이유가 있는** 가장 최근 줄. 없으면 null(정상 — 줄을 안 그린다).
+ * 이유 없는 줄까지 고르면 SK하이닉스 10/1(+3.21%, 마이크론 실적)을 두고 10/2(+0.44%, 이유 없음)가 서서
+ * '이유를 말한 곳이 없습니다 · 채널 74곳'이 나왔다 — 74곳이 말했는데 이유가 없다는 문장이 읽히지 않았다(2026-10-04 점검).
+ */
 export async function getStockMoveReason(code: string, base?: string): Promise<StockMoveReason | null> {
   const db = getSupabaseAdmin();
   const b = base ?? (await kaderaBaseDate());
@@ -314,6 +349,8 @@ export async function getStockMoveReason(code: string, base?: string): Promise<S
     .eq("stock_code", code)
     .gte("date", addDaysISO(b, -BOARD_STALE_DAYS))
     .lte("date", b)
+    .not("reason", "is", null)
+    .neq("reason", "")
     .order("date", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -321,10 +358,10 @@ export async function getStockMoveReason(code: string, base?: string): Promise<S
     console.error(`[getStockMoveReason] ${code} 까닭을 못 읽었습니다`, error);
     return null;
   }
-  if (!data) return null;
+  if (!data || !String(data.reason ?? "").trim()) return null;
   return {
     date: data.date as string,
-    reason: (data.reason as string | null) ?? null,
+    reason: String(data.reason).trim(),
     channelCount: (data.channel_count as number | null) ?? 0,
     mentionCount: (data.mention_count as number | null) ?? 0,
     changeRate: num(data.change_rate as number | string | null),
@@ -367,38 +404,36 @@ export function todayKst(): string {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-/**
- * (종목, 날짜, 정밀도)로 묶는다. 행사 문구는 채널마다 조금씩 달라 **가장 많이 쓰인 표기**를
- * 대표로 삼고, 채널 수는 묶음 안의 서로 다른 채널을 센다.
- */
+/** 일정 행 → 줄(lib/event-group.ts — 국장 · 미장이 같은 규칙). */
 function groupEvents(rows: EventRow[]): Omit<UpcomingEvent, "name" | "market">[] {
-  const groups = new Map<string, { rows: EventRow[] }>();
-  for (const r of rows) {
-    const k = `${r.stock_code}|${r.event_date}|${r.date_precision}`;
-    const g = groups.get(k);
-    if (g) g.rows.push(r);
-    else groups.set(k, { rows: [r] });
+  return groupEventRows(rows.map((r) => ({ code: r.stock_code, channel: r.channel_handle, date: r.event_date, precision: r.date_precision, event: r.event, postedAt: r.posted_at })));
+}
+
+/** 이미 지나간 같은 이야기를 볼 날 수 — 앞으로의 한 채널 줄을 이 안의 여러 채널 줄과 견준다(lib/event-group.ts dropAlreadyHappened). */
+const PAST_DAYS = 14;
+
+/** 준 종목들의 지난 PAST_DAYS 일 day 일정 줄. 한 채널 줄이 없으면 묻지 않는다. 못 읽으면 빈 목록(거르지 않는다). */
+async function recentPast(codes: string[], from: string): Promise<GroupedEvent[]> {
+  if (!codes.length) return [];
+  const { data, error } = await getSupabaseAdmin()
+    .from("telegram_stock_event")
+    .select("channel_handle,stock_code,event_date,date_precision,event,posted_at")
+    .in("stock_code", codes)
+    .eq("date_precision", "day")
+    .gte("event_date", addDaysISO(from, -PAST_DAYS))
+    .lt("event_date", from)
+    .limit(1000);
+  if (error) {
+    console.error("[recentPast] 지난 일정을 못 읽었습니다 — 거르지 않습니다", error);
+    return [];
   }
-  const out: Omit<UpcomingEvent, "name" | "market">[] = [];
-  for (const { rows: g } of groups.values()) {
-    const texts = new Map<string, { text: string; n: number }>();
-    for (const r of g) {
-      const key = r.event.replace(/[\s·,.()]/g, "");
-      const cur = texts.get(key);
-      if (cur) cur.n += 1;
-      else texts.set(key, { text: r.event, n: 1 });
-    }
-    const top = [...texts.values()].sort((a, b) => b.n - a.n)[0];
-    out.push({
-      code: g[0].stock_code,
-      date: g[0].event_date,
-      precision: g[0].date_precision,
-      event: top.text,
-      channels: new Set(g.map((r) => r.channel_handle)).size,
-      firstSeen: g.map((r) => r.posted_at).sort()[0],
-    });
-  }
-  return out;
+  return groupEvents((data ?? []) as EventRow[]);
+}
+
+/** 앞으로의 줄에서 이미 지나간 같은 이야기를 뺀다 — 한 채널 줄의 종목만 지난 일정을 묻는다. */
+async function withoutHappened<T extends Omit<UpcomingEvent, "name" | "market">>(future: T[], from: string): Promise<T[]> {
+  const single = [...new Set(future.filter((e) => e.channels < 2).map((e) => e.code))];
+  return dropAlreadyHappened(future, await recentPast(single, from));
 }
 
 async function attachNames<T extends { code: string }>(items: T[]): Promise<(T & { name: string; market: string | null })[]> {
@@ -431,7 +466,7 @@ export const getUpcomingEvents = cache(async (days = 35, limit = 400): Promise<M
     console.error("[getUpcomingEvents] 일정을 못 읽었습니다", error);
     return LOAD_FAILED;
   }
-  const grouped = groupEvents((data ?? []) as EventRow[]);
+  const grouped = await withoutHappened(groupEvents((data ?? []) as EventRow[]), from);
   grouped.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.channels - a.channels));
   // ⚠️ 한 날짜가 카드를 독차지하지 않게 날짜당 몇 줄로 자른다. 공시 알림 채널이 "추가상장·
   //    변경상장" 을 같은 날에 열 건씩 올리는데(2026-09-07 실측 12건), 그대로 두면 열두 줄이
@@ -450,11 +485,12 @@ export const getUpcomingEvents = cache(async (days = 35, limit = 400): Promise<M
 /**
  * 종목 화면용 — 아직 안 끝난 일정 전부(정밀도 무관), 먼저 끝나는 것부터. 없으면 빈 배열(정상).
  *
- * ⚠️ 달·분기·해 단위는 기간 **첫날**로 적혀 있어 `event_date >= 오늘` 로 거르면 이미 시작된
+ * ⚠️ 달·분기·해 단위는 기간 안의 한 날(대개 첫날, 가끔 15일 · 말일 — 2026-10-04 실측)로 적혀 있어 `event_date >= 오늘` 로 거르면 이미 시작된
  *    "9월 중"·"3분기"·올해 "2026년"이 다 빠진다. 올해 1월 1일부터 읽고 기간의 끝으로 거른다
  *    (lib/event-period.ts). day 는 예전처럼 오늘부터다.
  */
-export async function getStockEvents(code: string, limit = 8): Promise<UpcomingEvent[]> {
+/** 종목 화면용 — 아직 안 끝난 일정 앞 limit 건과, 자르기 전 전부의 수(머리의 '앞으로 N건'). */
+export async function getStockEvents(code: string, limit = 8): Promise<{ items: UpcomingEvent[]; total: number }> {
   const db = getSupabaseAdmin();
   const from = todayKst();
   const { data, error } = await db
@@ -466,11 +502,12 @@ export async function getStockEvents(code: string, limit = 8): Promise<UpcomingE
     .limit(500);
   if (error) {
     console.error(`[getStockEvents] ${code} 일정을 못 읽었습니다`, error);
-    return [];
+    return { items: [], total: 0 };
   }
-  const grouped = groupEvents((data ?? []) as EventRow[]).filter((e) => stillAhead(e, from));
+  const grouped = await withoutHappened(groupEvents((data ?? []) as EventRow[]).filter((e) => stillAhead(e, from)), from);
   grouped.sort(byPeriodEnd);
-  return attachNames(grouped.slice(0, limit));
+  // 자르기 전 수 — 자른 길이를 적으면 삼성전자(10건)가 늘 '앞으로 8건'이었다(2026-10-04 점검).
+  return { items: await attachNames(grouped.slice(0, limit)), total: grouped.length };
 }
 
 /**
@@ -492,7 +529,7 @@ export async function getEventsForCodes(codes: string[], limit = 12): Promise<Up
     console.error(`[getEventsForCodes] 일정을 못 읽었습니다`, error);
     return [];
   }
-  const grouped = groupEvents((data ?? []) as EventRow[]).filter((e) => stillAhead(e, from));
+  const grouped = await withoutHappened(groupEvents((data ?? []) as EventRow[]).filter((e) => stillAhead(e, from)), from);
   grouped.sort(byPeriodEnd);
   return attachNames(grouped.slice(0, limit));
 }
@@ -506,15 +543,18 @@ const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 export function eventDateLabel(e: { date: string; precision: DatePrecision }): string {
   const [y, m, d] = e.date.split("-").map(Number);
   const thisYear = Number(todayKst().slice(0, 4));
-  const yearPrefix = y !== thisYear ? `${y}년 ` : "";
+  // 다른 해는 두 자리('27년') — '2027년 1월 중' 알약 하나가 알약 칸을 91px 로 넓혀 짧은 알약 줄은 글 앞이 40px 남짓 비었다(2026-10-05 점검).
+  const yearPrefix = y !== thisYear ? `${String(y).slice(2)}년 ` : "";
   if (e.precision === "day") {
     const wd = WEEKDAY[new Date(`${e.date}T00:00:00Z`).getUTCDay()];
-    return `${yearPrefix}${m}월 ${d}일 (${wd})`;
+    return `${yearPrefix}${m}월 ${d}일(${wd})`;
   }
-  if (e.precision === "month") return `${yearPrefix}${m}월 중`;
+  // '중'은 뗀다 — 날짜 알약(10/7(수))과 나란히 서면 '10월'만으로 달 단위가 읽힌다.
+  if (e.precision === "month") return `${yearPrefix}${m}월`;
   if (e.precision === "quarter") return `${yearPrefix}${Math.ceil(m / 3)}분기`;
   if (e.precision === "half") return `${yearPrefix}${m <= 6 ? "상반기" : "하반기"}`;
-  return `${y}년`;
+  // 해 단위도 두 자리('26년') — '2026년'과 '27년 1월'이 한 목록에 섞였다(2026-10-05 점검).
+  return `${String(y).slice(2)}년`;
 }
 
 /** 오늘로부터 며칠 뒤인가("오늘" · "내일" · "3일 뒤"). 달력 줄의 보조 글자. */

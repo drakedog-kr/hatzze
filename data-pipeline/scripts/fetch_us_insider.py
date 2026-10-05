@@ -270,6 +270,11 @@ def parse_filing(doc: str, ticker: str, cik: int, acc: str, filed: dt.date, path
         # 클래스가 나뉜 종목은 우리 표기로 되돌린다(BRK.B → BRK). 안 되돌리면 아래
         # our_tickers 걸러내기에서 조용히 버려진다(OURS_BY_SEC 주석).
         ticker = OURS_BY_SEC.get(sym, sym)
+    elif issuer_cik and int(issuer_cik) != cik:
+        # ⛔ 심볼이 없는데 발행사가 폴더 CIK 와 다르면 **다른 회사(대개 비상장 펀드)** 의 신고다 — 짐작한 티커로 담으면
+        #    블랙스톤 계열이 자기 사모펀드(Blackstone Private Real Estate Credit & Income Fund, 단가 $26)를 산 신고가
+        #    'BX 임원 장내 매수'로 섰다(2026-10-04 점검, 6행). 버린다.
+        return []
     if issuer_cik:
         cik = int(issuer_cik)
     owner_block = re.search(r"<reportingOwner>(.*?)</reportingOwner>", doc, re.S)

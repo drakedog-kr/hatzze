@@ -52,6 +52,15 @@ describe("stockPosition", () => {
     assert.equal(p.value, 1800);
   });
 
+  it("0.5% 미만으로 흔들린 곳은 유지다 — 줄 글자 · 차트 표식 · 본 화면 셈이 같은 판정을 쓴다", () => {
+    const p = stockPosition([row("TSM", Q1, 336785, 1000), row("TSM", Q2, 335149, 1000)], [Q1, Q2]);
+    assert.ok(p);
+    assert.equal(p.move, "hold");
+    assert.ok(p.sharesChange! < 0);
+    const rows = [{ cik: 1, ...row("TSM", Q1, 336785, 1000) }, { cik: 1, ...row("TSM", Q2, 335149, 1000) }];
+    assert.equal(quarterMarks(rows, filedQuarters(rows)).length, 0);
+  });
+
   it("직전 분기를 아예 안 낸 곳만 비교 불가(null)다", () => {
     const p = stockPosition([row("XYZ", Q2, 100, 1000)], [Q2]);
     assert.ok(p);

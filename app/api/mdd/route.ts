@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { analyzeDrawdown, drawdownSeries, riskProfile, type Bar } from "@/lib/mdd";
+import { LADDER_ROWS, analyzeDrawdown, drawdownNow, drawdownOnDates, drawdownSeries, moveBetween, priceLadder, riskProfile, type Bar } from "@/lib/mdd";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { MDD_PEER_MAX, themesForName, THEMES } from "@/lib/stock-themes";
 import { US_MDD_PEER_MAX, US_THEMES, themesForTicker } from "@/lib/us-stock-themes";
+import { THEME_SLUGS, US_THEME_SLUGS, themeHref, usThemeHref } from "@/lib/theme-href";
 import { fetchDailyHistory, yahooSymbol } from "@/lib/yahoo-history";
 
 import { normalizeYears } from "../../mdd/shared";
@@ -34,8 +35,9 @@ const KOSDAQ = "^KQ11";
  */
 const SP500 = "^GSPC";
 
-type Peer = { name: string; code: string; dd: number; isSelf: boolean };
-type Theme = { name: string; peers: Peer[]; avgDd: number; sincePeakAvg: number | null };
+type Peer = { name: string; code: string; market: string | null; dd: number; isSelf: boolean };
+/** href 는 그 테마 리포트 주소(/theme/… · /theme/us/…) — 리포트가 없는 테마면 null. 첫 줄 띠의 링크 칸이 쓴다. */
+type Theme = { name: string; peers: Peer[]; avgDd: number; sincePeakAvg: number | null; href: string | null };
 /**
  * 테마 비교의 결과와 **얼마나 받아 왔나**. requested 는 조회를 건 대표 종목 수, ok 는 시세를 받은 수다.
  * 사전에 없는 종목이면 requested 0(부분 실패가 아니다). lookupFailed 는 대표 종목 명단 조회 자체가 깨진 것이다.
@@ -62,12 +64,26 @@ export async function GET(request: Request) {
   }
 
   const symbol = yahooSymbol(code, market);
-  const bars = await fetchDailyHistory(symbol, years);
+  const bars = await fetchDailyHistory(symbol, years, { volume: true });
   const analysis = bars ? analyzeDrawdown(bars) : null;
   if (!bars || !analysis) {
+    // 표에 없는 코드(잘못 친 · 상장폐지)와 일시 실패를 가른다 — 같은 문구 · 빨간 아이콘이라 없는 코드도 '고장'으로 읽혔다(2026-10-04 점검).
+    let known = true;
+    try {
+      const { data } = await getSupabaseServer()
+        .from(isUs ? "us_stocks" : "stocks")
+        .select(isUs ? "ticker" : "code")
+        .eq(isUs ? "ticker" : "code", code)
+        .maybeSingle();
+      known = !!data;
+    } catch {
+      // 표 조회가 깨졌으면 일시 실패로 둔다.
+    }
     return NextResponse.json(
-      { ok: false, error: "이 종목의 과거 시세를 불러오지 못했습니다." },
-      { status: 502 },
+      known
+        ? { ok: false, error: "이 종목의 과거 시세를 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오." }
+        : { ok: false, missing: true, error: "찾을 수 없는 종목 코드입니다. 위 검색창에서 종목 이름으로 찾아 보십시오." },
+      { status: known ? 502 : 404 },
     );
   }
 
@@ -75,8 +91,7 @@ export async function GET(request: Request) {
   const atHigh = analysis.currentDd > -1;
   const athDate = analysis.athDate;
 
-  // 시장 지수는 항상 받는다 — 원인 분해(고점 이후)뿐 아니라 리스크 프로필의 '시장 동반성'도
-  // 지수 시계열이 필요하기 때문이다.
+  // 시장 지수는 항상 받는다 — 원인 분해(고점 이후)와 역대 하락 사례의 '같은 기간 시장' 칸이 지수 시계열을 쓴다.
   // 시장 기준은 상장 시장을 따른다 — 코스피 · 코스닥(2026-09-30) · 미국은 S&P500. 엔비디아 낙폭을 코스피와,
   // 알테오젠 낙폭을 코스피와 견주는 건 뜻이 없다.
   //
@@ -85,12 +100,29 @@ export async function GET(request: Request) {
     fetchDailyHistory(isUs ? SP500 : market === "KOSDAQ" ? KOSDAQ : KOSPI, years),
     isUs
       ? buildUsThemeComparison(code, years, analysis.currentDd, athDate)
-      : buildThemeComparison(name, market, years, analysis.currentDd, athDate),
+      : buildThemeComparison(name, code, market, years, analysis.currentDd, athDate),
   ]);
+  // 역대 하락 사례마다 같은 기간(고점→저점) 시장 등락 — 사례 표의 '시장' 칸(lib/mdd.ts Episode.market).
+  if (marketBars) {
+    analysis.topDrawdowns = analysis.topDrawdowns.map((e) => ({ ...e, market: moveBetween(marketBars, e.peakDate, e.troughDate) }));
+  }
   const theme = themeFetch.theme;
+  // 지수 고점도 **종목 첫 날부터** 센다 — 종목 낙폭과 같은 출발점에 서야 같은 기간을 견준다. 상장이 짧은 종목 · '전체' 기간에서
+  // 지수만 그 전 고점부터 세어 물속 차트의 시장 선이 −24% 에서 출발했다(LG씨엔에스, 2026-10-05 머지 전 점검).
+  const marketSpan = marketBars && bars.length ? marketBars.filter((b) => b.date >= bars[0].date) : null;
+  // 같은 기간 기준 지수의 지금 낙폭 — 첫 줄 띠의 시장 칸('최근 10년 고점 대비 코스피 −23.2%').
+  const bench = marketSpan?.length ? drawdownNow(marketSpan) : null;
+  // 물속 차트의 '시장과 함께' 선 — 종목 물속 점과 같은 날짜로 맞춘 지수 낙폭(250개 남짓).
+  const benchUnderwater = marketSpan?.length ? drawdownOnDates(marketSpan, analysis.underwater.map((p) => p.date)) : null;
 
-  // 리스크 프로필(보상·큰 하락 빈도·시장 동반성) — 종목·코스피 종가로 요약.
-  const risk = riskProfile(bars, marketBars);
+  // 해마다 수익 · 낙폭과 복리 연평균(화면 '해마다' 모듈) — 종목 종가로 요약.
+  // ⏳ 옛 화면 받침 — v2 배포 순간 열려 있던 옛 /mdd 탭은 이 API 를 직접 부르고 risk.events.slice · bigDropCount 를 읽는다
+  //    (origin/main app/mdd/RiskProfile.tsx). 새 risk 엔 그 칸이 없어 TypeError 로 오류 화면이 떴다(2026-10-04 머지 전 점검).
+  //    빈 값으로 한동안 함께 실어 보낸다 — v2 화면은 이 칸을 안 읽는다. 다음 판에서 걷는다.
+  const riskCore = riskProfile(bars);
+  const risk = riskCore ? { ...riskCore, events: [], bigDropCount: 0, withMarket: null, dropDaysMedian: null, recoverDaysMedian: null } : riskCore;
+  // 최근 1년 가격대별 거래대금('수익 · 손실 비율' 칸).
+  const ladder = priceLadder(bars, LADDER_ROWS);
 
   // 원인 분해 — 이 종목의 고점 이후, 같은 기간 시장·테마는 얼마나 움직였나.
   // stock 은 곧 currentDd(고점 이후 수익률과 같다). 시장·테마와 나란히 놓아
@@ -104,6 +136,17 @@ export async function GET(request: Request) {
           market: marketSincePeak,
           theme: theme?.sincePeakAvg ?? null,
         }
+      : null;
+
+  // 고점 부근이면 원인을 나눌 하락이 없다 — 대신 최근 1년을 시장과 견준다('시장 탓' 칸 자리). 빈 판이던 자리다(2026-10-04 점검).
+  const yearAgo = new Date(Date.parse(`${analysis.asOf}T00:00:00Z`) - 365 * 86_400_000).toISOString().slice(0, 10);
+  const yearCmp =
+    atHigh && marketBars
+      ? (() => {
+          const stock = returnSince(bars, yearAgo);
+          const mk = returnSince(marketBars, yearAgo);
+          return stock !== null && mk !== null ? { stock, market: mk } : null;
+        })()
       : null;
 
   /**
@@ -122,7 +165,7 @@ export async function GET(request: Request) {
       : null;
 
   return NextResponse.json(
-    { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, theme, risk, partial },
+    { ok: true, code, name, market, symbol, years: yearsKey, analysis, attribution, yearCmp, theme, risk, partial, bench, benchUnderwater, ladder },
     {
       headers: {
         "Cache-Control": partial
@@ -184,8 +227,8 @@ async function buildUsThemeComparison(
 
   const ok = fetched.filter((p): p is NonNullable<typeof p> => p !== null);
   const counts = { requested: peerTickers.length, ok: ok.length, lookupFailed: false };
-  const peers: Peer[] = ok.map((p) => ({ name: p.name, code: p.code, dd: p.dd, isSelf: false }));
-  peers.push({ name: nameOf.get(ticker) ?? ticker, code: "", dd: selfDd, isSelf: true });
+  const peers: Peer[] = ok.map((p) => ({ name: p.name, code: p.code, market: "US", dd: p.dd, isSelf: false }));
+  peers.push({ name: nameOf.get(ticker) ?? ticker, code: ticker, market: "US", dd: selfDd, isSelf: true });
   peers.sort((a, b) => a.dd - b.dd); // 깊게 빠진 순
   if (peers.length < 2) return { theme: null, ...counts };
 
@@ -193,7 +236,7 @@ async function buildUsThemeComparison(
   const sinceVals = ok.map((p) => p.sincePeak).filter((v): v is number => v !== null);
   const sincePeakAvg = sinceVals.length ? sinceVals.reduce((s, v) => s + v, 0) / sinceVals.length : null;
 
-  return { theme: { name: themeName, peers, avgDd, sincePeakAvg }, ...counts };
+  return { theme: { name: themeName, peers, avgDd, sincePeakAvg, href: US_THEME_SLUGS[themeName] ? usThemeHref(themeName) : null }, ...counts };
 }
 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
@@ -220,6 +263,7 @@ function returnSince(bars: Bar[], date: string, toleranceDays = 14): number | nu
  */
 async function buildThemeComparison(
   name: string,
+  selfCode: string,
   market: string | null,
   years: number,
   selfDd: number,
@@ -256,14 +300,14 @@ async function buildThemeComparison(
       const bars = await fetchDailyHistory(yahooSymbol(m.code, m.market), years);
       if (!bars) return null;
       const ds = drawdownSeries(bars);
-      return { name: m.name, code: m.code, dd: ds[ds.length - 1].dd, sincePeak: returnSince(bars, athDate) };
+      return { name: m.name, code: m.code, market: m.market, dd: ds[ds.length - 1].dd, sincePeak: returnSince(bars, athDate) };
     }),
   );
 
   const ok = fetched.filter((p): p is NonNullable<typeof p> => p !== null);
   const counts = { requested: members.length, ok: ok.length, lookupFailed };
-  const peers: Peer[] = ok.map((p) => ({ name: p.name, code: p.code, dd: p.dd, isSelf: false }));
-  peers.push({ name, code: "", dd: selfDd, isSelf: true });
+  const peers: Peer[] = ok.map((p) => ({ name: p.name, code: p.code, market: p.market, dd: p.dd, isSelf: false }));
+  peers.push({ name, code: selfCode, market, dd: selfDd, isSelf: true });
   peers.sort((a, b) => a.dd - b.dd); // 깊게 빠진 순
 
   // 자기 종목만 남으면(피어를 하나도 못 받음) 비교의 의미가 없다.
@@ -273,5 +317,5 @@ async function buildThemeComparison(
   const sinceVals = ok.map((p) => p.sincePeak).filter((v): v is number => v !== null);
   const sincePeakAvg = sinceVals.length ? sinceVals.reduce((s, v) => s + v, 0) / sinceVals.length : null;
 
-  return { theme: { name: themeName, peers, avgDd, sincePeakAvg }, ...counts };
+  return { theme: { name: themeName, peers, avgDd, sincePeakAvg, href: THEME_SLUGS[themeName] ? themeHref(themeName) : null }, ...counts };
 }

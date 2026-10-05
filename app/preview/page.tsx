@@ -1,87 +1,73 @@
 import type { Metadata } from "next";
-import { assertLoaded } from "@/lib/load-state";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getOvernightLive, type OvernightRow } from "@/lib/kr-overnight";
+import { getKrIndexClosesSide } from "@/lib/data";
+import { formatKstSnappedShort, formatKstUpdateSnapped } from "@/lib/format";
+import { getOvernightLive, type OvernightData, type OvernightRow } from "@/lib/kr-overnight";
 import { getPreview, sessionWord, type PreviewLink, type PreviewMover } from "@/lib/kr-preview";
+import { assertLoaded, isLoadFailed } from "@/lib/load-state";
+import { stockHref } from "@/lib/stock-page";
 
-import { SectionIntro } from "../SectionIntro";
-import { SectionHead } from "../kadera/SectionHead";
+import { loadPreviewCoverChips } from "../kadera/cover-chips";
+import { CoverIndexCell, CoverLinkCell, CoverMeta, Module } from "../kadera/V2Modules";
+import { KOSPI_AFTER } from "../kr-preview-table";
 import { PREVIEW_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { PREVIEW_PUBLIC } from "../screen-flags";
 import { StockLogo } from "../StockLogo";
-import { KOSPI_AFTER } from "../kr-preview-table";
-import { C, Icon, MONO } from "../ui";
-import { formatKstUpdateSnapped } from "@/lib/format";
 
 /**
  * 국장 미리보기 — 간밤 미장에서 크게 움직인 종목이 오늘 아침 국내 어디와 엮이는지.
  *
- * 재료는 `data-pipeline/config/us_kr_pairs.py`(관계 153쌍 · 5년 실측)이고, 계산은 전부
+ * 재료는 `data-pipeline/config/us_kr_pairs.py`(관계 158쌍 · 5년 실측)이고, 계산은 전부
  * 파이프라인이 개장 전에 끝내 표에 넣는다. 여기서는 그리기만 한다.
+ *
+ * ## v2(2026-10-03) — 카더라 · 시장 브리핑 · 테마 판세와 같은 규칙
+ *
+ * 첫 줄 띠(지수 종가 · 국장 · 미장 급부상 링크 칸 · 업데이트) → 둘째 줄 [밤사이 뉴욕 | 해외에서 거래 중인 값 | 오늘의 브리핑]
+ * → 엮인 국장 종목 표(판 폭). 페이지 제목 · 구간 제목('01 미장의 여파') · 시트 부제 · 각주는 걷었다(v2 는 모듈 머리 띠가 이름을 말한다).
+ *   · 해외 값을 맨 아래에서 둘째 줄로 올렸다 — 그날 개장 갭과 상관 0.94~0.97 이라 개장 전에 가장 쓸모 있는 값인데 1,440 에서 1,900px 아래였다.
+ *   · '밤사이 가장 크게 움직인 곳' 네 줄은 걷었다 — 아래 표가 같은 순서(평소 폭 대비 큰 순)라 표 첫 네 묶음과 같은 말이었다.
+ *   · 미장 종목 타일 2열(카드 다섯 장)은 표 하나로 — 종목 수가 1~7 로 달라 짝 타일 바닥이 305px 비었고, 국장 종목끼리 열이 안 맞았다.
+ *   · 브리핑 첫 문단("…최근 5년치로 세어 보여 드립니다")은 화면 설명이라 걷고, 나머지 셋은 시장 브리핑처럼 이름표 줄로.
  *
  * ## 이 화면이 파는 것은 예보가 아니라 해설이다
  *
  * ⚠️⚠️ **효과는 거의 다 개장 갭에서 끝난다.** 사용자가 09:00 에 무엇을 하려는 순간 이미
- * 지나간 일이다. 숨기면 며칠 안에 들통나고, 먼저 밝히면 카드가 정직해진다.
- * ⚠️ 이 화면 안에는 '매수·매도 신호가 아니다' 라는 고지가 **없다**. 히어로 브리핑 끝 줄과
- * 시트 각주가 차례로 그 말을 하고 있었는데 2026-09-03 에 둘 다 다른 말로 바뀌었다. 지금은
- * 전역 푸터가 모든 화면에서 그 고지를 한다. 화면 안에 다시 넣기로 한다면 카더라처럼 각주
- * 끝에 "· 매수·매도 신호가 아닙니다" 를 붙이는 형태다.
+ * 지나간 일이다. 그래서 '장 중' 숫자를 늘 함께 낸다 — 그 숫자가 0 언저리인 것이 이 화면이 예보가
+ * 아니라는 증거다(밤사이 뉴욕 모듈 · 표의 장 중 칸). ⛔ 장 중 칸을 빼지 말 것.
+ * ⚠️ 이 화면 안에는 '매수·매도 신호가 아니다' 라는 고지가 **없다**. 투자 유의사항(/disclaimer, 모든
+ * 화면의 푸터가 가리킨다)이 그 고지를 한다.
  *
- * ⚠️ 여기 **"장중 기여가 정확히 0"** 이라고 적혀 있었는데 그건 적중률로만 본 값이라
- * 틀렸다(2026-09-03 재측정). 크기로 재면 대조군을 뺀 순수 몫이 개장 +0.548% · 장중
- * +0.178% 로 **장중이 24.5%** 다. 그래서 화면 문구는 "대부분 개장 순간에 끝납니다" 이지
- * "개장에서 끝납니다" 가 아니다 — 그 "대부분" 을 지우지 말 것.
+ * ⚠️ 크기로 재면 대조군을 뺀 순수 몫이 개장 +0.548% · 장중 +0.178% 로 **장중이 24.5%** 다(2026-09-03
+ * 재측정). 화면에 "개장에서 끝납니다" 라고 단정해 적지 말 것 — "대부분" 이다.
  *
  * ⚠️ **적중률로 말하지 않는다.** 2026 년에 세 분기 연속 적중률이 55%·52%·60% 로 떨어진
  * 적이 있는데, 신호 크기는 오히려 커졌고(+2.15% → +3.38%) 코스피 개장 폭이 0.9% → 2.3%
  * 로 뛴 게 원인이었다. 잡음이 오르면 적중률만 무너진다. 크기와 횟수로 말하면 그 국면에서도
  * 안 깨진다.
  *
- * ⚠️ **"코스피보다" 를 지우지 말 것.** 원본 상관은 51,626쌍 중 98.3% 가 양수다 — 지수 몫을
- * 안 빼면 모든 카드가 같은 날 다 맞고 같은 날 다 틀린다. 그건 종목 카드가 아니라 지수 카드다.
+ * ⚠️ 원본 상관은 51,626쌍 중 98.3% 가 양수다 — 쌍은 지수 몫을 빼고 골랐다. 그래서 밤사이 뉴욕 모듈의
+ * 코스피 세 줄(같은 구간 평균)이 표 숫자의 기준선 노릇을 한다. ⛔ 그 세 줄을 지우지 말 것.
  *
  * ⚠️⚠️ **화면 글자는 "밤사이" 다. "간밤"·"어젯밤" 으로 되돌리지 말 것.** 두 번 고친 자리다
  * (2026-09-03).
- *
- *   · "간밤" 은 증권가 기사에서 흔하지만 "살면서 몇 번 못 봤다" 는 지적을 받았다. 아는
- *     사람에게 자연스러운 말과 처음 보는 사람에게 읽히는 말은 다르고, 여기는 뒤쪽을 고른다.
+ *   · "간밤" 은 증권가 기사에서 흔하지만 "살면서 몇 번 못 봤다" 는 지적을 받았다.
  *   · "어젯밤" 은 **틀린 말이었다.** 미장은 한국 시각 22:30(겨울 23:30)에 열려 **05:00
  *     (겨울 06:00)에 닫는다** — 화면이 내는 종가는 어젯밤이 아니라 **오늘 새벽** 것이다.
- *   · "밤사이" 는 '밤이 지나는 동안' 이라 새벽까지 덮고(일기예보에서 매일 쓰는 말이라
- *     낯설지도 않다), 명사라서 "밤사이 뉴욕"·"밤사이 S&P 500" 처럼 이름 앞에도 선다.
- *     열 자리 중 여섯이 그 자리라 이 조건이 결정적이었다("밤새" 는 그 자리에서 어색하다).
- *
- * **주석과 DB 코멘트의 '간밤' 은 그대로 둔다** — 거기는 코드 안 말이라 바꿀 이유가 없고,
- * 화면 글자만 한 낱말로 맞춰 두면 다음에 고칠 자리도 분명해진다.
- *
- * ## 배치는 시장 브리핑과 같은 뼈대다
- *
- * 히어로 판(`.hz-hero-panel`) + 구간 배지 + 섹터 카드 벽. 히어로는 시장 브리핑이 쓰는
- * 그 판을 그대로 쓴다 — 1fr·1fr·2fr 격자라 넓은 화면은 한 줄, 1399 아래에서는 브리핑이
- * 아랫줄을 통째로 쓰는 **두 줄**이 된다.
- *
- * ⚠️ 카더라식 `hz-kd-hero`(q·q·h)로 되돌리지 말 것. 그건 셋이 늘 한 줄에 서서 오늘의
- * 브리핑이 25%~50% 폭에 갇힌다. 이 화면의 요지는 문장 쪽이라 아랫줄을 다 줘야 한다.
- *
- * ⚠️ 섹터 카드에 설명을 달지 말 것. 처음엔 머리마다 "국내 종목을 짚으면…" 을 넣었는데,
- * 섹터가 열한 개라 **같은 문장이 열한 번** 나왔다. 그 안내는 카드 벽 위에 한 번만 둔다.
+ *   · "밤사이" 는 새벽까지 덮고, 명사라서 "밤사이 뉴욕" 처럼 이름 앞에도 선다.
+ * 주말 · 연휴 뒤에는 그 자리가 "금요일" · "연휴 동안" 이 된다(sessionWord).
+ * **주석과 DB 코멘트의 '간밤' 은 그대로 둔다** — 거기는 코드 안 말이다.
  */
 
 /**
- * ⛔ **아직 안 연 화면이다.** 스위치는 `app/screen-flags.ts` 한 곳에 있다 — 푸터의
- * '바로가기' 목록도 같은 값을 읽으므로, 여는 날 고칠 곳이 흩어지지 않는다.
- * 여는 절차와 왜 그렇게 모았는지는 그 파일 머리말에 있다.
- */
-/**
  * 화면 사본(ISR)의 수명. 루트 기본값(1시간)보다 짧은 건 밤사이 시세가 10분마다 새로 오기
- * 때문이다(lib/kr-overnight.ts REVALIDATE_SEC). 페이지가 194KB 라 10분마다 새로 적어도
- * 하루 $0.02 안팎이다(2026-09-19 셈). ⚠️ 리터럴이어야 한다.
+ * 때문이다(lib/kr-overnight.ts REVALIDATE_SEC). ⚠️ 리터럴이어야 한다.
  */
 export const revalidate = 600;
 
+/** ⛔ 여는 스위치는 `app/screen-flags.ts` 한 곳이다(2026-09-04 열림). */
 const PUBLIC = PREVIEW_PUBLIC;
 
 /** 배포된 곳인가. Vercel 에서만 `VERCEL_ENV` 가 있고 로컬에는 없다 — 그래서 로컬에서는
@@ -89,11 +75,8 @@ const PUBLIC = PREVIEW_PUBLIC;
 const DEPLOYED = Boolean(process.env.VERCEL_ENV);
 
 export async function generateMetadata(): Promise<Metadata> {
-  // ⚠️ **await 를 빼지 말 것.** 다른 화면은 `return pageMetadata(...)` 로 프라미스를 그대로
-  // 돌려주지만 여기는 robots 를 얹으려고 펼친다 — 안 기다린 프라미스를 펼치면 자기 속성이
-  // 없어 **빈 객체**가 되고, 제목·설명·canonical 이 통째로 루트 것으로 떨어진다.
-  // 타입은 통과한다(Metadata 의 필드가 다 선택이라 `{}` 도 맞는 값이다). 2026-09-03 에
-  // 실제로 그 상태였고, robots 만 붙어 있어서 겉으로는 멀쩡해 보였다.
+  // ⚠️ **await 를 빼지 말 것.** 여기는 robots 를 얹으려고 펼친다 — 안 기다린 프라미스를 펼치면
+  // 빈 객체가 되고, 제목·설명·canonical 이 통째로 루트 것으로 떨어진다(2026-09-03 실제로 그랬다).
   const meta = await pageMetadata({
     title: "국장 미리보기 | hatzze",
     description:
@@ -101,22 +84,14 @@ export async function generateMetadata(): Promise<Metadata> {
     path: "/preview",
     ownImage: PREVIEW_CARD.alt,
   });
-  // 안 연 동안은 색인도 막는다. 아래에서 404 를 내므로 사실상 덤이지만, 사이드바에
-  // 링크가 있던 동안 크롤러가 주소를 이미 봤을 수 있다.
   return PUBLIC ? meta : { ...meta, robots: { index: false, follow: false } };
 }
 
-const HOT = "var(--c-hot-ink)";
-const COLD = "var(--c-cold-ink)";
-
-// 초과분(gap)은 이제 화면에 안 낸다 — 쌍을 고르고 검증하는 기준으로만 쓴다.
-
 /**
- * 종목 이름 뒤에 붙일 **조사만** 돌려준다(이름 자체는 <strong> 안에 따로 그린다).
- *
- * 브리핑 문장이 이름을 그대로 끼워 넣는데, 이름은 매일 바뀐다. 고정 문구로 두면
- * "엔비디아은" 같은 게 나온다. 한글이 아닌 이름(ASML·KT&G)은 받침 있는 쪽으로 보낸다 —
- * 자음으로 끝나는 약어가 대부분이라 그편이 덜 틀린다.
+ * 종목 이름 뒤에 붙일 **조사만** 돌려준다. 이름은 매일 바뀌어 고정 문구면 "엔비디아은" 이 나온다.
+ * 한글이 아닌 이름(ASML·KT&G)은 받침 있는 쪽으로 보낸다 — 자음으로 끝나는 약어가 대부분이다.
+ * ⚠️ "으로 / 로" 에는 쓰지 말 것 — ㄹ 받침은 "로" 다(아래 euro). 2026-10-03 까지 브리핑이
+ *    이걸로 "웨스턴디지털으로" 를 냈다.
  */
 function josa(word: string, withJong: string, withoutJong: string): string {
   const last = word.trim().slice(-1).charCodeAt(0);
@@ -126,16 +101,8 @@ function josa(word: string, withJong: string, withoutJong: string): string {
 }
 
 /**
- * "으로 / 로" 만 따로 본다. **위 josa() 로는 못 낸다** — 받침이 있어도 그게 ㄹ 이면 "로" 라서
- * 받침 유무 두 갈래로 갈리지 않는다.
- *
- * 브리핑이 관계 이름(`why`)에 이걸 붙이는데, 사전의 102가지 중 넷이 ㄹ 로 끝난다
- * ("석화 사이클"·"카메라 모듈"·"태양광 모듈"·"화장품 수출"). josa() 를 그대로 쓰면
- * "카메라 모듈으로" 가 된다. 그래서 예전엔 화면에 "(으)로" 라고 두 벌을 다 적어 뒀는데,
- * 그건 채우다 만 자리로 읽힌다(2026-09-03).
- *
- * ⚠️ 한글이 아닌 이름은 **"로"** 로 보낸다. josa() 는 받침 있는 쪽으로 보내지만 여기서는
- * 반대다 — 사전의 ADC·FPCB·SMR·RNA 는 소리내면 씨·비·알·에이로 끝나 넷 다 "로" 다.
+ * "으로 / 로". 받침이 없거나 ㄹ 이면 "로"("카메라 모듈로" · "웨스턴디지털로").
+ * ⚠️ 한글이 아닌 이름은 **"로"** — 사전의 ADC·FPCB·SMR·RNA 는 소리내면 씨·비·알·에이로 끝난다.
  */
 function euro(word: string): string {
   const last = word.trim().slice(-1).charCodeAt(0);
@@ -144,45 +111,26 @@ function euro(word: string): string {
   return jong === 0 || jong === 8 ? "로" : "으로";
 }
 
-
-/* ── 히어로 조각 ─────────────────────────────────────────────────────────── */
-
-/** 히어로 셀의 머리. 시장 브리핑의 셀 머리와 같은 크기·굵기다. */
-function CellHead({ title, note }: { title: string; note?: string }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-      <h2 style={{ margin: 0, fontSize: "var(--fs-14)", fontWeight: 700, letterSpacing: "-.01em", color: C.ink }}>{title}</h2>
-      {note && <span style={{ fontSize: "var(--fs-11-5)", color: C.muted, whiteSpace: "nowrap" }}>{note}</span>}
-    </div>
-  );
-}
-
-/* ── 종목 타일 ───────────────────────────────────────────────────────────── */
-
 const PCT = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
+const tone = (n: number | null | undefined) => (n == null || n === 0 ? "" : n > 0 ? " is-up" : " is-down");
 
 /**
  * 미장 세션 날짜를 "9/4(금)" 으로. 미장이 쉰 날 '마지막 거래일' 에만 쓴다.
- * ⚠️ 이 날짜는 **미 동부 달력의 날**(YYYY-MM-DD)이라 시각이 없다. `new Date(iso)` 를 KST 로
- *    옮기지 말 것 — 그 자리에서 요일을 뽑아야 하루가 안 밀린다(UTC 자정으로 읽고 UTC 요일).
+ * ⚠️ 이 날짜는 **미 동부 달력의 날**이라 시각이 없다. KST 로 옮기지 말 것 — UTC 자정으로 읽고 UTC 요일.
  */
 const sessionDay = (iso: string) =>
   `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}(${"일월화수목금토"[new Date(`${iso}T00:00:00Z`).getUTCDay()]})`;
 
+/** "2026-10-02" → "10/2" */
+const md = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
+
 /**
  * 24시간 거래대금($). 백만 달러 단위로 적되 **1M 이 안 되는 마켓을 0M 으로 뭉개지 않는다.**
- *
- * ⚠️ 반올림 하나만 쓰면 얇은 마켓이 통째로 사라진다. 2026-09-06 현대차가 실제로
- *    $102,986(0.10M)였는데 화면에는 "$0M" 이라 떠 있었다 — 거래가 없었다는 뜻으로 읽힌다.
- *    세 마켓이 나란히 서는 자리라, 한 칸만 0 이면 그 종목이 안 도는 것처럼 보인다.
- * ⭐ 눈금을 세 단으로 나눈다. 1M 이상은 정수(자리가 많아 소수점이 군더더기다), 그 아래는
- *    소수점 한 자리, 0.1M 도 안 되면 숫자를 적지 않고 상한만 말한다 — "$0.0M" 은
- *    "$0M" 과 똑같이 없는 것처럼 읽히고, 자리를 더 늘리면 없는 정밀도를 꾸며 낸다.
- * ⚠️ 진짜 0(그날 한 건도 안 붙은 마켓)은 "$0M" 으로 둔다. 그 자리에 "<$0.1M" 을 적으면
- *    조금이라도 돌았다는 거짓이 된다.
+ * ⚠️ 2026-09-06 현대차가 실제로 $102,986(0.10M)였는데 "$0M" 이라 떠 거래가 없던 것처럼 읽혔다.
+ *    1M 이상은 정수, 그 아래는 소수 한 자리, 0.1M 도 안 되면 상한만("<$0.1M"). 진짜 0 은 "$0M".
  */
 const VOL = (v: number | null) => {
-  if (v == null) return "—";
+  if (v == null) return "없음";
   if (v <= 0) return "$0M";
   const m = v / 1e6;
   if (m >= 1) return `$${Math.round(m).toLocaleString("en-US")}M`;
@@ -190,43 +138,24 @@ const VOL = (v: number | null) => {
   return "<$0.1M";
 };
 
-/** 하이퍼리퀴드에 이 마켓들을 띄운 빌더의 이름. 저장된 심볼의 접두사(`xyz:SMSN`)이고,
- *  화면에서는 이 자리만 거래소 이름으로 바꿔 적는다. 주소에는 그대로 쓴다.
+/** 하이퍼리퀴드에 이 마켓들을 띄운 빌더의 이름. 저장된 심볼의 접두사(`xyz:SMSN`)이고 주소에는 그대로 쓴다.
  *  ⚠️ `data-pipeline/scripts/fetch_kr_overnight.py` 의 `DEX` 와 같은 값이다. */
 const HL_DEX = "xyz";
 
 /**
  * 이 화면의 자료가 **실제로 쓰이는 시각**(KST). `formatKstUpdateSnapped` 가 이 정각에 붙인다.
- * 다른 화면의 '최종 업데이트'는 2026-09-30 부터 30분 눈금(`formatKstUpdate`)이고, 이 화면만
- * 예전 방식 그대로다. 옛 공용 눈금 [9, 20] 은 잡이 **끝나는** 시각이라 이 화면에는 안 맞았다 —
- * 스텝이 79개인데 여기 쓰이는 둘은 앞쪽에 있다.
- *
- *   HERO_HOURS   종목 줄은 **맨 앞 스텝**이라 07시다. 옛 눈금에 대면 여유 2시간에 걸려
- *                "오전 9시" 로 붙어 두 시간을 앞당겨 거짓말한다(2026-09-04 실측: 34줄이 전부 7시).
- *   PERP_HOURS   하이퍼리퀴드는 **KRX 08:00 게이트 바로 뒤**라 아침 08시 · 저녁 18시다.
- *                (이 눈금은 실시간을 못 받아 담아 둔 값으로 물러선 날에만 쓰인다.)
- *
+ *   HERO_HOURS   종목 줄은 파이프라인 **맨 앞 스텝**이라 07시다(06:31 에 쓰여도 2시간 안이라 7시에 붙는다).
+ *   PERP_HOURS   하이퍼리퀴드는 **KRX 08:00 게이트 바로 뒤**라 아침 08시 · 저녁 18시다
+ *                (실시간을 못 받아 담아 둔 값으로 물러선 날에만 쓰인다).
  * ⚠️ 스텝 자리를 옮기면 이 값도 함께 옮길 것. 라벨은 조용히 틀린다.
- *    2026-09-23 발사를 30분 당겨 종목 줄이 06:31 에 쓰이지만 HERO_HOURS 는 [7] 로 둔다.
- *    6시대도 7시에서 2시간 안이라 "오전 7시 기준"으로 붙고, 미장 종가는 05~06시에 이미
- *    확정이라 06:31 과 07:00 사이에 이 줄의 값이 달라질 게 없다. PERP_HOURS 도 그대로다
- *    (게이트 뒤 아침 08:00~08:05 · 저녁 18:38~18:53 으로 8시·18시 창 안이다).
  */
 const HERO_HOURS = [7] as const;
 const PERP_HOURS = [8, 18] as const;
 
 /**
  * 살아 있는 값의 '시점' 표기 — "9/4 오전 2:40".
- *
- * ⚠️⚠️ **날짜를 ISO 문자열에서 잘라 쓰지 말 것.** `capturedAt` 은 UTC 라 한국 새벽에는
- * 하루 전 날짜가 나온다(02:40 KST = 전날 17:40Z). 이 카드가 제일 많이 읽히는 시간대가
- * 바로 그 새벽이라 그 실수는 매일 밤 틀린다.
- *
- * ⚠️ 시·분과 **같은 포매터**에서 뽑는다. 날짜와 시각을 따로 만들면 자정 언저리에서 둘이
- * 다른 날을 가리킬 수 있다(00:00 KST 는 전날 15:00Z 다).
- *
- * ⚠️ ko-KR 의 기본 `format()` 은 "9. 4. 오전 2:40" 처럼 점을 찍는다. 슬래시로 적으려고
- * 조각을 직접 잇는다 — 다른 화면의 짧은 날짜(shortDate)와 같은 모양이다.
+ * ⚠️⚠️ **날짜를 ISO 문자열에서 잘라 쓰지 말 것.** `capturedAt` 은 UTC 라 한국 새벽에는 하루 전 날짜가 나온다.
+ * ⚠️ 시·분과 **같은 포매터**에서 뽑는다 — 따로 만들면 자정 언저리에서 둘이 다른 날을 가리킨다.
  */
 const STAMP_FMT = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
@@ -242,749 +171,384 @@ function kstStamp(iso: string): string {
   return `${get("month")}/${get("day")} ${get("dayPeriod")} ${get("hour")}:${get("minute")}`;
 }
 
+/* ── 둘째 줄 ─────────────────────────────────────────────────────────────── */
+
 /**
- * 국내 장이 닫힌 동안 밖에서 붙은 값. 종목 하나가 타일 하나다.
- *
- * ⚠️⚠️ **"오를 것" 으로 쓰지 말 것.** 이 값은 실측으로 그날 개장 갭과 상관 0.94~0.97 에
- * 기울기 1.0 이라, 사실상 개장가를 미리 아는 것에 가깝다. 그래서 더 조심해야 한다 —
- * 화면은 **"밖에서는 지금 얼마에 거래되고 있다" 는 사실**만 적고 예상을 말하지 않는다.
- *
- * ⚠️ **견준 종가의 날짜를 함께 낸다.** 그 종가가 직전 영업일 것이 아니면 아래 퍼센트는
- * 거짓인데 화면에서는 그럴듯해 보인다. 날짜가 있어야 읽는 사람이 스스로 알아챈다.
- *
- * ⚠️ 출처(선물 심볼)를 지우지 말 것. 국내 거래소 값이 아니라 해외 무기한선물 값이다.
- * 어디서 온 숫자인지 안 밝히면 KRX 시세로 오해한다.
+ * 밤사이 뉴욕 — S&P 500 과, 최근 5년 같은 구간에 든 아침의 코스피(개장 · 장 중 · 종가).
+ * ⭐ 간밤 S&P 와 코스피 **개장 갭**의 상관은 0.547 인데 **장중**과는 0.018 이다 — 장 중 줄이 어느 구간에서나
+ *    0 언저리인 게 이 화면이 예보가 아니라 개장 해설인 증거다. ⛔ 장 중 줄을 빼지 말 것.
+ * ⚠️ 미장이 쉰 날은 큰 숫자 대신 "휴장" — 그날 spx 는 마지막 거래일 것이라 크게 두면 밤사이 움직임으로 읽힌다.
+ *    그 값은 바닥 줄로 내린다.
  */
-function OvernightPanel({ r }: { r: OvernightRow }) {
-  const up = r.diffPct > 0;
-  const ink = up ? HOT : COLD;
+function NightModule({
+  when,
+  spx,
+  usHoliday,
+  usSession,
+}: {
+  when: string;
+  spx: number | null;
+  usHoliday: string | null;
+  usSession: string | null;
+}) {
+  // 간밤 S&P 가 든 구간의 과거 코스피. ⚠️ 미장이 쉰 날은 고르지 않는다 — 그날 spx 의 움직임은 전날 개장에서 이미 끝났다.
+  const after = spx == null || usHoliday ? null : (KOSPI_AFTER.find(([lo, hi]) => spx >= lo && spx < hi) ?? null);
+  return (
+    <Module id="night" title={`${when} 뉴욕`} meta="S&P500">
+      <div className="v2-pv-night">
+        <div className="v2-pv-big">
+          <b className={usHoliday ? undefined : tone(spx).trim() || undefined}>{usHoliday ? "휴장" : spx == null ? "없음" : PCT(spx)}</b>
+          {usHoliday && <span>{usHoliday}</span>}
+        </div>
+        {after ? (
+          <dl className="v2-pv-after">
+            {/* ⚠️ 횟수("189번 뒤")가 아니라 기간(최근 5년)으로 — 사람이 아는 단위는 기간이다(2026-09-02).
+                날 수(231일)는 걷었다 — 무엇을 센 날인지 안 읽혔다(2026-10-04 지적). '이런 날'이 위 큰 숫자를 가리킨다. */}
+            <div className="v2-pv-after-head">
+              <dt>최근 5년 이런 날 코스피</dt>
+            </div>
+            {/* ⭐ 라벨은 개장 · 장 중 · 종가(2026-09-02 확정). '개장 뒤'로 쓰지 말 것 — 개장 직후로 읽힌다. 아래 표와 같은 말이다. */}
+            {([["개장", after[3]], ["장 중", after[4]], ["종가", after[5]]] as const).map(([label, v]) => (
+              <div key={label} className="v2-pv-after-row">
+                <dt>{label}</dt>
+                <dd className={tone(v).trim() || undefined}>{PCT(v)}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="v2-pv-night-foot">
+            {usHoliday ? (
+              <>
+                마지막 거래일{usSession ? ` ${sessionDay(usSession)}` : ""} S&amp;P500{" "}
+                <b className={tone(spx).trim() || undefined}>{spx == null ? "없음" : PCT(spx)}</b>
+              </>
+            ) : (
+              "과거 같은 구간을 고를 자료를 아직 못 받았습니다"
+            )}
+          </p>
+        )}
+      </div>
+    </Module>
+  );
+}
+
+/**
+ * 해외에서 거래 중인 값 — 국내 장이 닫힌 동안 해외 무기한선물(하이퍼리퀴드)에서 붙은 값. 종목 하나가 한 줄이다.
+ *
+ * ⚠️⚠️ **"오를 것" 으로 쓰지 말 것.** 이 값은 실측으로 그날 개장 갭과 상관 0.94~0.97 에 기울기 1.0 이라,
+ * 사실상 개장가를 미리 아는 것에 가깝다. 그래서 더 조심한다 — "밖에서는 지금 얼마에 거래되고 있다" 는 사실만 적는다.
+ * ⚠️ **견준 종가의 날짜를 함께 낸다**(값 칸 아래 'M/D 종가'). 그 종가가 직전 영업일 것이 아니면 퍼센트는 거짓인데
+ *    화면에서는 그럴듯해 보인다. 날짜가 있어야 읽는 사람이 스스로 알아챈다.
+ * ⚠️⚠️ **"국장 대비" 머리를 지우지 말 것.** 시장이 둘이라(해외 선물 · 국내 종가) 라벨이 없으면 퍼센트가
+ *    선물의 하루 등락으로 읽힌다.
+ * ⚠️ 출처를 지우지 말 것 — 국내 거래소 값이 아니다. 거래소 이름은 머리 근거(Hyperliquid)에, 마켓 심볼은 이름 아래
+ *    링크로 둔다. ⚠️ 심볼의 `xyz` 는 마켓을 띄운 **빌더의 이름**이라 화면에선 떼고, 주소 · GA 에는 그대로 쓴다
+ *    (⛔ 주소까지 바꾸지 말 것 — 그 사이트에 없는 마켓이 된다).
+ * ⭐ 환율은 머리에 한 번만(그날 하나뿐인 값이라 줄마다 되풀이하지 않는다). 달러 표시가는 걷었다(원 값 ÷ 환율, 2026-10-03).
+ */
+function OvernightModule({ overnight }: { overnight: OvernightData & { live: boolean } }) {
+  const at = overnight.capturedAt
+    ? overnight.live
+      ? `${kstStamp(overnight.capturedAt)} 시점`
+      : `${formatKstSnappedShort(overnight.capturedAt, PERP_HOURS)} 시점`
+    : null;
+  // ⚠️ 환율은 하루에 하나다(수집기가 실행마다 한 번 받아 모든 줄에 같은 값을 넣는다). 줄 순서가 거래대금 순이라
+  //    rows[0] 은 날마다 다른 종목이다 — 가장 큰 값을 집어 뜻을 못박는다. 원 단위로 반올림(카드 값이 원 단위다).
+  const fx = Math.round(Math.max(...overnight.rows.map((r) => r.fx)));
+  return (
+    <Module id="perp" title="해외에서 거래 중인 값" meta={["Hyperliquid", at].filter(Boolean).join(" · ")} aside={`환율 ${fx.toLocaleString("ko-KR")}원`} className="v2-pv-perpmod">
+      <div className="v2-tbl v2-pv-perp">
+        <div className="v2-pv-th">
+          <span>종목</span>
+          <span>해외 값</span>
+          {/* '국장 대비'면 국장 종가와 견준 것으로 읽힌다 — '종가'까지 풀어 쓰면 길기만 했다(2026-10-04 지적). */}
+          <span>국장 대비</span>
+          <span>24H 거래량</span>
+        </div>
+        <ol className="v2-tbody">
+          {overnight.rows.map((r) => (
+            <li key={r.code}>
+              <PerpRow r={r} />
+            </li>
+          ))}
+        </ol>
+      </div>
+    </Module>
+  );
+}
+
+function PerpRow({ r }: { r: OvernightRow }) {
   const won = Math.round(r.krw - r.prevClose);
   return (
-    <div className="hz-panel-pad">
-      <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
-        <StockLogo code={r.code} name={r.name} market="KOSPI" size={30} />
-        <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-          <strong style={{ fontSize: "var(--fs-14)", fontWeight: 700, color: C.ink, letterSpacing: "-.01em" }}>{r.name}</strong>
-          {/* 심볼이 곧 출처 링크다. 이 값이 어디서 온 것인지 화면 어디에도 안 적혀
-              있었는데, 심볼은 이미 그 시장의 주소 노릇을 한다 — 따로 '출처' 줄을
-              만들지 않고 이걸 누를 수 있게 한다.
-
-              ⚠️⚠️ **화면에 내는 이름과 주소에 넣는 이름이 다르다.** 저장된 심볼은
-              `xyz:SMSN` 인데 그 `xyz` 는 하이퍼리퀴드에 마켓을 띄운 **빌더의 이름**이라
-              읽는 사람에게는 아무 뜻이 없었다. 화면에는 그 자리를 거래소 이름으로 바꿔
-              적고(`Hyperliquid:SMSN`), 주소·GA 라벨에는 **API 이름을 그대로** 쓴다.
-              ⛔ 주소까지 바꾸지 말 것 — `Hyperliquid:SMSN` 은 그 사이트에 없는 마켓이다.
-              ⚠️ 하이퍼리퀴드가 화면에 쓰는 이름은 또 다르지만(`xyz:SAMSUNG`) 사이트가
-              알아서 옮겨 준다(2026-09-04 실측: SMSN→SAMSUNG · SKHX→SKHYNIX · HYUNDAI 그대로).
-
-              ⚠️ 파랗게 칠하지 않는다. 누를 수 있다는 것은 화살표와 호버로만 말한다 —
-              MDD·종목 이름 링크가 이미 쓰는 방식이다(globals.css 주석 참고). */}
+    <div className="v2-tr">
+      <span className="v2-td-stock">
+        <StockLogo code={r.code} name={r.name} market="KOSPI" size={24} />
+        <span className="v2-pv-name">
+          {/* 이름은 아래 엮인 국장 종목 표처럼 종목 화면으로 잇는다. */}
+          <Link href={stockHref(r.code)} className="v2-pv-stock" data-ga="cta_click" data-ga-cta="stock" data-ga-surface="preview_perp">
+            {r.name}
+          </Link>
+          {/* 심볼이 곧 출처 링크다. 파랗게 칠하지 않고 화살표도 달지 않는다 — 세 줄마다 같은 아이콘이 섰다(2026-10-04 점검). 호버 밑줄로 알린다. */}
           <a
-            className="hz-perp-link"
+            className="v2-pv-sym"
             href={`https://app.hyperliquid.xyz/trade/${r.symbol}`}
             target="_blank"
             rel="noopener noreferrer"
             data-ga="preview_perp_click"
             data-ga-symbol={r.symbol}
-            style={{ fontFamily: MONO, fontSize: "var(--fs-11)", display: "inline-flex", alignItems: "center", gap: 2, width: "fit-content" }}
           >
-            {r.symbol.replace(`${HL_DEX}:`, "Hyperliquid:")}
-            {/* 11px 글자 옆이라 아이콘도 11px 이다. 12 로 두면 글자보다 커서 화살표가
-                먼저 눈에 든다 — 여기서 주인공은 심볼이다. */}
-            <Icon name="north_east" style={{ fontSize: "var(--fs-11)" }} />
+            {r.symbol.replace(`${HL_DEX}:`, "")}
           </a>
         </span>
-      </div>
-
-      {/* ⚠️⚠️ **값과 견줌을 두 줄로 나눈다.** 한 줄에 다 넣었더니 SK하이닉스만 자릿수가
-          일곱이라(1,579,154) 저 혼자 접혀 타일 키가 30px 어긋났다(2026-09-03 실측).
-          줄을 나누면 종목이 몇이든 세 장이 같은 키다.
-          ⚠️⚠️ **"국장 종가 대비" 를 지우지 말 것.** 이 카드에는 시장이 둘이라(해외 선물 ·
-          국내 종가) 라벨이 없으면 이 퍼센트가 선물의 하루 등락으로 읽힌다 — 실제로는
-          어제 국장 종가와 견준 값이다. 아래 '09/02 국장 종가' 줄과 짝이다. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 12 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-          <strong style={{ fontFamily: MONO, fontSize: "var(--fs-27)", fontWeight: 800, letterSpacing: "-.03em",
-                           lineHeight: 1.1, color: C.ink }}>
-            {r.krw.toLocaleString("ko-KR")}
-          </strong>
-          <span style={{ fontSize: "var(--fs-13)", color: C.sub }}>원</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-          <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>국장 종가 대비</span>
-          {/* ⚠️ 아래 퍼센트와 **같은 크기·같은 굵기**다. 한때 12.5/700 과 14/800 로 갈라 뒀는데
-              둘은 한 쌍(얼마 · 몇 %)이라 크기가 다르면 하나가 딸린 것처럼 읽힌다. */}
-          <span style={{ fontFamily: MONO, fontSize: "var(--fs-14)", fontWeight: 800, color: ink, letterSpacing: "-.02em" }}>
-            {/* 단위를 붙인다. 옆의 퍼센트와 나란히 서면 숫자 둘이 같은 종류로 보이는데,
-                하나는 원이고 하나는 %다. 아래 '1,613,000원' 과도 표기가 맞는다. */}
-            {up ? "+" : ""}{won.toLocaleString("ko-KR")}원
-          </span>
-          <span style={{ fontFamily: MONO, fontSize: "var(--fs-14)", fontWeight: 800, color: ink, letterSpacing: "-.02em" }}>
-            {PCT(r.diffPct)}
-          </span>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 7, paddingTop: 12,
-                    borderTop: "1px solid var(--c-hairline)" }}>
-        {([
-          // ⭐ "국장" 을 붙인다. 이 카드에는 값이 두 종류(해외 선물 · 국내 종가)라
-          // 그냥 "종가" 면 위의 큰 숫자와 같은 시장 것으로 읽힌다.
-          [`${r.prevCloseDate.slice(5).replace("-", "/")} 국장 종가`, `${r.prevClose.toLocaleString("ko-KR")}원`],
-          // ⚠️ 환율을 여기 붙이지 말 것. 그날 하나뿐인 값이라 시트 부제가 한 번 말한다.
-          ["달러 표시가", `$${r.usd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`],
-          ["24시간 거래대금", VOL(r.volumeUsd)],
-        ] as const).map(([k, v]) => (
-          <div key={k} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-            <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{k}</span>
-            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>{v}</span>
-          </div>
-        ))}
-      </div>
+      </span>
+      <span className="v2-td-two" data-k="해외 값">
+        <b>{r.krw.toLocaleString("ko-KR")}원</b>
+        <em>
+          {md(r.prevCloseDate)} 종가 {r.prevClose.toLocaleString("ko-KR")}원
+        </em>
+      </span>
+      {/* 얼마 · 몇 % 는 한 쌍이라 같은 칸에 위아래로. 원에도 단위를 붙인다(옆 % 와 같은 종류로 읽히지 않게). */}
+      <span className={`v2-td-two v2-pv-diff${tone(r.diffPct)}`}>
+        <b>{PCT(r.diffPct)}</b>
+        <em>
+          {won > 0 ? "+" : ""}
+          {won.toLocaleString("ko-KR")}원
+        </em>
+      </span>
+      <span className="v2-td-num v2-pv-vol" data-k="거래">
+        {VOL(r.volumeUsd)}
+      </span>
     </div>
   );
 }
 
 /**
- * 간밤 크게 움직인 **미국 종목 하나**가 타일 하나다.
- *
- * ⚠️⚠️ **섹터로 묶어 큰 상자를 만들지 말 것.** 섹터마다 종목이 1~5 로 달라 상자 키가
- * 제각각이 되고, 짝지어 세우면 짧은 쪽 바닥이 빈다. 섹터는 타일 위 **작은 라벨**로 남긴다 —
- * 정보는 그대로고 모양만 고르게 된다(카더라 '급부상 종목'의 타일과 같은 짜임).
- *
- * ⚠️⚠️ **숫자는 미국 줄과 같은 단위(%)로 적는다.** 한때 "173번 중 130번" 이었는데,
- * 위가 "+2.38%" 인데 아래가 횟수면 두 숫자가 같은 종류로 안 보여서 무엇을 어쩌라는 건지
- * 읽히지 않았다(2026-09-02). 같은 단위라야 눈이 바로 잇는다.
- *
- * ⚠️⚠️ **코스피 줄을 지우지 말 것.** "보통 +2.25%" 만 있으면 이 종목 덕인지 그날 장이
- * 좋아서인지 구별이 안 된다. 같은 날들의 코스피 평균이 위에 한 줄 서 있어야, 밑의 숫자들이
- * 저마다 그것과 견줘 읽힌다. 설명 문장 없이도 뜻이 서는 건 이 한 줄 덕이다.
+ * 오늘의 브리핑 — 이름표 줄 셋(시장 브리핑의 v2-brief3 꼴). 문장은 LLM 이 아니라 틀이다 — 재료가 숫자 몇 개라
+ * 틀이 고정이고, 이름 뒤 조사만 받침에 맞춘다(josa · euro).
+ * ⚠️ "코스피보다 얼마나" · %p 를 쓰지 말 것 — 지수 대비 초과분은 코드 안 개념이다. 화면은 **그 종목이 실제로 몇 %에 열렸나**로 적는다.
+ * ⭐ 겹친 곳 줄 — 여러 미국 종목에 동시에 걸린 국내 종목. 표에선 묶음마다 흩어져 안 보인다(대한항공이 부킹홀딩스 ·
+ *    사우스웨스트 · 보잉 세 곳에서 같이 밀린 날). 이 줄이 화면에서 유일하게 그걸 말한다.
  */
-/** 히어로의 '밤사이 가장 크게 움직인 곳' 이 데려올 자리. 카더라 히어로의 칩이 시트로
- *  내려가는 것과 같은 어법이다. */
-function moverAnchor(ticker: string) {
-  return `mv-${ticker}`;
+function BriefModule({
+  when,
+  usHoliday,
+  moverCount,
+  movers,
+}: {
+  when: string;
+  usHoliday: string | null;
+  moverCount: number;
+  movers: PreviewMover[];
+}) {
+  const biggest = movers.reduce<PreviewMover | null>((a, m) => (!a || Math.abs(m.dp) > Math.abs(a.dp) ? m : a), null);
+  const strongest = movers
+    .flatMap((m) => m.links.map((l) => ({ m, l })))
+    // 문장에 적는 값(개장)으로 고른다. 화면에 없는 코스피 대비 초과분(gap)으로 고르면 표에 더 큰 개장 값이 있어
+    // '가장 크게'가 틀려 보였다(2026-10-04 한화솔루션 +1.39% · 표의 SK하이닉스 −1.86%).
+    .reduce<{ m: PreviewMover; l: PreviewLink } | null>(
+      (a, x) => (!a || Math.abs(x.l.krOpen ?? 0) > Math.abs(a.l.krOpen ?? 0) ? x : a),
+      null,
+    );
+  const linkCount = new Map<string, number>();
+  for (const m of movers) for (const l of m.links) linkCount.set(l.stock, (linkCount.get(l.stock) ?? 0) + 1);
+  const crowded = [...linkCount.entries()].sort((a, b) => b[1] - a[1])[0];
+  const crowdedWith = crowded ? movers.filter((m) => m.links.some((l) => l.stock === crowded[0])).map((m) => m.usName) : [];
+
+  return (
+    <Module id="brief" title="오늘의 브리핑" className="v2-pv-briefmod">
+      {usHoliday ? (
+        // ⚠️ '조용한 밤' 문구와 섞지 말 것. 그건 미장이 열렸는데 크게 움직인 곳이 없던 밤이고, 이건 미장이 아예 안 열린 밤이다.
+        <p className="v2-pv-briefp">
+          밤사이 미장은 {usHoliday}
+          {euro(usHoliday)} 열리지 않았습니다. 새로 움직인 종목이 없어 오늘은 이어 붙일 국장 종목도 없습니다.
+        </p>
+      ) : moverCount === 0 ? (
+        <p className="v2-pv-briefp">
+          {when} 크게 움직인 종목이 없습니다. 눈여겨보는 미국 종목 가운데 평소 폭을 크게 넘어선 곳이 없었다는 뜻이고, 고장이 아니라
+          조용한 밤이었습니다. 한 해에 두세 번 있는 밤입니다.
+        </p>
+      ) : (
+        <dl className="v2-brief3">
+          {biggest && (
+            <div className="v2-brief3-row">
+              <dt>미장</dt>
+              <dd>
+                {when} {moverCount}곳이 평소 폭을 넘게 움직였습니다. 가장 큰 곳은 <b>{biggest.usName}</b>
+                {euro(biggest.usName)} <b className={tone(biggest.dp).trim() || undefined}>{PCT(biggest.dp)}</b>, 평소 폭의 {zx(biggest.z)}배였습니다.
+              </dd>
+            </div>
+          )}
+          {strongest && (
+            <div className="v2-brief3-row">
+              <dt>국장</dt>
+              <dd>
+                {/* 관계는 표와 같은 꼬리표로 둔다 — '엮여 있어' 같은 술어는 공급 · 경쟁 관계에 안 맞고 문장만 길었다(2026-10-05 점검). */}
+                가장 크게 따라간 곳은 <b>{strongest.l.stock}</b>({strongest.m.usName} · {strongest.l.why})입니다. 최근 5년 이런 날 평균{" "}
+                <b className={tone(strongest.l.krOpen).trim() || undefined}>{strongest.l.krOpen == null ? "없음" : PCT(strongest.l.krOpen)}</b>에 열렸습니다.
+              </dd>
+            </div>
+          )}
+          {crowded && crowded[1] > 1 && (
+            <div className="v2-brief3-row">
+              <dt>겹친 곳</dt>
+              <dd>
+                {/* 어느 미장 종목인지 이름으로 — 수만 적으면 표를 뒤져야 했다(2026-10-05 점검). 넷 이상이면 셋 + '등 N곳'. */}
+                <b>{crowded[0]}</b>
+                {josa(crowded[0], "은", "는")} {crowdedWith.length > 3 ? `${crowdedWith.slice(0, 3).join(" · ")} 등 ${crowdedWith.length}곳` : crowdedWith.join(" · ")}
+                {crowdedWith.length > 3 ? "과" : josa(crowdedWith[crowdedWith.length - 1], "과", "와")} 함께 움직입니다.
+              </dd>
+            </div>
+          )}
+        </dl>
+      )}
+    </Module>
+  );
 }
 
-function MoverPanel({ m, when }: { m: PreviewMover; when: string }) {
-  const ink = m.dp > 0 ? HOT : COLD;
+/** 평소 폭 배수. 문턱(1.0)을 막 넘은 값이 '1.0배'로 찍히면 평소와 같다는 말로 읽혀, 1.5 밑은 소수 둘째 자리(1.04배)까지 적는다. */
+function zx(z: number): string {
+  return z < 1.5 ? z.toFixed(2) : z.toFixed(1);
+}
+
+/* ── 엮인 국장 종목 표 ───────────────────────────────────────────────────── */
+
+/**
+ * 미장 종목 한 묶음 = 왼쪽 칸(그 미장 종목, 옅은 면) + 오른쪽 국장 줄들(엮인 종목 · 관계 · 개장 · 장 중 · 종가). 폰은 미장 칸이 묶음 머리 줄.
+ * ⛔ 데스크톱도 머리 줄 꼴로 바꿨다가 되돌렸다(2026-10-05 운영자 판단 "바로 전 단계가 더 좋다"). 국장 줄이 여럿인 묶음의 미장 칸 아래는
+ *    옅은 면이 메운다(v2.css .v2-pv-us).
+ *
+ * ⚠️⚠️ 국장 숫자 셋은 **최근 5년, 그 미장 종목이 이만큼(같은 방향) 움직인 날의 평균**이다 — 오늘 일이 아니다.
+ *    모듈 머리 근거('최근 5년 이런 날 평균')와 위아래를 가르는 칸 경계가 그 말을 한다(옛 타일은 선과 머리줄로 갈랐다).
+ * ⚠️⚠️ 셋을 **다 낸다.** 개장만 있으면 "그 뒤로는 별일 없었다" 를 못 말한다. 하루 전체는 담지 않고 개장과 장 중을 곱해 낸다.
+ * ⚠️ '평소 폭의 N배' — 등락률만으로는 큰 움직임인지 알 수 없다(종목마다 평소 폭이 다르다). "평소보다 1.0배" 는
+ *    평소와 같다는 말로 읽혀 바꿨다(2026-10-03, 그날 다섯 중 셋이 1.0~1.1배).
+ * ⭐ 묶음 순서는 **평소 폭 대비 큰 순**(z) — 등락률로 세우면 늘 변동성 큰 종목만 올라와 "평소와 달랐던 밤" 이 사라진다.
+ */
+function MoverGroup({ m, when }: { m: PreviewMover; when: string }) {
   return (
-    <div className="hz-panel-pad hz-mover-tile" id={moverAnchor(m.ticker)}>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
-        <StockLogo code={m.ticker} name={m.usName} market="US" size={30} />
-        <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-          <span style={{ display: "flex", alignItems: "baseline", gap: 7, minWidth: 0 }}>
-            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-15)", fontWeight: 800, color: C.ink, letterSpacing: "-.02em" }}>
-              {m.ticker}
-            </strong>
-            <span className="hz-cellname" style={{ fontSize: "var(--fs-13)", fontWeight: 600, color: C.sub }}>{m.usName}</span>
+    <li className="v2-pv-grp" id={`mv-${m.ticker}`}>
+      <div className="v2-pv-us">
+        <StockLogo code={m.ticker} name={m.usName} market="US" size={24} />
+        <span className="v2-pv-usname">
+          <span>
+            <b>{m.ticker}</b>
+            <em>{m.usName}</em>
           </span>
-          <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{m.sector}</span>
+          <em>{m.sector}</em>
         </span>
-        <span style={{ flex: 1 }} />
-        <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1, flexShrink: 0 }}>
-          {/* ⭐ "간밤" 을 붙인다. 밑에도 퍼센트가 줄줄이 있어서, 라벨이 없으면 위아래가
-              같은 종류로 읽힌다 — 위는 **어젯밤 실제로 일어난 일**이고 아래는 **과거 평균**이다. */}
-          <span style={{ display: "inline-flex", alignItems: "baseline", gap: 5, whiteSpace: "nowrap" }}>
-            <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{when}</span>
-            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-17)", fontWeight: 800, color: ink, letterSpacing: "-.02em" }}>
-              {PCT(m.dp)}
-            </strong>
-          </span>
-          {/* ⭐ 등락률만으로는 큰 움직임인지 알 수 없다 — 종목마다 평소 폭이 다르다. */}
-          <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: C.sub2, whiteSpace: "nowrap" }}>
-            평소보다 {m.z.toFixed(1)}배
-          </span>
+        <span className="v2-td-two">
+          <b className={tone(m.dp).trim() || undefined}>
+            <span className="v2-pv-when">{when} </span>
+            {PCT(m.dp)}
+          </b>
+          <em>평소 폭의 {zx(m.z)}배</em>
         </span>
       </div>
-
-      {/* ⚠️⚠️ 위(사실)와 아래(과거)를 **선으로 가른다.** 둘 다 퍼센트라, 선이 없으면 눈이
-          한 덩이로 읽고 "어젯밤 이 종목이 +0.38% 올랐다" 로 오해한다. 아랫단은 어젯밤 일이
-          아니라 **과거 5년의 평균**이다. */}
-      {/* ⚠️ 미국 줄과 국내 줄을 가르는 선. 회색 타일 위라 `--c-hairline` 를 쓴다 —
-          흰 판용 `--c-sheet-row` 는 여기서 대비 1.037 이라 있으나 마나였다. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 12,
-                    borderTop: "1px solid var(--c-hairline)" }}>
-        {/* 이 한 줄이 밑의 숫자들에 기준을 준다. */}
-        {/* ⚠️ 쉼표로 끝나는 매달린 문장을 쓰지 말 것. 예전엔 "…열렸고," 로 끝나 밑의
-            줄들이 그 문장의 뒷부분처럼 보였는데, 줄마다 종목이 달라 문장이 안 이어진다.
-            여기는 **목록의 머리**다 — 밑의 숫자들이 무엇과 견줘야 하는지만 세워 준다. */}
-        {/* ⚠️ 여기에 코스피 평균을 같이 적지 말 것. 시장 몫과 견주라고 넣어 봤는데
-            값이 −0.15%·+0.09% 같은 잡음 수준이라 판단에 보탬은 없고 자리만 먹었다
-            (2026-09-02). 시장 몫은 쌍을 고를 때 이미 뺐다. */}
-        {/* ⚠️⚠️ "과거 이런 날" 처럼 얼버무리지 말 것. **얼마나 오래**인지가 없으면 표본이
-            열흘인지 십 년인지 모른다. 방향도 적는다 — 오른 날과 내린 날은 다른 표다. */}
-        {/* ⚠️ "국내 개장은" 이었다(2026-09-04 고침). 밑에 붙는 숫자는 **셋**인데(개장·장 중·
-            종가) 머리가 개장 하나만 가리켜, 뒤의 둘이 무엇에 대한 값인지 안 서 있었다.
-            '국장에서는' 은 그 셋을 다 받는다. */}
-        <div style={{ paddingBottom: 2, fontSize: "var(--fs-11-5)", color: C.sub, wordBreak: "keep-all" }}>
-          최근 5년, 이렇게 {m.dp > 0 ? "오른" : "내린"} 날 국장에서는
-        </div>
+      <ol className="v2-pv-krs">
         {m.links.map((l) => {
-          // 하루 전체는 담지 않는다 — 개장과 개장 뒤를 곱해 정확히 낸다.
-          const day = l.krOpen != null && l.krIntra != null
-            ? ((1 + l.krOpen / 100) * (1 + l.krIntra / 100) - 1) * 100
-            : null;
+          const day = l.krOpen != null && l.krIntra != null ? ((1 + l.krOpen / 100) * (1 + l.krIntra / 100) - 1) * 100 : null;
           return (
-            <div key={l.stock} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-                <StockLogo code={l.code} name={l.stock} market={l.market} size={18} />
-                <span style={{ fontSize: "var(--fs-12-5)", fontWeight: 600, color: C.ink, whiteSpace: "nowrap" }}>{l.stock}</span>
-                {/* 관계는 한 낱말짜리 꼬리표다. 자리가 모자라면 이것만 줄어든다. */}
-                <span style={{ fontSize: "var(--fs-11)", color: C.sub2, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {l.why}
+            <li key={l.stock}>
+              <Link href={stockHref(l.code)} className="v2-pv-kr" data-ga="preview_stock_click" data-ga-symbol={l.code}>
+                <span className="v2-td-stock">
+                  <StockLogo code={l.code} name={l.stock} market={l.market} size={20} />
+                  <span className="v2-td-name">{l.stock}</span>
                 </span>
-              </div>
-              {/* ⚠️⚠️ 셋을 **다 낸다.** 개장만 있으면 "그리고 그 뒤로는 별일 없었다" 를 못
-                  말한다 — 이 화면이 예보가 아니라 개장 해설인 근거가 그 두 번째 숫자다.
-                  히어로가 코스피로 같은 셋을 내므로 앞뒤도 맞는다.
-                  ⚠️ 라벨을 떼지 말 것. 숫자 셋이 라벨 없이 서면 무엇이 무엇인지 모른다. */}
-              <div style={{ display: "flex", alignItems: "baseline", gap: 12, paddingLeft: 25, flexWrap: "wrap" }}>
-                {([["개장", l.krOpen], ["장 중", l.krIntra], ["종가", day]] as const).map(([label, v]) => (
-                  <span key={label} style={{ display: "inline-flex", alignItems: "baseline", gap: 4, whiteSpace: "nowrap" }}>
-                    <span style={{ fontSize: "var(--fs-11)", color: C.muted }}>{label}</span>
-                    <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 700,
-                                   color: v == null ? C.sub2 : v > 0 ? HOT : COLD }}>
-                      {v == null ? "—" : PCT(v)}
+                {/* 관계는 짧은 꼬리표다 — 쌍마다 다른 개별 관계(사전의 why). */}
+                <span className="v2-pv-why">{l.why}</span>
+                {/* ⛔ 개장 값 갈림 막대를 걷었다 — 축도 이름도 없어 무엇인지 안 읽혔다(2026-10-04 지적). 관계 칸이 남는 폭을 받는다. */}
+                <span className="v2-pv-nums">
+                  {([["개장", l.krOpen], ["장 중", l.krIntra], ["종가", day]] as const).map(([label, v]) => (
+                    <span key={label} className={`v2-td-num v2-td-chg${tone(v)}`} data-k={label}>
+                      {v == null ? "없음" : PCT(v)}
                     </span>
-                  </span>
-                ))}
-              </div>
-            </div>
+                  ))}
+                </span>
+              </Link>
+            </li>
           );
         })}
-      </div>
-    </div>
+      </ol>
+    </li>
   );
 }
 
 /* ── 화면 ────────────────────────────────────────────────────────────────── */
 
 export default async function PreviewPage() {
-  // ⛔ 안 연 화면이라 배포된 곳에서는 없는 페이지다. 사이드바 링크를 지우는 것만으로는
-  // 부족하다 — 주소를 알면 그대로 열린다.
+  // ⛔ 스위치가 꺼져 있으면 배포된 곳에서는 없는 페이지다 — 사이드바 링크를 지우는 것만으로는 부족하다.
   if (!PUBLIC && DEPLOYED) notFound();
 
-  // ⚠️ 둘을 나란히 부른다. 표가 서로 달라 한쪽이 비어도 다른 쪽은 그린다 —
-  // 하이퍼리퀴드 표가 아직 없던 날에도 아래 시트는 멀쩡해야 한다.
-  const [{ date, updatedAt, spx, sectors, moverCount, usHoliday, usSession, usFrom }, overnight] = await Promise.all([
+  // ⚠️ 나란히 부른다. 표가 서로 달라 한쪽이 비어도 다른 쪽은 그린다 — 하이퍼리퀴드 표가 없던 날에도 아래 표는 멀쩡해야 한다.
+  // 첫 줄의 지수 종가 · 링크 칸 둘은 곁들이는 칸이다(칸 하나가 실패하면 그 칸만 뺀다 — cover-chips 의 scoped).
+  const [{ date, updatedAt, spx, sectors, moverCount, usHoliday, usSession, usFrom }, overnight, rawIndexes, coverLinks] = await Promise.all([
     getPreview(),
     getOvernightLive(),
+    getKrIndexClosesSide(),
+    loadPreviewCoverChips(),
   ]);
   assertLoaded("/preview");
-  const stamp = date ? `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))} 아침 기준` : undefined;
+  const indexes = isLoadFailed(rawIndexes) ? null : rawIndexes;
 
-  // 장이 몇 개인지 — 두 번째 장('개장 전 지금')은 밤사이 표가 없으면 통째로 안 그려진다.
-  // ⚠️ 그런 날에는 첫 장에도 번호를 주지 않는다. "01" 만 혼자 서 있으면 다음 장이 있다고
-  //    약속해 놓고 안 지키는 꼴이라, 독자는 없는 02 를 찾아 아래로 내려간다.
+  // "밤사이" 자리에 들어갈 말(sessionWord 주석). ⚠️ 휴장한 날은 늘 "밤사이" 다 — 요일로 바꾸면 "금요일 뉴욕 · 휴장" 처럼
+  // 금요일이 쉰 것으로 읽힌다.
+  const when = usHoliday ? "밤사이" : sessionWord(date, usSession, usFrom);
+  const movers = sectors.flatMap((s) => s.movers);
+  const wall = [...movers].sort((a, b) => b.z - a.z);
   const hasOvernight = overnight.rows.length > 0;
 
-  // "밤사이" 자리에 들어갈 말(sessionWord 주석). ⚠️ 휴장한 날은 늘 "밤사이" 다 — 그날 세션은
-  // 휴장 전 마지막 거래일이라 요일로 바꾸면 "금요일 뉴욕 · 휴장" 처럼 금요일이 쉰 것으로 읽힌다.
-  const when = usHoliday ? "밤사이" : sessionWord(date, usSession, usFrom);
-
-  const movers = sectors.flatMap((s) => s.movers);
-
-  // 평소 대비 가장 크게 움직인 넷. z 로 세운다 — 등락률로 세우면 늘 변동성 큰 종목만
-  // 올라와서 "평소와 달랐던 밤"이라는 이 칸의 뜻이 사라진다.
-  //
-  // ⚠️ 다섯이었다. "너무 길어진다"는 지적을 받았고(2026-09-03), 다섯을 지키던 근거도
-  // 이미 사라져 있었다 — 옆 칸이 섹터 분포 일곱 줄이라 줄 수를 맞춰야 했던 시절의
-  // 값이다. 그 목록은 08-30 에 빠졌다.
-  // ⚠️ 셋으로는 줄이지 말 것. 이 칸이 답하는 것은 "어젯밤 어디가 시끄러웠나" 인데,
-  //    셋이면 하루 평균 6~12종목 중 절반도 못 보인다.
-  const loudest = [...movers].sort((a, b) => b.z - a.z).slice(0, 4);
-
-  // 브리핑 문장의 재료.
-  const biggest = movers.reduce<PreviewMover | null>((a, m) => (!a || Math.abs(m.dp) > Math.abs(a.dp) ? m : a), null);
-  const strongest = movers
-    .flatMap((m) => m.links.map((l) => ({ m, l })))
-    .reduce<{ m: PreviewMover; l: PreviewLink } | null>((a, x) => (!a || Math.abs(x.l.gap) > Math.abs(a.l.gap) ? x : a), null);
-  // ⭐ 여러 미국 종목에 동시에 걸린 국내 종목. 오늘 대한항공이 부킹홀딩스·사우스웨스트·
-  // 보잉 세 곳에서 같이 밀렸는데, 섹터 카드를 따로 읽으면 셋으로 흩어져 안 보인다.
-  // 이 문장이 그 화면에서 유일하게 그걸 말한다.
-  const linkCount = new Map<string, number>();
-  for (const m of movers) for (const l of m.links) linkCount.set(l.stock, (linkCount.get(l.stock) ?? 0) + 1);
-  const crowded = [...linkCount.entries()].sort((a, b) => b[1] - a[1])[0];
-  const stockCount = linkCount.size;
-  // 간밤 S&P 가 든 구간의 과거 코스피 성적. 사전의 정적 표에서 고른다.
-  // ⚠️ 미장이 쉰 날에는 고르지 않는다. 그날 spx 는 마지막 거래일 것이고, 그 움직임은 전날
-  //    개장에서 이미 끝났다 — "이만큼 오른 아침에 코스피는" 이 오늘 아침 얘기가 아니게 된다.
-  const after = spx == null || usHoliday ? null : KOSPI_AFTER.find(([lo, hi]) => spx >= lo && spx < hi) ?? null;
-
-  /**
-   * 타일을 세울 차례. **평소 대비 큰 순**이다.
-   *
-   * ⭐ 타일이 고르게 생겨서(미국 한 종목 + 국내 1~3줄) 크기로 짝을 맞출 이유가 없어졌다.
-   * 예전에 섹터 상자를 쓸 땐 종목 수가 1~5 로 달라 키를 맞추느라 크기 순으로 세웠는데,
-   * 그건 배치를 위해 순서를 내준 것이었다. 지금은 신호가 센 것이 위에 온다.
-   */
-  const wall = [...movers].sort((a, b) => b.z - a.z);
-
   return (
-    // 뿌리의 hz-tx 가 이번 리디자인을 켠다(globals.css).
-    <div className="hz-tx">
-      {/* ── 히어로 — 간밤 뉴욕 · 평소와 달랐던 곳 · 오늘의 브리핑(아랫줄 전체) ── */}
-      <section className="hz-hero-panel">
-        {/* ① 간밤 뉴욕 — 이 밤이 얼마나 시끄러웠나 */}
-        <div className="hz-hero-cell">
-          <CellHead title={`${when} 뉴욕`} note={stamp} />
-          {/* ⚠️⚠️ 여기에 섹터 분포를 두지 말 것. "그날 어디가 움직였나" 는 이 화면이 답할
-              물음이 아니다 — 개장 전에 사람이 궁금한 건 **"간밤 미국이 이랬는데 우리 장은
-              어떻게 열리나"** 하나다(2026-09-02 지적). 섹터는 타일마다 라벨로 이미 있다. */}
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            {/* ⭐ 미장이 쉰 날은 숫자 대신 "휴장" 이다(마이그레이션 083). 그날 spx 는 마지막
-                거래일 것이라 여기 크게 두면 밤사이 움직임으로 읽힌다 — 그 값은 바닥 줄로 내린다.
-                한글이라 MONO 를 빼고 본문 글꼴로 적는다. */}
-            <strong style={{ fontFamily: usHoliday ? undefined : MONO, fontSize: "var(--fs-38)", fontWeight: 800, letterSpacing: "-.04em", lineHeight: 1,
-                             color: usHoliday || spx == null ? C.ink : spx > 0 ? HOT : COLD }}>
-              {usHoliday ? "휴장" : spx == null ? "—" : PCT(spx)}
-            </strong>
-            <span style={{ flex: 1 }} />
-            {/* ⚠️⚠️ **이 라벨 밑에 풀이를 달지 말 것.** "미국 대표 500개 기업 평균입니다 ·
-                이 가운데 N곳이 평소보다 크게 움직였고 M곳이 올랐습니다" 가 붙어 있었는데,
-                앞 절은 바로 위 'S&P 500' 을 되풀이한 것이고 뒷 절은 셋째 칸 브리핑의 첫
-                문장("간밤에는 N곳이 평소보다 크게 움직였습니다")과 같은 말이었다
-                (2026-09-03 지적). 한 화면에서 같은 사실을 두 번 적으면 둘 다 값이 떨어진다. */}
-            <span style={{ fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.6, textAlign: "right", wordBreak: "keep-all" }}>
-              {usHoliday ?? <>{when} S&amp;P 500</>}
-            </span>
-          </div>
+    <div className="hz-tx v2-kd v2-pv">
+      {/* 첫 줄 — 지수 종가(어제 국장이 어디서 닫았나) · 개장 전 채널에서 말이 몰리는 종목(국장 · 미장 급부상) · 업데이트 */}
+      <div className="v2-cover">
+        {indexes && <CoverIndexCell kospi={indexes.kospi} kosdaq={indexes.kosdaq} />}
+        {coverLinks.map((c) => (
+          <CoverLinkCell key={c.ga} c={c} />
+        ))}
+        {/* ⚠️ 다른 화면의 30분 눈금이 아니라 HERO_HOURS 정각에 붙인다(06:31 에 쓰여 늘 '오전 7시'). 손으로 밖에서 돌린 실행만 '오후 3시경'. */}
+        {/* 근거(미장 N종목 · 국장 N종목)는 걷었다 — 링크 칸 둘 뒤에 붙이면 1,100 · 1,280 · 1,366 에서 업데이트 글자가 혼자 둘째 줄을
+            차지해 띠 절반이 비었다(2026-10-05 점검). 같은 수를 브리핑 첫 줄과 표가 말한다. */}
+        <CoverMeta updated={updatedAt ? formatKstUpdateSnapped(updatedAt, HERO_HOURS, "업데이트") : "업데이트 준비 중"} />
+      </div>
 
-          {/* ⭐⭐ 이 세 줄이 화면의 뼈대를 숫자로 보인다. 간밤 S&P 와 코스피 **개장 갭**의
-              상관은 0.547 인데 **장중**과는 0.018 이다 — 장중 줄이 어느 구간에서나 0 언저리인
-              게 그 증거고, 그래서 이 화면은 예보가 아니라 개장 해설이다.
-              ⚠️ 장중 줄을 빼지 말 것. 그게 없으면 "개장에서 끝난다" 가 각주의 주장으로만 남는다. */}
-          {/* ⚠️⚠️ **이 블록이 칸의 남는 높이를 먹는다(flex:1).** 예전엔 칸 맨 밑에 "오늘 국내
-              N종목이 여기에 이어집니다" 라는 바닥 줄이 있어서 그게 칸을 채웠는데, 아래 시트가
-              같은 말을 이미 하고 있어 뺐다(2026-09-03). 그러자 이 칸만 바닥이 60px 남아
-              옆 두 칸과 어긋났다 — 이 저장소의 히어로는 **세 칸 모두 바닥까지 찬다**(시장
-              브리핑 실측: 세 칸 다 269 에서 끝난다).
-              ⚠️ 남는 높이를 고정 padding 으로 메우지 말 것. 그 값은 셋째 칸 브리핑이 두
-              문단인지 네 문단인지에 따라 매일 달라진다. 늘어나는 쪽으로 풀어야 한다. */}
-          {/* paddingTop 10 은 **좁은 화면 몫**이다. 넓은 화면에서는 남는 높이가 알아서 머리글
-              위를 벌리지만(아래 flex-end), 칸이 세로로 쌓이는 375px 에서는 남는 높이가 0 이라
-              그 벌어짐이 사라진다 — 실측으로 위 16 · 아래 15 가 되어 머리글이 다시 가운데에
-              떴다. 이 값이 어느 폭에서나 최소 간격을 만든다. */}
-          {/* ⚠️⚠️ **자료가 없는 날의 바닥을 비워 두지 말 것.** 구간표를 못 고르면(표가 비었거나
-              조회가 실패해 spx 가 null 이면) 이 칸은 큰 숫자에서 끝나고 **바닥에 220px 이
-              빈다**(2026-09-03 전수검사에서 실측). 옆 두 칸은 그날도 각자 할 말이 있어서
-              칸 하나만 덩그러니 비어 고장처럼 보인다. 그래서 그 자리를 한 줄로 메운다. */}
-          {!after && (
-            <span style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--c-hairline)",
-                           fontSize: "var(--fs-12)", lineHeight: 1.6, color: C.sub }}>
-              {/* 미장이 쉰 날은 이 자리가 마지막 거래일의 S&P 다. 칸 바닥을 채우는 역할은 같다. */}
-              {usHoliday ? (
-                <>
-                  마지막 거래일{usSession ? ` ${sessionDay(usSession)}` : ""} S&amp;P 500{" "}
-                  {spx == null ? "—" : (
-                    <strong style={{ fontFamily: MONO, fontWeight: 800, color: spx > 0 ? HOT : COLD }}>{PCT(spx)}</strong>
-                  )}
-                </>
-              ) : (
-                "과거 같은 구간을 고를 자료를 아직 못 받았습니다"
-              )}
-            </span>
-          )}
-          {after && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingTop: 10,
-                          // ⚠️⚠️ 남는 높이는 **머리글 위로** 보낸다(flex-end). 한때 세 줄이
-                          // 나눠 갖게 했는데(flex:1), 줄이 늘면 글자가 줄 상자 가운데로
-                          // 내려앉아 머리글과 첫 줄 사이가 27px 로 벌어졌다 — 위의 큰 숫자와는
-                          // 16px 이라 **머리글이 아래 목록보다 위 숫자에 붙어 보였다**
-                          // (2026-09-03 지적·실측). 머리글은 목록의 것이다.
-                          flex: 1, justifyContent: "flex-end" }}>
-              {/* ⚠️⚠️ **"189번 뒤" 처럼 횟수로 쓰지 말 것.** 1,000일 중 189번인지 200일 중
-                  189번인지 알 수 없어 크기가 안 잡힌다(2026-09-02 지적). 사람이 아는 단위는
-                  **기간**이다 — "최근 5년" 이면 표본이 얼마나 두꺼운지 바로 가늠된다. */}
-              {/* ⚠️ paddingBottom 을 되살리지 말 것. 6 이 붙어 있어서 머리글과 첫 줄 사이가
-                  22px 였는데 줄과 줄 사이가 27px 이라 **머리글이 목록의 넷째 줄처럼** 보였다.
-                  머리글은 목록보다 확실히 붙어 있어야 목록의 머리로 읽힌다(지금 16 대 27). */}
-              <span style={{ fontSize: "var(--fs-11-5)", color: C.sub, wordBreak: "keep-all" }}>
-                최근 5년, 미장이 이만큼 {spx != null && spx > 0 ? "오른" : "내린"} 아침에 코스피는
+      {/* 둘째 줄 — 밤사이 뉴욕 | 해외에서 거래 중인 값 | 오늘의 브리핑. 해외 값이 없는 날(수집 실패 · 표 없음)은 그 모듈째 빼고 두 칸.
+          ⚠️ 빈 모듈을 남기지 말 것 — 고장으로 읽힌다. */}
+      <div className={`v2-pv-band${hasOvernight ? "" : " is-pair"}`}>
+        <NightModule when={when} spx={spx} usHoliday={usHoliday} usSession={usSession} />
+        {hasOvernight && <OvernightModule overnight={overnight} />}
+        <BriefModule when={when} usHoliday={usHoliday} moverCount={moverCount} movers={movers} />
+      </div>
+
+      {/* 엮인 국장 종목 — 판 폭 표. ⛔ 섹터로 나누지 말 것(섹터마다 종목이 1~5 라 덩어리 키가 제각각). 섹터는 미장 칸의 곁말.
+          묶을 미장 종목이 없는 날(휴장 · 조용한 밤)은 모듈째 안 그린다 — 브리핑이 "이어 붙일 국장 종목도 없습니다"를 이미 말한다. */}
+      {wall.length > 0 && (
+        <Module
+          id="links"
+          title="함께 움직인 국장 종목"
+          meta="최근 5년 이런 날 평균"
+          // 국장 줄이 종목 화면으로 가는 링크다(카더라 · 데일리 노트와 같은 가르침 'stock-row' — 한 번 보면 셋 다 끝).
+          hint={{ id: "stock-row", anchor: ".v2-pv-krs > li:first-child", text: "종목을 누르면 언급 추이와 요즘 도는 얘기가 나옵니다" }}
+        >
+          <div className="v2-pv-tbl">
+            <div className="v2-pv-grp v2-pv-head">
+              <span className="v2-pv-us">{when} 미장</span>
+              <span className="v2-pv-kr">
+                <span>국장 종목</span>
+                <span>관계</span>
+                <span className="v2-pv-nums">
+                  <span>개장</span>
+                  <span>장 중</span>
+                  <span>종가</span>
+                </span>
               </span>
-              {/* ⭐ 라벨은 **개장 · 장 중 · 종가** 로 못박는다(2026-09-02 확정).
-                  ⚠️ "개장 뒤" 로 쓰지 말 것 — 개장 직후 잠깐으로 읽히는데 실제로는 9시 시가에서
-                  15시 30분 종가까지 **하루 장 전체**다. 화면 두 곳(히어로·타일)이 같은 말을
-                  써야 위아래가 이어진다. */}
-              {([["개장", after[3]], ["장 중", after[4]], ["종가", after[5]]] as const).map(([label, v], k) => (
-                <div
-                  key={label}
-                  style={{
-                    // ⚠️ 여기에 flex:1 을 주지 말 것. 위 블록 주석 참고 — 줄이 늘면 글자가
-                    // 가운데로 내려앉아 머리글이 목록에서 떨어진다. 줄 높이는 늘 같게 둔다.
-                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
-                    // ⚠️⚠️ **마지막 줄만 바닥 여백을 뺀다(2026-09-03 지적).** 이 칸은 바닥 줄이
-                    // 없어서 '종가' 가 칸의 마지막 글자인데, 옆 두 칸의 마지막 글자는 바닥 설명이다.
-                    // 상자 바닥은 셋이 같은데(463) 글자 바닥이 450 대 460 으로 10px 어긋나 있었다 —
-                    // 이 줄은 아래로 padding 8 + 행간 5 를 깔고 있고 설명 줄은 3 뿐이라서다.
-                    // padding 8 을 빼고 marginBottom 으로 나머지를 맞춘다.
-                    // ⚠️ **글꼴 크기를 건드리면 이 값을 다시 재야 한다.** 실제로 그랬다 —
-                    //    옆 칸 설명을 11.5 에서 집안 표준인 12 로 올리자 그 칸이 1px 높아져
-                    //    판 전체가 따라 커졌고, 바닥에 붙어 있던 이 줄도 1px 내려갔다.
-                    //    그래서 −2 가 −1 이 됐다(2026-09-03).
-                    // ⚠️ 부호를 헷갈리지 말 것. 이 블록은 flex-end 라 **음수를 키우면 내려간다**
-                    //    (바깥 높이가 줄어 바닥이 상자 밖으로 나간다). 올리려면 0 쪽으로 간다.
-                    // ⚠️⚠️ **마지막 줄의 위 여백만 6.7 이다(8 이 아니다).** 이 블록은 flex-end 라
-                    // 바닥이 못박혀 있어서, '장 중' 밑 구분선의 자리를 정하는 것은 **이 줄의
-                    // 높이 하나**다. 8 이면 그 선이 옆 칸('밤사이 가장 크게 움직인 곳')의 각주
-                    // 구분선보다 1.3px 위에 선다 — 두 선이 세로 칸막이를 사이에 두고 나란히
-                    // 놓여 그 어긋남이 눈에 띈다(2026-09-04 지적).
-                    // 실측: 이 줄 높이 30.5(=8+22.5) → 선 369.7 · 옆 칸 선 371.0.
-                    //       6.7 로 줄이면 높이 29.2 → 선 371.0 으로 맞는다.
-                    // ⚠️ 대신 marginBottom 을 건드려 맞추지 말 것. 그건 줄 전체를 내려서
-                    //    '종가' 글자 바닥이 옆 칸 각주 글자 바닥과 어긋난다(아래 주석 참고).
-                    //    여기는 상자를 **위에서만** 줄이므로 글자는 제자리에 있는다.
-                    padding: k === 2 ? "6.7px 0 0" : "8px 0",
-                    marginBottom: k === 2 ? -1 : undefined,
-                    // ⚠️ `--c-sheet-row` 가 아니라 `--c-hairline` 다. 이 칸은 회색 타일이라
-                    // 흰 판용 값을 쓰면 대비 1.037 로 선이 안 보인다(globals.css 주석).
-                    borderBottom: k === 2 ? "none" : "1px solid var(--c-hairline)",
-                  }}
-                >
-                  {/* ⚠️ 가운데 줄만 작게·흐리게 두지 말 것. "개장 뒤는 거의 0" 이라는 걸
-                      크기로 말하려 했는데, 세 줄이 같은 종류라 가운데만 작으면 그냥 어긋나
-                      보인다(2026-09-02 지적). **그 말은 숫자가 이미 하고 있다.** */}
-                  <span style={{ fontSize: "var(--fs-12)", color: C.sub, fontWeight: 600 }}>{label}</span>
-                  <strong style={{ fontFamily: MONO, fontSize: "var(--fs-15)", fontWeight: 800,
-                                   letterSpacing: "-.02em", whiteSpace: "nowrap",
-                                   color: v > 0 ? HOT : COLD }}>
-                    {PCT(v)}
-                  </strong>
-                </div>
-              ))}
             </div>
-          )}
-
-        </div>
-
-        {/* ② 평소와 가장 달랐던 곳
-            ⚠️⚠️ **이 칸을 ① 에 합치지 말 것.** 한 번 합쳐서 판을 두 칸으로 만들었는데,
-            이 저장소의 히어로는 어디서나 1:1:2 세 칸이고 한 칸을 위아래로 가르는 화면도
-            없다. 이 화면만 다른 뼈대를 쓸 이유가 없다(2026-09-02 지적).
-            칸이 비어 보이던 건 칸 수 탓이 아니라 **바닥 줄이 없어서**였다. */}
-        <div className="hz-hero-cell hz-hero-divide">
-          <CellHead title={`${when} 가장 크게 움직인 곳`} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
-            {loudest.length === 0 ? (
-              /* ⚠️⚠️ **조용한 밤과 자료 없음을 가른다.** 예전엔 둘 다 "아직 채울 자료가
-                 없습니다" 였는데, 그 말은 고장으로 읽혀서 같은 판의 브리핑이 하는 말
-                 ("고장이 아니라 조용한 밤이었습니다")과 정면으로 부딪쳤다(2026-09-04).
-                 `date` 가 있으면 파이프라인이 **돌았고** 걸린 종목이 없었다는 뜻이다
-                 (마이그레이션 063 의 그날치 한 줄이 그 사실을 남긴다). */
-              <span style={{ fontSize: "var(--fs-12-5)", color: C.sub, lineHeight: 1.7 }}>
-                {usHoliday
-                  ? "미장이 쉬어 새로 움직인 종목이 없습니다"
-                  : date
-                    ? "평소 폭을 크게 넘어선 곳이 없었습니다"
-                    : "아직 채울 자료가 없습니다."}
-              </span>
-            ) : (
-              /* ⭐ 누르면 아래 그 종목 타일로 내려간다(2026-09-05 ). 히어로가 이름만
-                 늘어놓고 끝나면 "그래서 어디 있나"를 눈으로 찾아야 했다 — 카더라 히어로의
-                 '오늘 눈에 띄는 것' 칩이 시트로 데려가는 것과 같은 어법이다.
-                 호버·도착 강조는 CSS 가 맡는다(.hz-mover-link · .hz-mover-tile:target). */
-              loudest.map((m) => (
-                <a
-                  key={m.ticker}
-                  href={`#${moverAnchor(m.ticker)}`}
-                  className="hz-mover-link"
-                  data-ga="preview_mover_click"
-                  data-ga-symbol={m.ticker}
-                  style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}
-                >
-                  <StockLogo code={m.ticker} name={m.usName} market="US" size={24} />
-                  <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-                    <strong style={{ fontFamily: MONO, fontSize: "var(--fs-12-5)", fontWeight: 800, color: C.ink }}>{m.ticker}</strong>
-                    <span className="hz-cellname" style={{ fontSize: "var(--fs-11)", color: C.sub2 }}>{m.usName}</span>
-                  </span>
-                  <span style={{ flex: 1 }} />
-                  <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1, flexShrink: 0 }}>
-                    <strong style={{ fontFamily: MONO, fontSize: "var(--fs-13-5)", fontWeight: 800, whiteSpace: "nowrap", color: m.dp > 0 ? HOT : COLD }}>
-                      {PCT(m.dp)}
-                    </strong>
-                    <span style={{ fontSize: "var(--fs-11)", color: C.sub2, whiteSpace: "nowrap" }}>평소보다 {m.z.toFixed(1)}배</span>
-                  </span>
-                </a>
-              ))
-            )}
-          </div>
-          {/* ⚠️⚠️ **바닥 줄은 한 줄로 끝나야 한다.** 두 줄이 되면 그만큼 선이 위로 올라가
-              옆 칸과 어긋난다 — 넓은 화면에서 세 칸이 한 줄에 설 때 바로 드러난다(실측:
-              어긋났을 때 404·386·255, 시장 브리핑은 242·240·240). 좁은 칸(1800폭에서 334px)
-              에서도 안 접히게 20자 안팎으로 적을 것. */}
-          {/* ⚠️ 12px 이다. 시장 브리핑의 히어로 바닥 줄이 12 이고 '최종 업데이트' 만 11.5 다
-              (2026-09-03 실측). 여기만 11.5 로 두면 같은 자리 같은 역할의 글자가 화면마다
-              다른 크기가 된다. */}
-          {/* ⚠️ 조용한 밤에는 문구를 바꾼다. 줄 세울 종목이 없는데 "…견준 순서" 라고 적으면
-              없는 목록의 순서를 설명하는 꼴이다(2026-09-04). 대신 **무엇을 크게 움직였다고
-              보는지**를 적어 위 한 줄을 받쳐 준다.
-              ⛔ 이 바닥 줄을 통째로 숨기지 말 것. 옆 칸(①)이 flex-end 로 바닥까지 차 있어서
-                 이 칸만 바닥이 비면 판이 어긋나 보인다 — 이 칸이 비어 보이던 옛 문제가
-                 정확히 바닥 줄이 없어서였다(위 ② 칸 머리 주석). */}
-          <span style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid var(--c-hairline)",
-                         fontSize: "var(--fs-12)", color: C.sub, lineHeight: 1.6, whiteSpace: "nowrap",
-                         overflow: "hidden", textOverflow: "ellipsis" }}>
-            {usHoliday
-              ? "미장이 다시 열린 다음 아침에 채웁니다"
-              : loudest.length === 0
-                ? "평소 하루 폭을 넘어선 곳이 기준입니다"
-                : "그 종목이 평소 하루에 움직이던 폭과 견준 순서"}
-          </span>
-        </div>
-
-        {/* ③ 오늘의 브리핑 — 1:1:2 판의 셋째 칸(2fr).
-            ⚠️⚠️ **문단 크기를 여기에 적지 말 것**(2026-09-07). 넓은 화면 14 · 폰 14.5 는
-            시장 브리핑·카더라와 한 벌이라 globals.css 의 `.hz-tx .hz-hero-wide p` 가 정한다.
-            인라인 fontSize 는 폰 규칙(≤560)을 이겨서, 옆 두 화면이 14.5 로 올라가는 동안
-            이 화면만 14 에 묶여 있었다. 크기를 바꿀 일이 생기면 CSS 의 그 두 줄을 고친다.
-            ⚠️ 문장을 LLM 에 맡기지 않는다. 재료가 숫자 넷뿐이라 틀이 고정이고, 매일 두 번
-            도는 화면에 모델 값을 태울 이유가 없다. 이름 뒤 조사만 josa() 로 받침에 맞춘다. */}
-        <div className="hz-hero-cell hz-hero-divide hz-hero-wide">
-          <CellHead title="오늘의 브리핑" />
-          {usHoliday ? (
-            /* ⚠️ '조용한 밤' 문구와 섞지 말 것. 그건 미장이 열렸는데 크게 움직인 곳이 없던 밤이고
-               ("한 해에 두세 번"), 이건 미장이 아예 안 열린 밤이다. */
-            <p style={{ margin: 0, color: C.sub, wordBreak: "keep-all" }}>
-              밤사이 미장은 {usHoliday}
-              {euro(usHoliday)} 열리지 않았습니다. 새로 움직인 종목이 없어 오늘은 이어 붙일 국장 종목도 없습니다.
-            </p>
-          ) : moverCount === 0 ? (
-            <p style={{ margin: 0, color: C.sub, wordBreak: "keep-all" }}>
-              {when} 크게 움직인 종목이 없습니다. 눈여겨보는 미국 종목 가운데 평소 폭을 크게 넘어선 곳이 없었다는
-              뜻이고, 고장이 아니라 조용한 밤이었습니다. 한 해에 두세 번 있는 밤입니다.
-            </p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {/* ⚠️⚠️ **숫자보다 이 문장이 먼저다.** 이걸 빼고 수치부터 늘어놓으면 화면 전체가
-                  무슨 말인지 안 읽힌다 — 내용을 아는 사람도 못 읽었다(2026-09-02). 아래 카드의
-                  두 줄(미국 등락 / 국내 평균)이 무엇과 무엇인지를 여기서 한 번 밝혀야 그 뒤로
-                  나오는 조각들이 문장으로 붙는다. */}
-              {/* ⚠️ "코스피보다 얼마나" 같은 말을 쓰지 말 것. 지수 대비 초과분은 코드 안 개념이고,
-                  화면이 내는 숫자는 **그 종목이 실제로 몇 % 열렸나** 다. 문장도 그렇게 적는다. */}
-              <p style={{ margin: 0, color: C.sub, wordBreak: "keep-all" }}>
-                미장 종목이 평소보다 크게 움직인 날, 그 회사와 사업으로 엮인 국장 종목이 다음 날 아침 몇 %에
-                열렸는지를 최근 5년치로 세어 보여 드립니다.
-              </p>
-              {biggest && (
-                <p style={{ margin: 0, color: C.sub, wordBreak: "keep-all" }}>
-                  {when} {moverCount}곳이 평소보다 크게 움직였습니다. 그중 제일 큰 것은{" "}
-                  <strong style={{ color: C.ink, fontWeight: 700 }}>{biggest.usName}</strong>
-                  {josa(biggest.usName, "으로", "로")},{" "}
-                  {/* ⚠️ 여기에 {" "} 를 넣지 말 것. 조사는 앞말에 붙는다 — "+2.89% 로" 가 아니라
-                      "+2.89%로" 다(2026-09-03 지적). JSX 는 줄바꿈 뒤 여는 공백을 지우므로
-                      **아무것도 안 넣는 것이 붙여 쓰는 것**이다. 낱말 사이를 띄울 때만 넣는다. */}
-                  <strong style={{ color: biggest.dp > 0 ? HOT : COLD, fontWeight: 700 }}>{PCT(biggest.dp)}</strong>
-                  로 평소 하루에 움직이던 폭의 {biggest.z.toFixed(1)}배였습니다.
-                </p>
-              )}
-              {strongest && (
-                <p style={{ margin: 0, color: C.sub, wordBreak: "keep-all" }}>
-                  {/* ⚠️ %p 를 문장에 쓰지 말 것. 지수 대비 초과분이라 읽는 사람에게 뜻이 안 선다.
-                      화면 어디에서나 **그 종목이 실제로 몇 %에 열렸나** 로 적는다. */}
-                  국장에서 가장 크게 따라갔던 곳은{" "}
-                  <strong style={{ color: C.ink, fontWeight: 700 }}>{strongest.l.stock}</strong>
-                  {/* ⚠️ 관계 이름과 조사를 두 칸으로 나누지 말 것. 줄바꿈을 사이에 두면
-                      JSX 가 공백을 지워 붙긴 하지만, 읽는 사람이 붙는지 뜨는지 알 수 없다.
-                      한 식으로 이어 붙여 **눈에 보이는 대로** 둔다. */}
-                  입니다. {strongest.m.usName}에 {strongest.l.why + euro(strongest.l.why)} 엮여 있는데,
-                  최근 5년 이만큼 움직인 날 이 종목은
-                  아침에 평균{" "}
-                  <strong style={{ color: (strongest.l.krOpen ?? 0) > 0 ? HOT : COLD, fontWeight: 700 }}>
-                    {strongest.l.krOpen == null ? "—" : PCT(strongest.l.krOpen)}
-                  </strong>
-                  에 열렸습니다.
-                </p>
-              )}
-              {crowded && crowded[1] > 1 && (
-                <p style={{ margin: 0, color: C.sub, wordBreak: "keep-all" }}>
-                  <strong style={{ color: C.ink, fontWeight: 700 }}>{crowded[0]}</strong>
-                  {josa(crowded[0], "은", "는")} {when} 크게 움직인 미장 종목 {crowded[1]}곳과 한꺼번에 엮입니다.
-                </p>
-              )}
-            </div>
-          )}
-          {/* ⭐ **최종 업데이트는 이 저장소의 공용 어법이다**(시장 브리핑·카더라와 같은 모양:
-              schedule 아이콘 + "… 기준"). 값은 그날 줄의 `created_at` 이고, 수집기가
-              그날 것을 통째로 갈아 끼우므로 그게 곧 마지막 실행 시각이다.
-              ⚠️ 다른 화면의 30분 눈금이 아니라 HERO_HOURS [7] 정각에 붙인다. 자동 실행은 이
-              줄을 06:31 에 쓰고 ±2시간 안이라 늘 "오전 7시 기준" 이 된다(저녁 실행은 이 표를
-              안 쓴다). 손으로 5~9시 밖에 돌린 실행만 "오후 3시경" 처럼 실제 시각이 적힌다.
-
-              ⚠️⚠️ 여기 **"움직임은 대부분 개장 순간에 끝납니다 · 매수·매도 신호가 아닙니다"**
-              가 있었다(2026-09-03 에 최종 업데이트로 바뀜). 그 고지를 통째로 없앤 게 아니라
-              **시트 맨 아래 각주가 그대로 들고 있다** — 그 각주를 지우면 화면에서 '신호 아님'
-              이 사라진다. 절대 지우지 말 것.
-
-              ⚠️ **칸의 직계 자식이어야 한다.** 안쪽 래퍼에 두면 marginTop:auto 가 래퍼 안에서만
-              놀아 칸 바닥까지 안 밀리고, 옆 칸과 높이가 어긋난다(2026-09-02 실측). */}
-          <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 7,
-                        paddingTop: 10, borderTop: "1px solid var(--c-sheet-row)" }}>
-            <Icon name="schedule" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
-            {/* ⚠️ lineHeight 를 빼지 말 것. 이 줄만 아이콘과 나란히 서는 flex 라 줄 상자가
-                작아지고, 그러면 기준선이 옆 두 칸보다 3px 내려앉는다(2026-09-03 실측).
-                옆 칸 설명과 같은 1.6 을 줘야 셋이 같은 줄에 앉는다. */}
-            <span style={{ fontSize: "var(--fs-11-5)", lineHeight: 1.6, color: C.sub }}>
-              최종 업데이트 · {updatedAt ? formatKstUpdateSnapped(updatedAt, HERO_HOURS) : "—"}
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 타일 벽 ────────────────────────────────────────────────────────
-          ⭐ 구간 배지를 **이제는 쓴다.** 2026-09-02 에는 "가를 것이 없는데 배지 하나만 떠
-          있어 어색하다" 며 뺐는데, 09-03 에 위에 시트가 하나 더 생기면서 그 이유가 사라졌다.
-          가르는 것은 성격이다 — 위는 그 종목 자신의 **지금 값**이고 여기는 **과거 기록**이다.
-          ⚠️ 배지가 하나만 남게 되면 다시 뺄 것.
-
-          ⚠️ 섹터로 시트를 나누지도 말 것. 섹터마다 종목이 1~5 라 상자 키가 제각각이 되고,
-          짝지어 세우면 짧은 쪽 바닥이 빈다. 섹터는 타일 위 작은 라벨로 남긴다.
-
-          ⚠️⚠️ **desc 를 달지 말 것.** 예전엔 여기에 "윗줄은 …, 아랫줄은 …" 이라고 읽는 법을
-          적었는데, **그 설명이 있어야 읽히는 카드면 이미 진 것이다.** 타일이 스스로
-          말하도록 고친 뒤로는 필요가 없어졌다. 다시 적고 싶어지면 카드를 고칠 때다. */}
-      {/* ⚠️ 배지는 **시트 제목과 다른 말**이어야 한다. 제목("미국과 엮인 국내 종목")이
-          무엇을 모아 뒀는지 말하고, 배지는 그게 어떤 성격의 이야기인지 한 마디로 짚는다.
-          한때 "과거 기록" 이었는데 그건 자료를 분류한 말이지 읽는 사람의 말이 아니었다. */}
-      <SectionIntro n={hasOvernight ? 1 : undefined} title="미장의 여파" />
-      <section className="hz-sheet">
-        {/* ⚠️ desc 를 비워 두지 말 것. 이 저장소의 시트 머리는 어디서나 제목 + 부제 한 줄이라,
-            여기만 없으면 카드가 덜 만들어진 것처럼 보인다(2026-09-02 지적).
-            ⚠️⚠️ 다만 **읽는 법을 적는 자리가 아니다.** 한때 "윗줄은 …, 아랫줄은 …" 이라고
-            사용법을 적었는데, 그 설명이 있어야 읽히는 카드면 이미 진 것이다. 무엇을 모아
-            둔 자리인지만 적는다.
-
-            ⚠️⚠️ **제목은 짧게.** "간밤 크게 움직인 곳과 이어진 국내 종목"(20자)이었다.
-            이 저장소의 시트 제목은 "급부상 종목"·"이슈 키워드"·"임원이 신고한 매매" 처럼
-            대개 열 자 안팎이고, 긴 제목은 오른쪽 알약과 한 줄을 다투다 좁은 화면에서 먼저
-            눌린다(SectionHead 주석의 375px 실측). '간밤' 은 히어로 첫 칸이 이미 말한다.
-
-            ⚠️⚠️ **관계를 낱말만 나열하지 말 것.** 부제가 "납품·고객·같은 업종·기술이전"
-            이었는데 동사가 없어 걸러 낸 조건표처럼 읽혔고, '고객' 은 누가 누구의 고객인지도
-            모호했다(2026-09-03 지적). 여기는 **왜 이 국내 종목이 저 미국 종목 밑에 붙어
-            있는지**를 한 문장으로 말하는 자리다. 쌍마다 다른 개별 관계는 타일 안 `l.why`
-            꼬리표가 이미 붙이므로 여기서 다 셀 이유가 없다.
-
-            ⚠️ **부제는 고정 문구다**(2026-09-04). 한때 `sheetDesc()` 가 그날 뜬 관계 종류를
-            세어 문장을 지었는데("오늘은 같은 업종과 업황으로 엮인 곳이 대부분입니다"),
-            날마다 바뀐다는 사실은 이제 **바닥 각주**가 말한다. 부제는 이 시트가 무엇인지를
-            말하는 자리로 되돌렸다. 둘이 같은 일을 하면 부제가 매일 다른 말을 하면서도 정작
-            "이게 뭔가" 에는 답을 안 한다.
-            ↳ 그래서 `sheetDesc`·`KIND_LABEL`·`FALLBACK_DESC` 를 지웠다. 되살릴 일이 생기면
-              재료는 그대로 있다 — `kr_preview_daily.kind` 를 파이프라인이 계속 채우고
-              `lib/kr-preview.ts` 가 `PreviewLink.kind` 로 실어 온다(마이그레이션 061).
-            ⚠️⚠️ **JSX 는 속성 사이에 주석을 못 둔다**(TS1005). 이 화면에서 두 번 밟았다 —
-            할 말이 있으면 요소 위에 적을 것. */}
-        {/* ⚠️ 제목이 **말끝을 열어 둔 채 끝난다**("…국장에서는"). 일부러다 — 위 구간 배지가
-            '미장의 여파' 라 배지와 제목이 이어서 한 문장이 되고, 그 뒤를 타일 안 숫자가
-            받는다. 타일 머리줄("최근 5년, 이렇게 오른 날 국장에서는")과도 같은 말이라
-            제목에서 본 문장을 타일에서 다시 만난다.
-            ⛔ "미국과 엮인 국내 종목" 으로 되돌리지 말 것 — 엮였다는 사실은 **부제**가 이미
-            말한다(2026-09-04). 제목까지 그러면 같은 말이 두 번이고, 정작 이 시트가 무엇을
-            내주는지(그런 아침의 국내 기록)는 아무 데도 안 적힌다. */}
-        {/* ⚠️ level={3} 를 빼지 말 것. 기본값 3 은 시트 위에 구간 제목(h2)이 한 겹 더 있는
-            화면(내부자·홈)에 맞춘 값이다. 이 화면은 그 겹이 없어서 h3 를 쓰면 히어로 칸
-            제목(h2)의 하위처럼 읽힌다. 시장 브리핑·카더라도 같은 자리에서 h2 다. */}
-        <SectionHead
-          level={3}
-          icon="call_split"
-          title="그런 아침 국장에서는"
-          note={moverCount ? `미장 ${moverCount}종목 · 국장 ${stockCount}종목` : undefined}
-          desc={`${when} 미장에서 크게 움직인 종목과 그 종목에 사업으로 엮인 국장 종목입니다`}
-        />
-        {wall.length === 0 ? (
-          <p style={{ margin: 0, padding: "20px 22px", fontSize: "var(--fs-13)", lineHeight: 1.75, color: C.sub, wordBreak: "keep-all" }}>
-            {usHoliday ? "밤사이 미장이 쉬어 이어 붙일 자리가 없습니다" : `${when} 크게 움직인 종목이 없어 이어 붙일 자리도 없습니다`}
-          </p>
-        ) : (
-          <>
-            <div className="hz-panelgrid hz-panelgrid-2">
+            <ol>
               {wall.map((m) => (
-                <MoverPanel key={m.ticker} m={m} when={when} />
+                <MoverGroup key={m.ticker} m={m} when={when} />
               ))}
-            </div>
-            {/* ⭐ **이 목록이 날마다 바뀐다는 것**만 각주로 낸다.
-
-                2026-09-03 에는 각주 띠를 아예 떼기로 했었다. 그때 후보였던 말들이("개장·장 중·
-                종가 모두 최근 5년 평균입니다" 따위) **이미 타일 안에 있는 사실을 열세 번째로
-                되풀이**했기 때문이다. 그 판단은 그 문구들에 대해서는 지금도 맞다.
-                ⛔ 그러니 여기에 표본 크기·대조군·사전 규모·5년 평균을 도로 적지 말 것.
-                ⛔ '매수·매도 신호가 아니다' 고지도 여기 적지 말 것 — 전역 푸터가 한다.
-                ⭐ 이 한 줄만 다른 이유: **화면 어디에도 없는 사실**이라서다. 머리의 알약은
-                  "미국 8종목 · 국내 12종목" 이라고 오늘 숫자만 말하고, 타일은 저마다 자기
-                  종목만 말한다. 그래서 읽는 사람은 이 열두 곳이 **늘 같은 목록**인 줄 안다.
-                  실측(2026-09-04): 최근 여섯 날이 하루 4~19곳으로 오르내렸고, 9/1 과 9/2 는
-                  겹치는 종목이 둘뿐이었다. */}
-            <div className="hz-sheet-foot" style={{ marginTop: "auto" }}>
-              {/* ⚠️ 안쪽에 세로 padding 을 주지 말 것 — 띠가 이미 위아래 11px 을 들고 있다
-                  (globals.css 의 .hz-sheet-foot 주석 참고). */}
-              {/* ⚠️ 폰(375)에서 이 띠의 글 칸은 343px 이고, 12px 글자로 **37자가 310px** 이다
-                  (실측 2026-09-04). 지금 문구는 53자 447px 이라 폰에서 두 줄이고 띠가 44 → 63px 이
-                  된다 — 알고 쓰는 것이다. 한 줄로 되돌리려면 37자 아래로 줄여야 한다.
-                  ⚠️ 처음 쓴 98자짜리는 폰에서 세 줄(83px)이었다. 거기까지 늘리지 말 것. */}
-              <span style={{ fontSize: "var(--fs-12)", lineHeight: 1.6, color: C.sub, wordBreak: "keep-all" }}>
-                고정된 목록이 아닙니다. 그날 평소보다 크게 움직인 종목만 남고 목록이 매일 아침마다 바뀝니다.
-              </span>
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* ── 해외에서 거래 중인 값 ───────────────────────────────────────────
-          ⚠️ **이 시트는 위 것 뒤다**(2026-09-03 에 앞뒤를 바꿨다). 처음엔 "그 종목 자신의
-          값이니 가까운 것을 먼저" 라며 앞에 뒀는데, 그러면 히어로(밤사이 뉴욕 → 크게 움직인
-          미국 종목 → 브리핑)에서 이어지던 이야기가 한 번 끊긴다. 위 시트가 히어로의 연장이고
-          이건 다른 축이라 뒤가 맞다.
-          ⚠️ 자료가 없는 날(수집 실패·표 없음)에는 시트째 그리지 않는다. 빈 시트를 남기면
-          고장으로 읽힌다 — 아래 시트는 그날도 자기 할 말이 있다. */}
-      {hasOvernight && <SectionIntro n={2} title="개장 전 지금" />}
-      {overnight.rows.length > 0 && (
-        <section className="hz-sheet">
-          {/* ⭐ '시점' 알약은 살아 있는 값일 때 **날짜와 분까지** 적는다("9/4 오전 2:40 시점").
-              10분마다 새로 받으므로 "오후 8시" 로 뭉개면 방금 값인지 두 시간 전 값인지 구별이
-              안 되고, 날짜가 없으면 새벽에 어제 것인지 오늘 것인지가 안 갈린다.
-              담아 둔 값으로 물러선 날에는 집안 어법(formatKstUpdateSnapped)을 쓴다 — 그쪽은 이미
-              연·월·일과 요일을 다 적는다(그때는 아침 실행 시각이다).
-
-              ⭐ 환율은 **부제에 한 번만** 적는다(2026-09-03). 카드마다 되풀이하면 종목 셋에
-              같은 숫자가 세 번 나오는데, 환율은 그날 하나뿐이라 카드의 값이 아니라 이 시트
-              전체의 전제다.
-              ⚠️ 원 단위로 반올림한다. 카드의 원화 값이 이미 원 단위라 여기만 소수점을 적으면
-              정밀도가 어긋나 보인다. */}
-          <SectionHead
-            level={3}
-            /* ⚠️ schedule 이었다. 위 히어로 칸의 '최종 업데이트' 줄이 같은 시계를 쓰고 있어
-               한 화면에 둘이었다. 게다가 시각은 오른쪽 알약이 이미 적는다 — 이 시트를 다른
-               시트와 가르는 말은 제목의 **'해외에서'** 쪽이다. */
-            icon="public"
-            title="해외에서 거래 중인 값"
-            note={
-              overnight.capturedAt
-                ? overnight.live
-                  ? `${kstStamp(overnight.capturedAt)} 시점`
-                  : `${formatKstUpdateSnapped(overnight.capturedAt, PERP_HOURS).replace(" 기준", "")} 시점`
-                : undefined
-            }
-            /* ⚠️ '거래된' 이 아니라 **'거래되는'** 이다(2026-09-05 지적). 시트 제목이
-                "해외에서 거래 **중인** 값" 인데 설명만 과거였다 — 제 제목과 어긋난다.
-                이 화면을 읽는 시각은 국장이 열기 전이고 그때 저쪽은 아직 거래 중이다.
-                언제 값인지는 옆 '시점' 알약이 따로 말하므로 설명이 시제로 겹칠 이유가 없다. */
-            desc={`국장이 닫힌 동안 해외 무기한선물에서 거래되는 값입니다. 환율 ${Math.round(
-              // ⚠️ 환율은 **하루에 하나**다(수집기가 실행마다 한 번 받아 모든 줄에 같은 값을
-              //    넣는다). 그래서 어느 줄에서 꺼내도 같지만, 줄 순서가 거래대금 순이라
-              //    rows[0] 은 날마다 다른 종목이다 — 가장 큰 값을 집어 뜻을 못박는다.
-              Math.max(...overnight.rows.map((r) => r.fx)),
-            ).toLocaleString("ko-KR")}원 기준입니다.`}
-          />
-          {/* ⚠️ 여기는 **3열**이다(아래 미국 타일 벽은 2열). 종목이 셋뿐이라 2열이면 둘째 줄에
-              한 장만 남아 오른쪽이 빈다. 좁은 화면에서는 globals.css 가 1120 아래에서 2열,
-              700 아래에서 1열로 알아서 접는다. */}
-          <div className="hz-panelgrid hz-panelgrid-3">
-            {overnight.rows.map((r) => (
-              <OvernightPanel key={r.code} r={r} />
-            ))}
+            </ol>
           </div>
-        </section>
+        </Module>
       )}
     </div>
   );

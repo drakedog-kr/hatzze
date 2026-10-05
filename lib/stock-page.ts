@@ -395,22 +395,26 @@ export async function themePeerStocks(
   code: string,
   themes: string[],
   limit = 8,
-): Promise<{ code: string; name: string }[]> {
+): Promise<{ code: string; name: string; market: string | null; price: number | null; changeRate: number | null }[]> {
   if (!themes.length) return [];
   // 여러 테마에 걸친 종목은 첫 테마만 쓴다. 둘을 합치면 이웃이 20개가 넘어 줄이 길어지고,
   // 무엇을 기준으로 묶인 목록인지도 흐려진다.
   const names = (THEMES[themes[0]] ?? []).slice(0, limit + 4);
   if (!names.length) return [];
   const db = getSupabaseAdmin();
-  const { data, error } = await db.from("stocks").select("code,name").in("name", names);
+  // 종가 · 등락도 같은 표에서 — 이름만 든 알약 여덟이 판 폭의 절반만 채웠다(2026-10-05 점검). 바깥 요청 · 채널 합집합 조회는 늘지 않는다.
+  const { data, error } = await db.from("stocks").select("code,name,market,close_price,change_rate").in("name", names);
   if (error) {
     // 곁다리 줄이다. 못 읽으면 그 줄만 안 그린다 — 화면 전체를 막지 않는다.
     console.error(`[themePeerStocks] ${themes[0]} 이웃 종목을 못 읽었습니다`, error);
     return [];
   }
-  const byName = new Map((data ?? []).map((r) => [r.name as string, r.code as string]));
+  const byName = new Map((data ?? []).map((r) => [r.name as string, r]));
   return names
-    .map((name) => ({ name, code: byName.get(name) ?? "" }))
+    .map((name) => {
+      const r = byName.get(name);
+      return { name, code: (r?.code as string) ?? "", market: (r?.market as string | null) ?? null, price: (r?.close_price as number | null) ?? null, changeRate: (r?.change_rate as number | null) ?? null };
+    })
     .filter((s) => s.code && s.code !== code)
     .slice(0, limit);
 }

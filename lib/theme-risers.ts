@@ -47,6 +47,8 @@ export function parseRisers(rows: RiserRow[], known: (theme: string) => boolean)
     seen.add(r.theme);
     if (!r.riser?.code) continue; // 그 테마의 최신 행에 후보가 없다 — 줄이 없다.
     const s = r.riser;
+    // 횟수가 그대로거나 준 종목은 줄을 세우지 않는다 — 파이프라인 pick_risers 와 같은 거름(2026-10-04 점검). 그 규칙 전에 저장된 행에도 건다.
+    if ((Number(s.prior) || 0) > 0 && (Number(s.recent) || 0) <= (Number(s.prior) || 0)) continue;
     out.push({
       theme: r.theme,
       code: s.code,
@@ -65,4 +67,32 @@ export function parseRisers(rows: RiserRow[], known: (theme: string) => boolean)
     return a.recent > b.recent;
   };
   return out.sort((a, b) => (better(a, b) ? -1 : better(b, a) ? 1 : 0)).slice(0, RISER_MAX);
+}
+
+/** 기준일에 줄이 하나도 없을 때 거슬러 갈 날수 — 연휴(추석 닷새)도 넘게. */
+export const RISER_FALLBACK_DAYS = 7;
+
+/**
+ * 화면에 세울 줄 — 이유가 있는 줄만. 기준일(carryFrom 부터 이어 읽기, parseRisers) 줄이 하나도 없으면 그 앞 날 가운데 줄이 있는
+ * **가장 최근 하루**의 목록을 그날 날짜(asOf)와 함께 준다. 화면은 asOf 가 있으면 머리에 'n/n 기준'을 적는다.
+ *
+ * 왜: 급부상은 최근 사흘과 앞 사흘을 견주고 언급 수도 늘어야 줄을 세운다(pick_risers). 최근 사흘이 토 · 일 · 대체공휴일(10/3~10/5)이고
+ * 앞 사흘이 평일이면 모든 종목의 언급 수가 줄어 국장 · 미장 카드가 통째로 비었다(2026-10-05 운영자 지적 "하나도 안 나온다").
+ * 평일 기준일은 늘 10줄이 찬다(9/19~10/4 되돌려 잼 — 비는 날은 연휴 끝자락뿐). 견주는 방식은 그대로 두고 빈 날만 앞 날로 채운다.
+ */
+export function risersWithFallback(
+  rows: RiserRow[],
+  known: (theme: string) => boolean,
+  carryFrom: string,
+): { risers: ThemeRiser[]; asOf: string | null } {
+  const withReason = (rs: RiserRow[]) => parseRisers(rs, known).filter((r) => r.reason);
+  const now = withReason(rows.filter((r) => r.date >= carryFrom));
+  if (now.length) return { risers: now, asOf: null };
+  // 날마다 따로 본다 — 어제(이어 읽기 안의 날)도 오늘 행에 가려졌을 수 있다(테마마다 최신 행만 보므로).
+  const days = [...new Set(rows.map((r) => r.date))].sort().reverse();
+  for (const d of days) {
+    const l = withReason(rows.filter((r) => r.date === d));
+    if (l.length) return { risers: l, asOf: d };
+  }
+  return { risers: [], asOf: null };
 }

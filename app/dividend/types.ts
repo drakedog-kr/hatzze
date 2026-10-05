@@ -118,4 +118,4 @@ export type BasketLite = {
  * page.tsx 에 있다. `note` 는 묶음 밑에 적는 한 줄 — 여기 없는 건 검색으로 찾으라는 안내와 담긴 수.
  */
 export type MoreRow = { label: string; codes: string[] };
-export type MoreLists = Record<"kr" | "us" | "etf", { rows: MoreRow[]; note: string }>;
+export type MoreLists = Record<"kr" | "us" | "etf", { rows: MoreRow[] }>;

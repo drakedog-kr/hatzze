@@ -176,11 +176,12 @@ TELEGRAM_ATTEMPTS = 3
 
 def stage_for_score(score: float) -> str:
     """점수 → 구간. app/ui.tsx stageForScore · calculate_score.stage_for_score 와 같은 경계."""
-    if score < 25:
+    s = js_round(score)  # 화면에 찍히는 정수로 가른다(app/ui.tsx stageForScore). 24.72 는 25℃ · 상온이다.
+    if s < 25:
         return "저온"
-    if score < 50:
+    if s < 50:
         return "상온"
-    if score < 75:
+    if s < 75:
         return "고온"
     return "초고온"
 

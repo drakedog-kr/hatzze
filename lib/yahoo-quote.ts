@@ -14,6 +14,8 @@ export type YahooQuote = {
   prevClose: number | null;
   /** 최근 52주 최고가. 응답에 없으면 null. */
   fiftyTwoWeekHigh: number | null;
+  /** 이 시세가 찍힌 시각(유닉스 초, meta.regularMarketTime). 응답에 없으면 null. */
+  marketTime: number | null;
 };
 
 /** Next 의 fetch 확장(next.revalidate)까지 받는 init 타입. */
@@ -101,10 +103,12 @@ export async function fetchYahooQuote(symbol: string, init: FetchInit): Promise<
       (x: unknown): x is number => typeof x === "number",
     );
     const high52 = result?.meta?.fiftyTwoWeekHigh;
+    const mt = result?.meta?.regularMarketTime;
     return {
       price,
       prevClose: resolvePrevClose(closes, price, result?.meta?.chartPreviousClose),
       fiftyTwoWeekHigh: typeof high52 === "number" ? high52 : null,
+      marketTime: typeof mt === "number" ? mt : null,
     };
   } catch {
     return null;
@@ -115,3 +119,26 @@ export async function fetchYahooQuote(symbol: string, init: FetchInit): Promise<
 export function changeRateOf(q: YahooQuote): number | null {
   return typeof q.prevClose === "number" && q.prevClose !== 0 ? (q.price / q.prevClose - 1) * 100 : null;
 }
+
+/** 유닉스 초 → 그 시간대의 날짜(YYYY-MM-DD). */
+export function dateInZone(unixSec: number, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(unixSec * 1000));
+}
+
+/**
+ * 시장의 마지막 거래일과 오늘(그 시장 시간대) — 표 머리 '지금 등락'을 정한다. 지수 하나의 시세 시각으로 본다.
+ * 장이 쉬는 주말에 '지금 등락'이라 적힌 값이 바로 옆 표의 '10/2 등락'과 같은 값이었다(2026-10-04 점검). 못 받으면 null.
+ */
+export async function lastSession(symbol: string, timeZone: string): Promise<{ session: string; today: string } | null> {
+  const q = await fetchYahooQuote(symbol, { next: { revalidate: 1800 } });
+  if (!q || q.marketTime === null) return null;
+  return { session: dateInZone(q.marketTime, timeZone), today: dateInZone(Date.now() / 1000, timeZone) };
+}
+
+/** 표 머리 — 오늘 거래일이면 '지금 등락', 장이 쉬었으면 마지막 거래일('10/2 등락'). 모르면 '지금 등락'. */
+export function liveChangeHead(s: { session: string; today: string } | null): string {
+  if (!s || s.session === s.today) return "지금 등락";
+  const [, m, d] = s.session.split("-").map(Number);
+  return `${m}/${d} 등락`;
+}
+

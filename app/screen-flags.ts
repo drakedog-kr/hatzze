@@ -16,7 +16,6 @@
  * ## 이 플래그를 읽는 곳
  *
  *   app/preview/page.tsx  배포된 곳에서 404 를 낼지(`!PUBLIC && DEPLOYED`), 색인을 막을지
- *   app/Footer.tsx        '바로가기' 목록에 줄을 낼지
  *   app/AppShell.tsx      소식 띠가 어느 화면을 가리킬지(NEWS)
  *
  * ⚠️ 사이드바(app/AppShell.tsx)는 아직 이 플래그를 안 읽는다. 거기는 항목의 **모양**이
@@ -27,7 +26,7 @@
  * ## 여는 절차
  *
  *   1. 아래 값을 true 로 바꾼다.
- *      ↳ 이것만으로 푸터 바로가기와 **소식 띠**가 함께 켜진다. 띠 문구는 정해 뒀다.
+ *      ↳ 이것만으로 **소식 띠**가 함께 켜진다. 띠 문구는 정해 뒀다.
  *   2. `app/AppShell.tsx` 의 COMING_SOON 항목을 지우고 NAV 에 `{ href: "/preview", ... }` 를
  *      같은 자리에 넣는다.
  *   3. `app/releases.ts` 에 한 줄 올린다(화면이 하나 느는 것이라 Minor).
@@ -46,7 +45,6 @@ export const PREVIEW_PUBLIC = true;
  *
  *   app/daily/page.tsx · app/daily/[date]/page.tsx   배포된 곳에서 404 를 낼지, noindex 를 달지
  *   app/AppShell.tsx                                  NAV ↔ COMING_SOON · DEEP_PAGES · 소식 띠(NEWS)
- *   app/Footer.tsx                                    '바로가기' 목록
  *   app/sitemap-urls.ts · app/sitemap-notes.xml       사이트맵(목록 화면 + 날짜별 글)
  *   app/robots.ts                                     sitemap-notes.xml 을 적을지
  *   scripts/check-routes.mjs                          안 연 동안 사이트맵에 없는 것을 정상으로 볼지
@@ -64,11 +62,11 @@ export const DAILY_PUBLIC = true;
 
 /**
  * 배당으로 살기(/dividend) — 종목과 주수를 넣으면 1년에 얼마 받는지 계산하는 화면. 2026-09-11 에
- * 만들었고 **아직 안 열었다.** 읽는 곳은 데일리 노트와 같다(사이드바·푸터·사이트맵·검사).
+ * 만들었고 **아직 안 열었다.** 읽는 곳은 데일리 노트와 같다(사이드바·사이트맵·검사) + 투자 유의사항의 데이터 출처.
  *
  *   app/dividend/page.tsx     배포된 곳에서 404 를 낼지, noindex 를 달지
  *   app/AppShell.tsx          NAV ↔ COMING_SOON · DEEP_PAGES
- *   app/Footer.tsx            '바로가기' 목록
+ *   app/disclaimer/page.tsx   투자 유의사항 '데이터 출처'의 배당 줄
  *   app/sitemap-urls.ts       사이트맵
  *   scripts/check-routes.mjs  안 연 동안 사이트맵에 없는 것을 정상으로 볼지
  *
@@ -85,11 +83,10 @@ export const DIVIDEND_PUBLIC = true;
 
 /**
  * 테마 리포트(/theme · /theme/[테마]) — 테마 하나를 두고 채널에서 무슨 얘기가 도는지 보는 화면.
- * 2026-09-19 에 만들어 **2026-09-23 에 열었다.** 읽는 곳은 배당으로 살기와 같다(사이드바·푸터·사이트맵·검사).
+ * 2026-09-19 에 만들어 **2026-09-23 에 열었다.** 읽는 곳은 배당으로 살기와 같다(사이드바·사이트맵·검사).
  *
  *   app/theme/page.tsx · app/theme/[theme]/page.tsx   배포된 곳에서 404 를 낼지, noindex 를 달지
  *   app/AppShell.tsx                                   NAV ↔ COMING_SOON · DEEP_PAGES · 소식 띠(NEWS) · 머리 도구의 건너가기 단추
- *   app/Footer.tsx                                     '바로가기' 목록
  *   app/sitemap-urls.ts                                사이트맵(목록 + 테마별 실주소)
  *   scripts/check-routes.mjs                           안 연 동안 사이트맵에 없는 것을 정상으로 볼지
  *
@@ -104,13 +101,5 @@ export const DIVIDEND_PUBLIC = true;
  */
 export const THEME_PUBLIC = true;
 
-/**
- * 사이드바의 '테마 리포트' 옆 **빨간 N 배지**. 새로 생긴 화면이라는 표시다(푸터 버전 옆에 붙는 것과 같은 표식).
- *
- * ⚠️ **기한이 없다.** 푸터 배지는 방문자가 업데이트 기록을 보면 꺼지고 열나흘이 지나면 저절로 꺼지는데
- *    (app/VersionBadge.tsx), 이 배지는 그런 판정을 하지 않는다 — 켜 두기로 한 동안 모두에게 늘 보인다.
- *    뗄 때는 **이 줄을 false 로 바꾸는 것이 아니라 지운다**(읽는 곳은 app/AppShell.tsx 의 NAV 한 줄뿐이다).
- */
-export const THEME_NAV_NEW = true;
 // 화면 캐시를 비우고 데우는 자리는 손댈 것이 없다 — `scripts/revalidate.sh` 의 DEFAULT_WARM 에 /theme·/theme/us 가 이미 있고,
 // 파이프라인의 '테마 리포트 화면만 먼저 비우고 데우기' 스텝도 그대로다(안 연 동안은 404 라 아무 일이 없다).

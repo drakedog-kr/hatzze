@@ -8,6 +8,8 @@ import { THEMES } from "@/lib/stock-themes";
 import { LOAD_FAILED, type MaybeFailed } from "@/lib/load-state";
 import { RISING_WINDOW_DAYS, channelDeltas, type ChannelDelta, type ChannelSnapshot } from "@/lib/rising-channels";
 import { MIN_RECENT_MENTIONS, scoreSurging } from "@/lib/surging-score";
+import { dropOverlaps } from "@/lib/keyword-overlap";
+import { usableDays, weekAgoDates } from "@/lib/theme-flow";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { trendingTodayStartISO } from "@/lib/trending-window";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
@@ -1567,21 +1569,21 @@ async function themeStocks(windowDates: string[]): Promise<Map<string, ThemeStoc
 /**
  * 테마 로테이션 비교 창.
  *
- * ⚠️ **data-pipeline/common/broadcast_content.py 의 같은 이름 상수와 값이 같아야 한다.**
+ * ⚠️ **data-pipeline/common/broadcast_content.py 의 같은 이름 상수 · 같은 규칙이어야 한다.**
  * 이 카드의 숫자와 방송 C(테마) 글의 숫자가 같은 날 같은 테마를 말하는데, 그 글은 본문에
  * 이 사이트 링크를 달고 나간다 — 창이 갈리면 클릭 한 번에 어긋남이 보인다. 2026-07-31 에
  * 실제로 그랬다(반도체를 카드는 ▲3.7%p, 방송은 +5.6%p 로 적었다. 파이프라인 쪽이 공백
  * 이틀을 기준 창에 넣고 있었다). Python 과 TS 라 import 로 공유할 수 없어 손으로 맞춘
- * 사본이고, 그래서 규칙을 바꿀 땐 **양쪽을 같이** 고쳐야 한다.
+ * 사본이고, 그래서 규칙을 바꿀 땐 **양쪽을 같이** 고쳐야 한다. 견줄 날은 lib/theme-flow.ts weekAgoDates
+ * (파이썬 짝 common/thin_days.py week_ago_dates)가 고른다.
  */
 const THEME_LOOKBACK_DAYS = 14;
 const THEME_RECENT_DAYS = 3;
-const THEME_PRIOR_GAP_DAYS = 5;
 
 /**
  * 테마 로테이션 — 테마별 언급 점유율·순위와 그 변화.
  * 절대 언급량은 주말에 급감해 비교가 안 되므로 '그날 전체 대비 점유율'로 본다.
- * 순위 변동·점유율 증감은 5일 이상 이전 데이터가 있을 때만 계산한다(축적 초기 왜곡 방지).
+ * 순위 변동·점유율 증감은 1주 전 같은 날들의 집계가 있을 때만 계산한다(축적 초기 왜곡 방지).
  */
 export async function getThemeRotation(limit = 10): Promise<MaybeFailed<ThemeRotation[]>> {
   const db = getSupabaseAdmin();
@@ -1595,36 +1597,21 @@ export async function getThemeRotation(limit = 10): Promise<MaybeFailed<ThemeRot
   }
   if (!data?.length) return [];
 
-  const dates = [...new Set(data.map((r) => r.date))].sort();
-  const latestDate = dates[dates.length - 1];
-  const DAY = 24 * 60 * 60 * 1000;
-  const daysBefore = (d: string) => (new Date(latestDate).getTime() - new Date(d).getTime()) / DAY;
-
+  // 표본이 거의 없는 날(기준일 아침 · 수집이 끊긴 날)은 창에서 뺀다(lib/theme-flow.ts usableDays).
+  const dayTotals = new Map<string, number>();
+  for (const r of data) dayTotals.set(r.date, (dayTotals.get(r.date) ?? 0) + (r.mention_count ?? 0));
+  const allDates = [...new Set(data.map((r) => r.date))].sort();
+  const dates = usableDays(dayTotals, allDates);
+  if (!dates.length) return [];
   // 하루치끼리 비교하면 주말·수집 첫날처럼 표본이 얇은 날에 점유율이 요동친다.
-  // 그래서 '최근 3일 평균' vs '5일 이상 이전 평균'으로 창을 잡아 비교한다.
-  //
-  // **사이에 이틀(3·4일 전)을 비워 두는 이유.** 겹침을 막으려는 게 아니다 — 두 창은
-  // 공백이 없어도 겹치지 않는다. 막는 건 경계를 갓 넘어온 날이다. 공백을 없애면 기준
-  // 창의 가장 최근 날이 '어제까지 최근 창에 있던 날'이 되어, 최근 3일을 하루 밀린 자기
-  // 자신과 견주는 꼴이 된다.
-  //
-  // 다만 **그게 숫자로 낫다는 근거는 없다.** 2026-07-31 에 지난 재생분으로 '하루가
-  // 지날 때 변동폭이 흔들린 폭'을 두 방식으로 재 봤는데, 창이 꽉 찬 날만 추리면
-  // (6일·55쌍) 평균은 공백 쪽이 0.99 vs 1.09%p 로 조금 낫고 중앙값(0.45 vs 0.44%p)과
-  // 최대(7.4 vs 6.7%p)는 오히려 반대였다. 표본이 그만한 차이를 가릴 만큼 작다.
-  // 그래서 이 값은 '더 정확해서'가 아니라 **한쪽으로 정해 두려고** 고른 것이다.
-  // 고른 쪽이 이 값인 이유는 이슈 키워드(computeIssueKeywords ↔
-  // calculate_telegram_sentiment.py)가 이미 양쪽 다 5일로 맞춰져 있어서다.
-  // 바꾸고 싶으면 취향이 아니라 표본을 들고 올 것. 그때도 양쪽을 같이 바꿔야 한다.
+  // 그래서 '최근 3일 평균' vs '1주 전 같은 날들의 평균'으로 창을 잡아 비교한다(화면 글자 '1주 전 대비').
+  // 같은 요일끼리라 주말이 한쪽에만 드는 일이 없다. 예전 '5일 이상 전 평균'(5~14일 전)에서 바꾼 근거와
+  // 되돌려 잰 값은 lib/theme-flow.ts weekAgoDates 주석에 있다(2026-10-05). 이슈 키워드의 증감 판정
+  // (computeIssueKeywords ↔ calculate_telegram_sentiment.py)은 '5일 이상 전'을 그대로 쓴다 — 화면에 기간 글자가 없다.
   const recentDates = dates.slice(-THEME_RECENT_DAYS);
-  // recent 는 **개수**로, prior 는 **날짜 간격**으로 잡는다. 그래서 수집이 며칠 끊기면
-  // recent 가 THEME_PRIOR_GAP_DAYS 보다 더 뒤까지 손을 뻗어 같은 날이 양쪽에 들어간다
-  // (07-20·07-25·07-30·07-31 만 남은 경우 07-25 가 recent 이면서 5일 이상 이전이다).
-  // 그 날은 이중으로 세어져 변동폭을 조용히 깎으므로 명시적으로 뺀다. 카더라 수집은
-  // 2026-07-26~28 에 실제로 이틀 멈춘 적이 있다.
-  const priorDates = dates.filter(
-    (d) => daysBefore(d) >= THEME_PRIOR_GAP_DAYS && !recentDates.includes(d),
-  );
+  // 최근 창이 개수로 잡혀 수집이 며칠 끊기면 1주보다 더 뒤까지 뻗을 수 있지만, 견줄 날은 최근 날마다 정확히 7일 앞이라
+  // 같은 날이 양쪽에 들어가지 않는다(07-26~28 수집이 멈췄던 때 옛 규칙이 겪은 함정).
+  const priorDates = weekAgoDates(recentDates, dates);
 
   // 최근 창에 한 번도 안 뜬 테마도 카드에는 0%로 남겨야 정원(10개)이 채워진다.
   // 그래서 집계 대상 테마는 '최근 창에 등장한 것'이 아니라 조회 구간 전체의 테마다.
@@ -2199,8 +2186,8 @@ export type IssueKeyword = {
  * 옮겨갔는가"라는 원래 묻고 싶은 것이 남는다 — 테마 로테이션·급부상 종목이 같은 이유로
  * share 기반이다.
  *
- * 창은 테마 로테이션과 동일하게 최근 3일 평균 vs 5일 이상 이전 평균 — 하루치끼리
- * 비교하면 표본이 얇은 날에 요동친다.
+ * 창은 최근 3일 평균 vs 5일 이상 이전 평균 — 하루치끼리 비교하면 표본이 얇은 날에 요동친다.
+ * (테마 로테이션도 같은 창이었다가 2026-10-05 에 '1주 전 같은 날들'로 바꿨다 — 화면 글자 '1주 전 대비'. 이 표엔 기간 글자가 없어 그대로 둔다.)
  *
  * ⚠️ **이 규칙의 사본이 파이프라인에도 있다**(calculate_telegram_sentiment.py 의
  * issue_keyword_rows). 평소엔 그쪽이 미리 계산한 값을 읽고, 그 표가 비었을 때만 아래
@@ -2273,7 +2260,12 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
   );
   if (!data.length) return [];
 
-  const dates = [...new Set(data.map((r) => r.date))].sort();
+  // 표본이 거의 없는 날(기준일 아침 · 수집이 끊긴 날)은 창에서 뺀다(lib/theme-flow.ts usableDays).
+  const dayTotals = new Map<string, number>();
+  for (const r of data) dayTotals.set(r.date, (dayTotals.get(r.date) ?? 0) + (r.mention_count ?? 0));
+  const allDates = [...new Set(data.map((r) => r.date))].sort();
+  const dates = usableDays(dayTotals, allDates);
+  if (!dates.length) return [];
   const latestDate = dates[dates.length - 1];
   const DAY = 24 * 60 * 60 * 1000;
   const daysBefore = (d: string) => (new Date(latestDate).getTime() - new Date(d).getTime()) / DAY;
@@ -2304,27 +2296,37 @@ async function computeIssueKeywords(limit: number): Promise<IssueKeyword[]> {
   }
 
   const canCompare = priorDates.size > 0;
-  return [...total.entries()]
+  const candidates = [...total.entries()]
     .filter(([, count]) => count >= MIN_KEYWORD_MENTIONS)
     // 언급 수가 같으면 화제어로 가른다 — 정수라 동점이 흔하고, 안 가르면 순위가
     // DB 행 순서에 딸려 흔들린다(채널 랭킹에서 실제로 겪었다).
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  // 같은 화제를 두 칸에 세우지 않는다 — 파이프라인 common/keyword_overlap.py 와 같은 규칙(lib/keyword-overlap.ts).
+  const keep = new Set(dropOverlaps(candidates.map(([w]) => w)));
+  return candidates
+    .filter(([w]) => keep.has(w))
     .slice(0, limit)
     .map(([word, count]) => {
       // 창 길이가 다르므로 '하루 평균 점유율'로 맞춰 비교한다.
       // 그날 등장하지 않은 화제어는 점유율 0으로 치므로 창 전체 일수로 나눈다.
       const recentAvg = (recentShare.get(word) ?? 0) / Math.max(recentDates.size, 1);
       const priorAvg = (priorShare.get(word) ?? 0) / Math.max(priorDates.size, 1);
-      // 부동소수 비교라 정확히 같은 경우는 드물다 — 점유율 차이가 무시할 수준이면
-      // 'flat' 으로 본다. 둘 다 0인 경우(최근 창에 한 번도 안 나온 말)도 여기 걸린다.
+      // 파이프라인 keyword_trend 와 같은 판정 — 앞 기간 몫의 25% 안쪽이면 'flat'(상대 폭). 절대 %p 로 가르면 낱말 하나의
+      // 몫이 0.3~2% 라 반 넘게 늘어도 '비슷'이었다(2026-10-04 점검). 둘 다 0인 경우(최근 창에 안 나온 말)도 'flat'.
       const FLAT = 1e-6;
+      const REL_FLAT = 0.25;
+      const d = recentAvg - priorAvg;
       const trend: IssueKeyword["trend"] = !canCompare
         ? null
-        : Math.abs(recentAvg - priorAvg) < FLAT
+        : Math.abs(d) < FLAT
           ? "flat"
-          : recentAvg > priorAvg
+          : priorAvg <= 0
             ? "up"
-            : "down";
+            : Math.abs(d) / priorAvg < REL_FLAT
+              ? "flat"
+              : d > 0
+                ? "up"
+                : "down";
       return { rank: 0, word, count, trend, shareDelta: canCompare ? recentAvg - priorAvg : null };
     });
 }

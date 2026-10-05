@@ -60,7 +60,7 @@ function exchangeDate(epochSec: number, gmtOffsetSec: number): string {
  *     (lib/yahoo-quote 의 같은 판정을 그대로 쓴다 — 규칙이 둘로 갈리면 티커와 MDD 가
  *     또 어긋난다. 2026-07-28 에 실제로 15.7% 어긋났었다).
  */
-function appendLastSession(bars: Bar[], meta: Record<string, unknown> | undefined): void {
+function appendLastSession(bars: Bar[], meta: Record<string, unknown> | undefined, withVolume = false): void {
   const price = meta?.regularMarketPrice;
   const marketTime = meta?.regularMarketTime;
   if (typeof price !== "number" || typeof marketTime !== "number") return;
@@ -94,7 +94,8 @@ function appendLastSession(bars: Bar[], meta: Record<string, unknown> | undefine
 
   // 일봉이 이미 그 날짜를 채웠으면(야후가 뒤늦게 정리한 경우) 그대로 둔다.
   if (bars.length > 0 && bars[bars.length - 1].date >= sessionDate) return;
-  bars.push({ date: sessionDate, close: price });
+  const volume = withVolume ? meta?.regularMarketVolume : null;
+  bars.push(typeof volume === "number" ? { date: sessionDate, close: price, volume } : { date: sessionDate, close: price });
 }
 
 /**
@@ -105,14 +106,19 @@ function appendLastSession(bars: Bar[], meta: Record<string, unknown> | undefine
 export async function fetchDailyHistory(
   symbol: string,
   years: number,
+  /** 봉에 거래량을 붙일까 — MDD 종목 조회('가격대별 거래')만 켠다. 봉을 그대로 화면에 넘기는 곳(내부자 차트)의 전송량을 안 늘린다. */
+  opts: { volume?: boolean } = {},
 ): Promise<Bar[] | null> {
   const now = Math.floor(Date.now() / 1000);
   // 전체(years 아주 큼)여도 야후는 상장 이후만 준다. 여유로 하루 더 뺀다.
   const period1 = years >= 100 ? 0 : Math.max(0, now - Math.ceil(years * SECONDS_PER_YEAR) - 86_400);
-  const url =
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}` +
-    `?period1=${period1}&period2=${now}&interval=1d`;
+  return fetchBars(
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}` + `?period1=${period1}&period2=${now}&interval=1d`,
+    opts.volume === true,
+  );
+}
 
+async function fetchBars(url: string, withVolume = false): Promise<Bar[] | null> {
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
@@ -128,6 +134,8 @@ export async function fetchDailyHistory(
     const result = (await res.json())?.chart?.result?.[0];
     const timestamps: unknown = result?.timestamp;
     const closes: unknown = result?.indicators?.quote?.[0]?.close;
+    // 거래량 — MDD '가격대별 거래'(lib/mdd.ts priceLadder)만 쓴다. 없으면 봉에 안 붙인다.
+    const volumes: unknown = withVolume ? result?.indicators?.quote?.[0]?.volume : null;
     if (!Array.isArray(timestamps) || !Array.isArray(closes)) return null;
 
     // 봉의 날짜는 **거래소 현지 기준**이다(exchangeDate 주석). 국장은 +9h 라 예전과 같다.
@@ -138,10 +146,11 @@ export async function fetchDailyHistory(
       const t = timestamps[i];
       const c = closes[i];
       if (typeof t !== "number" || typeof c !== "number") continue; // 휴장·결측 봉은 건너뛴다
-      bars.push({ date: exchangeDate(t, gmtOffset), close: c });
+      const v = Array.isArray(volumes) ? volumes[i] : null;
+      bars.push(typeof v === "number" ? { date: exchangeDate(t, gmtOffset), close: c, volume: v } : { date: exchangeDate(t, gmtOffset), close: c });
     }
 
-    appendLastSession(bars, result?.meta);
+    appendLastSession(bars, result?.meta, withVolume);
     return bars.length >= 2 ? bars : null;
   } catch {
     return null;

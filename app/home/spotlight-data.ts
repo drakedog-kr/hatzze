@@ -90,8 +90,8 @@ async function surgingChip(): Promise<SpotChip | null> {
     return {
       cap: "급부상",
       name: top.name,
-      // 신규 등장은 배수가 무한대라 숫자 대신 '신규'.
-      val: top.isNew || !Number.isFinite(top.ratio) ? "신규" : `${top.ratio.toFixed(1)}배`,
+      // 신규 등장은 배수가 무한대라 숫자 대신 '첫 언급'(카더라 표와 같은 말 — '신규'는 신규 상장으로 읽혔다). 배수엔 '언급'을 붙인다(2026-10-04 점검).
+      val: top.isNew || !Number.isFinite(top.ratio) ? "첫 언급" : `언급 ${top.ratio.toFixed(1)}배`,
       ink: HOT,
       href: "/kadera#surging",
       ga: "spotlight_surging",

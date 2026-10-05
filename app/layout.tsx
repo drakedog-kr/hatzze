@@ -103,9 +103,12 @@ export const revalidate = 3600;
  *    다시 맞추므로 **첫 화면과 토글 뒤의 주소창 색이 달랐다**(2026-09-30). 이제 tests/og-colors.test.ts 가 맞춰 본다.
  */
 const THEME_COLOR = { light: "#f7fafd", dark: "#101013" } as const;
-
-/** 한국 시각의 연도("2026"). 푸터 저작권 줄에 넘긴다 — 아래 AppShell 자리 주석. */
-const KST_YEAR = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric" });
+/**
+ * 폰(≤560)의 주소창 색 — 폰은 탑바(카드색)가 맨 위 면이라 화면 바탕(--c-bg)이 아니라 **--c-card** 와 맞춘다. 다크에서 #101013 주소창
+ * 아래 #202027 탑바가 두 단으로 갈렸다(2026-10-05 모바일 점검). media 가 붙은 메타가 앞에 있어 폰에선 이쪽이 이긴다.
+ * tests/og-colors.test.ts 가 --c-card 와 맞춰 본다.
+ */
+const THEME_COLOR_PHONE = { light: "#ffffff", dark: "#202027" } as const;
 
 /**
  * 테마·통화 쿠키를 **브라우저가** 페인트 전에 읽어 <html> 에 붙이는 스크립트.
@@ -131,7 +134,8 @@ const KST_YEAR = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year
  * mobile.css 의 `[data-cur-default]`). "안 고름"과 "원화 고름"을 반드시 갈라야 한다 —
  * 안 가르면 /insider 에서 ₩ 를 눌러도 다시 달러로 돌아간다.
  */
-const PREF_SCRIPT = `(function(){try{var c=document.cookie.split("; "),t,u,s;for(var i=0;i<c.length;i++){var p=c[i].split("=");if(p[0]==="hz-theme")t=p[1];else if(p[0]==="hz-cur")u=p[1];else if(p[0]==="hz-side")s=p[1];}var d=document.documentElement;if(s==="icon")d.setAttribute("data-sidebar","icon");if(t==="dark"){d.setAttribute("data-theme","dark");var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",${JSON.stringify(THEME_COLOR.dark)});}if(u==="usd"||u==="krw")d.setAttribute("data-cur",u);}catch(e){}})();`;
+// 끝의 try 하나 — 배당으로 살기에 담은 종목이 있으면 data-dv-has(결과 셋 자리표시자를 세운다, app/dividend/BandSkeleton.tsx).
+const PREF_SCRIPT = `(function(){try{var c=document.cookie.split("; "),t,u,s;for(var i=0;i<c.length;i++){var p=c[i].split("=");if(p[0]==="hz-theme")t=p[1];else if(p[0]==="hz-cur")u=p[1];else if(p[0]==="hz-side")s=p[1];}var d=document.documentElement;if(s==="icon")d.setAttribute("data-sidebar","icon");if(t==="dark"){d.setAttribute("data-theme","dark");var ms=document.querySelectorAll('meta[name="theme-color"]');for(var j=0;j<ms.length;j++)ms[j].setAttribute("content",ms[j].media?${JSON.stringify(THEME_COLOR_PHONE.dark)}:${JSON.stringify(THEME_COLOR.dark)});}if(u==="usd"||u==="krw")d.setAttribute("data-cur",u);}catch(e){}try{var h=localStorage.getItem("hz-dividend-holdings");if(h&&h!=="[]")document.documentElement.setAttribute("data-dv-has","1");}catch(e){}})();`;
 
 export default function RootLayout({
   children,
@@ -148,6 +152,7 @@ export default function RootLayout({
       <head>
         {/* 라이트 값으로 내보내고, 다크 쿠키면 아래 PREF_SCRIPT 가 페인트 전에 바꾼다.
             토글을 누를 때는 AppShell 의 ThemeToggle 이 --c-bg 를 읽어 다시 맞춘다. */}
+        <meta name="theme-color" media="(max-width: 560px)" content={THEME_COLOR_PHONE.light} />
         <meta name="theme-color" content={THEME_COLOR.light} />
         <script dangerouslySetInnerHTML={{ __html: PREF_SCRIPT }} />
         {/* 데일리 노트 RSS(app/daily/rss.xml). 구독기·검색엔진이 머리의 이 줄로 피드를 찾는다. 안 연 동안은 싣지 않는다.
@@ -227,10 +232,8 @@ export default function RootLayout({
           <body>에 속성을 주입해 불일치 경고를 낸다. body 자신의 속성 불일치만
           무시한다 — 내부 컴포넌트 hydration 검사에는 영향 없다. */}
       <body className="font-sans" suppressHydrationWarning>
-        {/* 테마 리포트를 사이드바 링크로 낼지는 서버가 정한다(AppShell 의 ShellEnv 주석) — 열었거나, 배포가 아닌 로컬.
-            푸터 저작권 연도도 서버가 **한국 시각**으로 정한다 — 브라우저가 제 시계로 세면 새해 첫 아홉 시간 동안
-            서버 HTML 과 갈린다(Footer 주석). 사본이 새해를 한 시간쯤 늦게 따라가는 건 해가 없다. */}
-        <AppShell themeNav={THEME_PUBLIC || !process.env.VERCEL_ENV} year={Number(KST_YEAR.format(new Date()))}>
+        {/* 테마 리포트를 사이드바 링크로 낼지는 서버가 정한다(AppShell 의 ShellEnv 주석) — 열었거나, 배포가 아닌 로컬. */}
+        <AppShell themeNav={THEME_PUBLIC || !process.env.VERCEL_ENV}>
           {children}
         </AppShell>
       </body>
