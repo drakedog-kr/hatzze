@@ -3,7 +3,7 @@
   telegram_surging_oneliner.oneliner     : 국장 급부상 카드 6장
   telegram_us_surging_oneliner.oneliner  : 미장 급부상 카드 6장
 
-주요 종목 리포트의 흐름 요약(telegram_stock_narrative, 95~105자 · 2026-10-05 부터)과는 **다른 글**이다.
+주요 종목 리포트의 흐름 요약(telegram_stock_narrative, 62~72자 · 2026-10-05 저녁부터)과는 **다른 글**이다.
 그쪽은 반 칸 카드라 두 줄이 들어가지만, 급부상 카드는 3열 격자라 훨씬 좁다
 (1440에서 안쪽 324px · 13px 한글 26자/줄). 그 카드에 75자를 넣으면 세 줄이 된다.
 
