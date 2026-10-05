@@ -755,6 +755,9 @@ def build_stock_digests(
 
 def main() -> None:
     dry_run = "--dry-run" in sys.argv[1:]
+    # --stocks-only: 종목 흐름 요약만 다시 쓴다(총평 '오늘의 요약'은 그대로). 길이 규칙을 바꾼 날 그 자리만 바로 고치려고 둔다
+    # (.github/workflows/narratives-rerun.yml, 2026-10-05 저녁 95~105 → 62~72자).
+    stocks_only = "--stocks-only" in sys.argv[1:]
     if not HAS_LLM_CREDENTIAL and not dry_run:
         print("[skip] LLM 자격(구독 토큰·API 키)이 없어 문장 생성을 건너뜁니다.")
         return
@@ -786,7 +789,7 @@ def main() -> None:
     msgs = load_us_messages(db, (date.fromisoformat(min(since, card_since)) - timedelta(days=WINDOW_DAYS)).isoformat())
     print(f"[재료] 창 안 미국 언급 메시지 {len([m for m in msgs if since <= m['date'] <= end]):,}건")
 
-    brief_digest = build_brief_digest(db, latest, msgs, name_of)
+    brief_digest = None if stocks_only else build_brief_digest(db, latest, msgs, name_of)
     stock_digests, required = build_stock_digests(latest, msgs, name_of)
 
     if dry_run:
@@ -915,7 +918,7 @@ def main() -> None:
         except Exception as exc:  # noqa: BLE001
             print(f"[WARNING] 총평 생성 실패: {type(exc).__name__}: {exc}")
     else:
-        print("[안내] 총평을 만들 집계가 없어 건너뜁니다.")
+        print("[안내] --stocks-only — 총평은 건드리지 않습니다." if stocks_only else "[안내] 총평을 만들 집계가 없어 건너뜁니다.")
 
     # ── 종목 흐름 요약 ──────────────────────────────────────────────────────
     saved = 0
