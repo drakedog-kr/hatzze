@@ -302,6 +302,8 @@ export function buildHotStocks(
   byCode: Map<string, ThemeMember>,
   reasons: ThemeReasonRow[],
   share?: { usualDays: string[]; dayTotals: Map<string, number> | null },
+  /** 이유 기간의 끝 — 화면 '등락의 이유'와 같은 기준일. 없으면 최근 날 중 마지막. */
+  reasonEnd?: string,
 ): ThemeHotStock[] {
   const agg = new Map<string, { m: number; c: number; w: number; u: number }>();
   const usualSet = new Set(share?.usualDays ?? []);
@@ -321,7 +323,9 @@ export function buildHotStocks(
   const latestReasonOf = new Map<string, ThemeReasonRow>();
   // 이유는 최근 7일 안의 것 — 아래 '등락의 이유'와 같은 기간이다. 최근 사흘로만 붙이면 주말 · 월요일엔 사실상 금요일 하루치라
   // 열 줄 중 아홉이 비어 큰 빈 칸이 생겼다(2026-10-04 점검, 반도체). 날짜가 줄에 붙으니 오래된 이유도 그렇게 읽힌다.
-  const recentEnd = [...recentSet].sort().at(-1);
+  // 끝은 기준일(reasonEnd) — 최근 날의 끝으로 잡으면 기준일이 얇은 아침에 하루 이르게 끝나, 아래 '등락의 이유'(기준일부터 7일)에 없는
+  // 날의 이유가 붙었다(2026-10-05 머지 전 점검).
+  const recentEnd = reasonEnd ?? [...recentSet].sort().at(-1);
   const reasonFrom = recentEnd ? addDaysISO(recentEnd, -6) : null;
   for (const r of reasons) {
     // 종목마다 가장 최근 하나(목록이 최신순이라 처음 만난 것이 그것이다).
@@ -503,6 +507,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
     byCode,
     reasons,
     { usualDays, dayTotals },
+    baseDate,
   );
 
   // ── 점유율·순위 ── 테마 로테이션과 같은 값이어야 카드에서 이 화면으로 넘어와도 숫자가 같다.

@@ -180,6 +180,7 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
     byCode,
     reasons,
     { usualDays, dayTotals },
+    baseDate,
   );
 
   let recentShare: number | null = null;
