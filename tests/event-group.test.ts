@@ -144,4 +144,13 @@ describe("dropAlreadyHappened", () => {
       ["MU 투자자 행사", "NVDA 실적 발표"],
     );
   });
+
+  it("절차가 이어지는 종류(자사주 · 배당)는 지난 일이 있어도 앞날 줄을 남긴다(2026-10-05 머지 전 점검)", () => {
+    const past = groupEventRows([
+      row("000660", "a", "2026-09-24", "day", "자사주 美 증시 상장 추진 보도 관련 재공시 기한"),
+      row("000660", "b", "2026-09-24", "day", "자사주 상장 추진 재공시 기한"),
+    ]);
+    const future = [{ code: "000660", event: "자사주 매입 및 소각 완료", channels: 1 }];
+    assert.equal(dropAlreadyHappened(future, past).length, 1);
+  });
 });

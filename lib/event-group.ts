@@ -181,8 +181,13 @@ export function groupEventRows(rows: EventRowLike[]): GroupedEvent[] {
 /**
  * 이미 지나간 같은 이야기 — 지난 며칠 안에 채널 둘 이상이 짚은 같은 종목 · 같은 종류 일정이 있으면, 앞으로의 한 채널 줄은 뺀다.
  * 마이크론 실적(10/1, 여러 채널)을 한 채널이 '10/7 실적 발표'로 다시 적어 이미 발표한 실적이 다가오는 일정에 섰다(2026-10-04 점검).
+ * ⚠️ 한 번뿐인 종류(ONE_SHOT — 실적 · 매출 · 주총 · 공개 · 출시 · 인수)에만 건다. 자사주 · 배당처럼 절차가 이어지는 종류에 걸면
+ *    9/24 '자사주 … 재공시 기한' 때문에 11/19 '자사주 매입 및 소각 완료'가 빠졌다(SK하이닉스, 2026-10-05 머지 전 점검).
  */
 export function dropAlreadyHappened<T extends { code: string; event: string; channels: number }>(future: T[], past: GroupedEvent[]): T[] {
   const done = new Set(past.filter((p) => p.channels >= 2).map((p) => `${p.code}|${eventKind(p.event)}`));
-  return future.filter((f) => f.channels >= 2 || !done.has(`${f.code}|${eventKind(f.event)}`));
+  return future.filter((f) => {
+    const kind = eventKind(f.event);
+    return f.channels >= 2 || !ONE_SHOT.has(kind) || !done.has(`${f.code}|${kind}`);
+  });
 }
