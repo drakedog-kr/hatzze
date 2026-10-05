@@ -2804,6 +2804,26 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
   .v2-tm-reasonrows .v2-td-chg { min-width: 58px; text-align: right; }
   .v2-tm-reasonrows .v2-td-ch { min-width: 52px; text-align: right; }
 }
+/* MDD 연도 두 자리 꼴은 판 330 이하(320 폰)에서만 — 375 폰(판 351)은 네 자리가 한 줄에 든다. */
+.v2-yc-y2 { display: none; }
+@container kd (max-width: 679px) {
+  /* MDD 물속 차트 — 겹치는 번호 표식은 위로 · '지금' 글자는 점 아래로(app/mdd/Hero.tsx is-nudge · is-below). */
+  .mdd-uw-num.is-nudge { transform: translate(-50%, calc(-50% - 20px)); }
+  .mdd-uw-now.is-below > em { bottom: auto; top: calc(100% + 8px); }
+  /* 사례 표 둘째 층 이름표(코스피 · 빠진 · 회복)를 세로 한 줄에 — 데스크톱 오른쪽 정렬(0,3,0)에 폰 왼쪽 정렬이 졌다. */
+  .v2-md .v2-md-case > :nth-child(3),
+  .v2-md .v2-md-case > :nth-child(4),
+  .v2-md .v2-md-case > :nth-child(5) { text-align: left; }
+  /* 주인공 숫자 '지금 낙폭'을 폰 첫 화면에 — 현재가 칸보다 앞에(넓은 화면 세 칸 차례는 그대로). */
+  .v2-md-band > .v2-md-dd { order: -1; }
+}
+@container kd (max-width: 330px) {
+  .v2-yc-y4 { display: none; }
+  .v2-yc-y2 { display: inline; }
+}
+@container kd (max-width: 359px) {
+  .v2-md-case { grid-template-columns: minmax(76px, 1.25fr) minmax(0, 1fr) minmax(0, 1.25fr) auto; }
+}
 @container kd (max-width: 359px) {
   /* 360 미만에서만 표 종목 이름 세 줄. */
   .v2-td-name { -webkit-line-clamp: 3; }

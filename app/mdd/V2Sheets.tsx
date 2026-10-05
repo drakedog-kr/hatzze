@@ -318,7 +318,8 @@ export function CasesTable({
       meta={`${periodLabel} · 깊은 순`}
       className="v2-md-cases-mod"
       // 줄이 단추다(누르면 위 물속 차트에 그 하락 구간이 칠해진다) — 생김새는 그냥 표라 눌러 볼 생각을 안 한다.
-      hint={{ id: "mdd-cases", order: 1, anchor: ".v2-md-case:not(.v2-md-case-th)", text: "줄을 누르면 차트에 그 하락 구간이 칠해집니다" }}
+      // 쪽지는 마지막 줄을 가리켜 판 바닥에서 위로 뒤집혀 선다 — 첫 줄 밑이면 폰에서 '진행 중' 줄(가장 중요한 줄)을 덮었다(2026-10-05 모바일 점검).
+      hint={{ id: "mdd-cases", order: 1, anchor: "ol > .v2-md-case:last-child", text: "줄을 누르면 차트에 그 하락 구간이 칠해집니다" }}
     >
       <div className="v2-md-cases">
         <div className="v2-md-case v2-md-case-th" aria-hidden="true">
@@ -718,7 +719,15 @@ export function YearsModule({
                 </span>
                 {/* 하나 걸러 숨길 연도 — 해가 많을 때(.is-dense)만 CSS 가 숨긴다. */}
                 <span className="v2-yc-yr" data-minor={i % 2 === 1 && !partYear ? "" : undefined}>
-                  {partYear ? "올해" : y.year}
+                  {/* 320 폰은 두 자리(’17) — 네 자리가 '201/7'로 꺾였다(2026-10-05 모바일 점검). 갈아 끼우는 건 v2.css. */}
+                  {partYear ? (
+                    "올해"
+                  ) : (
+                    <>
+                      <span className="v2-yc-y4">{y.year}</span>
+                      <span className="v2-yc-y2">’{String(y.year).slice(2)}</span>
+                    </>
+                  )}
                 </span>
               </div>
             );

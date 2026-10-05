@@ -462,6 +462,12 @@ export function Underwater({
     return k;
   };
   const marks = (cases ?? []).map((c, i) => ({ no: i + 1, peak: c.peakDate, k: pointOf(c.troughDate) }));
+  // 폰에선 뷰박스 720 이 화면 폭(≈300~400)으로 눌려 18px 표식이 가로 32~44 · 세로 20 units 남짓을 먹는다 — 이웃 번호 표식이 그 안이면
+  // 뒤 번호에 is-nudge(위로 20px), 끝 점 가로 62 units(≈30px) 안에 표식이 있으면 '지금' 글자를 점 아래로(is-below).
+  // 옮기는 건 폰 컨테이너 쿼리 안에서만(v2.css) — 넓은 화면은 표식이 작아 안 겹친다(2026-10-05 모바일 점검, 삼성전자 5 · 6번).
+  const markXY = marks.map((m) => [x(m.k), y(series[m.k].dd)] as const);
+  const nudged = marks.map((_, i) => markXY.slice(0, i).some(([px, py]) => Math.abs(px - markXY[i][0]) < 50 && Math.abs(py - markXY[i][1]) < 26));
+  const nowBelow = marks.some((m) => m.k !== n - 1 && x(n - 1) - x(m.k) < 62);
   const at = (k: number) => ({ left: `${(x(k) / W) * 100}%`, top: `${((y(series[k].dd) + VB_PAD) / VBH) * 100}%` });
   // 선 끝 '지금' — 진행 중인 사례의 바닥이 곧 오늘이면(신저점) 그 번호 표식에 '지금'을 붙이고 점은 따로 안 찍는다.
   const nowOnMark = marks.some((m) => m.k === n - 1);
@@ -575,15 +581,15 @@ export function Underwater({
         <div className="mdd-uw-marks">
           {/* 끝 점이 고점 바로 밑(−2% 안)이면 '지금' 글자를 점 왼쪽에 — 위에 두면 머리 띠 선을 넘었다(2026-10-04 점검, 신고가 심텍). */}
           {!nowOnMark && (
-            <span className={`mdd-uw-now${series[n - 1].dd > -2 ? " is-top" : ""}`} style={at(n - 1)} aria-hidden>
+            <span className={`mdd-uw-now${series[n - 1].dd > -2 ? " is-top" : nowBelow ? " is-below" : ""}`} style={at(n - 1)} aria-hidden>
               <em>지금</em>
             </span>
           )}
-          {marks.map((m) => (
+          {marks.map((m, i) => (
             <button
               key={m.peak}
               type="button"
-              className={`mdd-uw-num${focusPeak === m.peak ? " is-on" : ""}${m.k === n - 1 && series[n - 1].dd > -2 ? " is-top" : ""}`}
+              className={`mdd-uw-num${focusPeak === m.peak ? " is-on" : ""}${m.k === n - 1 && series[n - 1].dd > -2 ? " is-top" : ""}${nudged[i] ? " is-nudge" : ""}`}
               style={at(m.k)}
               aria-label={`${m.no}번 사례 구간을 차트에 표시`}
               aria-pressed={focusPeak === m.peak}
