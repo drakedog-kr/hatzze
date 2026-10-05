@@ -398,7 +398,7 @@ a.v2-tr:hover { background: var(--t-tint); }
   padding: 0 5px;
   border-radius: 4px;
   background: var(--t-down-weak);
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 600;
   line-height: 18px;
   color: var(--t-down-deep);
@@ -449,7 +449,7 @@ a.v2-tr:hover { background: var(--t-tint); }
   padding: 0 5px;
   border-radius: 4px;
   background: var(--t-tint);
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 500;
   line-height: 16px;
   color: var(--t-ink2);
@@ -948,7 +948,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
   padding: 0 5px !important;
   border-radius: 4px !important;
   background: var(--t-up) !important;
-  font-size: 11px !important;
+  font-size: var(--fs-11) !important;
   font-weight: 600 !important;
   line-height: 18px !important;
   color: var(--t-card) !important;
@@ -980,7 +980,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-bf .hz-split-k { align-self: flex-start; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); }
 .v2-bf .hz-split-k.is-tip { text-decoration: underline dotted var(--t-ink4); text-underline-offset: 3px; cursor: help; }
 .v2-bf .hz-split-v { font-size: 13px; font-weight: 600; line-height: 20px; font-variant-numeric: tabular-nums; color: var(--t-ink); }
-.v2-bf .hz-split-sub { font-size: 11px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
+.v2-bf .hz-split-sub { font-size: var(--fs-11); font-weight: 500; line-height: 16px; color: var(--t-ink3); }
 
 /* 순위 목록(증권 앱) — 회색 둥근 행 대신 가는 선으로 나눈 줄. 순위는 고정 폭이라 이름 길이와 상관없이 같은 자리에 선다. */
 .v2-bf .hz-rank-list { display: flex; flex-direction: column; }
@@ -1441,7 +1441,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dv .v2-dv-up .dv-upcoming-tag { grid-column: 3; grid-row: 1; justify-self: start; }
 .v2-dv .v2-dv-up .dv-upcoming-amt { grid-column: 5; grid-row: 1; text-align: right; white-space: nowrap; }
 .v2-dv .v2-dv-up .dv-upcoming-what { grid-column: 2 / -1; grid-row: 2; font-size: 12px; line-height: 16px; color: var(--t-ink3); }
-.v2-dv .dv-upcoming-tag { border-radius: 4px; font-size: 11px; }
+.v2-dv .dv-upcoming-tag { border-radius: 4px; font-size: var(--fs-11); }
 .v2-dv .dv-upcoming-tag-sure { color: var(--t-down-deep); background: var(--t-down-weak); }
 
 /* 내 종목 — 검색 · 갈래 셋 · 담은 종목 표. 갈래는 회색 판 대신 세로 가는 선으로 가른다. */
@@ -1533,7 +1533,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dv-bk-read .v2-mod-head .v2-dv-help { margin-left: -4px; }
 .v2-dv-bk-read .v2-mod-meta { min-width: 0; }
 .v2-dv-bk-rules { display: flex; flex-wrap: wrap; gap: 4px; }
-.v2-dv .dv-tfact { border-radius: 4px; background: var(--t-tint); color: var(--t-ink2); font-size: 11px; }
+.v2-dv .dv-tfact { border-radius: 4px; background: var(--t-tint); color: var(--t-ink2); font-size: var(--fs-11); }
 /* 주의 알약은 붉은 기 — 위 규칙(0,2,0)이 tx.css 의 .dv-tfact-warn(0,1,0)을 덮어 일반 알약과 같은 회색이었다(2026-10-05 점검). */
 .v2-dv .dv-tfact-warn { background: var(--t-up-weak); color: var(--c-hot-ink); }
 
@@ -1618,7 +1618,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-dv-amt { flex-wrap: wrap; }
   .v2-dv .v2-dv-amt-range { flex: 1 1 100%; }
   /* 폰 알약 — 옛 폰 규칙(여백 0 · 바탕 없음 · '·' 구분점)과 v2 바탕이 섞여 글자가 상자 왼끝에 붙고 줄 첫머리에 점이 남았다(2026-10-05 점검). */
-  .v2-dv .dv-tfact { padding: 2px 6px; font-size: 11px; }
+  .v2-dv .dv-tfact { padding: 2px 6px; font-size: var(--fs-11); }
   .v2-dv .dv-tfact + .dv-tfact::before { content: none; }
   /* 폰 검색 줄 — 이름이 세 글자로 잘렸다('TIG…'). 이름은 감기고 값은 아랫줄로. */
   .v2-dv .dv-search-row { flex-wrap: wrap; row-gap: 2px; }
@@ -1749,8 +1749,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-td-two em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-td-theme { min-width: 0; font-weight: 500; color: var(--t-ink); text-decoration: none; overflow-wrap: anywhere; }
 .v2-td-theme:hover { text-decoration: underline; text-decoration-color: var(--t-ink4); text-underline-offset: 3px; }
-.v2-tm .hz-theme-tag { flex-shrink: 0; height: 18px; padding: 0 5px; border-radius: 4px; font-size: 11px; font-weight: 500; line-height: 18px; white-space: nowrap; }
-.v2-td-date { margin-left: 6px; font-style: normal; font-size: 11px; color: var(--t-ink3); white-space: nowrap; }
+.v2-tm .hz-theme-tag { flex-shrink: 0; height: 18px; padding: 0 5px; border-radius: 4px; font-size: var(--fs-11); font-weight: 500; line-height: 18px; white-space: nowrap; }
+.v2-td-date { margin-left: 6px; font-style: normal; font-size: var(--fs-11); color: var(--t-ink3); white-space: nowrap; }
 
 /* 테마별 급부상 종목 — 테마 · 종목(태그) · 요즘 도는 얘기 · 언급(그 전). 테마 흐름과 같은 이름 → 문장 → 숫자 차례. */
 .v2-tm-risertbl .v2-tr { grid-template-columns: 96px 260px minmax(0, 1fr) 88px; min-height: 44px; }
@@ -1812,7 +1812,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-tm-trendbody:has(> .v2-tm-legend) > .v2-tm-legend { grid-area: 1 / 2; align-self: end; }
   .v2-tm-trendbody:has(> .v2-tm-legend) > .v2-tm-trend { grid-area: 2 / 1 / 3 / 3; }
 }
-.v2-tm-legend { display: flex; gap: 14px; font-size: 11px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
+.v2-tm-legend { display: flex; gap: 14px; font-size: var(--fs-11); font-weight: 500; line-height: 16px; color: var(--t-ink3); }
 .v2-tm-legend > span { display: inline-flex; align-items: center; gap: 5px; }
 .v2-tm-legend i { width: 10px; height: 10px; border-radius: 2px; background: color-mix(in srgb, var(--t-down) 35%, transparent); }
 .v2-tm-legend i.is-recent { background: var(--t-down); }
@@ -2016,7 +2016,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-pv-name { display: flex; flex-direction: column; min-width: 0; line-height: 18px; }
 .v2-pv-stock { width: fit-content; font-weight: 600; color: var(--t-ink); text-decoration: none; overflow-wrap: anywhere; }
 .v2-pv-stock:hover { text-decoration: underline; text-underline-offset: 2px; }
-.v2-pv-sym { display: inline-flex; align-items: center; width: fit-content; font-size: 11px; font-weight: 500; line-height: 16px; color: var(--t-ink3); text-decoration: none; }
+.v2-pv-sym { display: inline-flex; align-items: center; width: fit-content; font-size: var(--fs-11); font-weight: 500; line-height: 16px; color: var(--t-ink3); text-decoration: none; }
 .v2-pv-sym:hover { color: var(--t-down); text-decoration: underline; text-underline-offset: 2px; }
 .v2-pv .v2-td-two b { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .v2-pv .v2-td-two em { white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -2751,7 +2751,23 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
   .v2-tm-pill { height: 34px; line-height: 32px; }
   .v2-tm-pills { gap: 8px; }
 }
+@container kd (max-width: 679px) {
+  /* 글자 바닥 12 — 11px 직접값을 var(--fs-11)(폰 12)로 바꾼 꼬리표 중 높이가 18 로 못박힌 테마 태그는 20 으로. */
+  .v2-tm .hz-theme-tag { height: 20px; line-height: 20px; }
+  /* 첫 줄 띠 값은 자르지 않고 접는다 — 320 에서 코스닥 등락이 띠 테두리에 5px 잘렸고, 긴 미장 이름이 링크 칸 화살표를 덮었다.
+     넘치는 날에만 등락이 이름 아래로 내려간다(390 실데이터 띠 높이는 그대로). */
+  .v2-cover-idx { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2-cover-v { flex-wrap: wrap; white-space: normal; min-width: 0; column-gap: 4px; row-gap: 0; }
+  .v2-cover-v b { overflow-wrap: anywhere; }
+  /* 폰 두 층 표 줄 — 위아래 10, 문장 칸의 데스크톱 한 줄 여백(9px 0)은 걷는다(한 줄 문장 행이 78 → 64). */
+  .v2-tr,
+  .v2-tbl.is-move .v2-tr,
+  .v2-tbl.is-talk .v2-tr { padding-top: 10px; padding-bottom: 10px; }
+  .v2-td-text { margin: 0; }
+}
 @container kd (max-width: 359px) {
+  /* 360 미만에서만 표 종목 이름 세 줄. */
+  .v2-td-name { -webkit-line-clamp: 3; }
   /* 320 — 바스켓 이름 칸이 74px 로 세 줄이 됐다. 숫자 칸을 줄여 이름에 준다. */
   .v2-dv-bk-th,
   .v2-dv-bk-row { grid-template-columns: minmax(0, 1fr) 60px 96px; }
