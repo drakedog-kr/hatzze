@@ -276,7 +276,8 @@ def mentionable(row: dict) -> bool:
 # 주인공 문단(① 가장 뜨거운 시장 지표 뜻풀이)에 걸었다 — 옵션 풋/콜 비율이 09-11~17 7일 · 09-22~27 6일
 # 연속이었다. 같은 날 세 줄 요약으로 바뀌며 주인공 문단이 없어져, 지표 이름을 늘 부르는 이 줄로 옮겼다.
 # 9월 기록에 대 본 값(옛 주인공 기준 어림): 규칙 없음 풋/콜 17/27일 · 최장 7일 → 5일 중 2일 9/27 · 2일.
-# '달라진 것' 줄에는 걸지 않는다 — 크게 움직인 지표는 날마다 바뀌고, 막으면 실제 움직임을 숨긴다.
+# '달라진 것' 줄에는 이 규칙 대신 더 느슨한 '사흘 연속 금지'를 건다(CHANGE_STREAK_MAX) — 크게 움직인 지표는 날마다
+# 바뀌고, 많이 막으면 실제 움직임을 숨긴다.
 HOT_WINDOW = 5
 HOT_MAX_IN_WINDOW = 2
 # '가장 뜨거운 ○○' 처럼 1등이라 부르는 말. 더 뜨거운 지표를 건너뛴 날엔 거짓이 된다.
@@ -308,6 +309,32 @@ def hot_line_of(summary: str | None) -> str:
         if x.startswith("[뜨거운 곳]"):
             return x
     return "" if any(x.startswith("[") for x in lines) else (lines[0] if lines else "")
+
+
+def change_line_of(summary: str | None) -> str:
+    """저장된 요약에서 '달라진 것' 줄. 없으면(옛 형식 · 요약 없는 날) 빈 문자열."""
+    for x in (summary or "").split("\n"):
+        if x.strip().startswith("[달라진 것]"):
+            return x.strip()
+    return ""
+
+
+# '달라진 것' 줄 — 같은 지표가 사흘 연속 나오지 않게, 앞 CHANGE_STREAK_MAX 날 그 줄에 모두 나온 지표는 오늘 목록에서 뺀다.
+# 코스피 신고가 대비 괴리율이 09-30 · 10-01 · 10-02 사흘, 닷새 중 나흘 섰다(2026-10-05 운영자 지시 "같은 곳이 3일 연속으로
+# 나오지는 않도록"). 그 지표가 오늘 정말 크게 움직였어도 다음 지표가 그 자리에 선다 — 하루 2~8개가 문턱을 넘는다(pick_movers 주석).
+CHANGE_STREAK_MAX = 2
+
+
+def change_streak_names(prev_lines: list[str], names: list[str]) -> set[str]:
+    """앞 CHANGE_STREAK_MAX 날의 '달라진 것' 줄(change_line_of, **최근 날부터**)에 매일 나온 지표들 — 오늘 쉰다.
+    앞 날이 모자라면(요약 없는 날 포함) 아무것도 안 쉰다 — 연속이 끊긴 것이다."""
+    lines = prev_lines[:CHANGE_STREAK_MAX]
+    if len(lines) < CHANGE_STREAK_MAX or not all(lines):
+        return set()
+    common = names_in_line(lines[0], names)
+    for line in lines[1:]:
+        common &= names_in_line(line, names)
+    return common
 
 
 def resting_names(prev_lines: list[str], names: list[str]) -> set[str]:
@@ -842,6 +869,9 @@ def main() -> None:
     resting = resting_names([hot_line_of(r.get("ai_summary")) for r in ds.data[1:]], names)
     for n in sorted(resting):
         print(f"[뜨거운 곳] {n} — 앞 {HOT_WINDOW - 1}일 그 줄에 {HOT_MAX_IN_WINDOW}번 이상 나와 오늘은 이름을 쉽니다.")
+    change_resting = change_streak_names([change_line_of(r.get("ai_summary")) for r in ds.data[1:]], names)
+    for n in sorted(change_resting):
+        print(f"[달라진 것] {n} — 앞 {CHANGE_STREAK_MAX}일 연속 그 줄에 나와 오늘은 뺍니다.")
 
     rows: list[dict] = []
     for ind in indicators.data:
@@ -889,7 +919,7 @@ def main() -> None:
     # 뜨거운 곳 줄: ℃ 블록을 빼고 [갈림] 개수를 넣은 자료(옛 갈림 문단의 것). ℃ 가 있으면 흐름 줄의 일까지
     # 해 버린다(build_digest 의 index_lines 주석). '뜻:'도 뺀다 — 이 줄은 뜻풀이가 아니다.
     hot_digest = build_digest(score, stage, hot_count, rows, recent, index_lines=False, desc=False)
-    movers = pick_movers(rows, datetime.now(timezone.utc))
+    movers = pick_movers([r for r in rows if r["name"] not in change_resting], datetime.now(timezone.utc))
     change_src = change_digest(movers)
 
     print("─" * 60)

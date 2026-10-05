@@ -1589,6 +1589,16 @@ def reach(m: dict) -> int:
     return (m.get("views") or 0) + (m.get("forwards") or 0) * 3
 
 
+def newest_first(msgs: list[dict], day_of, score) -> list[dict]:
+    """최근 날 글부터, 같은 날 안에서는 score(도달 · 조회) 큰 순.
+
+    표본은 기준일이 얇을 때 뒤로 넓힌다(NEWS_MIN_MSGS). 넓힌 표본을 도달 순으로만 세우면 조회가 쌓인 앞 날 글이 앞에 서서,
+    휴일 아침 요약 셋째 대목이 전날 요약과 같은 이야기(JP모건 마이크론 · 엑시노스 2700)를 되풀이했다(2026-10-05 운영자 지적
+    "오늘의 요약은 최대한 가장 최근의 일들 위주로"). 앞 날 글은 기준일 글로 자리가 다 안 찰 때만 들어간다. 국장 · 미장 같은 규칙.
+    """
+    return sorted(msgs, key=lambda m: (day_of(m), score(m)), reverse=True)
+
+
 def choose_excerpts(first: list[dict], rest: list[dict], n: int, first_slots: int) -> list[dict]:
     """`first` 에서 `first_slots` 건을 먼저 싣고 남은 자리를 `rest` 로 채운다. 도달 순으로 돌려준다.
 
@@ -1644,8 +1654,8 @@ def build_news_block(db, latest: str, window_since: str, msgs: list[dict]) -> li
     span = "오늘" if used == [latest] else f"{used[0][5:]}~{used[-1][5:]}"
 
     # 널리 퍼진 순 = 조회 + 확산×3. 종목 리포트의 [대표 메시지 발췌]와 같은 가중치라
-    # 두 문장이 같은 기준으로 '화제'를 고른다.
-    picked.sort(key=reach, reverse=True)
+    # 두 문장이 같은 기준으로 '화제'를 고른다. 날짜가 먼저다 — 최근 날 글부터(newest_first).
+    picked = newest_first(picked, lambda m: kst_date(m["posted_at"]), reach)
     # 국내 종목 글을 먼저 싣고 미국 종목만 다룬 글은 뺀다(NEWS_KR_SLOTS 주석). 태그를 못 읽으면
     # 예전처럼 도달 순으로만 고른다.
     ranked = picked[:NEWS_TAG_CANDIDATES]

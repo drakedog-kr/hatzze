@@ -10,6 +10,8 @@ from generate_daily_summary import (
     CHANGE_NONE,
     LINE_MAX,
     change_fallback,
+    change_line_of,
+    change_streak_names,
     hot_fallback,
     brief_story,
     yeoron_problems,
@@ -249,3 +251,16 @@ def test_change_fallback_lists_movers():
     # 셋이면 앞의 둘만 — 한 줄(LINE_MAX)에 들게.
     three = change_fallback([{"name": "경제뉴스 감성 지수", "hotter": True}, {"name": "VKOSPI (변동성지수)", "hotter": False}, {"name": "버핏지수", "hotter": True}])
     assert three == got and len(three.replace("**", "")) <= LINE_MAX
+
+
+def test_change_streak_rests_name_seen_two_days_in_row():
+    # 09-30 · 10-01 · 10-02 사흘 연속 '코스피 신고가 대비 괴리율'이 섰다 — 앞 이틀 연속이면 오늘 뺀다.
+    names = ["코스피 신고가 대비 괴리율", "증권 앱 인기차트 순위", "버핏지수"]
+    d1 = "[달라진 것] **버핏지수**와 **코스피 신고가 대비 괴리율**이 하루 새 크게 과열 쪽으로 움직였습니다."
+    d2 = "[달라진 것] **코스피 신고가 대비 괴리율**이 더 뜨거워졌고 **증권 앱 인기차트 순위**도 과열 쪽으로 움직였습니다."
+    assert change_line_of("[흐름] …\n" + d1 + "\n[뜨거운 곳] …") == d1
+    assert change_streak_names([d1, d2], names) == {"코스피 신고가 대비 괴리율"}
+    # 하루라도 끊겼으면(요약 없는 날 · 안 나온 날) 쉬지 않는다.
+    assert change_streak_names([d1, ""], names) == set()
+    assert change_streak_names([d1], names) == set()
+

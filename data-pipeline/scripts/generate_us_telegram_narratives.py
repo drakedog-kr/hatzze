@@ -96,6 +96,7 @@ from generate_telegram_narratives import (  # noqa: E402
     first_sentences,
     has_schedule_block,
     kst_date,
+    newest_first,
     optimism,
     percent_count,
     schedule_digest,
@@ -606,7 +607,8 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
     if picked:
         # 하루로 끝났고 그날이 기준일이면 '오늘'이라 불러도 된다. 넓혔으면 기간을 밝힌다.
         span = "오늘" if used == [end] else f"{used[0][5:]}~{used[-1][5:]}"
-        top = sorted(picked, key=lambda m: -(m.get("views") or 0))[:NEWS_EXCERPTS]
+        # 최근 날 글부터, 같은 날 안에서는 조회수 순(국장 newest_first 주석).
+        top = newest_first(picked, lambda m: m["date"], lambda m: m.get("views") or 0)[:NEWS_EXCERPTS]
         lines += ["", f"[{span} 오간 이야기] 조회수 상위 {len(top)}건 발췌 (표본 {len(picked)}건)"]
         for m in top:
             first = m["mentions"][0]
