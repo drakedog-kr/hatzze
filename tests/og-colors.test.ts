@@ -61,4 +61,11 @@ describe("주소창 색(app/layout.tsx THEME_COLOR)", () => {
     assert.ok(m, "layout.tsx 에서 THEME_COLOR 를 못 찾았습니다");
     assert.equal(m[1].toLowerCase(), light("--c-bg"));
   });
+
+  it("폰 라이트 값이 탑바(카드) 토큰과 같다", () => {
+    const layout = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+    const m = layout.match(/THEME_COLOR_PHONE\s*=\s*\{\s*light:\s*"(#[0-9a-fA-F]{6})"/);
+    assert.ok(m, "layout.tsx 에서 THEME_COLOR_PHONE 을 못 찾았습니다");
+    assert.equal(m[1].toLowerCase(), light("--c-card"));
+  });
 });

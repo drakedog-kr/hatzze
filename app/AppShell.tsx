@@ -1301,9 +1301,15 @@ function ThemeToggle({ size = 38, radius = R.control }: { size?: number; radius?
     // 모바일 주소창 색도 같이 돌린다. 이 메타는 layout.tsx 가 라이트 값으로 내보내고
     // PREF_SCRIPT 가 다크 쿠키면 바꾸므로, 여기서 안 고치면 다음 페이지 로드까지
     // 주소창만 이전 테마로 남는다.
-    // 값을 또 적지 않고 방금 바뀐 data-theme 의 --c-bg 를 읽어 globals.css 를 따라간다.
-    const bg = getComputedStyle(root).getPropertyValue("--c-bg").trim();
-    if (bg) document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg);
+    // 값을 또 적지 않고 방금 바뀐 data-theme 의 토큰을 읽어 globals.css 를 따라간다 — 폰 메타(media 붙은 것)는 탑바 색 --c-card,
+    // 나머지는 바탕 --c-bg(layout.tsx THEME_COLOR_PHONE 주석).
+    const cs = getComputedStyle(root);
+    const bg = cs.getPropertyValue("--c-bg").trim();
+    const card = cs.getPropertyValue("--c-card").trim();
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+      const v = m.getAttribute("media") ? card : bg;
+      if (v) m.setAttribute("content", v);
+    });
   };
 
   return (

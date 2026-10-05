@@ -141,3 +141,7 @@
   transition: color 0.12s ease;
 }
 .hz-footer-link:hover { color: var(--c-ink); }
+/* 폰 — 18px 링크가 위아래 6px 로 붙어 있었다. 누르는 자리만 38 로(자리 차지는 그대로, 2026-10-05 모바일 점검). */
+@media (max-width: 560px) {
+  .hz-footer-link { display: inline-block; padding-block: 10px; margin-block: -10px; }
+}
