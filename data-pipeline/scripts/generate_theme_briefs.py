@@ -10,7 +10,7 @@
             (lib/theme-page.ts 머리말 — 태그가 드문 테마에서 그 조인이 8초 벽에 걸렸다).
 
 그리고 둘째 몫: 테마 목록의 **'갑자기 많이 언급된 종목'** 카드. 대상은 common/theme_risers.py 가 고르고
-(테마마다 앞 사흘 대비 배수 1위, 최대 열 테마), 까닭은 50~90자로 써서 **그 테마의 요약 행(riser jsonb)**에
+(테마마다 앞 사흘 대비 배수 1위, 최대 열 테마), 까닭은 42~58자로 써서 **그 테마의 요약 행(riser jsonb)**에
 종목·언급 수와 함께 넣는다(마이그레이션 081). 화면은 이 행만 읽는다 — 고르는 규칙이 TS 에도 있던 시절엔
 두 벌이 어긋나면 까닭 없는 줄이 나갔다. 처음엔 급부상 한 줄 요약(22~30자, telegram_surging_oneliner)을
 같이 썼는데, 이 화면은 까닭 칸이 넓어 한 줄짜리가 아까웠다(2026-09-21 "이유를 더 자세히").
@@ -155,6 +155,20 @@ def has_trade_framing(text: str) -> bool:
 # 테마 화면의 본론치고 짧았다(2026-09-21 "문단 2개 정도로 길이 늘리기"). 문단 사이 빈 줄도 글자 수에 든다.
 LEN_MIN, LEN_MAX = 260, 380
 LEN_HARD_MIN, LEN_HARD_MAX = 200, 460
+# 첫 문장 상한. 목록 화면(테마 흐름 '요즘 도는 얘기')은 요약의 **첫 문장**만 한 줄로 세운다(lib/theme-page.ts briefFirstSentence).
+# 첫 문장이 36~98자로 흔들려 1440 에서 열 줄 중 다섯이 두 줄로 꺾였다(2026-10-05 운영자 지적 "가끔 2줄 · 한 줄이었으면").
+# 1440 칸 한 줄이 59자 남짓이라 55자로 둔다(1280 노트북은 41자라 그래도 꺾일 수 있다).
+FIRST_SENTENCE_MAX = 55
+
+
+def first_sentence(text: str) -> str:
+    """화면이 목록에 세우는 첫 문장 — lib/theme-page.ts briefFirstSentence 와 같은 규칙(손으로 맞춘 사본).
+    '다.' 뒤 공백에서 끊고, 첫 토막이 20자 미만이면 다음 토막까지 붙인다."""
+    parts = re.split(r"(?<=다\.)\s+", text.strip())
+    out = parts[0] if parts else text.strip()
+    if len(out) < 20 and len(parts) > 1:
+        out = f"{out} {parts[1]}"
+    return out
 PARAGRAPHS = 2
 MAX_RETRIES = 3
 
@@ -196,6 +210,8 @@ THEME_RULES = f"""
 - [함께 언급된 테마]는 문장에 옮기지 마세요. 화면이 따로 보여줍니다. 첫 실행(2026-09-19)에서 이걸
   허용했더니 방산·화장품·지주 요약 끝에 "지주·밸류업 관련 논의와 함께", "바이오 테마 종목들도 함께
   언급되는 추세" 같은 겉도는 문장이 붙었습니다. 이 테마 종목 이야기만 씁니다.
+- **첫 문장은 {FIRST_SENTENCE_MAX}자 이내로 짧게** 씁니다(공백 포함). 목록 화면이 첫 문장만 한 줄로 세웁니다.
+  첫 문장에는 가장 크게 오간 이야기 하나만 담고, 자세한 내용은 다음 문장으로 넘기세요.
 - **반드시 {LEN_MIN}자 이상 {LEN_MAX}자 이하**로 쓰세요(공백 포함). 문단마다 두 문장 또는 세 문장으로
   자연스럽게 맞추세요."""
 
@@ -214,10 +230,11 @@ def paragraph_count(text: str) -> int:
     return len([p for p in text.split("\n\n") if p.strip()])
 
 
-# 갑자기 많이 언급된 종목의 까닭. 종목 요약(75~80자)보다 조금 길다 — 이 칸은 줄 폭을 다 가져서 넓은 화면은
-# 한 줄, 1000px 는 두 줄이다. "무엇이 화제였나"에 더해 **왜 갑자기**인지가 본론이다.
-RISER_LEN_MIN, RISER_LEN_MAX = 50, 90
-RISER_LEN_HARD_MIN, RISER_LEN_HARD_MAX = 40, 110
+# 갑자기 많이 언급된 종목의 까닭. "무엇이 화제였나"에 더해 **왜 갑자기**인지가 본론이다.
+# 42~58자(허용 34~64) — 테마 판세 '채널이 말한 이유' 칸이 1440 에서 한 줄 68자 남짓인데 50~90자라 아홉 줄 중 넷이 두 줄로
+# 꺾였다(2026-10-05 운영자 지적 "한 줄이었으면"). 1280 노트북(약 50자)에선 그래도 꺾일 수 있다.
+RISER_LEN_MIN, RISER_LEN_MAX = 42, 58
+RISER_LEN_HARD_MIN, RISER_LEN_HARD_MAX = 34, 64
 # 까닭을 못 읽겠을 때 모델이 쓰기로 한 문장의 표지. 이게 오면 저장은 null 로 한다 — 화면이 "채널에서 까닭을
 # 말한 곳이 없습니다"를 제 말로 적는다(모델 문장은 표현이 흔들리고 ✨ 고지가 붙는다). 길이 검사도 건너뛴다 —
 # 이 문장을 규정 길이로 늘리게 하면 없는 까닭을 지어 채운다(2026-09-21 코미코: 등락률 목록에만 있던 종목을
@@ -449,6 +466,8 @@ def pick_text(candidates: list[str], digest: str) -> str | None:
     clean = [t for t in candidates if is_clean(t, digest)] or candidates
     # 두 문단인 후보가 있으면 그쪽만. 한 문단짜리도 읽히긴 하니 전부 그러면 그대로 간다.
     clean = [t for t in clean if paragraph_count(t) == PARAGRAPHS] or clean
+    # 첫 문장이 목록 한 줄(FIRST_SENTENCE_MAX)에 드는 후보가 있으면 그쪽만.
+    clean = [t for t in clean if len(first_sentence(t)) <= FIRST_SENTENCE_MAX] or clean
     mid = (LEN_MIN + LEN_MAX) / 2
     in_goal = [t for t in clean if LEN_MIN <= len(t) <= LEN_MAX]
     in_ok = [t for t in clean if LEN_HARD_MIN <= len(t) <= LEN_HARD_MAX]
@@ -471,6 +490,8 @@ def write_brief(ask_with, system: str, digest: str, label: str) -> str | None:
         found = brief_problems(cur, digest)
         if paragraph_count(cur) != PARAGRAPHS:
             found.append(f"문단이 {paragraph_count(cur)}개(둘이어야 함)")
+        if len(first_sentence(cur)) > FIRST_SENTENCE_MAX:
+            found.append(f"첫 문장 {len(first_sentence(cur))}자({FIRST_SENTENCE_MAX}자 이내로 짧게)")
         if LEN_MIN <= len(cur) <= LEN_MAX and not found:
             break
         if found:
@@ -487,7 +508,7 @@ def write_brief(ask_with, system: str, digest: str, label: str) -> str | None:
 
 
 def write_riser_reason(ask_with, system: str, digest: str | None, name: str) -> str | None:
-    """갑자기 많이 언급된 종목의 까닭(50~90자). 재료가 없거나 등락률 목록뿐이면 묻지 않고 None."""
+    """갑자기 많이 언급된 종목의 까닭(42~58자). 재료가 없거나 등락률 목록뿐이면 묻지 않고 None."""
     if not digest or digest_is_list_only(digest):
         return None
     candidates = [ask_with(system, digest)]
