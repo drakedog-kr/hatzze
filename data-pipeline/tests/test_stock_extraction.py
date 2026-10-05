@@ -693,3 +693,65 @@ def test_week3_phantoms_are_not_stocks(text):
 )
 def test_week3_real_mentions_survive(text, code):
     assert code in _week3(text)
+
+
+# ── 2026-10-06: 미장 레딧(RDDT) ← 게시판 레딧 이야기 ─────────────────────────────────────────
+# 채널은 게시판 레딧을 남의 종목 관심을 재는 출처로 쓴다(정형 글 `미국 레딧 게시물 분석` · `레딧 관심도`). 10-05 미장 테마
+# '소프트웨어'의 말 많은 종목에 레딧이 올랐는데 최근 사흘 근거 글 8건이 전부 이 꼴이었다. 회사 자리는 남는다.
+# 규칙은 config.us_stock_extraction.NEGATIVE_CONTEXT["레딧"].
+
+@pytest.fixture(scope="module")
+def us_tagger():
+    import extract_telegram_us_stocks as us
+
+    mt = us.build_dictionary()
+    pattern, caseless = us.build_pattern(list(mt))
+    return lambda text: set(us.extract(text, pattern, mt, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "2026년 10월 4일 미국 레딧 베스트 게시물 분석\n\n🤖 NVDA / AI 반도체\n\n· 반도체만 계속 시장 주도",
+        "미국 레딧 게시물 분석\n(2026년 9월 11일 00:00~06:00 기준)",
+        "레딧 관심도 현황\n\n유가, 브로드컴 그리고 금",
+        "레딧 관심도는 마이크론, 나이키에 집중",
+        "미국 레딧 최대 관심사는 유가..;;;",
+        "현시간 레딧에서 많이 언급되는 종목 및 워딩\n\n1위 유가, 2위 타코",
+        "미국 최대 온라인 커뮤니티 ‘레딧’에선 ‘사이버캡이 우버를 무너트릴 수 있을까?’",
+        "▸ 2,000달러 이상 가격과 스펙 타협 우려: 레딧(r/apple) 유저들은 \"2,000달러가 넘는 기기인데\"",
+        "레딧 베플글 번역:\n\n한국 증시? 솔직히 지금 정상적인 시장이라고 보기 어렵다.",
+        "레딧서 화제인 태국 16세 소녀 ㄷㄷ...mp4",
+        "레딧에 도는짤....",
+        "아모레퍼시픽: 레딧 최다(447건 net +0.33)·COSRX 기반 견조하나",
+    ],
+)
+def test_reddit_board_is_not_rddt(us_tagger, text):
+    assert "RDDT" not in us_tagger(text)
+
+
+def test_reddit_board_post_keeps_the_stocks_it_talks_about(us_tagger):
+    # 게시판 글이 다루는 종목은 그대로 센다 — 빠지는 건 레딧 자리 하나다.
+    assert us_tagger("레딧 관심도 현황\n\n유가, 브로드컴 그리고 금") == {"AVGO"}
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # 등락 · 실적 · 광고 매출 · 지수 편입 · 티커 표기
+        "레딧(+5.22%)은 법원이 앤트로픽에 대한 데이터 무단수집 소송에서 레딧의 계약상 주장을 계속 심리할 수 있다고 판단",
+        "제목 : 레딧, 2분기 매출 8억 490만 달러 기록… 전년비 큰 폭 성장",
+        "레딧은 2분기 광고 매출이 61% 성장하며 미국 광고 사업에서 높은 성장세를 보였다",
+        "레딧, 상장 2년 만에 S&P500 편입 확정",
+        "구글이 레딧(NYS: RDDT)과의 AI 라이선스 계약을 재협상하는 과정에서",
+        # 앞 문맥이 '커뮤니티'여도 회사 소식이다 — 그래서 앞은 안 본다
+        "美 온라인 커뮤니티 레딧, S&P500 편입...시간외 12% 폭등",
+        # `에는` · `게시판` 은 규칙에 없다 — 둘 다 회사(주가) 이야기로 왔다
+        "이번 보도가 사실이라면 레딧에는 상당한 후퇴가 될 수 있다",
+        "하락 배경은 AI 모델이 레딧 게시판 트래픽을 잠식할 것이라는 우려",
+        # 한 글에 게시판 자리와 회사 자리가 같이 있으면 회사 자리가 남긴다
+        "레딧 관심도는 메타에 몰빵...\n[레딧(+3.0%)] S&P500 편입. 시간외 +10%",
+    ],
+)
+def test_reddit_company_mentions_survive(us_tagger, text):
+    assert "RDDT" in us_tagger(text)
