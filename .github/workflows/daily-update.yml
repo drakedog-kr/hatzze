@@ -51,6 +51,21 @@ on:
         options:
           - evening
           - morning
+      # 같은 시간대(아침 21:00Z~ · 저녁 08:00Z~)에 이미 성공했거나 도는 실행이 있어도 돌린다. 손으로 다시 돌릴 때만 켠다(아래 guard).
+      # Vercel 시계는 이 입력을 안 넣는다 — 시계가 보낸 실행은 늘 슬롯 검사를 받는다.
+      force:
+        description: "같은 시간대에 이미 성공한 실행이 있어도 다시 돌린다 (손으로 다시 돌릴 때만)"
+        type: boolean
+        default: false
+
+# ⭐ 같은 워크플로는 한 번에 하나만 돈다(2026-10-05). 겹치면 뒤의 것이 앞의 것이 끝날 때까지 기다리고, 시작하면 guard 가
+#    '이 시간대를 이미 누가 처리했나'를 본다. 그날 17:50 만회 크론이 17:30 실행을 못 보고 하나를 더 던졌고, guard 의 '도는 실행
+#    있나' 조회도 같은 깃헙 실행 목록에서 그 실행을 못 봐 둘이 나란히 돌았다(같은 표 동시 쓰기 · 채널 발송 두 번 직전에 손으로 취소).
+#    목록 조회는 순간 틀릴 수 있다. 동시에 못 돌게 하는 것은 깃헙이 보장하고, 목록은 기다린 뒤(앞 실행이 끝난 뒤) 다시 읽는다.
+#    cancel-in-progress 는 끈다 — 켜면 늦게 온 쪽이 돌던 쪽을 죽인다.
+concurrency:
+  group: daily-update-${{ github.ref }}
+  cancel-in-progress: false
 
 # 비밀값은 워크플로 머리에 둔다(2026-09-25). 잡을 나누며 잡마다 env 를 따로 두면
 # 한 잡에서 줄이 빠지기 쉽다(아래 예탁원 키 주석이 바로 그 사고다). 게이트 잡도 받지만
@@ -163,6 +178,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EVENT: ${{ github.event_name }}
           CRON: ${{ github.event.schedule }}
+          FORCE: ${{ inputs.force }}
+          BROADCAST: ${{ inputs.broadcast }}
         run: |
           skip=false
           MAX_LATE_MIN=120   # 자기 발화보다 이만큼 넘게 늦은 예약은 빼는 상한(위 주석)
@@ -251,31 +268,68 @@ jobs:
               fi
             fi
           else
-            # ── 수동 실행(폴백 포함) ─────────────────────────────────────────
-            # 시각 검사는 안 한다(사람이 고른 시각이 곧 이유다). 대신 **동시에 두 개가
-            # 도는 것만** 막는다. Vercel 크론은 전달이 best effort 라 같은 예약을 두 번
-            # 부를 수 있는데(문서 명시), 두 요청이 1초 안에 겹치면 서로의 실행을 못 보고
-            # 둘 다 던진다. 그러면 파이프라인이 둘 돌고 브리핑이 두 번 나간다.
-            #
-            # 게이트는 실행이 **생긴 뒤** 도므로 그 경합을 여기서 풀 수 있다. 나보다 먼저
-            # 생겼고 아직 도는 중인 실행이 있으면 늦게 생긴 쪽만 빠진다.
-            # ⚠️ **끝난 실행은 안 센다.** 손으로 다시 돌리는 길(실패 뒤 재시도)을 막으면 안 된다.
+            # ── 수동 실행 · Vercel 시계(지금은 모든 실행이 여기로 온다) ──────────────────────────
+            # 깃헙 예약은 2026-08-29 에 껐다 — 위 schedule 갈래는 지금 안 쓰인다. 시계(Vercel)도 workflow_dispatch 로 던진다.
+            # 예전 이 갈래는 '지금 도는 실행이 있나'만 봤다. 2026-10-05 17:50 만회 크론이 던진 실행이 그 조회에서 17:30 실행을
+            # 못 보고(깃헙 실행 목록이 그 순간 그 실행을 안 돌려줬다) 나란히 돌았다. 그래서 둘을 바꾼다.
+            #   ① 동시 실행은 워크플로 머리의 concurrency 가 막는다 — 겹친 실행은 기다렸다가 앞 실행이 끝난 뒤 여기 온다.
+            #   ② 여기서는 **시간대(슬롯)** 로 본다 — 지금 시간대(아침 21:00Z~ · 저녁 08:00Z~, lib/cron-schedule.ts 의 fireUtc 와
+            #      같은 경계)에 나보다 먼저 생긴 실행이 성공했거나 · 아직 돌거나 · 사람이 취소했으면 빠진다(위 schedule 갈래와 같은 셈).
+            #      실패 · 시간 초과면 만회로 돈다. 단 그 실행이 이 슬롯 발송까지 끝냈고 나도 발송할 거면 빠진다(같은 글 두 번).
+            #   ③ 손으로 다시 돌리려면 force 를 켠다(성공한 시간대를 일부러 다시 돌리는 경우).
+            # ⚠️ 목록 조회가 끝내 실패하면 게이트는 연다(위 '고장 나면 열려야 한다'). 실패와 '없음'을 가르려고 조회마다 다시 묻는다.
             mine=$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq ".created_at" 2>/dev/null || true)
-            if [ -z "$mine" ]; then
+            if [ "$FORCE" = "true" ]; then
+              echo "force — 시간대 검사 없이 진행합니다"
+            elif [ -z "$mine" ]; then
               echo "내 실행 생성 시각을 못 읽어 게이트를 엽니다 — 그대로 진행합니다"
             else
-              q=".workflow_runs[]"
-              q="$q | select(.status != \"completed\")"
-              q="$q | select(.created_at < \"$mine\" or (.created_at == \"$mine\" and .id < $GITHUB_RUN_ID))"
-              q="$q | .html_url"
-              busy=$(gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/daily-update.yml/runs?per_page=30&branch=main" --jq "$q" 2>/dev/null | head -1 || true)
-              if [ -n "$busy" ]; then
+              mine_epoch=$(date -u -d "$mine" +%s)
+              day=$(date -u -d "$mine" +%Y-%m-%d)
+              b_m=$(date -u -d "$day 21:00" +%s); [ "$b_m" -gt "$mine_epoch" ] && b_m=$(( b_m - 86400 ))
+              b_e=$(date -u -d "$day 08:00" +%s); [ "$b_e" -gt "$mine_epoch" ] && b_e=$(( b_e - 86400 ))
+              since=$(date -u -d "@$(( b_m > b_e ? b_m : b_e ))" +%Y-%m-%dT%H:%M:%SZ)
+              runs_url="/repos/$GITHUB_REPOSITORY/actions/workflows/daily-update.yml/runs?per_page=30&branch=main"
+              earlier=".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | select(.created_at >= \"$since\")"
+              earlier="$earlier | select(.created_at < \"$mine\" or (.created_at == \"$mine\" and .id < $GITHUB_RUN_ID))"
+              q="$earlier | select(.status != \"completed\" or .conclusion == \"success\" or .conclusion == \"cancelled\") | .html_url"
+              # '없음'도 세 번 묻는다(10초 간격) — 깃헙 실행 목록이 도는 실행을 몇 초 동안 빼고 돌려준다. 2026-10-05 17:50 에 Vercel 과
+              # 이 게이트가 10초 사이로 둘 다 그랬고, 같은 조회를 손으로 다시 돌렸을 때도 한 번 그랬다(그 뒤 45번은 멀쩡했다).
+              # 한 번이라도 보이면 건너뛴다. 실패(응답 없음)는 따로 센다 — 셋 다 실패면 게이트를 연다.
+              hit=""; ok=false
+              for attempt in 1 2 3; do
+                if out=$(gh api "$runs_url" --jq "$q" 2>/dev/null); then
+                  ok=true
+                  hit=$(printf '%s\n' "$out" | head -1)
+                  [ -n "$hit" ] && break
+                fi
+                [ "$attempt" -lt 3 ] && sleep 10
+              done
+              if [ "$ok" = "true" ] && [ -z "$hit" ] && [ "$BROADCAST" != "none" ] && [ -n "$BROADCAST" ]; then
+                # 실패한 앞 실행이 발송까지는 했을 수 있다(위 '이미 발송했으면 막는다').
+                case "$BROADCAST" in
+                  morning) step="A 어제 브리핑" ;;
+                  *)       step="B 마감 리포트" ;;
+                esac
+                ids=$(gh api "$runs_url" --jq "$earlier | .id" 2>/dev/null || true)
+                for id in $ids; do
+                  sent=$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" \
+                         --jq "[.jobs[].steps[] | select(.name | contains(\"$step\")) | select(.conclusion == \"success\")] | length" 2>/dev/null || echo 0)
+                  if [ "${sent:-0}" -gt 0 ]; then
+                    hit="https://github.com/$GITHUB_REPOSITORY/actions/runs/$id (이미 $step 발송함)"
+                    break
+                  fi
+                done
+              fi
+              if [ "$ok" != "true" ]; then
+                echo "실행 목록을 세 번 다 못 읽어 게이트를 엽니다 — 그대로 진행합니다"
+              elif [ -n "$hit" ]; then
                 skip=true
-                echo "이미 도는 실행이 있어 건너뜁니다(동시 실행 방지): $busy"
-                echo "## 실행을 건너뜀 — 이미 도는 실행이 있음" >> "$GITHUB_STEP_SUMMARY"
-                echo "$busy 가 아직 돌고 있어 이 실행은 아무것도 하지 않습니다." >> "$GITHUB_STEP_SUMMARY"
+                echo "이 시간대($since~)를 이미 처리했거나 도는 실행이 있어 건너뜁니다: $hit"
+                echo "## 실행을 건너뜀 — 이 시간대를 이미 처리함" >> "$GITHUB_STEP_SUMMARY"
+                echo "\`$since\` 뒤의 실행이 이 시간대를 맡았습니다: $hit · 다시 돌리려면 force 를 켜고 손으로 실행하십시오." >> "$GITHUB_STEP_SUMMARY"
               else
-                echo "수동 실행($EVENT) · 도는 실행 없음 — 그대로 진행합니다"
+                echo "수동 실행($EVENT) · 이 시간대($since~)에 앞선 실행 없음 — 그대로 진행합니다"
               fi
             fi
           fi
