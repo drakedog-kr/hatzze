@@ -163,7 +163,6 @@ export default async function UsKaderaPage() {
       title: "언급 급부상 종목",
       meta: `최근 ${US_WINDOW_DAYS}일 · 평소 대비`,
       // 국장과 같은 자리 · 같은 차례. 미장 줄은 내부자 리포트 종목 화면으로 가서 문구가 다르다.
-      hint: { id: "stock-row-us", order: 0, text: "종목을 누르면 월가 거물·임원 매매까지 함께 나옵니다" },
       kind: "surge",
       heads: ["", "종목", liveHead, "언급 증가", "왜 뜨나"],
       key0: "언급",
@@ -186,6 +185,8 @@ export default async function UsKaderaPage() {
       id: "talk",
       title: "많이 언급된 종목",
       meta: `최근 ${US_WINDOW_DAYS}일`,
+      // 종목 쪽지는 이 표 첫 줄(가장 많이 언급된 종목) 밑에 — 국장 카더라와 같은 까닭(app/kadera/page.tsx talk 주석).
+      hint: { id: "stock-row-us", order: 2, text: "종목을 누르면 월가 거물·임원 매매까지 함께 나옵니다" },
       kind: "talk",
       heads: ["", "종목", liveHead, "언급", "흐름 요약"],
       key0: "언급",
