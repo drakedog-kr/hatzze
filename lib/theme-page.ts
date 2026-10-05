@@ -112,8 +112,11 @@ export type ThemeHotStock = ThemeMember & {
   usualMentions: number;
   /** 최근 사흘 중 하루 최다 채널 수. **기간 합집합이 아니다**(lib/stock-page.ts 머리말 ②). */
   channels: number;
-  /** 최근 사흘 안의 가장 최근 까닭 한 줄. 없으면 null(정상). */
-  reason: { date: string; reason: string; changeRate: number | null } | null;
+  /**
+   * 요즘 도는 얘기 한 줄(LLM 20~28자) — 파이프라인이 화면과 같은 규칙으로 고른 줄마다 써 둔 것(테마 요약 행의 talk ·
+   * 마이그레이션 092). 그 종목 이야기가 발췌에 없었거나 고르는 규칙이 경계에서 갈렸으면 null.
+   */
+  talk: string | null;
 };
 
 export type ThemeReasonRow = ThemeMember & {
@@ -259,7 +262,25 @@ export function themeQuotes(rows: { changeRate: number | null; priceDate: string
 
 /** telegram_theme_brief · telegram_us_theme_brief 의 한 행(둘이 같은 열이다 — 마이그레이션 082). */
 export type BriefExcerptRow = { channel_handle: string; message_id: number; posted_at: string; views?: number | null; forwards?: number | null; text: string; stocks?: string[] | null };
-export type BriefRow = { date: string; brief: string | null; related: ThemeRelated[] | null; excerpts: BriefExcerptRow[] | null; message_count: number | null };
+export type BriefRow = {
+  date: string;
+  brief: string | null;
+  related: ThemeRelated[] | null;
+  excerpts: BriefExcerptRow[] | null;
+  message_count: number | null;
+  /** 말 많은 종목마다 요즘 도는 얘기 {종목코드: 한 줄}(마이그레이션 092). 그 전 행은 null. */
+  talk?: Record<string, unknown> | null;
+};
+
+/** 요약 행의 talk 를 {코드: 한 줄}로. 문자열이 아닌 값 · 빈 문자열은 버린다. */
+export function talkOf(b: BriefRow | null): Map<string, string> {
+  const out = new Map<string, string>();
+  if (!b?.talk || typeof b.talk !== "object") return out;
+  for (const [code, text] of Object.entries(b.talk)) {
+    if (typeof text === "string" && text.trim()) out.set(code, text.trim());
+  }
+  return out;
+}
 
 /** 요약 행을 화면 타입으로. 채널 제목·사진은 여기서 붙인다. related 는 사전에 있는 이름만 남긴다. */
 export function parseBriefRow(b: BriefRow | null, meta: Awaited<ReturnType<typeof channelMeta>>, known: (theme: string) => boolean): ThemeBrief | null {
@@ -293,17 +314,17 @@ export type StockDailyLike = { date: string; code: string; mentions: number | nu
  * '이 테마의 주인공' — 최근 창 언급 합 순. usualMentions 는 **평소 몫으로 본 최근 창의 기대 언급 수**다
  * (lib/stock-usual.ts expectedUsualMentions — 앞날들의 언급 합 ÷ 그날들 테마 대화 총량 × 최근 창 총량). 언급 수 그대로
  * 하루 평균 × 창 길이로 재던 때는 요일을 탔다. `share` 가 없거나 총량을 못 읽었으면 그 옛 식으로 물러선다.
- * 국장·미장이 같은 규칙으로 줄을 세운다(lib/us-theme-page.ts). reasons 는 최신순이어야 종목마다 처음 만난 것이 가장 최근 까닭이다.
+ * 국장·미장이 같은 규칙으로 줄을 세운다(lib/us-theme-page.ts). ⚠️ 파이프라인 짝(data-pipeline/common/theme_hot.py)이 같은 규칙으로
+ * 줄을 골라 '요즘 도는 얘기'를 써 둔다 — 차례를 바꾸면 그쪽도 같이 고친다(안 그러면 경계의 줄이 빈다).
  */
 export function buildHotStocks(
   rows: StockDailyLike[],
   recentSet: Set<string>,
   usualDayCount: number,
   byCode: Map<string, ThemeMember>,
-  reasons: ThemeReasonRow[],
+  /** 요즘 도는 얘기 {코드: 한 줄}(talkOf). */
+  talk: Map<string, string>,
   share?: { usualDays: string[]; dayTotals: Map<string, number> | null },
-  /** 이유 기간의 끝 — 화면 '등락의 이유'와 같은 기준일. 없으면 최근 날 중 마지막. */
-  reasonEnd?: string,
 ): ThemeHotStock[] {
   const agg = new Map<string, { m: number; c: number; w: number; u: number }>();
   const usualSet = new Set(share?.usualDays ?? []);
@@ -320,23 +341,11 @@ export function buildHotStocks(
     }
     agg.set(r.code, a);
   }
-  const latestReasonOf = new Map<string, ThemeReasonRow>();
-  // 이유는 최근 7일 안의 것 — 아래 '등락의 이유'와 같은 기간이다. 최근 사흘로만 붙이면 주말 · 월요일엔 사실상 금요일 하루치라
-  // 열 줄 중 아홉이 비어 큰 빈 칸이 생겼다(2026-10-04 점검, 반도체). 날짜가 줄에 붙으니 오래된 이유도 그렇게 읽힌다.
-  // 끝은 기준일(reasonEnd) — 최근 날의 끝으로 잡으면 기준일이 얇은 아침에 하루 이르게 끝나, 아래 '등락의 이유'(기준일부터 7일)에 없는
-  // 날의 이유가 붙었다(2026-10-05 머지 전 점검).
-  const recentEnd = reasonEnd ?? [...recentSet].sort().at(-1);
-  const reasonFrom = recentEnd ? addDaysISO(recentEnd, -6) : null;
-  for (const r of reasons) {
-    // 종목마다 가장 최근 하나(목록이 최신순이라 처음 만난 것이 그것이다).
-    if (reasonFrom && recentEnd && r.date >= reasonFrom && r.date <= recentEnd && !latestReasonOf.has(r.code)) latestReasonOf.set(r.code, r);
-  }
   return [...agg.entries()]
     // 앞 사흘에만 언급되고 최근 사흘엔 없는 종목은 '말 많은 종목'이 아니다.
     .filter(([code, a]) => byCode.has(code) && a.m > 0)
     .sort((x, y) => y[1].m - x[1].m || y[1].w - x[1].w || x[0].localeCompare(y[0]))
     .map(([code, a]) => {
-      const why = latestReasonOf.get(code);
       return {
         ...byCode.get(code)!,
         mentions: a.m,
@@ -346,7 +355,7 @@ export function buildHotStocks(
             ? (a.u / usualDayCount) * recentSet.size
             : 0,
         channels: a.c,
-        reason: why ? { date: why.date, reason: why.reason, changeRate: why.changeRate } : null,
+        talk: talk.get(code) ?? null,
       };
     });
 }
@@ -438,7 +447,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
     // 기준일분이 아직 없으면 하루까지 거슬러 가장 최근 것을 쓴다(LLM_TEXT_CARRY_DAYS).
     db
       .from("telegram_theme_brief")
-      .select("date,brief,related,excerpts,message_count")
+      .select("date,brief,related,excerpts,message_count,talk")
       .eq("theme", theme)
       .gte("date", addDaysISO(baseDate, -LLM_TEXT_CARRY_DAYS))
       .lte("date", baseDate)
@@ -505,9 +514,8 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
     recentSet,
     usualDays.length,
     byCode,
-    reasons,
+    talkOf((briefRow.data ?? null) as BriefRow | null),
     { usualDays, dayTotals },
-    baseDate,
   );
 
   // ── 점유율·순위 ── 테마 로테이션과 같은 값이어야 카드에서 이 화면으로 넘어와도 숫자가 같다.

@@ -19,6 +19,7 @@ import {
   buildHotStocks,
   flowStats,
   parseBriefRow,
+  talkOf,
   themeDayTotals,
   themeQuotes,
   type BriefRow,
@@ -106,7 +107,7 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
     getUsThemeRotation(100),
     db
       .from("telegram_us_theme_brief")
-      .select("date,brief,related,excerpts,message_count")
+      .select("date,brief,related,excerpts,message_count,talk")
       .eq("theme", theme)
       .gte("date", addDaysISO(baseDate, -LLM_TEXT_CARRY_DAYS))
       .lte("date", baseDate)
@@ -178,9 +179,8 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
     recentSet,
     usualDays.length,
     byCode,
-    reasons,
+    talkOf((briefRow.data ?? null) as BriefRow | null),
     { usualDays, dayTotals },
-    baseDate,
   );
 
   let recentShare: number | null = null;

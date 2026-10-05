@@ -12,6 +12,8 @@
               본문을 뒤에 붙일 일이 없다(미국 언급 메시지는 창에 천여 건이라 본문째 받아도 가볍다).
   사전        config/us_stock_themes.py — 키가 티커라 이름 대조가 없다.
   급부상      common/us_theme_risers.py 가 고르고, digest 는 build_stock_digests(tickers=…)로 만든다.
+  도는 얘기   테마 상세 '말 많은 종목' 줄마다 한 줄(talk jsonb · 마이그레이션 092). 줄은 common/theme_hot.py 가 화면과 같은
+              규칙으로 고르고, 쓰는 일(TALK_RULES · write_talk)은 국장 짝 그대로다.
 
 실행:
     cd data-pipeline && source .venv/bin/activate
@@ -19,6 +21,7 @@
     python scripts/generate_us_theme_briefs.py                         # 생성 + 저장(전 테마)
     python scripts/generate_us_theme_briefs.py --theme AI반도체,메모리    # 몇 개만
     python scripts/generate_us_theme_briefs.py --theme 메모리 --no-save  # 문장만 보고 저장 안 함
+    python scripts/generate_us_theme_briefs.py --talk-only               # 말 많은 종목의 도는 얘기만(그날 행의 talk 열)
 """
 
 from __future__ import annotations
@@ -35,6 +38,7 @@ from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
+from common.theme_hot import theme_hot  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from common.us_theme_risers import us_theme_risers  # noqa: E402
 from config.us_stock_extraction import is_house  # noqa: E402
@@ -49,6 +53,7 @@ TABLE = "telegram_us_theme_brief"
 
 US_THEME_SYSTEM = US.US_COMMON + TB.THEME_RULES
 US_RISER_SYSTEM = US.US_COMMON + TB.RISER_RULES
+US_TALK_SYSTEM = US.US_COMMON + TB.TALK_RULES
 
 
 def build_us_theme_bundle(
@@ -142,6 +147,8 @@ def main() -> None:
     args = sys.argv[1:]
     dry_run = "--dry-run" in args
     no_save = "--no-save" in args
+    # 도는 얘기(talk)만 다시 쓴다 — 요약 · 급부상 이유는 그대로 두고 그날 행의 talk 열만 고친다(narratives-rerun.yml what=talk).
+    talk_only = "--talk-only" in args
     only: set[str] | None = None
     if "--theme" in args:
         only = {t.strip() for t in args[args.index("--theme") + 1].split(",") if t.strip()}
@@ -169,10 +176,15 @@ def main() -> None:
         for t in tickers:
             themes_of[t].append(theme)
 
-    msgs = [m for m in US.load_us_messages(db, since) if m["date"] <= end]
+    # 도는 얘기의 줄과 창 — 화면 '말 많은 종목'과 같은 규칙(common/theme_hot.py). 얇은 날(기준일 아침)을 빼면 창이 하루 앞에서
+    # 시작할 수 있어 메시지를 그만큼 앞에서부터 받고, 요약 · 급부상 재료는 예전 창(since ~ end)으로 다시 자른다.
+    talk_days, hot_of = theme_hot(db, latest, US_THEMES, "telegram_us_stock_daily", "telegram_us_theme_daily", "ticker", TB.TALK_ROWS)
+    print(f"[도는 얘기] 최근 {', '.join(talk_days)} · {sum(len(v) for v in hot_of.values())}종목")
+    wide = [m for m in US.load_us_messages(db, min([since, *talk_days[:1]])) if m["date"] <= end]
     # 은행 화자 태그(config.RESEARCH_HOUSES 주석)는 테마 재료에서 뗀다 — `골드만삭스는 … 전망` 은 금융 테마 얘기가 아니다.
-    for m in msgs:
+    for m in wide:
         m["mentions"] = [x for x in m["mentions"] if not is_house(x)]
+    msgs = [m for m in wide if m["date"] >= since]
     print(f"[재료] 창 안 미국 언급 메시지 {len(msgs):,}건")
 
     # ── 둘째 몫: 급부상 종목의 이유 ── digest 는 종목 요약과 같은 함수·같은 창.
@@ -184,6 +196,17 @@ def main() -> None:
 
     targets = [t for t in US_THEMES if only is None or t in only]
     bundles = {theme: build_us_theme_bundle(theme, set(US_THEMES[theme]), msgs, name_of, themes_of) for theme in targets}
+
+    # 도는 얘기 재료 — 화면 최근 3일(talk_days)에 그 종목이 언급된 글. 미장 글은 본문째 온다(attach 없음).
+    wanted = {t for th in targets for t in hot_of.get(th, [])}
+    pool: dict[str, list[tuple[dict, str | None]]] = defaultdict(list)
+    for m in wide:
+        if not talk_days or m["date"] < talk_days[0]:
+            continue
+        for x in {x["ticker"]: x for x in m["mentions"]}.values():
+            if x["ticker"] in wanted:
+                pool[x["ticker"]].append((m, x.get("match_text")))
+    blocks = TB.talk_blocks(pool, sorted(wanted))
 
     if dry_run:
         for theme in targets:
@@ -198,7 +221,11 @@ def main() -> None:
         for _t, _n, d in riser_digests[:3]:
             print(d)
             print("─" * 60)
-        print("[dry-run] LLM 호출·저장 없이 종료합니다.")
+        for theme in targets[:1]:
+            items = [(i + 1, name_of.get(t, t), blocks[t], None) for i, t in enumerate(t for t in hot_of.get(theme, []) if t in blocks)]
+            print(TB.talk_prompt(theme, items))
+            print("─" * 60)
+        print(f"[dry-run] 도는 얘기 재료 {len(blocks)}/{len(wanted)}종목. LLM 호출·저장 없이 종료합니다.")
         return
 
     client = get_llm_client(ANTHROPIC_API_KEY)
@@ -207,10 +234,31 @@ def main() -> None:
         resp = client.messages.create(model=MODEL, max_tokens=500, system=system, messages=[{"role": "user", "content": digest}])
         return "".join(b.text for b in resp.content if b.type == "text").strip()
 
+    def ask_talk(system: str, user: str) -> str:
+        resp = client.messages.create(model=MODEL, max_tokens=TB.TALK_MAX_TOKENS, system=system, messages=[{"role": "user", "content": user}])
+        return "".join(b.text for b in resp.content if b.type == "text").strip()
+
+    if talk_only:
+        done = 0
+        for theme in targets:
+            items = [(c, name_of.get(c, c), blocks[c]) for c in hot_of.get(theme, []) if c in blocks]
+            talk = TB.write_talk(ask_talk, US_TALK_SYSTEM, theme, items)
+            for c, line in talk.items():
+                print(f"    · {name_of.get(c, c)} ({len(line)}자) {line}")
+            print(f"  [{theme}] 도는 얘기 {len(talk)}/{len(hot_of.get(theme, []))}줄")
+            if not no_save:
+                res = db.table(TABLE).update({"talk": talk, "updated_at": datetime.now(KST).isoformat()}).eq("date", latest).eq("theme", theme).execute()
+                if not res.data:
+                    print(f"  [{theme}] {latest} 요약 행이 없어 도는 얘기를 넣지 못했습니다(테마 요약을 먼저 돌릴 것).")
+                    continue
+                done += 1
+        print(f"[Supabase] {TABLE} 도는 얘기 {done}/{len(targets)}테마" + (" (저장 안 함)" if no_save else ""))
+        return
+
     saved = 0
     for theme in targets:
         b = bundles[theme]
-        row = {"date": latest, "theme": theme, "brief": None, "related": [], "excerpts": [], "message_count": 0, "stock_count": 0, "model": None, "riser": None}
+        row = {"date": latest, "theme": theme, "brief": None, "related": [], "excerpts": [], "message_count": 0, "stock_count": 0, "model": None, "riser": None, "talk": {}}
         try:
             if b is not None:
                 text = TB.write_brief(ask_with, US_THEME_SYSTEM, b["digest"], theme)
@@ -223,6 +271,11 @@ def main() -> None:
                 row["riser"] = {"code": r["code"], "name": r["name"], "market": "US", "recent": r["recent"], "prior": r["prior"], "ratio": r["ratio"],
                                 "reason": TB.write_riser_reason(ask_with, US_RISER_SYSTEM, digest_of.get(r["code"]), r["name"])}
                 print(f"  [{theme} · {r['name']}] {row['riser']['reason'] or '(이유 없음)'}")
+            items = [(t, name_of.get(t, t), blocks[t]) for t in hot_of.get(theme, []) if t in blocks]
+            row["talk"] = TB.write_talk(ask_talk, US_TALK_SYSTEM, theme, items)
+            for t, line in row["talk"].items():
+                print(f"    · {name_of.get(t, t)} ({len(line)}자) {line}")
+            print(f"  [{theme}] 도는 얘기 {len(row['talk'])}/{len(hot_of.get(theme, []))}줄")
             if not no_save:
                 # updated_at 을 직접 넣는다 — 국장 짝(generate_theme_briefs.py)의 같은 자리 주석.
                 row["updated_at"] = datetime.now(KST).isoformat()
