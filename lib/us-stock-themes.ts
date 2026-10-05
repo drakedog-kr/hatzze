@@ -42,7 +42,7 @@ export const US_THEMES: Record<string, string[]> = {
   "바이오·헬스케어": ["LLY", "MRNA", "NVO", "MRK", "PFE", "ABBV", "AZN", "NVS", "JNJ", "UNH", "ISRG", "MDGL", "CVS", "CAH", "AMGN", "MDT", "EVMN"],
   "금융": ["GS", "JPM", "MS", "BAC", "BRK", "BX", "SCHW", "MA", "AXP", "PYPL", "SOFI", "UPST", "C"],
   "가상자산": ["COIN", "MSTR", "CRCL", "GLXY", "CLSK", "RIOT", "CIFR", "HOOD"],
-  "소비재·유통": ["KO", "WMT", "COST", "SBUX", "MCD", "NKE", "CMG", "PEP", "PM", "DIS", "DKNG", "ORLY", "DECK", "LUV", "DHI", "PLD", "WELL", "CPNG", "MELI", "URI", "ABNB", "BKNG", "CAT", "VZ", "HD", "BBY", "DLTR", "EBAY", "LULU", "KR"],
+  "소비재·유통": ["KO", "WMT", "COST", "SBUX", "MCD", "NKE", "CMG", "PEP", "PM", "DIS", "DKNG", "ORLY", "DECK", "LUV", "DHI", "PLD", "WELL", "CPNG", "MELI", "URI", "ABNB", "BKNG", "CAT", "VZ", "HD", "BBY", "DLTR", "EBAY", "LULU", "KR", "CCL"],
   "에너지·원자재": ["XOM", "CVX", "KMI", "VLO", "FCX", "NEM", "NUE", "ALB"],
   "양자컴퓨팅": ["IONQ", "QBTS", "RGTI"],
   "중국": ["BABA", "BIDU", "PDD", "JD"],

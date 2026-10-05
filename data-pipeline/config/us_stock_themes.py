@@ -83,7 +83,7 @@ US_THEMES: dict[str, list[str]] = {
         "KO", "WMT", "COST", "SBUX", "MCD", "NKE", "CMG", "PEP", "PM",
         "DIS", "DKNG", "ORLY", "DECK", "LUV", "DHI", "PLD", "WELL",
         "CPNG", "MELI", "URI", "ABNB", "BKNG", "CAT", "VZ",
-        "HD", "BBY", "DLTR", "EBAY", "LULU", "KR",
+        "HD", "BBY", "DLTR", "EBAY", "LULU", "KR", "CCL",
     ],
     "에너지·원자재": ["XOM", "CVX", "KMI", "VLO", "FCX", "NEM", "NUE", "ALB"],
     # 아직 작지만(합쳐 170회) 뜰 때 한꺼번에 뜨는 묶음이라 따로 둔다.
