@@ -244,7 +244,8 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           </span>
         </div>
         {d.price != null && (
-          <div className="v2-cover-cell">
+          // v2-cover-price — 폰에서 이 화면의 대표 숫자(가격)만 키운다(v2.css 모바일 묶음).
+          <div className="v2-cover-cell v2-cover-price">
             <span className="v2-cover-k">{d.priceDate ? `${md(d.priceDate)} 종가` : "종가"}</span>
             <span className="v2-cover-v">
               <b>{d.price.toLocaleString("ko-KR")}원</b>

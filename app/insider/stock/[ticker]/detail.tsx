@@ -295,7 +295,8 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
           </h1>
         </div>
         {d.price != null && (
-          <div className="v2-cover-cell">
+          // v2-cover-price — 폰에서 이 화면의 대표 숫자(현재가)만 키운다(v2.css 모바일 묶음).
+          <div className="v2-cover-cell v2-cover-price">
             <span className="v2-cover-k">현재가</span>
             <span className="v2-cover-v">
               {/* 시세는 소수 둘째 자리까지(ExactMoney) — 금액 접기(Money)는 $1,000 미만을 정수로 반올림해 $6.92 가 '$7'로 섰다(2026-10-04 점검). */}
