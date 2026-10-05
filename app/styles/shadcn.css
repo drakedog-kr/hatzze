@@ -77,8 +77,9 @@
   .cn-command-input-group {
     @apply bg-input/50 h-8!;
   }
+  /* 폰(640 미만)은 16px — iOS 사파리가 16px 미만 입력칸에 초점이 가면 화면을 확대하고, 창을 닫아도 확대가 남는다(2026-10-05 모바일 점검). */
   .cn-command-input {
-    @apply w-full text-sm;
+    @apply w-full text-base sm:text-sm;
   }
   .cn-command-input-icon {
     @apply size-4 shrink-0 opacity-50;
@@ -97,11 +98,13 @@
   }
   /* 고른 줄은 rhea 의 bg-muted 가 아니라 사이드바 '지금 보는 항목'과 같은 파란 틴트다. muted(--c-soft)는
      흰 창 위에서 1.06 이라 Enter 로 열릴 줄이 거의 안 보였다(실측). */
+  /* 폰 대화상자 안 줄은 44 — 32 줄이 간격 0 으로 붙어 엄지로 옆 줄을 잘못 눌렀다(2026-10-05 모바일 점검). 목록은 이미 안에서 굴러간다. */
   .cn-command-item {
-    @apply data-selected:bg-(--c-blue-tint) data-selected:text-(--c-cold-ink) relative flex min-h-7 cursor-default items-center gap-2 rounded-xl px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-2xl;
+    @apply data-selected:bg-(--c-blue-tint) data-selected:text-(--c-cold-ink) relative flex min-h-7 cursor-default items-center gap-2 rounded-xl px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-2xl in-data-[slot=dialog-content]:max-sm:min-h-11;
   }
+  /* 오른쪽 값(+6.8%p 같은 유입 증가)은 고른 줄에서도 잉크 — 파랑이면 2색 체계에서 '내림'으로 읽혔다(폰은 첫 줄이 저절로 골라진다). */
   .cn-command-shortcut {
-    @apply text-muted-foreground group-data-selected/command-item:text-(--c-cold-ink) ml-auto text-xs tracking-widest;
+    @apply text-muted-foreground group-data-selected/command-item:text-(--c-ink) ml-auto text-xs tracking-widest;
   }
 
   /* ── InputGroup(검색칸 틀) ── */
