@@ -180,13 +180,8 @@ function NoteStocksModule({ stocks, noteDate }: { stocks: NoteStocks; noteDate: 
       id="stocks"
       title="언급된 종목"
       meta={stale ? `${fmtNoteDay(latest)} 종가 · ${counts}` : counts}
+      // 종목 쪽지는 두지 않는다 — 글을 읽는 화면이라 줄 위에 뜬 쪽지가 걸렸다(2026-10-05 운영자 지시 "여긴 뜰 필요 없어").
       className="v2-nt-stockmod"
-      // 줄이 종목 화면으로 가는 링크다. 첫 줄이 국내면 카더라 · 미리보기와 같은 'stock-row', 미국 종목뿐이면 내부자 종목 화면이라 'stock-row-us'.
-      hint={
-        stocks.kr.length
-          ? { id: "stock-row", anchor: ".v2-nt-stocks > li:first-child", text: "종목을 누르면 언급 추이와 요즘 도는 얘기가 나옵니다" }
-          : { id: "stock-row-us", anchor: ".v2-nt-stocks > li:first-child", text: "종목을 누르면 월가 거물·임원 매매까지 함께 나옵니다" }
-      }
     >
       <ul className="v2-nt-stocks">
         {stocks.kr.map((s) => {

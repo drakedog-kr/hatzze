@@ -50,7 +50,7 @@ export type BoardSection = {
   rows: BoardRow[];
   empty: string;
   /** 처음 온 사람에게 한 번 띄우는 쪽지(app/V2Hint.tsx) — 첫 줄 밑. 줄이 링크인데 화살표가 없어서다. */
-  hint?: { id: string; text: string; order?: number };
+  hint?: { id: string; text: string; order?: number; together?: boolean };
 };
 
 const pct = (r: number) => `${r > 0 ? "+" : r < 0 ? "-" : ""}${Math.abs(r).toFixed(2)}%`;
