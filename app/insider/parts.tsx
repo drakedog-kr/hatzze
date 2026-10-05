@@ -11,6 +11,8 @@ import { Fragment } from "react";
 
 import Link from "next/link";
 
+import { HOLD_FLOOR } from "@/lib/insider-13f";
+
 import type { AnalystTop, CongressTicker, InsiderActivity, InsiderOverview, ManagerMove, ManagerRank } from "@/lib/insider-data";
 import type { AnalystAction, AnalystConsensus } from "@/lib/insider-detail";
 
@@ -134,12 +136,7 @@ export const CODE_LABEL: Record<string, { text: string }> = {
   J: { text: "기타" },
 };
 
-/**
- * 변화를 "유지"로 접는 문턱(%). 13F 의 주식 수는 자잘하게 흔들린다 — 실측 2,616개
- * 보유 중 105개가 0 이 아니면서 0.5% 미만이었다(−0.072% 같은 값). 그대로 반올림하면
- * **"0% 줄임"** 이라는 없는 말이 나온다.
- */
-const HOLD_FLOOR = 0.5;
+// 변화를 "유지"로 접는 문턱(%)은 판정(lib/insider-13f.ts quarterShift)과 하나다 — 그대로 반올림하면 "0% 줄임"이라는 없는 말이 나온다.
 
 /**
  * 방향 배지의 색 — **국내 증시 관례**다. 사는 쪽이 빨강, 파는 쪽이 파랑, 그대로면 회색.

@@ -46,7 +46,7 @@ describe("groupInsiderLines", () => {
     value,
   });
 
-  it("바로 이어진 같은 사람 · 같은 날 · 같은 종류만 묶는다", () => {
+  it("같은 사람 · 같은 날 · 같은 종류를 묶는다 — 날이 다르면 따로", () => {
     const out = groupInsiderLines([r("A", "2026-09-23", 100), r("A", "2026-09-23", 50), r("A", "2026-09-23", 25), r("B", "2026-09-23", 10), r("A", "2026-09-22", 5)]);
     assert.deepEqual(
       out.map((x) => [x.ownerName, x.count, x.value, x.shares]),
@@ -54,6 +54,26 @@ describe("groupInsiderLines", () => {
         ["A", 3, 175, 30],
         ["B", 1, 10, 10],
         ["A", 1, 5, 10],
+      ],
+    );
+  });
+
+  it("같은 날 다른 사람 줄이 사이에 끼어도 묶는다(금액 순으로 섞인 신고)", () => {
+    const out = groupInsiderLines([
+      r("SICILIA", "2026-09-21", 5.2, "F"),
+      r("MAGOUYRK", "2026-09-21", 5.1, "F"),
+      r("HURA", "2026-09-21", 3.1, "F"),
+      r("SICILIA", "2026-09-21", 2.6, "F"),
+      r("MAGOUYRK", "2026-09-21", 2.4, "F"),
+      r("SICILIA", "2026-09-21", 1, "S"),
+    ]);
+    assert.deepEqual(
+      out.map((x) => [x.ownerName, x.code, x.count]),
+      [
+        ["SICILIA", "F", 2],
+        ["MAGOUYRK", "F", 2],
+        ["HURA", "F", 1],
+        ["SICILIA", "S", 1],
       ],
     );
   });

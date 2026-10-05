@@ -488,8 +488,8 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
           [
             holdersMod ? { key: "holders", node: holdersMod, w: rowsWeight(d.holders.length) } : null,
             consensusMod ? { key: "consensus", node: consensusMod, w: 12 } : null,
-            execMod ? { key: "exec", node: execMod, w: rowsWeight(groupInsiderLines(execTrades).length) } : null,
-            cgMod ? { key: "congress", node: cgMod, w: rowsWeight(groupCongressLines(cgTrades).length) } : null,
+            execMod ? { key: "exec", node: execMod, w: rowsWeight(groupInsiderLines(execTrades.slice(0, ROWS_MAX)).length) } : null,
+            cgMod ? { key: "congress", node: cgMod, w: rowsWeight(groupCongressLines(cgTrades.slice(0, ROWS_MAX)).length) } : null,
           ] as (PairMod | null)[]
         ).filter((m): m is PairMod => m != null),
       ).map((g) => (

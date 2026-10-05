@@ -30,6 +30,13 @@ export type QuarterShift = {
   sharesChange: number | null;
 };
 
+/**
+ * 변화를 "유지"로 접는 문턱(%). 13F 의 주식 수는 자잘하게 흔들린다 — 실측 2,616개 보유 중 105개가 0 이 아니면서 0.5% 미만이었다
+ * (−0.072% 같은 값). 판정(quarterShift)과 줄 글자(app/insider/parts.tsx moveBadge)가 이 하나를 같이 쓴다 — 줄 글자만 접고 판정은
+ * 원값으로 두었을 때 TSM 상세의 '줄임 · 정리 14명'과 같은 화면 차트 말풍선 · 본 화면 '줄인 종목'의 16명이 어긋났다(2026-10-05 머지 전 점검).
+ */
+export const HOLD_FLOOR = 0.5;
+
 const sum = (rows: ClassRow[], k: "shares" | "value") => rows.reduce((s, r) => s + (r[k] ?? 0), 0);
 
 /** 운용사별로 **자기가 낸** 분기, 오래된 순. 받는 행은 그 운용사의 보유 전체여야 한다. */
@@ -82,9 +89,10 @@ export function quarterShift(now: ClassRow[], before: ClassRow[]): QuarterShift 
       was += (before.find((r) => r.ticker === t)?.shares ?? 0) * u;
     }
   }
+  const sharesChange = was ? ((shares - was) / was) * 100 : null;
   return {
-    move: shares > was ? "add" : shares < was ? "trim" : "hold",
-    sharesChange: was ? ((shares - was) / was) * 100 : null,
+    move: sharesChange != null && Math.abs(sharesChange) < HOLD_FLOOR ? "hold" : shares > was ? "add" : shares < was ? "trim" : "hold",
+    sharesChange,
   };
 }
 
