@@ -348,9 +348,9 @@ TALK_SYSTEM = f"""당신은 한국 주식 데이터 서비스의 에디터입니
 - 주가 얘기(주가 · 강세 · 급등 · 상승세 · 상한가 · 저평가)는 쓰지 마세요. 무엇이 화제였는지만 씁니다.
 - ⛔ 증권사가 그 종목을 좋게 본 평가(매수 의견 · 추천 · 탑픽 · 비중 확대 · 목표주가)는 옮기지 마세요. 보고서가 **무엇을
   다뤘는지**만 적습니다.
-- 그 종목만의 소식이 없고 여러 종목을 늘어놓은 정리 글(업종 보고서 요약 · 주간 정리)에만 이름이 있으면 그 글이 다룬
-  주제를 적습니다(예: "전력기기 업종 수주 전망 보고서"). 등락률 · 상승률 순위 목록뿐이거나 그 종목 이야기가 없으면
-  **빈 문자열**입니다. 지어내지 마세요.
+- **그 종목만의 소식이 없어도 비우지 마세요.** 여러 종목을 늘어놓은 정리 글(업종 보고서 요약 · 주간 정리)에만 이름이
+  있으면 그 글이 다룬 주제와 그 종목 대목을 적습니다(예: "전력기기 업종 수주 전망 보고서 속 언급"). 빈 문자열은 발췌가
+  **전부** 등락률 · 상승률 숫자 목록일 때만 씁니다. 지어내지 마세요.
 - 같은 테마의 다른 종목과 같은 줄을 쓰지 마세요. 한 글에 여러 종목이 있으면 그 종목에 해당하는 대목을 씁니다.
 {PLAIN_PROSE_RULE_SHORT}
 - ⚠️ 발췌 가운데 `{KR.EXCERPT_ELLIPSIS.strip()}` 는 중간을 줄인 표시입니다. 앞뒤를 붙여 읽어 없는 인과를 만들지 마세요.
@@ -381,12 +381,13 @@ def talk_problems(text: str, digest: str, name: str) -> list[str]:
 
 
 def talk_pick(candidates: list[str], digest: str, name: str = "") -> str | None:
-    """한 종목의 후보 중 저장할 줄. 매수·매도 표현은 어느 단계에서도 안 고르고, 나머지 규칙은 깨끗한 후보가 있으면 그쪽만 본다."""
-    candidates = [t for t in candidates if t.strip() and not has_trade_framing(t)]
+    """한 종목의 후보 중 저장할 줄. 매수·매도 표현 · 시세 낱말은 어느 단계에서도 안 고르고, 나머지 규칙은 깨끗한 후보가 있으면 그쪽만 본다."""
+    # 매수·매도 표현과 시세 낱말은 어느 단계에서도 안 고른다 — 이 칸은 무엇이 화제였는지만 맡는다. 둘째 실행(2026-10-05)에서
+    # 다시 써도 시세로 돌아온 줄이 그대로 실렸다("EU 규제 영향 주가 하락").
+    candidates = [t for t in candidates if t.strip() and not has_trade_framing(t) and not any(w in t for w in PRICE_WORDS + TALK_PRICE_WORDS)]
     if not candidates:
         return None
     soft = [
-        lambda t: not any(w in t for w in PRICE_WORDS + TALK_PRICE_WORDS),
         lambda t: not window_hits(t) and not trend_hits(t),
         lambda t: not t.rstrip(". ").endswith("다"),
         lambda t: not [g for g in _GLUED.findall(t) if not g.startswith("http")],
@@ -489,7 +490,11 @@ def write_talk(ask_with, system: str, theme: str, items: list[tuple[str, str, st
                 again.append((i, "빠졌습니다. 이 번호의 줄을 쓰세요"))
                 continue
             if not t:
+                # 첫 답의 빈칸은 한 번만 더 묻는다 — 정리 글에만 이름이 있는 종목을 쉽게 비웠다(2026-10-05 둘째 실행: 국장 전자·부품
+                # 9줄 중 8줄 · 전체 243줄 중 95줄). 그때도 비우면 받아들인다 — 숫자 목록뿐인 종목에 더 조르면 지어낸다.
                 if attempt == 0:
+                    again.append((i, "비웠습니다. 이 종목이 나온 글이 무엇을 다뤘는지 적으세요(발췌가 전부 숫자 목록이면 다시 빈 문자열)"))
+                else:
                     none.add(code)
                 continue
             candidates[code].append(t)

@@ -66,6 +66,7 @@ def test_talk_pick():
     assert talk_pick(["증권사 매수 의견 보고서 소식", ok], "") == ok
     assert talk_pick(["외주 물량이 확대됩니다", ok], "") == ok
     assert talk_pick(["증권사 매수 의견 보고서 소식"], "") is None
+    assert talk_pick(["EU 규제 영향 주가 하락"], "") is None  # 시세 낱말뿐이면 비운다
     assert talk_pick([], "") is None
 
 
@@ -76,11 +77,15 @@ def test_write_talk_retries_only_failed_lines():
         asked.append(user)
         if len(asked) == 1:
             return _json([(1, "엔비디아 HBM 납품 기대"), (2, "가" * 40), (3, "")])
-        assert "### 1" not in user and "### 3" not in user and "### 2 나" in user  # 걸린 2번만 다시 묻는다
-        return _json([(2, "신규 반도체 공장 증설 소식")])
+        if len(asked) == 2:
+            # 걸린 2번과 비운 3번만 다시 묻는다
+            assert "### 1" not in user and "### 2 나" in user and "### 3 다" in user and "비웠습니다" in user
+            return _json([(2, "신규 반도체 공장 증설 소식"), (3, "")])
+        raise AssertionError("두 번이면 끝나야 한다")
 
     items = [("A", "가", "- 엔비디아 HBM 납품"), ("B", "나", "- 신규 반도체 공장 증설"), ("C", "다", "- 등락률 목록")]
     got = write_talk(ask, "sys", "반도체", items)
+    # 두 번째에도 비운 3번은 받아들인다(숫자 목록뿐인 종목)
     assert got == {"A": "엔비디아 HBM 납품 기대", "B": "신규 반도체 공장 증설 소식"}
     assert len(asked) == 2
 
