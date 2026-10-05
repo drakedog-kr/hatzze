@@ -2794,12 +2794,13 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
   .hz-rowlink > a::after,
   .hz-rowlink > span > a::after { content: ""; position: absolute; inset: 0; }
 }
-/* 홈 '신용융자 잔고' 준비 중 칸 — 넓은 화면은 점선 상자(96)로 두 칸을 채운다. */
+/* 홈 '신용융자 잔고' 준비 중 칸 — 넓은 화면은 점선 상자(96)로 칸을 채운다.
+   투자자예탁금이 들어온 2026-10-06 부터 한 칸이다(그 전엔 두 칸 · .hz-cell-wide 로 골랐다). */
 .hz-soon-box { min-height: 96px; }
 @container kd (max-width: 679px) {
   /* 폰 한 줄기에선 156px 를 점선 빈 상자로 썼다 — 제목 줄과 '데이터 준비 중' 글자 한 줄로 접는다(인라인 flex 방향이라 !important). */
-  .hz-cell-wide:has(.hz-soon-box) { flex-direction: row !important; align-items: center; justify-content: space-between; }
-  .hz-cell-wide:has(.hz-soon-box) > .hz-cell-graphic { flex: none !important; }
+  .hz-cards > :has(.hz-soon-box) { flex-direction: row !important; align-items: center; justify-content: space-between; }
+  .hz-cards > :has(.hz-soon-box) > .hz-cell-graphic { flex: none !important; }
   .hz-soon-box { min-height: 0; border: 0 !important; }
 }
 /* 테마 흐름 이름 줄 — 이름 옆 열흘 조각(폰 전용). */

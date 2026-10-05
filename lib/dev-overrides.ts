@@ -3,7 +3,7 @@ import "server-only";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { IndicatorDetails } from "@/lib/data";
+import type { IndicatorDetails, IndicatorWithLatestValue } from "@/lib/data";
 
 // 로컬 개발용 오버레이. 지표 설명(description_beginner)이나 서브값(details)을
 // 운영 Supabase에 쓰기 전에, 로컬 dev 서버에서만 새 값을 얹어 미리 보기 위한
@@ -48,6 +48,12 @@ export type DevOverrides = {
    * **표에 쓰기 전에** 로컬에서 선을 보는 용도다(data-pipeline/scripts/recompute_score_history.py --json 이 이 꼴로 뽑는다).
    */
   scoreHistory?: { date: string; score: number }[];
+  /**
+   * DB 에 아직 없는 **새 지표**. 수집 스크립트를 운영 DB 에 돌리기 전에 카드를 로컬에서 본다.
+   * 같은 slug 가 DB 에 이미 있으면 DB 쪽을 쓴다(이 목록은 무시된다).
+   * 꼴은 IndicatorWithLatestValue 에서 id 를 뺀 것이다 — `fetch_investor_deposit.py --preview` 가 한 항목을 이 꼴로 뽑는다.
+   */
+  indicators?: Omit<IndicatorWithLatestValue, "id">[];
 };
 
 const EMPTY: DevOverrides = {};
