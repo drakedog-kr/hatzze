@@ -32,6 +32,19 @@ describe("periodStart · eventKind", () => {
 });
 
 describe("groupEventRows", () => {
+  it("넓은 기간 줄은 채널이 가장 많은 좁은 줄로 접는다 — 행 순서와 무관하게 같은 결과", () => {
+    const rows = [
+      row("005930", "a", "2026-10-07", "day", "3분기 실적 발표"),
+      row("005930", "b", "2026-10-08", "day", "실적 발표"),
+      row("005930", "c", "2026-10-08", "day", "실적 발표"),
+      row("005930", "d", "2026-10-08", "day", "실적 발표"),
+      ...["e", "f", "g", "h", "i"].map((ch) => row("005930", ch, "2026-10-01", "month", "실적 발표")),
+    ];
+    const pick = (out: ReturnType<typeof groupEventRows>) => out.map((e) => `${e.date}/${e.channels}`).sort();
+    assert.deepEqual(pick(groupEventRows(rows)), pick(groupEventRows([...rows].reverse())));
+    assert.ok(groupEventRows(rows).some((e) => e.date === "2026-10-08" && e.channels === 8));
+  });
+
   it("같은 날 다른 일정은 다른 줄 · 채널 수는 그 일정을 말한 채널만", () => {
     const out = groupEventRows([
       row("005930", "a", "2026-10-01", "month", "잠정실적발표"),

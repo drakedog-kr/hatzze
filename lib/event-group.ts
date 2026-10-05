@@ -140,9 +140,18 @@ export function groupEventRows(rows: EventRowLike[]): GroupedEvent[] {
   for (const wide of byWidth) {
     if (wide.precision === "day") continue;
     const end = periodEnd(wide.date, wide.precision);
-    const inner = byWidth.find(
-      (n) => alive.has(n) && n !== wide && n.code === wide.code && n.kind === wide.kind && WIDTH[n.precision] < WIDTH[wide.precision] && n.date >= wide.date && n.date <= end,
-    );
+    // 담을 줄이 여럿이면 채널이 가장 많은 줄(같으면 먼저 짚인 · 이른 날) — 처음 만난 줄로 고르면 일정 조회에 차례가 없어 같은 자료도
+    // 행 순서에 따라 날짜 · 채널 수가 갈렸다(META 10/13 · 10/23 이 3·2 ↔ 2·3, 2026-10-05 머지 전 점검).
+    let inner: (typeof byWidth)[number] | undefined;
+    for (const n of byWidth) {
+      if (!alive.has(n) || n === wide || n.code !== wide.code || n.kind !== wide.kind || WIDTH[n.precision] >= WIDTH[wide.precision] || n.date < wide.date || n.date > end) continue;
+      if (
+        !inner ||
+        n.channels.size > inner.channels.size ||
+        (n.channels.size === inner.channels.size && (n.firstSeen < inner.firstSeen || (n.firstSeen === inner.firstSeen && n.date < inner.date)))
+      )
+        inner = n;
+    }
     if (!inner) continue;
     for (const c of wide.channels) inner.channels.add(c);
     if (wide.firstSeen < inner.firstSeen) inner.firstSeen = wide.firstSeen;
