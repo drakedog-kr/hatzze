@@ -50,6 +50,7 @@ from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 
 from common.broadcast_content import banned_hits  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
+from common.stock_framing import EXTRA_BANNED, PRICE_WORDS, has_trade_framing  # noqa: E402
 from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
 from common.text_check import fix_glued_josa_latin, glued_names, is_clean, problems  # noqa: E402
 from common.timeutil import KST  # noqa: E402
@@ -100,29 +101,7 @@ RELATED_KEEP = 5
 # 전선·바이오·지주가 된다(2026-09-19 dry-run 실측: 상위 다섯이 전부 정리 글 몫이었다).
 RELATED_MAX_TAGS = 6
 
-# 이 화면에서만 더 막는 말. broadcast_content.BANNED_TERMS(매수 의견·매매 신호 …)는 발송 글의 그물이라
-# 좁게 잡혀 있는데, 첫 실행(2026-09-19) 금융 요약이 "매수 기회를 제시하는 관점도 함께 나타났습니다"로
-# 그 그물을 지났다. 채널이 한 말을 옮긴 전언이라도 공개 화면에서는 매수·매도 프레이밍이다.
-EXTRA_BANNED = (
-    "매수 기회", "매도 기회", "매수 타이밍", "매도 타이밍", "저가 매수", "추격 매수",
-    "매수 관점", "매도 관점", "비중 확대", "비중 축소", "매수 전략", "매도 전략",
-    # 증권사 보고서의 추천 어휘. "SK텔레콤을 섹터 내 최우선 투자 대상으로 보는 의견"(2026-09-21 통신)처럼
-    # 전언으로 옮겨도 화면에선 그 종목을 사라는 말이 된다.
-    # 통신 요약을 세 번 다시 써도 "최우선 투자 대상" → "최우선 추천 종목" → "최우선주 · 투자 매력도"로 낱말만 바꿔
-    # 되돌아왔다. 증권사 추천을 전언으로 옮기는 버릇이라, 낱말이 아니라 **뜻**을 막는다(아래 프롬프트 규칙)하고
-    # 그물도 그 뜻의 낱말 전부로 넓힌다.
-    "최선호", "최우선", "투자 대상", "추천 종목", "추천주", "톱픽", "Top pick", "top pick",
-    "투자 매력", "매력도", "투자의견", "목표주가", "목표가",
-)
-
-
-# 시세를 말하는 낱말. 이 문장은 "무슨 얘기가 돌았나"만 맡고 등락은 까닭 이력 표가 숫자로 적는다.
-# 세 번째 실행(2026-09-19)에서 26건 중 3건이 "강세를 보였으며", "상승세 속에서"로 나왔다 — 채널이
-# 그렇게 말한 것을 옮긴 것이지만, 우리 문장이 되면 시세 평가로 읽힌다. 다시 쓰게 하고, 끝내 못
-# 고치면 저장은 한다(권유 표현과 달리 읽혀도 위험하지는 않다).
-# 저평가·고평가는 증권사가 "싸다·비싸다"고 한 평가라 시세 낱말과 같은 자리다(2026-09-21 의료기기 까닭
-# "저평가된 밸류에이션에 관한 보고서").
-PRICE_WORDS = ("강세", "약세", "상승세", "하락세", "급등", "급락", "저평가", "고평가")
+# 매수·매도 표현(EXTRA_BANNED)·시세 낱말(PRICE_WORDS)은 종목 흐름 요약과 함께 쓴다 — common/stock_framing.py.
 
 
 # 기간·매체를 가리키는 말. 화면이 머리에서 이미 "최근 3일 채널 글"이라 적으므로 문장이 되풀이할 자리가 아니다.
@@ -145,10 +124,6 @@ def brief_problems(text: str, digest: str) -> list[str]:
         + [f"시세 표현({w})" for w in price]
         + [f"기간·매체 표현({w})" for w in window_hits(text)]
     )
-
-
-def has_trade_framing(text: str) -> bool:
-    return bool(banned_hits(text) or any(w in text for w in EXTRA_BANNED))
 
 
 # 글 길이. **두 문단**(문단마다 두세 문장)이 한 시트에 서는 자리다. 처음엔 한 문단 130~180자였는데
