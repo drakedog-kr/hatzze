@@ -96,6 +96,16 @@ describe("expectedPays — 다가오는 일정의 '석 달 안 예상' 합에 �
     assert.deepEqual(expectedPays(ibm, iso, horizon, null), [{ date: "2026-12-10", v: 1.68 }]);
   });
 
+  it("latest 라도 같은 차례 금액과 25% 넘게 다르면 그 차례 금액 — 특별배당 · 반기 금액이 다른 배당", () => {
+    // HST — 10/15 확정 $0.20, 7월은 특별배당 $0.92. 정기 차례가 $0.92 로 적히면 안 된다.
+    const hst: [number, number, number][] = [[1, 0.2, 15], [4, 0.2, 15], [7, 0.92, 15], [10, 0.2, 15]];
+    const got = expectedPays(hst, "2026-10-05", "2027-10-05", { pay: "2026-10-15", record: null, amount: 0.2 }, true);
+    assert.deepEqual(got.map((e) => e.v), [0.2, 0.2, 0.92]);
+    // AZN — 3월 결산 $2.17 · 9월 중간 $1.06. 최근이 중간이어도 3월은 $2.17.
+    const azn: [number, number, number][] = [[3, 2.17, 23], [9, 1.06, 8]];
+    assert.deepEqual(expectedPays(azn, "2026-10-05", "2027-10-05", null, true).map((e) => e.v), [2.17, 1.06]);
+  });
+
   it("지난 날은 내년으로 옮기고, 석 달 밖은 빼고, 가까운 순으로 선다", () => {
     const got = expectedPays([[1, 10, 15], [11, 10, 10], [12, 10, 20]], "2026-11-15", "2027-02-15", null);
     assert.deepEqual(dates(got), ["2026-12-20", "2027-01-15"]);

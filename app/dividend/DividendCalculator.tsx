@@ -430,7 +430,8 @@ export function DividendCalculator({
           그 칸이 여섯 줄까지 길어져 달력 · 일정 칸까지 같이 늘었다(2026-10-04 점검). */}
       {lines.length > 0 && heroNote && <p className="v2-dv-notebar">{heroNote}</p>}
       {/* 달력에서 누른 달 — 그 달에 주는 종목(빈 달 채우기). 둘째 줄 바로 아래 판 폭으로. */}
-      {fillMonth != null && <MonthFill month={fillMonth} order={fillOrder} holdings={holdings} onPick={(code) => add(code, "fill_month")} onClose={() => setFillMonth(null)} />}
+      {/* 종목을 다 빼면 달력이 사라지니 그 달 판도 같이 걷는다. */}
+      {lines.length > 0 && fillMonth != null && <MonthFill month={fillMonth} order={fillOrder} holdings={holdings} onPick={(code) => add(code, "fill_month")} onClose={() => setFillMonth(null)} />}
 
       <section
         ref={calcRef}

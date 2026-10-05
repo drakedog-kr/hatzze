@@ -32,7 +32,10 @@ export function MonthCalendar({
   const max = Math.max(...MONTHS.map((m) => monthly[m]));
   const paidMonths = MONTHS.filter((m) => monthly[m] > 0).length;
   // 판 하나에 단위 하나 — 칸마다 100만 문턱을 따로 재면 '870,676원'이 '108만원'보다 길어 더 커 보였다(2026-10-05 점검).
-  const amt = (v: number) => (max >= 1e8 ? `${(v / 1e8).toFixed(1)}억원` : max >= 1e6 ? `${Math.round(v / 1e4).toLocaleString("ko-KR")}만원` : won(v));
+  // 단위로 반올림해 0 이 되는 작은 달은 한 단계 아래로 — '0만원'이면 지급이 있는데 점선 '0원' 칸(빈 달)과 섞여 머리의 '빈 달 N'과
+  // 안 맞았다(2026-10-05 머지 전 점검).
+  const amt = (v: number) =>
+    max >= 1e8 && v >= 5e6 ? `${(v / 1e8).toFixed(1)}억원` : max >= 1e6 && v >= 5e3 ? `${Math.round(v / 1e4).toLocaleString("ko-KR")}만원` : won(v);
   return (
     <div className="dv-cal">
       {!bare && (
@@ -114,7 +117,7 @@ export function upcomingOf(lines: Line[], fx: number, mode: TaxMode): { items: U
     // 공시된 확정값 — 지급일까지 있으면 그날, 지급일이 없으면(국내 결산배당 공시) 기준일 줄에 금액을 적는다.
     const sure = s.nextPay && (s.nextPay[0] ? s.nextPay[0] >= iso : !!s.nextRecord && s.nextRecord >= iso) ? s.nextPay : null;
     // 지난 1년 지급일로 어림한 석 달 안의 건 — 확정 건의 짝은 빠져 있다. 합에는 전부, 표에는 확정 건이 없을 때 첫 건만.
-    const expected = expectedPays(s.pays, iso, horizon, sure && { pay: sure[0], record: s.nextRecord }, s.currency === "USD");
+    const expected = expectedPays(s.pays, iso, horizon, sure && { pay: sure[0], record: s.nextRecord, amount: sure[1] }, s.currency === "USD");
     if (s.nextRecord && s.nextRecord >= iso) {
       const a = sure && !sure[0] ? net(ls, sure[1]) : null;
       out.push({

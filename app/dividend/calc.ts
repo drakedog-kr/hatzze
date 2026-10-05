@@ -43,18 +43,22 @@ const dayOfYear = (m: number, d: number) => Math.round((Date.UTC(2001, m - 1, d)
  * latest 면 금액은 지난해 같은 차례가 아니라 **가장 최근 지급 건**의 금액 — 미국 종목은 회차마다 같은 금액을 주다가 올리므로,
  * 같은 차례 금액이면 그 뒤에 올린 배당이 안 들었다(IBM 12월 예상 $1.68, 최근은 $1.69 · 2026-10-04 점검). 결산 · 중간 금액이
  * 다른 국내 종목은 같은 차례 금액이 맞아 쓰지 않는다.
+ * 최근 금액은 공시된 확정 건(sure.amount)이 있으면 그것이고, 같은 차례 금액과 ±25% 안일 때만 바꿔 쓴다 — 그 밖은 인상이 아니라
+ * 특별배당이나 반기마다 금액이 다른 배당이다. 한 건으로 다 바꾸면 HST 정기 $0.20 차례가 특별배당 $0.92 로, AZN 3월 $2.17 이
+ * $1.06 으로 적혔다(2026-10-05 머지 전 점검).
  */
 export function expectedPays(
   pays: [number, number, number][],
   iso: string,
   horizon: string,
-  sure: { pay: string | null; record: string | null } | null,
+  sure: { pay: string | null; record: string | null; amount?: number | null } | null,
   latest = false,
 ): { date: string; v: number }[] {
   const year = Number(iso.slice(0, 4));
   // 가장 최근 지급 건 — 해를 뗀 날이 오늘 앞이면 올해, 아니면 지난해에 준 것으로 보고 가장 늦은 날.
   let lastV: number | null = null;
-  if (latest && pays.length) {
+  if (latest && sure?.amount) lastV = sure.amount;
+  else if (latest && pays.length) {
     const past = pays.map(([m, v, d]) => {
       const md = `${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       return { date: `${year}-${md}` < iso ? `${year}-${md}` : `${year - 1}-${md}`, v };
@@ -86,7 +90,8 @@ export function expectedPays(
     twin = all.find((e) => e.date >= record)?.i ?? -1;
   }
   const after = sure?.pay ?? "";
-  return all.filter((e) => e.i !== twin && e.date > after).map(({ date, v }) => ({ date, v: lastV ?? v }));
+  const near = (v: number) => lastV != null && Math.abs(lastV - v) <= v * 0.25;
+  return all.filter((e) => e.i !== twin && e.date > after).map(({ date, v }) => ({ date, v: near(v) ? lastV! : v }));
 }
 
 /**
