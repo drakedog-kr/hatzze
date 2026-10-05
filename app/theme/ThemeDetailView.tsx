@@ -22,7 +22,7 @@ import { BackTrail } from "@/components/back-trail";
  *
  * ## v2(2026-10-03) — 카더라 · MDD · 배당에 쓴 규칙으로
  * 뒤로 가기 줄 → 첫 줄 띠(테마 종목 · 최근 3일 점유율 · 시세 반응 · 기준일) → [요즘 도는 얘기 | 30일 점유율 추이]
- * → [말 많은 종목 | 다가오는 일정 · 함께 거론되는 테마] → 등락의 이유(최근 7일).
+ * → [말 많은 종목(줄마다 요즘 도는 얘기) | 다가오는 일정 · 함께 거론되는 테마] → 등락의 이유(최근 7일).
  * - 걷은 것: 회색 타일 히어로, 큰 구간 제목 셋(01 · 02 · 03), 시트 머리 아이콘 타일 · 설명 문장, 등락의 이유 '이전 7일' 단추(쪽 넘김),
  *   '채널에서 오간 글' 카드 여섯 장 + 더 보기 — 카더라 v2 에서 화제 글을 걷은 것과 같은 까닭(눌린 비율 2~5%).
  * - 주인공은 1~5 · 6~10 두 단이었는데 한 단 열 줄로(비교 목록은 한 단 세로 목록이 낫다 — MDD 업종 칸 때 정한 것).
@@ -208,7 +208,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
       </Module>
     </>
   );
-  const anyReason = d.hotStocks.slice(0, HOT_ROWS).some((x) => x.reason);
+  const anyTalk = d.hotStocks.slice(0, HOT_ROWS).some((x) => x.talk);
 
   return (
     <div className="hz-tx v2-kd v2-tm">
@@ -336,14 +336,14 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
 
       {/* 셋째 줄 — [이 테마의 주인공 | 다가오는 일정 · 함께 거론되는 테마]. 주인공 열 줄이 키를 정하고 오른쪽 일정 줄이 그 높이를 나눠 받는다. */}
       <div className={`v2-tm-band is-hot${solo ? " is-solo" : ""}`}>
-        {/* 이름은 목록 화면과 같은 '말 많은 종목'(2026-10-04 점검). 채널이 말한 이유 칸이 AI 글이라 고지는 머리에. */}
+        {/* 이름은 목록 화면과 같은 '말 많은 종목'(2026-10-04 점검). 요즘 도는 얘기 칸이 AI 글이라 고지는 머리에. */}
         {/* 사흘을 날짜로 — 이 화면의 사흘은 기준일을 넣고(2026-09-29 결정), 종목 화면 · 카더라는 기준일 앞 사흘이라 같은 '최근 3일'에
             숫자가 달랐다(삼성전자 318회 · 612회, 2026-10-04 점검). */}
         <Module
           title="말 많은 종목"
           meta={`${d.recentDays.length ? `${mdShort(d.recentDays[0])}~${mdShort(d.recentDays[d.recentDays.length - 1])}` : `최근 ${KADERA_WINDOW_DAYS}일`} 언급 · 평소 대비`}
           className="v2-tm-hot"
-          ai={anyReason}
+          ai={anyTalk}
         >
           {d.loadFailed ? (
             <p className="v2-empty">집계를 지금 불러오지 못했습니다.</p>
@@ -355,14 +355,14 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
               <div className="v2-tm-share">
                 <ShareBar stocks={d.hotStocks} ariaLabel={`${theme} 테마 종목별 최근 ${KADERA_WINDOW_DAYS}일 언급의 몫`} />
               </div>
-              {/* 열 종목 모두 이유가 없으면 그 칸을 걷는다 — '-' 만 열 줄 서 있었다(원전). */}
-              <div className={`v2-tbl v2-tm-hottbl${anyReason ? "" : " no-reason"}`}>
+              {/* 열 종목 모두 도는 얘기가 없으면(요약 행이 아직 없는 날) 그 칸을 걷는다 — '-' 만 열 줄 서 있었다(원전). */}
+              <div className={`v2-tbl v2-tm-hottbl${anyTalk ? "" : " no-reason"}`}>
                 {/* 칸 차례는 이름 → 문장 → 숫자(2026-10-04, 테마 목록의 두 표와 같다). 숫자(오른쪽 정렬)가 문장 앞에 붙으면 '597회'와 이유 첫 낱말이
                     한 덩어리로 읽혔다. */}
                 <div className="v2-tr v2-th" aria-hidden="true">
                   <span />
                   <span>종목</span>
-                  {anyReason && <span>채널이 말한 이유</span>}
+                  {anyTalk && <span>요즘 도는 얘기</span>}
                   <span>언급 · 채널</span>
                 </div>
                 <ol className="v2-tbody">
@@ -376,18 +376,10 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
                           {/* 평소와 견준 언급 변화 — 색은 지도 칸과 같은 단계(stockTone). */}
                           <span className={`hz-theme-tag ${stockTone(s.mentions, s.usualMentions)}`}>{usualDeltaText(s.mentions, s.usualMentions)}</span>
                         </span>
-                        {/* 까닭 한 줄과 날짜. 그날 등락률은 여기 안 적는다 — 시세는 '등락의 이유'의 몫(2026-09-21).
-                            까닭이 없는 줄은 비워 둔다 — '-' 가 열 줄 중 일곱 줄에 서서 줄마다 잡음이었다. */}
-                        {anyReason && (
-                          <span className={`v2-td-text${s.reason ? "" : " is-pending"}`}>
-                            {s.reason && (
-                              <>
-                                {s.reason.reason}
-                                <em className="v2-td-date">{fmtKoDate(s.reason.date)}</em>
-                              </>
-                            )}
-                          </span>
-                        )}
+                        {/* 요즘 도는 얘기 한 줄(파이프라인이 줄마다 쓴다 · lib/theme-page.ts talkOf). 예전 이 칸은 '채널이 말한 이유'(등락 까닭)라
+                            움직이지 않은 종목은 비어 열 줄 중 대여섯이 빈칸이었고, 같은 문장이 아래 '등락의 이유'에 또 섰다(2026-10-05 운영자 결정).
+                            없는 줄은 비워 둔다 — '-' 가 줄마다 서면 잡음이다. */}
+                        {anyTalk && <span className={`v2-td-text${s.talk ? "" : " is-pending"}`}>{s.talk}</span>}
                         <span className="v2-td-num v2-td-two">
                           {s.mentions.toLocaleString("ko-KR")}회<em>{s.channels}곳</em>
                         </span>
@@ -411,7 +403,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
       {/* '크게 움직인 날'은 뺐다 — 이유 후보엔 많이 언급된 종목도 들어 −0.98% 같은 작은 움직임 줄이 섞인다(2026-10-04 점검). */}
       {/* 이유가 하나도 없는 주는 모듈째 그리지 않는다 — 문장 한 줄짜리 판 폭 모듈이 섰다(방산, 2026-10-05 점검). */}
       {reasonDays.length > 0 && (
-        <Module title="등락의 이유" meta={`${mdShort(reasonStart)}~${mdShort(reasonEnd)} · 채널이 이유를 단 종목`} className="v2-tm-reasons" ai>
+        <Module title="등락의 이유" meta={`${mdShort(reasonStart)}~${mdShort(reasonEnd)}`} className="v2-tm-reasons" ai>
           <div className={`v2-tm-days${anyClose ? "" : " no-close"}`}>
             {reasonDays.map(([date, list]) => (
               <section key={date} aria-label={fmtKoWd(date)}>
