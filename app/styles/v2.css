@@ -2716,3 +2716,43 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
 .v2-isd-inv .v2-isd-facts-mod { flex: 1; }
 /* 이번 분기에 한 것 — 갈래 이름 아래 그 종목들(티커). */
 .v2-isd-facts dt em { display: block; margin-top: 2px; font-style: normal; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
+
+/* ══ 모바일 최적화(2026-10-05 · 모바일 점검 워크플로) ══════════════════════════════════════════════════════════
+   폰 규칙은 여기 한곳에 모은다 — 앞 블록들과 같은 특이도면 뒤에 있어 이긴다. 넓은 화면(680 이상)은 건드리지 않는다.
+   공통 값: 누르는 줄 44(토스 한 줄) · 판 폭 표 줄은 40 까지 · 작은 조작은 겉은 그대로 두고 ::after 로 누르는 자리만 44 ·
+   머리 띠 밖 알약 · 세그먼트 34~36 · 알약 사이 8. */
+@container kd (max-width: 679px) {
+  /* 누르는 줄 44 — 햇쩨 지수 구간 줄(28 · 옛 폰 40 규칙이 v2 의 28 에 덮였다) · 일정 줄(30) · MDD 대표 종목 줄(30). */
+  .v2-band-row { min-height: 44px; }
+  a.v2-ev-row { min-height: 44px; }
+  .v2-band > #events .v2-events { gap: 0; }
+  .v2-md .v2-dd-row { min-height: 44px; }
+  /* 머리 띠 안 세그먼트(키 24 · 머리 42 규칙)는 겉 그대로, 누르는 자리만 위아래로 넓힌다 — 낙폭 추이 '종목만 · 코스피와 함께',
+     배당 '세후 · 세전', 내부자 종목 기간. */
+  .v2-kd.v2-md .mdd-uw-seg > button,
+  .v2-kd.v2-dv .v2-mod-head .v2-dv-seg > button,
+  .v2-isd-chart .v2-mod-aside .hz-seg > a { position: relative; }
+  .v2-kd.v2-md .mdd-uw-seg > button::after,
+  .v2-kd.v2-dv .v2-mod-head .v2-dv-seg > button::after,
+  .v2-isd-chart .v2-mod-aside .hz-seg > a::after { content: ""; position: absolute; inset: -12px 0; }
+  /* 머리 띠 밖 계좌 단추(22)는 36 으로 · 사이 4. */
+  .v2-kd.v2-dv .v2-dv-acct .v2-dv-seg { gap: 4px; }
+  .v2-kd.v2-dv .v2-dv-acct .v2-dv-seg > button { height: 36px; }
+  /* 내부자 차트 갈래 거르기(28) → 36 · 사이 6. */
+  .v2-in .hz-mkfilter-set { gap: 6px; }
+  .v2-in .hz-mkfilter-set label { display: inline-flex; align-items: center; min-height: 36px; }
+  /* 미장 카더라 첫 줄 띠 마지막 링크 칸(36) · 배당 성향별 바스켓 줄(40) → 44. */
+  .v2-cover-idx:not(:has(> .v2-cover-v + .v2-cover-v)) ~ a.v2-cover-go:last-of-type { min-height: 44px; }
+  .v2-dv-bk-th,
+  .v2-dv-bk-row { min-height: 44px; }
+  /* 데일리 노트 ‹ › 넘김(24×20)은 누르는 자리만 넓힌다 · 테마 알약(26)은 34 · 사이 8. */
+  .v2-nt-pager button { position: relative; }
+  .v2-nt-pager button::after { content: ""; position: absolute; inset: -12px -10px; }
+  .v2-tm-pill { height: 34px; line-height: 32px; }
+  .v2-tm-pills { gap: 8px; }
+}
+@container kd (max-width: 359px) {
+  /* 320 — 바스켓 이름 칸이 74px 로 세 줄이 됐다. 숫자 칸을 줄여 이름에 준다. */
+  .v2-dv-bk-th,
+  .v2-dv-bk-row { grid-template-columns: minmax(0, 1fr) 60px 96px; }
+}
