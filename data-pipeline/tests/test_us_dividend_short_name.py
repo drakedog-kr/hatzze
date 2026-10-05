@@ -29,3 +29,8 @@ def test_never_empty_and_unique():
     for t, v in out.items():
         assert v not in seen, f"{t} · {seen.get(v)} → {v}"
         seen[v] = t
+
+
+def test_generic_word_keeps_tail():
+    # 꼬리를 떼면 일반 낱말만 남는 이름은 그대로.
+    assert us.short_en("News Corp (Class A)") == "News Corp (Class A)"

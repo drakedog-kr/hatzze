@@ -127,6 +127,10 @@ DUR = {"month": (25, 35), "quarter": (80, 100), "half": (170, 190), "nine": (255
 _EN_TAIL = re.compile(r"(?:,?\s+(?:&\s*)?(?:Inc\.?|Incorporated|Corporation|Corp\.?|Company|Co\.|plc|PLC|Ltd\.?|Group|Holdings))+$")
 
 
+# 꼬리를 떼면 일반 낱말 하나만 남는 이름 — 그대로 둔다('News Corp' 가 화면에 'News' 로 섰다, 2026-10-05 머지 전 점검).
+_KEEP_TAIL = {"News"}
+
+
 def short_en(name: str) -> str:
     """'Coca-Cola Company (The)' → 'Coca-Cola', 'Lilly (Eli)' → 'Eli Lilly', 'Alphabet Inc. (Class A)' → 'Alphabet (Class A)'."""
     n = name.strip()
@@ -139,6 +143,8 @@ def short_en(name: str) -> str:
     if m:
         n = f"{m.group(2)} {m.group(1)}"
     short = _EN_TAIL.sub("", n).strip()
+    if short in _KEEP_TAIL:
+        short = n
     return (short or n) + cls
 
 
