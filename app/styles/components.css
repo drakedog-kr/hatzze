@@ -66,6 +66,11 @@
   cursor: pointer;
 }
 .hz-news-x:hover { opacity: 1; background: var(--c-blue-tint2); }
+/* 폰 — 겉 30 은 그대로 두고 누르는 자리만 44 로(2026-10-05 모바일 점검). */
+@media (max-width: 560px) {
+  .hz-news-x { position: relative; }
+  .hz-news-x::after { content: ""; position: absolute; inset: -7px; }
+}
 
 /* 좁은 화면에서는 '보러 가기' 글자를 접는다. 띠 전체가 링크라 화살표만으로 충분하고,
    그 글자까지 두면 문장이 세 줄이 된다. */

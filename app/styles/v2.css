@@ -100,6 +100,7 @@
 /* 닫기 — 24 칸(손가락 자리) · 글자색을 그대로 받아 옅게. 쪽지 몸이 손가락을 통과시키므로 이것만 되받는다. */
 .v2-hint-x {
   pointer-events: auto;
+  position: relative;
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -133,6 +134,8 @@
 .v2-hint-phone { display: none; }
 @container kd (max-width: 679px) {
   .v2-hint-phone:not([hidden]) { display: block; }
+  /* ✕ 는 24 그대로 두고 누르는 자리만 44 로 — 빗나가면 쪽지 밑 줄이 눌려 화면을 떠났다(2026-10-05 모바일 점검). */
+  .v2-hint-x::after { content: ""; position: absolute; inset: -10px; }
 }
 
 /* 머리 띠 — 제목 · 근거 · 오른쪽 덧붙임이 한 밑선에 앉는다(baseline). AI 표시는 제 줄 상자 가운데(AiMark 의 alignSelf). */
@@ -798,6 +801,11 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 /* ── 화면 머리 ── v2 화면은 제목·부제를 화면에서 걷고(AppShell 의 V2_PAGES) 오른쪽 도구도 두지 않는다 — 머리가 높이 0 이 된다.
    그대로 두면 위아래 간격(20 + 20)이 겹쳐 빈 띠가 생기므로 하나를 지운다. */
 .hz-page-head.is-v2 { margin-top: -20px; }
+/* 폰은 본문 gap 이 12 라(AppShell 본문 상자 인라인) −20 이면 머리 높이 0 이 12 + 12 − 20 = 4px 만 남아 첫 모듈이 탑바 · 소식 띠에
+   붙었다(2026-10-05 모바일 점검). 간격 하나(12)만 남게 −12. */
+@media (max-width: 560px) {
+  .hz-page-head.is-v2 { margin-top: -12px; }
+}
 
 /* ── v2 시장 브리핑(2026-10-03) — 카더라 v2 의 규칙을 옮겼다 ─────────────────────────────
    얼개: 첫 줄 띠(.v2-cover, 카더라와 같은 부품) → 둘째 줄 [햇쩨 지수 | 오늘의 브리핑](app/home/V2Briefing.tsx) → 지표 모듈 둘(시장 · 감성).

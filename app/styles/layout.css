@@ -200,6 +200,12 @@
   .hz-topbar-logo { display: inline-flex; align-items: flex-start; gap: 5px; }
   .hz-menu-btn { display: inline-flex; }
   .hz-topbar { display: flex; padding: 0 16px; }
+  /* 탑바 단추(검색 · 메뉴 · 테마)는 겉 38(AppShell 인라인) 그대로 두고 누르는 자리만 44 로 — 사이 8px 라 이웃과 2px 가 남는다
+     (2026-10-05 모바일 점검). */
+  .hz-topbar .hz-menu-btn,
+  .hz-topbar .hz-theme-btn { position: relative; }
+  .hz-topbar .hz-menu-btn::before,
+  .hz-topbar .hz-theme-btn::before { content: ""; position: absolute; inset: -3px; }
 
   /* 스크롤을 내리면 접히고 올리면 다시 나온다. 흐름에서 빼야(fixed) 접힌 자리에
      빈 칸이 안 남는다. 빠진 높이(54)는 본문 위쪽 여백으로 되메운다. */
