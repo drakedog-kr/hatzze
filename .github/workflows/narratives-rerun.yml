@@ -1,4 +1,6 @@
-# 카더라 '많이 언급된 종목'의 흐름 요약(종목 요약)만 다시 만든다. 손으로만 돈다.
+# 카더라 '많이 언급된 종목'의 흐름 요약(종목 요약) · 테마 요약(테마 흐름 '요즘 도는 얘기' · 급부상 이유)만 다시 만든다. 손으로만 돈다.
+# what: narratives(흐름 요약 · 기본) · themes(테마 요약) · both. 테마 요약은 2026-10-05 저녁 첫 문장 55자 · 급부상 이유 42~58자로
+# 줄인 PR 을 머지한 직후 그날 것을 바로 고치려고 더했다.
 #
 # ## 왜 따로 있나
 #
@@ -10,7 +12,7 @@
 # 줄인 PR(#651)을 머지한 직후다(2026-10-05 저녁 — 그날 저녁 실행이 쓴 긴 요약을 다음 아침까지 두지 않으려고).
 #
 # ⚠️ daily-update.yml 이 도는 동안엔 돌리지 말 것 — 같은 표를 같이 쓴다.
-name: 흐름 요약 다시 만들기 (수동)
+name: 흐름 요약 · 테마 요약 다시 만들기 (수동)
 
 on:
   workflow_dispatch:
@@ -20,6 +22,11 @@ on:
         type: choice
         default: both
         options: [both, kr, us]
+      what:
+        description: "무엇을 (narratives=흐름 요약 · themes=테마 요약 · both=둘 다)"
+        type: choice
+        default: narratives
+        options: [narratives, themes, both]
 
 jobs:
   rerun:
@@ -49,17 +56,33 @@ jobs:
           "$HOME/.local/bin/claude" --version
 
       - name: (국장) 흐름 요약 다시 만들기
-        if: ${{ github.event.inputs.market != 'us' }}
+        if: ${{ github.event.inputs.market != 'us' && github.event.inputs.what != 'themes' }}
         run: python data-pipeline/scripts/generate_telegram_narratives.py --stocks-only
 
       - name: (미장) 흐름 요약 다시 만들기
-        if: ${{ !cancelled() && github.event.inputs.market != 'kr' }}
+        if: ${{ !cancelled() && github.event.inputs.market != 'kr' && github.event.inputs.what != 'themes' }}
         run: python data-pipeline/scripts/generate_us_telegram_narratives.py --stocks-only
 
-      # 새 문장이 바로 보이게 카더라 두 화면과 종목 화면을 비우고 데운다(daily-update.yml 의 같은 자리와 같다).
+      # 테마 요약은 26 · 16 테마를 다 다시 쓴다(급부상 이유 포함). 하루치 행을 그대로 덮는다.
+      - name: (국장) 테마 요약 다시 만들기
+        if: ${{ !cancelled() && github.event.inputs.market != 'us' && github.event.inputs.what != 'narratives' }}
+        run: python data-pipeline/scripts/generate_theme_briefs.py
+
+      - name: (미장) 테마 요약 다시 만들기
+        if: ${{ !cancelled() && github.event.inputs.market != 'kr' && github.event.inputs.what != 'narratives' }}
+        run: python data-pipeline/scripts/generate_us_theme_briefs.py
+
+      # 새 문장이 바로 보이게 화면을 비우고 데운다(daily-update.yml 의 같은 자리와 같다).
       - name: 카더라 · 종목 화면 비우고 데우기
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event.inputs.what != 'themes' }}
         continue-on-error: true
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: bash scripts/revalidate.sh /kadera /kadera/us '/stock/[code]'
+
+      - name: 테마 화면 비우고 데우기
+        if: ${{ !cancelled() && github.event.inputs.what != 'narratives' }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /theme /theme/us '/theme/[theme]' '/theme/us/[theme]'

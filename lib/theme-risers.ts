@@ -25,7 +25,7 @@ export type ThemeRiser = {
    * (recent / prior)과 다를 수 있다 — 주말이 낀 창은 총량이 작아서다. prior 가 0 이면 null(새로 등장).
    */
   ratio: number | null;
-  /** 채널이 말한 까닭(LLM, 50~90자). 파이프라인이 못 썼으면 null. */
+  /** 채널이 말한 까닭(LLM, 42~58자). 파이프라인이 못 썼으면 null. */
   reason: string | null;
 };
 
