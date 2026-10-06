@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { C } from "../ui";
-import { LEAN_WORD, type ThemeRow, themeLean, themeTip } from "./theme-vs-usual";
+import { LEAN_WORD, type LeanMarket, type ThemeRow, themeLean, themeTip } from "./theme-vs-usual";
 
 /**
  * 카더라 리포트가 공유하는 표시 프리미티브.
@@ -95,23 +95,35 @@ export function Pill({
 /**
  * 히어로 센티먼트 칸의 인기 테마 줄 — **평소 대비 막대**(국장·미장 같은 판).
  *
- * 가운데 눈금이 그 테마의 평소다. 오늘 낙관이 평소보다 적으면 왼쪽(파랑), 많으면 오른쪽(주황)으로 뻗고,
- * 평소와 다르다고 말할 만큼은 아니면 회색이다(--tx-flat). 왜 낙관도 그대로 나누지 않는지는 theme-vs-usual.ts 머리 주석.
+ * 가운데 눈금이 그 테마의 평소다. 오늘 낙관이 평소보다 적으면 왼쪽(파랑), 많으면 오른쪽(주황)으로 차이만큼 뻗는다.
+ * 평소와 다르다고 말할 만큼은 아닌 줄('평소 수준')은 같은 방향으로 **짧고 옅게** 뻗는다(--tx-lean-up-soft · --tx-lean-down-soft).
+ * 옅은 막대는 그날 어떤 진한 막대보다도 짧다 — 길이 셈은 theme-vs-usual.ts themeLean 주석.
+ * 눈금(반쪽을 채우는 차이)은 시장마다 다르다(THEME_LEAN_FULL) — market 으로 받는다.
+ * 왜 낙관도 그대로 나누지 않는지는 theme-vs-usual.ts 머리 주석.
  * 숫자(낙관 %·평소 %)는 툴팁이 말한다 — 막대 길이는 평활 전 비율로 재서 툴팁 숫자의 뺄셈과 1~2점 갈릴 수 있어,
  * 줄에는 숫자를 적지 않는다(themeTip 주석의 2026-09-30 지적과 같은 까닭).
  *
  * 이름 칸은 62px 이고, 그보다 긴 테마 이름이 있을 때만 그 이름만큼 넓어진다. 칸 폭을 네 줄이 같이 쓰도록
  * 격자로 둔다 — 줄마다 따로 넓히면 가운데 눈금이 줄마다 어긋나 눈이 세로로 훑질 못한다.
  */
-export function ThemeVsUsualRows({ themes }: { themes: (ThemeRow & { name: string })[] }) {
+export function ThemeVsUsualRows({ themes, market = "kr" }: { themes: (ThemeRow & { name: string })[]; market?: LeanMarket }) {
   if (!themes.length) return null;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(62px, max-content) minmax(0, 1fr) max-content", columnGap: 10, rowGap: 6, paddingTop: 2 }}>
       <span style={{ gridColumn: "1 / -1", fontSize: "var(--fs-11)", fontWeight: 500, letterSpacing: ".04em", color: C.sub }}>인기 테마 · 평소 대비</span>
       {themes.map((t) => {
-        const lean = themeLean(t);
+        const lean = themeLean(t, market);
         // 색은 바로 위 큰 비관·낙관 막대, 테마 로테이션 줄의 오르내림과 같은 -2 단이다 — 한 화면에서 같은 말을 같은 색으로.
-        const fill = !lean ? null : lean.shift === "up" ? "var(--c-warm-2)" : lean.shift === "down" ? "var(--c-blue-2)" : "var(--tx-flat)";
+        // '평소 수준'은 같은 색을 옅게 — 방향만 보이고, 진한 줄('더·덜 낙관')과 섞여 읽히지 않는다.
+        const fill = !lean
+          ? null
+          : lean.shift === "up"
+            ? "var(--c-warm-2)"
+            : lean.shift === "down"
+              ? "var(--c-blue-2)"
+              : lean.side === "right"
+                ? "var(--tx-lean-up-soft)"
+                : "var(--tx-lean-down-soft)";
         const ink = lean?.shift === "up" ? "var(--c-hot-ink)" : lean?.shift === "down" ? "var(--c-cold-ink)" : C.sub;
         return (
           <div
@@ -122,10 +134,12 @@ export function ThemeVsUsualRows({ themes }: { themes: (ThemeRow & { name: strin
           >
             <span style={{ ...clip, fontSize: "var(--fs-11)", fontWeight: 500, color: C.label }}>{t.name}</span>
             <span style={{ position: "relative", minWidth: 0, height: 7 }}>
-              {/* 트랙·회색 채움·눈금은 잉크를 섞은 타일 전용 색(tx.css --tx-track · --tx-flat · --tx-tick) — --c-track 은 회색 타일 위에서 사라진다. */}
+              {/* 트랙·눈금은 잉크를 섞은 타일 전용 색(tx.css --tx-track · --tx-tick) — --c-track 은 회색 타일 위에서 사라진다. */}
               <span style={{ position: "absolute", inset: 0, borderRadius: 999, background: "var(--tx-track)", overflow: "hidden" }}>
-                {/* '평소 수준'은 눈금만 — 차이 길이만큼 회색을 그리면 '더 낙관' 막대보다 긴 회색이 섰다(2026-10-05 점검). 막대가 선 줄 = 다르다고 말한 줄. */}
-                {lean && lean.shift !== "same" && fill && (
+                {/* '평소 수준'도 방향을 그린다(2026-10-06 운영자 요청 "평소 73%인데 지금 85%면 조금이라도 오른쪽으로" · "다 가운데라 심심하다").
+                    10-05 점검에서 눈금만 남겼었다 — 차이만큼 회색을 그리니 '더 낙관' 막대보다 긴 회색이 섰다. 지금은 같은 방향 색을
+                    옅게 칠하고, 길이는 가장 짧은 진한 막대보다 늘 짧다(themeLean). */}
+                {lean && lean.width > 0 && fill && (
                   <span
                     style={{
                       position: "absolute",

@@ -10,6 +10,7 @@ import { RISING_WINDOW_DAYS, channelDeltas, type ChannelDelta, type ChannelSnaps
 import { MIN_RECENT_MENTIONS, scoreSurging } from "@/lib/surging-score";
 import { dropOverlaps } from "@/lib/keyword-overlap";
 import { usableDays, weekAgoDates } from "@/lib/theme-flow";
+import { pickThemeRows } from "@/lib/theme-rows";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { trendingTodayStartISO } from "@/lib/trending-window";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
@@ -1953,10 +1954,10 @@ export function toPercents(pos: number, neu: number, neg: number): [number, numb
 }
 
 /**
- * 카드에 막대로 그릴 테마 수, 그리고 테마가 막대에 오르기 위한 최소 표본.
+ * 카드에 막대로 그릴 테마 수.
  *
- * ⚠️ **두 값 모두 data-pipeline/scripts/generate_telegram_narratives.py 의
- * THEME_TOP_N · MIN_DECIDED 와 같은 값이어야 한다.** 그쪽은 같은 테이블을 같은 기준으로
+ * ⚠️ **data-pipeline/scripts/generate_telegram_narratives.py 의 THEME_TOP_N 과 같은 값,
+ * 고르는 순서는 그쪽 top_themes 와 같은 규칙이어야 한다(lib/theme-rows.ts pickThemeRows).** 그쪽은 같은 테이블을 같은 기준으로
  * 다시 집계해 LLM 총평의 입력(digest)을 만드는데, 총평은 이 카드 **바로 왼쪽**에 붙는다.
  * 한쪽만 고치면 총평이 옆 막대에 없는 테마의 숫자를 인용하고, 독자는 그 숫자를 확인할
  * 방법이 없다. Python 과 TS 라 import 로 공유할 수 없어 손으로 맞춘 사본이다
@@ -1970,12 +1971,6 @@ export function toPercents(pos: number, neu: number, neg: number): [number, numb
  * 높이가 맞는 한계다. 그래서 **총평 쪽을 이 값에 맞춘다**(카드를 늘리는 게 아니라).
  */
 const THEME_TOP_N = 4;
-
-/** 낙관/비관이 합쳐 이만큼은 돼야 비율에 의미가 있다. 그 아래는 몇 건에 막대가 크게 흔들려
- *  실제보다 단정적으로 보인다. 8 이던 것을 20 으로 올렸다(2026-09-29) — 8~19건짜리 막대가
- *  78일 동안 302개 중 36개였고 대부분 연휴에 떴다.
- *  위 THEME_TOP_N 주석의 동기화 규칙이 이 값에도 그대로 적용된다. */
-const THEME_MIN_DECIDED = 20;
 
 /**
  * 낙관도(%) — 중립을 뺀 '낙관 : 비관' 중 낙관 쪽 비중. **평활을 건다.**
@@ -2110,11 +2105,8 @@ export async function getEcosystemSentiment(): Promise<MaybeFailed<EcosystemSent
   const [positive, neutral, negative] = toPercents(head.pos, head.neu, head.neg);
 
   // 테마 막대는 중립을 뺀 낙관도를 그 테마의 평소와 견준다(loadThemeUsual 주석).
-  // 하한·개수는 총평 쪽과 같이 움직여야 한다(THEME_TOP_N 주석 참고).
-  const topThemes = [...agg.entries()]
-    .filter(([scope, a]) => scope !== "overall" && a.pos + a.neg >= THEME_MIN_DECIDED)
-    .sort((x, y) => y[1].total - x[1].total)
-    .slice(0, THEME_TOP_N);
+  // 개수·순서는 총평 쪽과 같이 움직여야 한다(THEME_TOP_N · pickThemeRows 주석 참고).
+  const topThemes = pickThemeRows(agg, THEME_TOP_N);
 
   // 총평은 **기준일분만** 집는다. 파이프라인이 이 문장을 저장할 때 쓴 날짜가 곧 기준일이라
   // (generate_telegram_narratives 가 `date: latest` 로 upsert), 날짜로 맞추면 문장이 말하는

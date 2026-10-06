@@ -214,7 +214,7 @@ export default async function UsKaderaPage() {
       <div className="v2-band">
         {sentiment ? (
           <SentimentModule score={sentiment.score} label={sentiment.label} trend={sentiment.trend ?? []} days={sentiment.windowDays}>
-            <ThemeVsUsualRows themes={sentiment.byTheme} />
+            <ThemeVsUsualRows themes={sentiment.byTheme} market="us" />
           </SentimentModule>
         ) : (
           <Module id="mood" title="여론 낙관도">

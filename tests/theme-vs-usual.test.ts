@@ -9,7 +9,17 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { LEAN_WORD, THEME_USUAL_BAND, THEME_USUAL_Z, themeLean, themeTip, usualShift } from "../app/kadera/theme-vs-usual.ts";
+import {
+  LEAN_WORD,
+  THEME_LEAN_FULL,
+  THEME_LEAN_SOFT_MAX,
+  THEME_USUAL_BAND,
+  THEME_USUAL_Z,
+  themeLean,
+  themeTip,
+  usualBand,
+  usualShift,
+} from "../app/kadera/theme-vs-usual.ts";
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 
@@ -38,6 +48,12 @@ describe("themeTip", () => {
 
   it("평소가 없으면 낙관도만 말한다", () => {
     assert.equal(themeTip({ ...AI_SEMI, usual: null }), "낙관 68% · 평소 기록이 아직 적습니다");
+  });
+
+  it("낙관·비관 글이 없으면 낙관도도 판정도 말하지 않는다 — 평활값 50 을 '평소와 비슷'으로 적지 않는다", () => {
+    // 하한이 없어져(2026-10-06, lib/theme-rows.ts) 중립 글만 있는 테마도 줄에 선다.
+    assert.equal(themeTip({ pos: 50, usual: 80, positive: 0, negative: 0 }), "낙관·비관으로 읽힌 글이 없습니다");
+    assert.equal(themeTip({ pos: 50, usual: null, positive: 0, negative: 0 }), "낙관·비관으로 읽힌 글이 없습니다");
   });
 });
 
@@ -85,6 +101,53 @@ describe("themeLean — 평소 대비 막대", () => {
     assert.deepEqual(themeLean({ pos: 70, usual: 80, positive: 16, negative: 4 }), { shift: "same", side: "right", width: 0 });
   });
 
+  it("'평소 수준' 줄도 방향대로 뻗는다 — 길이는 판정 폭에 다가간 만큼", () => {
+    // 2026-10-06 국장 인터넷·플랫폼: 11:2 = 84.6% vs 평소 73 → +11.6, 13건이라 판정 폭 24.6 → 0.47 × 12.5 × 0.9
+    assert.deepEqual(themeLean({ pos: 70, usual: 73, positive: 11, negative: 2 }), { shift: "same", side: "right", width: 5.3 });
+    // 2차전지 13:4 = 76.5% vs 84 → −7.5, 판정 폭 17.8 → 왼쪽 4.8
+    assert.deepEqual(themeLean({ pos: 67, usual: 84, positive: 13, negative: 4 }), { shift: "same", side: "left", width: 4.8 });
+  });
+
+  it("옅은 막대는 어떤 진한 막대보다도 짧다 — 같은 날 '더 낙관'보다 긴 '평소 수준'이 서지 않는다", () => {
+    for (const market of ["kr", "us"] as const) {
+      const strongMin = (THEME_USUAL_BAND / THEME_LEAN_FULL[market]) * 50;
+      for (const n of [1, 2, 5, 13, 20, 60, 200, 1000]) {
+        for (const usual of [55, 73, 81, 90]) {
+          for (let pos = 0; pos <= n; pos++) {
+            const lean = themeLean({ pos: 0, usual, positive: pos, negative: n - pos }, market)!;
+            if (lean.shift === "same") assert.ok(lean.width <= strongMin * THEME_LEAN_SOFT_MAX + 0.05, `${market} ${pos}/${n} vs ${usual}: ${lean.width}`);
+            else assert.ok(lean.width >= strongMin - 0.05, `${market} ${pos}/${n} vs ${usual}: ${lean.width}`);
+          }
+        }
+      }
+    }
+  });
+
+  it("글이 1~2건이면 옅은 막대도 짧다 — 차이 그대로 그리면 트랙 끝까지 뻗었다(09-26 인터넷·플랫폼 1건)", () => {
+    const lean = themeLean({ pos: 45, usual: 74, positive: 0, negative: 1 })!;
+    assert.equal(lean.shift, "same");
+    assert.ok(lean.width < 12.5, String(lean.width));
+  });
+
+  it("미장은 눈금이 30 — 같은 차이가 국장보다 짧다", () => {
+    assert.equal(themeLean(AI_SEMI, "us")!.width, 19.8); // 11.9 / 30 × 50
+    assert.equal(themeLean(AI_SEMI)!.width, 29.7); // 기본은 국장(20)
+  });
+
+  it("판정 폭은 판정(usualShift)과 같은 값이다", () => {
+    assert.ok(Math.abs(usualBand(185, 80) - 5.88) < 0.01); // AI반도체 185건 · 평소 80 → 폭 5.9(usualShift 주석)
+    assert.equal(usualBand(10000, 80), THEME_USUAL_BAND);
+  });
+
+  it("'평소 수준' 줄은 옅은 색으로 그린다 — 눈금만 남기던 조건(shift !== same)으로 되돌리지 않는다", () => {
+    const src = read("app/kadera/parts.tsx");
+    assert.ok(!src.includes('lean.shift !== "same" && fill'), "평소 수준 줄의 막대가 다시 빠졌다");
+    assert.ok(src.includes("var(--tx-lean-up-soft)") && src.includes("var(--tx-lean-down-soft)"));
+    const css = read("app/styles/tx.css");
+    assert.match(css, /--tx-lean-up-soft: color-mix\(in srgb, var\(--c-warm-2\)/);
+    assert.match(css, /--tx-lean-down-soft: color-mix\(in srgb, var\(--c-blue-2\)/);
+  });
+
   it("평소가 없으면 막대 없이 '기록 적음'", () => {
     assert.equal(themeLean({ ...AI_SEMI, usual: null }), null);
     assert.equal(LEAN_WORD.none, "기록 적음");
@@ -99,7 +162,7 @@ describe("테마 줄", () => {
   it("국장·미장 모두 같은 평소 대비 막대를 쓴다 — 낙관도로 나누는 두 색 막대로 되돌리지 않는다", () => {
     for (const p of ["app/kadera/page.tsx", "app/kadera/us/page.tsx"]) {
       const src = read(p);
-      assert.ok(src.includes("<ThemeVsUsualRows themes={sentiment.byTheme} />"), p);
+      assert.ok(src.includes(p.includes("/us/") ? '<ThemeVsUsualRows themes={sentiment.byTheme} market="us" />' : "<ThemeVsUsualRows themes={sentiment.byTheme} />"), p);
       assert.ok(!src.includes("width: `${t.pos}%`"), p);
     }
   });

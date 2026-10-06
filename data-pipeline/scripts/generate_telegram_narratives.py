@@ -414,7 +414,7 @@ BRIEF_THEME_SYSTEM = COMMON + f"""
   기울기를 말할 땐 [테마별]에 적힌 평소 대비 라벨(평소보다 낙관 쪽·평소와 비슷·평소보다
   비관 쪽)을 그대로 쓰세요("반도체는 평소보다 낙관 쪽입니다"). '~쪽으로 기울었다'로 바꿔
   쓰지 마세요. 테마는 늘 낙관 쪽이라 '낙관 우세' 같은 절대 라벨은 아무 말도 안 하니 테마에 붙이지 마세요.
-  '평소 기록이 적어 견줄 수 없음'인 테마는 기울기를 말하지 말고 부피로만 쓰세요.
+  '견줄 수 없음'이 붙은 테마는 기울기를 말하지 말고 부피로만 쓰세요.
   **이 대목에 퍼센트 기호가 한 번이라도 들어가면 잘못 쓴 것입니다.**
 - ⚠️ **'가장 ~한'이라고 쓸 거면 digest 의 값을 실제로 견주고 쓰세요.** 언급이 가장 많은
   테마와 낙관이 가장 기운 테마는 대개 다릅니다. 이 둘을 뒤섞으면 한 문단 안에서 앞뒤가
@@ -617,11 +617,15 @@ def optimism(positive: int, negative: int) -> int | None:
 #
 # 총평은 화면에서 테마 막대 바로 왼쪽에 붙는다. 총평이 인용한 숫자를 독자가 확인할
 # 곳은 그 막대뿐이므로, 두 곳이 고르는 테마 집합이 어긋나면 확인할 방법이 없는 숫자가
-# 화면에 나간다. 집합을 정하는 조건은 셋(정렬 키·표본 하한·개수)이고 셋 다 같아야 한다.
+# 화면에 나간다. 집합을 정하는 조건은 둘(정렬 키·개수)이고 둘 다 같아야 한다.
 #
-#   정렬 키   : total 내림차순      ← 양쪽 동일
-#   표본 하한 : MIN_DECIDED         ← lib/telegram-data.ts THEME_MIN_DECIDED 와 같은 값
+#   정렬 키   : total 내림차순, 동점은 낙관+비관 많은 쪽, 그다음 이름  ← lib/theme-rows.ts pickThemeRows 와 같은 순서
 #   개수      : THEME_TOP_N         ← lib/telegram-data.ts THEME_TOP_N 과 같은 값
+#
+# 표본 하한은 없다(2026-10-06). 예전엔 낙관+비관 20건(2026-09-29 에 8 → 20) 아래인 테마를 뺐는데,
+# 연휴 끝엔 하한을 넘는 테마가 반도체 하나라 화면에 한 줄만 섰다. 운영자 결정은 "기간은 그대로, 건수가
+# 적어도 넷은 항상"이다. 얇은 테마의 기울기는 usual_label 이 표본 크기를 보고 막는다(대개 '평소와 비슷').
+# 하한이 없으니 얇은 날엔 4위 자리에 같은 건수가 몰려(10-06: 26건 셋) 동점 순서까지 못 박는다.
 #
 # ⚠️ **한쪽만 고치면 안 된다.** Python 과 TS 라 import 로 공유할 수 없어 손으로 맞춘
 # 사본이다(lib/stock-themes.ts ↔ config/stock_themes.py 와 같은 관례). 같은 병이 두 번
@@ -632,8 +636,18 @@ def optimism(positive: int, negative: int) -> int | None:
 # 맞추는 방향은 **총평을 카드에 맞춘다**(4개). 카드가 4개인 건 반칸 카드에 막대 4줄이
 # 왼쪽 종합 막대와 높이가 맞는 한계라 늘리기 어렵고, 총평은 어차피 상위 몇 개만
 # 인용하기 때문이다. 프롬프트가 요구하는 "테마 최소 2개 언급"에도 4개면 충분하다.
-MIN_DECIDED = 20  # 8 → 20(2026-09-29). 8~19건짜리 막대는 연휴에 몇 건으로 크게 흔들렸다
 THEME_TOP_N = 4
+
+
+def top_themes(window: dict[str, Counter]) -> list[tuple[str, Counter]]:
+    """총평이 볼 테마 — 화면 줄과 같은 넷(위 주석). 언급 많은 순, 동점은 낙관+비관 많은 쪽, 그다음 이름.
+
+    이름은 코드 포인트 순이다. 화면 pickThemeRows 의 `<` 비교와 같은 순서다(한글은 둘 다 같은 값을 비교한다).
+    """
+    return sorted(
+        ((s, c) for s, c in window.items() if s != "overall" and c["total"]),
+        key=lambda kv: (-kv[1]["total"], -(kv[1]["positive"] + kv[1]["negative"]), kv[0]),
+    )[:THEME_TOP_N]
 
 # ── 테마의 '평소' — 화면 막대 툴팁이 평소와 견준다(2026-09-29 · 09-30) ─────────────────
 #
@@ -646,7 +660,7 @@ THEME_TOP_N = 4
 #   평소가 THEME_USUAL_MIN_DECIDED 건 미만이면 평소 없음
 #
 # ⚠️ lib/telegram-data.ts loadThemeUsual 의 THEME_USUAL_DAYS · THEME_USUAL_MIN_DECIDED 와 같은
-#    값이어야 한다(위 MIN_DECIDED 와 같은 손 사본 관례).
+#    값이어야 한다(위 THEME_TOP_N 과 같은 손 사본 관례).
 THEME_USUAL_DAYS = 30
 THEME_USUAL_MIN_DECIDED = 60
 # 평소와 이만큼 안쪽이면 '평소와 비슷'. 미장 총평의 BASE_DAY_SAME_BAND 와 같은 폭이다.
@@ -1575,25 +1589,18 @@ def build_brief_digest(db, latest: str, msgs: list[dict]) -> str | None:
     # 범위가 곧 화면의 범위라는 걸, digest 를 읽는 사람도 모델도 같이 보게 하려는 것이다.
     lines.append(
         f"[테마별] 평소 대비 기울기 (중립 뺀 낙관도를 그 테마의 직전 {THEME_USUAL_DAYS}일과 견줌 · "
-        f"낙관+비관 {MIN_DECIDED}건 이상 · 화면 막대에 뜨는 상위 {THEME_TOP_N}개입니다)"
+        f"화면 막대에 뜨는 언급 상위 {THEME_TOP_N}개입니다)"
     )
-    # 카드(lib/telegram-data.getEcosystemSentiment)와 **같은 정렬·하한·개수**로 고른다.
-    # 셋 다 맞아야 총평과 옆 막대가 같은 테마를 말한다(위 THEME_TOP_N 주석 참고).
-    # 프롬프트로 "표본 적은 테마는 빼라"고 시켜도 모델에게 표본 수를 안 줬으니 판단할
-    # 근거가 없었다. 화면에 없는 테마는 아예 digest 에 넣지 않는 게 확실하다.
-    themes = sorted(
-        (
-            (s, c)
-            for s, c in window.items()
-            if s != "overall" and c["total"] and (c["positive"] + c["negative"]) >= MIN_DECIDED
-        ),
-        key=lambda kv: kv[1]["total"],
-        reverse=True,
-    )[:THEME_TOP_N]
+    # 카드(lib/telegram-data.getEcosystemSentiment)와 **같은 정렬·개수**로 고른다(top_themes).
+    # 둘 다 맞아야 총평과 옆 막대가 같은 테마를 말한다(위 THEME_TOP_N 주석 참고).
+    # 화면에 없는 테마는 아예 digest 에 넣지 않는다 — 프롬프트로 빼라고 시키는 것보다 확실하다.
+    themes = top_themes(window)
     window_start = min(sent_days)
     for scope, c in themes:
         o = optimism(c["positive"], c["negative"])
         if o is None:
+            # 하한이 없어 중립 글만 있는 테마도 화면 줄에 선다(막대 없이 '기록 적음'). 빼면 [부피 비교]가 센 넷과 목록이 갈린다.
+            lines.append(f"- {scope}: {c['total']}건 · 낙관·비관 글이 없어 견줄 수 없음")
             continue
         # 숫자만 주면 모델이 방향을 뒤집어 읽는다 — "낙관이 43%로 우세"(2026-07-20),
         # "38%로 상대적으로 높은"(07-19) 처럼. 화면 막대가 그리는 것과 같은 말(평소 대비
@@ -1606,7 +1613,7 @@ def build_brief_digest(db, latest: str, msgs: list[dict]) -> str | None:
                 f"- {scope}: {c['total']}건 · {usual_label(c['positive'], c['negative'], u)} (낙관도 {o}% · 평소 {u}%)"
             )
     if not themes:
-        lines.append(f"- (표본 {MIN_DECIDED}건 이상인 테마가 없습니다. 테마 언급은 생략하세요)")
+        lines.append("- (테마가 붙은 글이 없습니다. 테마 언급은 생략하세요)")
     if len(themes) >= 2 and (cmp := volume_comparison_line(themes)):
         lines.append(cmp)
 

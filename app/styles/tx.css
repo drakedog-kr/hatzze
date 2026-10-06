@@ -17,13 +17,16 @@
   --tx-tile: #f3f6fa;
   --tx-btn: rgba(14, 33, 54, 0.05);
   --tx-btn-hover: rgba(14, 33, 54, 0.09);
-  /* 회색 타일 위 테마 줄(parts.tsx ThemeVsUsualRows)의 빈 트랙 · '평소 수준' 채움 · 평소 눈금.
+  /* 회색 타일 위 테마 줄(parts.tsx ThemeVsUsualRows)의 빈 트랙 · 평소 눈금.
      --c-track(#eef3f9)은 흰 카드 기준이라 타일(#f3f6fa) 위에서는 사라지고, --c-bar 는 연파랑이라 '덜 낙관'으로
      읽혔다(2026-10-01 폰·다크 캡처). 테마 로테이션 줄을 올렸을 때 트랙이 사라진 일(kadera.css .hz-trow:hover
      .hz-bar)과 같은 처방 — **잉크를 섞어** 어느 바탕에서든 한 단 어둡게(다크에선 밝게) 둔다. 잉크가 다크에서
      밝은 색으로 바뀌므로 다크 블록을 따로 둘 필요가 없다. 7% 로는 "배경과 구분이 잘 안 간다"는 말을 들어 올렸다. */
   --tx-track: color-mix(in srgb, var(--c-ink) 11%, transparent);
-  --tx-flat: color-mix(in srgb, var(--c-ink) 32%, transparent);
+  /* '평소 수준' 줄의 옅은 채움 — 진한 줄(--c-warm-2 · --c-blue-2)과 같은 색을 반쯤 비쳐 트랙 위에 얹는다(2026-10-06).
+     예전 회색(--tx-flat, 잉크 32%)은 방향을 못 말했다. 투명도로 섞어 다크에서도 같은 처방이 통한다. */
+  --tx-lean-up-soft: color-mix(in srgb, var(--c-warm-2) 45%, transparent);
+  --tx-lean-down-soft: color-mix(in srgb, var(--c-blue-2) 45%, transparent);
   --tx-tick: color-mix(in srgb, var(--c-ink) 58%, transparent);
   /* 2026-09-04 실측으로 다시 맞춘 값이다. 토스 를 훑어 보니 카드 모서리는 **16px 이
      18곳으로 다수**고 20px 은 7곳뿐이었다(컨트롤은 10~12, 알약 999). 처음엔 20/16 으로
