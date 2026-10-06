@@ -86,7 +86,7 @@ export default async function Home() {
   const extra = (cat: IndicatorCategory) =>
     indicators.filter((i) => i.category === cat && !LAID_OUT.has(i.slug));
 
-  // 히어로 '지표 분포' — 25개를 네 구간으로 센다.
+  // 히어로 '지표 분포' — 지표(26개)를 네 구간으로 센다. 과열도가 아직 없는 지표는 빼므로 햇쩨 지수 머리의 '지표 N개'도 이 합이다.
   // 카드의 구간 판정(overheatColor)·초고온 배지(isHit)와 **같은 값**을 쓴다: capped(0~100)
   // 를 stageForScore 에 넣는다. 다른 기준으로 세면 "초고온 3개"라고 적어 놓고 시트에는
   // 빨간 셀이 둘만 보이는 일이 난다.
