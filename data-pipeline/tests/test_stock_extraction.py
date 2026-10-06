@@ -755,3 +755,49 @@ def test_reddit_board_post_keeps_the_stocks_it_talks_about(us_tagger):
 )
 def test_reddit_company_mentions_survive(us_tagger, text):
     assert "RDDT" in us_tagger(text)
+
+
+# ── 2026-10-06: 대교(019680) ← 다리 이름 ─────────────────────────────────────────────────────
+# 사례는 전 기간 코퍼스의 실제 문장이다. 근거와 전량 재현 수치는 config/stock_extraction.py 의 HOMONYM_CUES["대교"] 주석.
+
+
+def _daegyo(text: str) -> set[str]:
+    match_to_code = {"대교": "019680"}
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = {"대교"} & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, {"대교": "dict"}, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "우크라이나 키이우의 드니프로강을 가로지르는 북부 대교를 러시아의 S8000 반데롤 순항 미사일이 타격하는 장면",
+        "북한 신의주와 중국 단둥을 잇는 신압록강대교가 조만간 개통할 것이라는 관측이 나온다. "
+        "북·중 수교 기념일 개통설은 실현되지 않았지만 대교 주변 시설 정비와 차량 이동 등 준비 움직임이 관측되고 있다.",
+        "러시아 하산과 북한 나선시를 잇는 '하산 두만강 대교'가 곧 개통될 예정이다.",
+        "🎯 크림반도 방공망 무력화와 케르치 대교 고립 전략",
+        "상하이는 도시 고속도로가 현재 정상 교통을 재개했으나 양쯔강 대교는 시속 60km의 제한 속도를 유지하고 있으며",
+        "샤먼시 ‘양안 교류 12개항 조치’ 발표 중 진먼-샤먼 대교 건설 계획 밝혀",
+        "* 대교 이어 목화·시범까지 … 여의도 래미안 벨트",
+        "46. '해상 랜드마크' 어디 가고 '다리 없는 대교'...갈팡질팡 영일만대교 노선",
+    ],
+)
+def test_bridges_are_not_daegyo(text):
+    assert _daegyo(text) == set()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "(유가)대교 - 주요사항보고서(자기주식처분결정) http://dart.fss.or.kr/api/link.jsp?rcpNo=1",
+        "2026.10.06 14:52:54 기업명: 대교(시가총액: 653억) A019680 보고서명: 주요사항보고서(자기주식처분결정)",
+        "[실적속보]대교, 올해 2Q 매출액 1586억(-2.4%) 영업이익 -37.2억(적자전환) (연결)",
+        "- [편출] 대교(019680), 진흥기업(002780), 케어젠(214370), 외 9개",
+        "28. 대교 거래정지(주식병합)",
+        "대교·교원·웅진이 '시니어 학습지' 공들이는 까닭",
+        "'눈높이' 대교의 반전…학원 대신 '이 사업'에 꽂혔다",
+        "* MLCC 슈퍼사이클…다시 뛰는 삼성전기·삼화콘덴서\n\n* 사업 다각화 속도내는 대교\n\n* 국내 유일 기체분리막 기술로",
+    ],
+)
+def test_daegyo_stock_mentions_survive(text):
+    assert _daegyo(text) == {"019680"}
