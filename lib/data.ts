@@ -239,7 +239,7 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
   // 전에 로컬에서만 미리 보기 위해 slug별로 덮어쓴다.
   const overrides = getDevOverrides();
 
-  return ((data ?? []) as unknown as RawRow[]).map((row) => {
+  const rows = ((data ?? []) as unknown as RawRow[]).map((row) => {
     const iv = row.indicator_values[0];
     const nameOverride = overrides.names?.[row.slug];
     const descOverride = overrides.descriptions?.[row.slug];
@@ -275,6 +275,12 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
         .map((v) => ({ date: v.date, value: v.raw_value })),
     };
   });
+  // DB 에 아직 없는 새 지표(로컬 dev 전용). 같은 slug 가 DB 에 생기면 DB 쪽을 쓴다.
+  const known = new Set(rows.map((r) => r.slug));
+  const fresh = (overrides.indicators ?? [])
+    .filter((ind) => !known.has(ind.slug))
+    .map((ind) => ({ ...ind, id: `dev-${ind.slug}` }));
+  return [...rows, ...fresh];
 }
 
 /** 거래대금 상위 종목의 52주 신고가 대비 괴리율 (코스피 신고가 카드의 오른쪽 칸). */

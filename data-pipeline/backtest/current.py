@@ -76,7 +76,7 @@ lead = pd.Series({
 })
 
 RAW = {"kospi_high_gap": high_gap, "buffett_index": buffett}
-SHORT = ["investor_deposit", "individual_net_buy", "dcinside_post_count", "turnover_concentration",
+SHORT = ["individual_net_buy", "dcinside_post_count", "turnover_concentration",
          "news_sentiment", "brokerage_app_rank", "youtube_finance_search_views",
          "bestseller_finance_ratio", "github_trading_bot_repos"]
 

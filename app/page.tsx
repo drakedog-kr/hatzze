@@ -8,7 +8,7 @@ import { ANCHOR_ALIAS, BAND_LABELS, DIST_FILL } from "./home/Hero";
 import type { BandItem } from "./home/Hero";
 import { BriefModule, IndexModule } from "./home/V2Briefing";
 import { CoverIndexCell, CoverLinkCell, CoverMeta, Module, type CoverLink } from "./kadera/V2Modules";
-import { CardBuffett, CardLeverage, CardMarketActions, CardTurnover, CardHighGap, CardSpeed, CardVkospi, CardAsia, CardGoldRatio, CardVolume, CardFx, CardNetBuy, CardLimitUp, CardPutCall } from "./home/cards-market";
+import { CardBuffett, CardLeverage, CardMarketActions, CardTurnover, CardHighGap, CardSpeed, CardVkospi, CardAsia, CardGoldRatio, CardVolume, CardFx, CardNetBuy, CardLimitUp, CardPutCall, CardDeposit } from "./home/cards-market";
 import { CardComingSoon, CardDivergence, CardTrend, CardSentiment, CardYoutube, CardSpending, CardUpbit, CardBrokerage } from "./home/cards-sentiment";
 import type { IconName } from "@/lib/icon-names";
 import { loadSpotlight, type SpotChip } from "./home/spotlight-data";
@@ -35,7 +35,7 @@ const LAID_OUT = new Set([
   "buffett_index", "leverage_etf_volume", "market_actions_30d", "turnover_concentration",
   "kospi_high_gap", "kospi_speed_60d", "vkospi", "kospi_asia_relative_strength",
   "kospi_gold_ratio", "kospi_volume_surge", "usdkrw_volatility",
-  "foreign_sell_at_high", "put_call_ratio", "limit_up_breadth",
+  "foreign_sell_at_high", "put_call_ratio", "limit_up_breadth", "investor_deposit",
   "naver_search_trend", "dcinside_post_count", "news_sentiment", "bestseller_finance_ratio",
   "youtube_finance_search_views", "luxury_consumption_index", "fine_dining_search_index",
   "upbit_speculation_index", "github_trading_bot_repos", "brokerage_app_rank",
@@ -189,11 +189,14 @@ export default async function Home() {
                 <CardGoldRatio v={p("kospi_gold_ratio")} />
                 <CardFx v={p("usdkrw_volatility")} />
                 <CardAsia v={p("kospi_asia_relative_strength")} />
+                {/* 예탁금은 바로 옆 '신용융자 잔고(준비 중)'와 짝이다 — 둘 다 개인이 증권계좌로 들인 돈이다. */}
+                <CardDeposit v={p("investor_deposit")} />
                 <CardComingSoon />
                 {/* 순서 = 가중치 × 직관성 × 변동성. VIX 대비 VKOSPI 스프레드는 내렸다 — 1년의 76%가 과열도 0이라
                     종합점수에 기여하지 못했고, VKOSPI 에서 파생된 지표라 VKOSPI 카드와 겹쳤다.
                     v2 행 구성(4열, 칸 합계 16): [신고가·거래대금·속도·급등] [외국인·쏠림·풋콜·안전장치]
-                                                [VKOSPI·레버리지·버핏·금] [환율·아시아·준비중2] */}
+                                                [VKOSPI·레버리지·버핏·금] [환율·아시아·예탁금·준비중]
+                    예탁금(2026-10-06)이 들어오며 '준비 중'이 두 칸에서 한 칸이 됐다. */}
                 {extra("시장").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["시장"]} />
                 ))}

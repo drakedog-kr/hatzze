@@ -16,5 +16,7 @@
       "body_md": "주식 텔레그램 채널에서 오간 말을 매일 모아 정리합니다.\n\n---\n\n### 첫 꼭지 소제목\n\n첫 문단입니다.\n\n### 이 글 한 편에 들어간 데이터\n\n| 항목 | 양 |\n|---|---|\n| 수집 채널 | 317개 |\n\n출처: hatzze.fun/kadera\n\n※ 언급량·집계는 무엇이 얼마나 회자되는지를 나타낸 표현일 뿐, 재미·참고용이며 매수·매도 신호가 아닙니다.",
       "short_md": null
     }
-  ]
+  ],
+  "_indicators": "DB 에 아직 없는 새 지표를 로컬 카드로 볼 때 씁니다. 키 이름에서 밑줄을 떼고 indicators 로 두세요. 한 항목은 수집 스크립트의 --preview 가 뽑습니다(예: python data-pipeline/scripts/fetch_investor_deposit.py --preview /tmp/deposit.json). 같은 slug 가 DB 에 생기면 DB 쪽을 씁니다.",
+  "_indicators_value": []
 }
