@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 
+import requests
+
 from common.config import KSD_API_KEY
 from common.http_client import get_with_retry
 
@@ -23,16 +25,36 @@ BASE = "https://apis.data.go.kr/1160100/service/GetKofiaStatisticsInfoService/"
 PAGE_ROWS = 3000
 
 
+class KofiaUnavailableError(RuntimeError):
+    """재시도를 다 쓰고도 저쪽에 닿지 못했을 때 — 연결 끊김 · 타임아웃 · 5xx/429.
+
+    해외 러너에서 apis.data.go.kr 로 나가는 연결이 가끔 통째로 막힌다(2026-08-19 서학개미 리허설 · 2026-10-06 저녁 실행에서
+    투자자예탁금이 연결 타임아웃 4번으로 죽어 '데일리 파이프라인 실패' 이슈가 열렸다). 두 지표는 매번 전 기록을 다시 받으므로
+    하루 못 받아도 다음 실행이 메운다. 그래서 수집 스크립트는 이걸 잡아 경고만 남기고 넘어가고, 오래 멈추면 check_freshness
+    (허용 3영업일)가 잡는다 — 알람은 '이번에 받았나'가 아니라 '표가 낡았나'로 본다.
+    403(활용신청 안 됨) · 그 밖의 4xx · 응답 코드 오류는 여기 안 든다. 다시 걸어도 같은 답이 오는, 사람이 고쳐야 하는 오류다.
+    """
+
+
 def fetch_daily(op: str, field: str, label: str) -> list[tuple[str, float]]:
-    """기능 op 의 칸 field 를 (YYYY-MM-DD, 값) 날짜 오름차순으로 돌려준다."""
+    """기능 op 의 칸 field 를 (YYYY-MM-DD, 값) 날짜 오름차순으로 돌려준다.
+
+    저쪽에 못 닿으면 KofiaUnavailableError 를 던진다(위). 다른 오류는 그대로 올린다.
+    """
     items: list[dict] = []
     page = 1
     while True:
-        resp = get_with_retry(
-            BASE + op,
-            label=label,
-            params={"serviceKey": KSD_API_KEY, "resultType": "json", "numOfRows": PAGE_ROWS, "pageNo": page},
-        )
+        try:
+            resp = get_with_retry(
+                BASE + op,
+                label=label,
+                params={"serviceKey": KSD_API_KEY, "resultType": "json", "numOfRows": PAGE_ROWS, "pageNo": page},
+            )
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            raise KofiaUnavailableError(f"{label}: 연결 실패(재시도 소진) — {e}") from e
+        except requests.exceptions.HTTPError as e:
+            # get_with_retry 가 5xx · 429 를 다 다시 걸어 보고도 안 되면 이걸 올린다(그 밖의 상태는 응답을 그대로 돌려준다).
+            raise KofiaUnavailableError(f"{label}: 서버 오류(재시도 소진) — {e}") from e
         if resp.status_code == 403:
             raise PermissionError(
                 f"공공데이터포털 403: {resp.text[:200]} — '금융위원회_금융투자협회종합통계정보'에 "
