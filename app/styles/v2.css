@@ -1394,7 +1394,8 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dv-band.v2-dv-band-ph { display: none; }
 :root[data-dv-has] .v2-dv-band.v2-dv-band-ph { display: grid; }
 .v2-dv-help { display: inline-flex; align-self: center; color: var(--t-ink3); cursor: help; }
-.v2-dv-acct { display: flex; align-items: flex-start; gap: 8px; }
+/* '계좌' 글자는 단추 글자와 한 줄에 — 세그먼트 겉(테두리 1 · 안쪽 2)만큼 키가 커서 위에 붙이면 3px(모바일 36 단추는 9px) 떴다. */
+.v2-dv-acct { display: flex; align-items: center; gap: 8px; }
 .v2-dv-acct-k { flex: none; font-size: 12px; font-weight: 500; line-height: 24px; color: var(--t-ink3); }
 /* 계좌 다섯 — 한 줄에 같은 폭(짧은 이름 · tax.tsx ACCOUNT_TINY). 셋 · 둘 두 줄은 고르지 않았다(2026-10-05 운영자 지적).
    칸이 좁으면(1,280 의 248 · 1,000 미만의 216) '계좌' 글자를 빼야 '비과세'가 안쪽 여백 안에 든다 — 단추 이름이 다 계좌라 글자 없이도 읽힌다. */
