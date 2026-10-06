@@ -759,8 +759,8 @@ export function CardDeposit({ v }: { v: Pick }) {
   ];
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
-      {/* 금투협 통계는 다음 영업일에 나오고 '결제일 기준'이라 자기 자료일을 밝힌다(sourceDateBadge 머리말의 두 경우 중 하나). */}
-      <TitleRow desc={v.headline} icon="account_balance_wallet" name={v.name} badge={sourceDateBadge(v) ?? undefined} />
+      {/* 자료일 배지('10/1 기준')는 달지 않는다(2026-10-06 운영자 결정). 공표가 하루이틀 늦지만 차트 끝점 툴팁이 날짜를 말한다. */}
+      <TitleRow desc={v.headline} icon="account_balance_wallet" name={v.name} />
       {v.raw !== null && (
         <Big disp={`${v.raw >= 0 ? "+" : ""}${v.raw.toFixed(1)}`} unit="%" color={v.color} size={32} sub="평소 대비" />
       )}
