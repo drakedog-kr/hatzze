@@ -136,25 +136,18 @@ export function Shell({
   slug,
   hit = false,
   warm = false,
-  wide = false,
   minH = 230,
   children,
 }: {
   /**
    * 지표 slug. 셀에 `ind-<slug>` 라는 id 를 달아 **스크롤 목적지**로 만든다.
    * 히어로의 '지표 분포'가 구간별 지표 이름을 목록으로 열고, 그 이름이 여기로 건너온다.
-   * 값이 없는 셀('준비 중')은 목적지가 될 일이 없으므로 id 도 안 붙는다.
+   * slug 가 없으면 id 도 안 붙는다.
    */
   slug?: string;
   hit?: boolean;
   /** 고온 이상(진행률 ≥ 50). 카드에 붙는 보조 배지의 색을 가른다(pick 의 warm 주석). */
   warm?: boolean;
-  /**
-   * 두 칸 폭(v2, 2026-10-03). 시장 지표 14장 · 감성 10장이라 4열 · 2열 어디서든 끝 줄이 두 칸 빈다 — 판마다 끝의 자리 채움 칸
-   * (준비 중 · 지표 제보)을 두 칸으로 펴서 16 · 12 로 맞춘다. ⛔ 지표 칸은 늘리지 않는다 — 아시아 · 여윳돈을 늘려 봤다가
-   * "이상하다"로 되돌렸다. 폭이 갈리는 자리는 v2.css .hz-cell-wide.
-   */
-  wide?: boolean;
   minH?: number;
   children: React.ReactNode;
 }) {
@@ -169,8 +162,15 @@ export function Shell({
   // 저마다 다른 높이에서 시작해 25칸이 표로 안 읽혔다. 위에서부터 쌓아야 눈이 가로로
   // 훑을 때 같은 자리에서 같은 종류를 만난다.
   const kids = React.Children.toArray(children);
-  const head = kids[0];
   const foot = kids.length > 1 ? kids[kids.length - 1] : null;
+  // 지표 소개 — 각주(Foot)의 문장을 머리(TitleRow) 이름의 말풍선으로 건넨다. v2 는 각주 칸을 숨겨서(v2.css .hz-cell-foot)
+  // 그 문장이 이름 호버로만 남는다(2026-10-06 운영자 지시). 카드 25장이 저마다 넘기지 않고 여기 한 곳에서 잇는다 —
+  // 각주와 말풍선이 다른 말을 할 자리가 없다. TitleRow 에 tip 을 직접 준 카드는 그 값을 쓴다.
+  const footText = React.isValidElement<{ text?: string }>(foot) && foot.type === Foot ? foot.props.text : undefined;
+  const head =
+    footText && React.isValidElement<{ tip?: string }>(kids[0]) && kids[0].type === TitleRow && kids[0].props.tip === undefined
+      ? React.cloneElement(kids[0], { tip: footText })
+      : kids[0];
   const body = kids.slice(1, kids.length - 1);
   return (
     <div
@@ -178,7 +178,7 @@ export function Shell({
       // 2026-08 콘솔 리디자인: 카드가 아니라 **시트 안의 셀**이다. 배경·격자선·최소
       // 높이는 globals.css 의 .hz-cards > * 가 준다 — 여기서 인라인으로 주면 초고온
       // 셀의 상단 라인(.hz-cell-hot)을 덮어써 버린다.
-      className={[hit ? "hz-cell-hot" : "", wide ? "hz-cell-wide" : ""].filter(Boolean).join(" ") || undefined}
+      className={hit ? "hz-cell-hot" : undefined}
       style={{
         // 모든 카드의 divider(Foot 등) 가로 위치가 동일하도록 안쪽 여백을 통일한다.
         // 값은 폭에 따라 22 → 18 (globals.css 의 --hz-card-pad).
@@ -277,6 +277,7 @@ export function TitleRow({
   iconSize = 20,
   badge,
   right,
+  tip,
 }: {
   icon: IconName;
   name: React.ReactNode;
@@ -285,7 +286,24 @@ export function TitleRow({
   iconSize?: number;
   badge?: string;
   right?: React.ReactNode;
+  /** 이름에 마우스를 올리면(폰은 누르면) 뜨는 지표 소개. 보통은 Shell 이 각주 문장을 넣어 준다. */
+  tip?: string;
 }) {
+  const nameEl = (
+    <span className="hz-clamp2 hz-cell-name" style={{ fontSize: "var(--fs-13)", fontWeight: 700, color: C.ink, lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
+      {name}
+    </span>
+  );
+  // 말풍선은 이름을 **감싼** 칸에 단다 — 이름 칸(.hz-clamp2)이 두 줄 말줄임이라 overflow:hidden 이어서, 앵커 위치지정이 없는
+  // 브라우저에선 그 안의 말풍선이 통째로 잘린다. 감싼 칸은 글자 폭만큼이라 이름 위에서만 열린다.
+  // 한 줄로 띄운다(hz-tip-wide 를 안 쓴다 · 2026-10-06 운영자 지시) — 소개 문장이 22~28자라 넓은 화면에선 한 줄에 든다. 폰(560 이하)은 화면 폭에 맞춰 접힌다.
+  const title = tip ? (
+    <span className="hz-tip hz-tip-start hz-name-tip" data-tip={tip} style={{ display: "flex", minWidth: 0 }}>
+      {nameEl}
+    </span>
+  ) : (
+    nameEl
+  );
   return (
     // ① 머리 슬롯 — 왼쪽에 아이콘, 오른쪽에 제목/부제.
     //
@@ -329,9 +347,7 @@ export function TitleRow({
             justifyContent: right ? "space-between" : undefined,
           }}
         >
-          <span className="hz-clamp2 hz-cell-name" style={{ fontSize: "var(--fs-13)", fontWeight: 700, color: C.ink, lineHeight: 1.3, letterSpacing: "-.01em", wordBreak: "keep-all" }}>
-            {name}
-          </span>
+          {title}
           {badge && (
             <span
               className="hz-cell-badge"
@@ -678,6 +694,127 @@ export function AreaChart({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+const fmtJo = (v: number) => `${v.toFixed(1)}조`;
+
+// 1년 흐름 차트 — 지금 값(면 + 실선) 위에 그날그날의 기준값(점선)을 겹친다. 둘이 벌어진 만큼이 카드의 큰 숫자다.
+// 투자자예탁금(기준 = 1년 평소) · 신용융자 잔고(기준 = 한 달 전 잔고) · 기업 체감 경기(기준 = 1년 전 같은 달)가 같이 쓴다.
+// 값과 날짜 글자는 카드가 정한다(fmt · dateFmt). 기본은 일별 '조' 단위다.
+export function RefChart({
+  dates,
+  main,
+  base,
+  baseLabel,
+  color,
+  fmt = fmtJo,
+  dateFmt = shortDate,
+}: {
+  dates: string[];
+  main: number[];
+  base: number[];
+  /** 툴팁에서 기준값 앞에 붙는 말 — '평소' · '한 달 전'. */
+  baseLabel: string;
+  color: string;
+  fmt?: (v: number) => string;
+  /** 툴팁의 날짜 글자. 지난해 점엔 앞에 'YY년 '을 붙인다(아래). */
+  dateFmt?: (d: string) => string;
+}) {
+  const n = dates.length;
+  const all = [...main, ...base];
+  const hi = Math.max(...all);
+  const lo = Math.min(...all);
+  const pad = (hi - lo) * 0.1 || 1;
+  // 세로는 0~100(%) 좌표다. SVG 를 칸 크기대로 늘리므로(preserveAspectRatio none) 점·끝점은 HTML 로 얹는다 — SVG 원은 찌그러진다.
+  const y = (v: number) => ((hi + pad - v) / (hi - lo + 2 * pad)) * 100;
+  const x = (i: number) => (i / (n - 1)) * 100;
+  const pts = (arr: number[]) => arr.map((v, i) => `${x(i)},${y(v)}`).join(" ");
+  let hsh = 0;
+  for (const ch of `${color}|${baseLabel}|${dates[0]}|${n}`) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
+  const gid = `hz-ref-${hsh.toString(36)}`;
+  return (
+    <div style={{ position: "relative", flex: 1, minHeight: 88 }}>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible" }}>
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.28} />
+            <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+          </linearGradient>
+        </defs>
+        <polygon points={`0,100 ${pts(main)} 100,100`} fill={`url(#${gid})`} />
+        <polyline points={pts(base)} fill="none" stroke={C.muted} strokeWidth={1.25} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+        <polyline points={pts(main)} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      </svg>
+      {/* 끝점 — 큰 숫자가 말하는 그날이다. */}
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          left: "100%",
+          top: `${y(main[n - 1])}%`,
+          width: 7,
+          height: 7,
+          borderRadius: R.pill,
+          background: color,
+          boxShadow: `0 0 0 2px ${C.card}`,
+          transform: "translate(-50%, -50%)",
+        }}
+      />
+      {/* 호버 — 공용 영역 차트(AreaChart)와 같은 어법. 끝쪽은 툴팁이 칸 밖으로 안 나가게 여는 방향을 튼다. */}
+      <div style={{ position: "absolute", inset: 0, display: "flex" }}>
+        {dates.map((d, i) => {
+          const at = i / (n - 1);
+          const edge = at < 0.25 ? " hz-tip-start" : at > 0.75 ? " hz-tip-end" : "";
+          return (
+            <div
+              key={d}
+              className={`hz-tip hz-vline${edge}`}
+              // 1년 차트라 첫 며칠은 끝 며칠과 월·일이 겹친다(9/26 이 둘 · 기업 전망은 10월이 둘) — 지난해 점엔 해를 붙인다.
+              data-tip={`${d.slice(0, 4) !== dates[n - 1].slice(0, 4) ? `${d.slice(2, 4)}년 ` : ""}${dateFmt(d)} · ${fmt(main[i])} · ${baseLabel} ${fmt(base[i])}`}
+              style={{ flex: 1, position: "relative", ["--hz-x" as string]: `${at * 100}%` }}
+            >
+              <span className="hz-vdot" style={{ top: `${y(main[i])}%`, background: color }} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// 차트 아래 두 줄 — 차트의 범례이자 오늘 값이다. 선 모양 견본을 앞에 둬 범례 줄을 따로 두지 않는다.
+export function RefRows({
+  color,
+  rows,
+  fmt = fmtJo,
+}: {
+  color: string;
+  rows: { label: string; value: number | null; dashed: boolean }[];
+  fmt?: (v: number) => string;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {rows.map((r) => (
+        <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <svg width={14} height={6} aria-hidden style={{ flexShrink: 0 }}>
+            <line
+              x1={0}
+              y1={3}
+              x2={14}
+              y2={3}
+              stroke={r.dashed ? C.muted : color}
+              strokeWidth={r.dashed ? 1.25 : 2}
+              strokeDasharray={r.dashed ? "4 3" : undefined}
+            />
+          </svg>
+          <span style={{ flex: 1, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>{r.label}</span>
+          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: r.dashed ? C.label : C.ink }}>
+            {r.value !== null ? fmt(r.value) : "-"}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

@@ -114,7 +114,7 @@ function BrandCard() {
           아래 점수 카드(ScoreCard)의 한 줄은 반대다 — 거기는 햇쩨 지수 자체를 설명하는
           자리라 '시장·감성'이라는 지표 묶음 이름이 맞다. 둘을 같이 고치지 말 것. */}
       <div style={{ marginTop: 20, fontSize: 30, fontWeight: 500, color: SUB }}>
-        26개 지표로 잰 코스피 과열도 · 텔레그램 여론 · 미국 공시와 통계
+        28개 지표로 잰 코스피 과열도 · 텔레그램 여론 · 미국 공시와 통계
       </div>
     </div>
   );
@@ -168,7 +168,7 @@ function ScoreCard({ score, date }: { score: number; date: string }) {
       {/* 한 문장을 `{date} 기준 …` 처럼 쓰면 Satori 가 텍스트 노드 둘로 세어
           "display 를 명시하라"며 렌더를 통째로 실패시킨다. 문자열 하나로 만든다. */}
       <div style={{ fontSize: 27, fontWeight: 500, color: SUB }}>
-        {`${date} 기준 · 시장·감성 26개 지표를 하나의 과열도 점수로 환산합니다.`}
+        {`${date} 기준 · 시장·감성 28개 지표를 하나의 과열도 점수로 환산합니다.`}
       </div>
     </CardShell>
   );

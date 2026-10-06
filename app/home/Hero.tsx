@@ -292,7 +292,7 @@ function IndexTile({
     <div className="hz-tx-tile-cap">
       <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
         햇쩨 지수
-        <span className="hz-tip hz-tip-wide hz-tip-below" data-tip="지표 26개 가중 평균" data-ga-tip="hatzze_index" style={{ display: "inline-flex", cursor: "help" }}>
+        <span className="hz-tip hz-tip-wide hz-tip-below" data-tip="지표 28개 가중 평균" data-ga-tip="hatzze_index" style={{ display: "inline-flex", cursor: "help" }}>
           <Icon name="help" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
         </span>
       </span>
