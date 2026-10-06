@@ -1,4 +1,4 @@
-"""지표 행 보장 — 모든 fetch 스크립트가 공유한다.
+"""지표 행 보장 — 모든 fetch 스크립트가 공유한다. 전 기록 병합 upsert·dev 미리보기 JSON 도 여기 있다(아래).
 
 예전엔 이 함수가 25개 스크립트에 복붙돼 있었고, 구현이 6종으로 갈라져 있었다.
 그중 5개만 이미 있는 행의 메타데이터를 UPDATE했고 **나머지 20개는 삽입만** 했다.
@@ -11,6 +11,9 @@
 """
 
 from __future__ import annotations
+
+import json
+from pathlib import Path
 
 
 def ensure_indicator(client, meta: dict) -> str:
@@ -40,3 +43,60 @@ def ensure_indicator(client, meta: dict) -> str:
             client.table("indicators").update(updates).eq("id", indicator_id).execute()
         return indicator_id
     return client.table("indicators").insert(meta).execute().data[0]["id"]
+
+
+def upsert_merged(client, indicator_id: str, rows: list[dict], series_keys: tuple[str, ...]) -> int:
+    """전 기록을 다시 쓰되 details 는 기존 키와 병합한다.
+
+    details 는 calculate_score 와 나눠 쓰는 칸이다(hot_threshold 를 얹는다). 통째로 대입하면 그 키가 날아가므로
+    기존 값을 읽어 내 키만 얹는다. 차트 점(series_keys)만은 지난 행에서 걷는다 — 어제의 최신 행에 실렸던 배열이
+    오늘부터는 아무도 안 보는 짐이 된다. 500행씩 끊어 보낸다.
+    """
+    from common.supabase_client import load_keyset
+
+    existing = {
+        r["date"]: (r.get("details") or {})
+        for r in load_keyset(
+            client, "indicator_values", "id,date,details", narrow=lambda q: q.eq("indicator_id", indicator_id)
+        )
+    }
+    payload = []
+    for r in rows:
+        kept = {k: v for k, v in existing.get(r["date"], {}).items() if k not in series_keys}
+        payload.append({"indicator_id": indicator_id, **r, "details": {**kept, **r["details"]}})
+    for i in range(0, len(payload), 500):
+        client.table("indicator_values").upsert(payload[i : i + 500], on_conflict="indicator_id,date").execute()
+    return len(payload)
+
+
+def write_preview(meta: dict, rows: list[dict], path: str) -> dict:
+    """DB 를 안 건드리고, 로컬 dev 오버레이(dev-overrides.json 의 indicators)에 넣을 한 항목을 쓴다.
+
+    과열도(normalized_score)·기준선(threshold)은 calculate_score 와 같은 함수로 낸다 — 운영에선 calculate_score 가
+    쓰는 값이라, 미리보기도 그 값과 같아야 카드 색·배지가 같다.
+    """
+    from config.indicator_thresholds import INDICATOR_THRESHOLDS
+    from config.indicator_weights import INDICATOR_WEIGHTS
+    from scripts.calculate_score import HOT_ZONE, compute_progress, raw_at_progress
+
+    slug = meta["slug"]
+    cfg = INDICATOR_THRESHOLDS[slug]
+    last = rows[-1]
+    recent = rows[-30:]
+    entry = {
+        **meta,
+        "direction": "high",
+        "weight": INDICATOR_WEIGHTS.get(slug, 1.0),
+        "latest": {
+            "date": last["date"],
+            "raw_value": last["raw_value"],
+            "normalized_score": round(compute_progress(slug, last["raw_value"], cfg["threshold"], cfg), 2),
+            "threshold": round(raw_at_progress(slug, HOT_ZONE, cfg["threshold"], cfg) or 0, 2),
+            "details": last["details"],
+        },
+        "history": [r["raw_value"] for r in recent],
+        "historyPoints": [{"date": r["date"], "value": r["raw_value"]} for r in recent],
+    }
+    Path(path).write_text(json.dumps(entry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"[미리보기] {path} — {last['date']} {last['raw_value']:+.1f}{meta.get('unit', '')} · 과열도 {entry['latest']['normalized_score']}")
+    return entry

@@ -130,6 +130,22 @@
   border-bottom: 5px solid var(--t-ink);
 }
 .v2-hint-slot.is-above .v2-hint::before { top: auto; bottom: -5px; border-bottom: 0; border-top: 5px solid var(--t-ink); }
+/* 오른쪽에 띄우는 쪽지(at="right" · 사이드바 새 소식) — 화면 좌표(fixed)라 사이드바의 스크롤 영역에 안 잘리고 본문 위로 나온다.
+   꼭지는 왼쪽 가운데에서 가리킨 줄을 향한다. 폭은 본문 쪽 여유를 보고 300 으로 묶는다(두 줄까지). */
+.v2-hint-slot.is-right { position: fixed; z-index: 60; max-width: 300px; }
+/* 본문 밖(사이드바 · 폰 메뉴)의 쪽지 — 쪽지 색(--t-ink · --t-card)은 .v2-kd 아래에만 있어서, 밖에선 바탕이 비어 투명한 글자만 떴다
+   (2026-10-06 "너무 흐리다"). 본문 쪽지와 같은 값을 여기서도 건다. */
+.hz-sidebar .v2-hint-slot,
+.hz-menu-panel .v2-hint-slot { --t-card: var(--c-card); --t-ink: rgba(26, 31, 41, 0.89); }
+[data-theme="dark"] .hz-sidebar .v2-hint-slot,
+[data-theme="dark"] .hz-menu-panel .v2-hint-slot { --t-ink: rgba(242, 246, 255, 0.9); }
+.v2-hint-slot.is-right .v2-hint::before { top: 50%; left: -5px; margin-top: -5px; border: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-right: 5px solid var(--t-ink); }
+/* 기기마다 다른 문구(touchText) — 마우스 기기는 '올리면', 호버가 없는 기기는 '누르면'. */
+.v2-hint-touch { display: none; }
+@media (hover: none) {
+  .v2-hint-mouse { display: none; }
+  .v2-hint-touch { display: inline; }
+}
 /* 폰에서만 서는 쪽지(테마 판세 흐름 표 — 넓은 화면은 지도 칸이 같은 말을 한다). */
 .v2-hint-phone { display: none; }
 @container kd (max-width: 679px) {
@@ -970,9 +986,9 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-bf .hz-report-cell .ms { font-size: 18px; }
 .v2-bf .hz-report-cell strong { font-size: 13px; font-weight: 600; }
 
-/* 두 칸 셀 — 판 끝의 자리 채움 칸(준비 중 · 지표 제보)만. 지표 14 · 10장 + 두 칸 = 16 · 12 라 4열 · 2열 어디서든 끝 줄이 꽉 찬다.
-   ⛔ 지표 칸은 늘리지 않는다(아시아 · 여윳돈을 늘렸다가 "이상하다"로 되돌림). 한 단(폰)에선 그냥 한 칸. */
-.v2-bf .hz-cards > .hz-cell-wide { grid-column: span 2; }
+/* 두 칸 셀(.hz-cell-wide)은 2026-10-06 에 걷었다. 판 끝의 자리 채움 칸(준비 중 · 지표 제보)을 두 칸으로 펴 끝 줄을 채우던 것인데,
+   신용융자 · 기업 체감 경기가 들어와 시장 16장 · 감성 11장 + 제보 한 칸으로 4열 · 2열이 꽉 찬다. 지표가 늘거나 줄면 끝 줄을 다시 셀 것.
+   ⛔ 지표 칸은 늘리지 않는다(아시아 · 여윳돈을 늘렸다가 "이상하다"로 되돌림). */
 
 /* 근거 두 칸(parts.tsx SplitStats) — 회색 타일 둘 대신 위 가는 선 · 가운데 세로선. */
 .v2-bf .hz-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--t-line); }
@@ -1000,7 +1016,6 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 @container kd (max-width: 679px) {
   .v2-bf-band { grid-template-columns: minmax(0, 1fr); }
   .v2-bf .v2-sheet .hz-cards { grid-template-columns: minmax(0, 1fr); }
-  .v2-bf .hz-cards > .hz-cell-wide { grid-column: auto; }
   .v2-brief3-row { grid-template-columns: 56px minmax(0, 1fr); padding: 10px 14px; }
 }
 
@@ -2794,15 +2809,6 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
   .hz-rowlink { position: relative; min-height: 40px; }
   .hz-rowlink > a::after,
   .hz-rowlink > span > a::after { content: ""; position: absolute; inset: 0; }
-}
-/* 홈 '신용융자 잔고' 준비 중 칸 — 넓은 화면은 점선 상자(96)로 칸을 채운다.
-   투자자예탁금이 들어온 2026-10-06 부터 한 칸이다(그 전엔 두 칸 · .hz-cell-wide 로 골랐다). */
-.hz-soon-box { min-height: 96px; }
-@container kd (max-width: 679px) {
-  /* 폰 한 줄기에선 156px 를 점선 빈 상자로 썼다 — 제목 줄과 '데이터 준비 중' 글자 한 줄로 접는다(인라인 flex 방향이라 !important). */
-  .hz-cards > :has(.hz-soon-box) { flex-direction: row !important; align-items: center; justify-content: space-between; }
-  .hz-cards > :has(.hz-soon-box) > .hz-cell-graphic { flex: none !important; }
-  .hz-soon-box { min-height: 0; border: 0 !important; }
 }
 /* 테마 흐름 이름 줄 — 이름 옆 열흘 조각(폰 전용). */
 .v2-td-theme2-top { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; min-width: 0; }

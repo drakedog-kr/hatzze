@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAppPathname } from "./use-app-pathname";
+import { V2Hint, type HintSpec } from "./V2Hint";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/lists";
 import { PageJsonLd } from "./JsonLd";
@@ -215,12 +216,25 @@ type NavItem = {
   children?: NavChild[];
 };
 
+/* 시장 브리핑에 새 지표가 들어왔다는 소식 — 사이드바(넓은 화면)는 '시장 브리핑' 줄 오른쪽, 폰 메뉴는 그 줄 밑에 한 번 띄운다(app/V2Hint.tsx).
+   2026-10-06 운영자 지시. 투자자예탁금(10-06 열림) · 신용융자 잔고 · 기업 체감 경기. 시효가 있는 소식이라 until 이 지나면 안 뜬다.
+   '시장 브리핑' 줄을 누르거나 ✕ 를 누르면 '봤음'. together — 본문 쪽지(구간 · 지표 이름)의 차례를 막지도, 그 차례에 막히지도 않는다.
+   ⚠️ 다음 소식은 id 를 새로 딴다(같은 id 면 이번 소식을 닫은 사람에게 안 뜬다). 문구만 고칠 땐 그대로 둔다. */
+const NEW_INDICATORS_HINT: Omit<HintSpec, "at"> = {
+  id: "news-indicators-2026-10",
+  text: "새 지표 3개가 추가됐습니다. 투자자예탁금 · 신용융자 잔고 · 기업 체감 경기",
+  anchor: 'a[data-label="시장 브리핑"]',
+  together: true,
+  icon: "new_releases",
+  until: "2026-10-27T00:00:00+09:00",
+};
+
 /* themeNav 가 무엇이고 왜 서버가 정하는지는 app/shell-env.tsx 에. 배포에서 안 연 화면은 COMING_SOON 의
    눌리지 않는 '준비 중' 줄로 남는다(2026-08-30 에 그 줄이 눌려 404 가 났다 — COMING_SOON 머리 주석). */
 
 function buildNav(themeNav: boolean): NavItem[] {
   return [
-  { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 26개로 잰 오늘의 시장 온도" },
+  { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 28개로 잰 오늘의 시장 온도" },
   // 카더라가 국장·미장 둘로 갈린다. **부모는 그대로 두고 밑에 서브 항목을 단다** —
   // 부모를 국장으로 바꿔 버리면 카더라라는 이름이 사이드바에서 사라지고, 나중에 시장을
   // 하나 더 붙일 자리도 없어진다.
@@ -890,6 +904,7 @@ function Sidebar() {
             </Link>
           );
         })}
+        <V2Hint {...NEW_INDICATORS_HINT} at="right" />
       </nav>
       {/* 예고 항목에 대하여(위 map 의 kind === "soon" 가지).
           <a href> 가 아니라 <div> 인 게 "못 누른다"의 유일한 보장이다 — href 만 뺀 <a> 는
@@ -988,7 +1003,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
   return (
     <>
       <div className="hz-menu-backdrop" onClick={onClose} />
-      <nav ref={panelRef} className="hz-menu-panel" id="hz-mobile-menu" aria-label="주요 메뉴">
+      <nav ref={panelRef} className="hz-menu-panel v2-has-hint" id="hz-mobile-menu" aria-label="주요 메뉴">
         {/* 예고 항목은 사이드바와 같은 이유로 <div> 다(링크가 아니고 포커스도 안 받는다).
             다만 배지는 위첨자가 아니라 라벨 옆에 나란히 둔다. 여기는 폭이 사이드바처럼
             210px 로 묶여 있지 않아 자리가 남고, 툴팁이 안 뜨는 화면이라 배지가 유일한
@@ -1082,6 +1097,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
             <Link
               key={item.href}
               href={item.href}
+              data-label={item.label}
               {...intentPrefetch(item.href)}
               className={`hz-nav-item${active ? " hz-nav-active" : ""}`}
               aria-current={active ? "page" : undefined}
@@ -1115,6 +1131,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
           <Icon name={TELEGRAM.icon} style={{ fontSize: "var(--fs-20)" }} />
           <span style={{ fontSize: "var(--fs-15)" }}>{TELEGRAM.label}</span>
         </a>
+        <V2Hint {...NEW_INDICATORS_HINT} at="below" />
       </nav>
     </>
   );

@@ -2,40 +2,9 @@
 
 import { formatIndicatorValue, formatSampleCount, sentimentTone, shortDate } from "@/lib/format";
 import { C, MONO, R } from "../ui";
-import { overheatColor, Shell, TitleRow, Big, Foot, HeatFill, HeatScale, AreaChart, SplitStats } from "./parts";
+import { overheatColor, Shell, TitleRow, Big, Foot, HeatFill, HeatScale, AreaChart, SplitStats, RefChart, RefRows } from "./parts";
 import type { Pick } from "./parts";
 import type { IconName } from "@/lib/icon-names";
-
-// 신용융자 잔고 — DB 미보유 placeholder ("준비 중").
-// 목업은 점선 상승 곡선이 아니라 **점선 상자 + 모래시계**다. 곡선은 "이런 모양일 것"이라는
-// 가짜 데이터라, 값이 없는 카드에 그려 두면 한 번은 진짜로 읽힌다.
-export function CardComingSoon() {
-  return (
-    // 한 칸 — 시장 판 끝 줄의 남는 칸을 채운다(지표 15장 + 이 칸 = 16). 투자자예탁금이 들어오기 전(~2026-10-06)엔 두 칸이었다.
-    // 지표 칸은 늘리지 않는다(2026-10-03 "2칸은 이상해").
-    <Shell minH={230}>
-      {/* v2(2026-10-03): 이름 옆 '준비 중' 꼬리표 · 회색 면 · 모래시계를 걷었다 — 상자 안 글자와 꼬리표가 같은 말을 했다.
-          점선 테두리 하나가 '빈자리'를 말한다(지표 제보 칸과 같은 어법). */}
-      <TitleRow icon="credit_score" name="신용융자 잔고" desc="빚내서 주식을 산 금액" />
-      {/* 폰 한 줄기에선 점선 상자를 걷고 제목 줄 오른쪽 글자 한 줄로 접는다(v2.css .hz-soon-box · 2026-10-05 모바일 점검 — 156 → 한 줄).
-          그래서 키는 인라인이 아니라 클래스(.hz-soon-box min-height 96)가 쥔다. */}
-      <div
-        className="hz-soon-box"
-        style={{
-          flex: 1,
-          borderRadius: R.control,
-          border: `1px dashed ${C.line}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub }}>데이터 준비 중</span>
-      </div>
-      <Foot text="빚내서 주식 사는 돈이 불어나면 과열 신호입니다" />
-    </Shell>
-  );
-}
 
 // ── 소셜 지표 카드들 ──────────────────────────────────────────────
 
@@ -602,6 +571,52 @@ export function CardBrokerage({ v }: { v: Pick }) {
           </span>
         )}
       </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 기업 체감 경기 — 한국은행 기업경기조사의 업황전망(전산업). 큰 숫자는 1년 전 같은 달과의 차이(p)다.
+// 예탁금·신용융자 카드와 같은 꼴이고 점선만 다르다 — 각 달의 **1년 전 같은 달**이다. 업황 BSI 는 계절조정을 안 한
+// 값이라 같은 달끼리 견준다(fetch_business_outlook.py 머리말). 달마다 한 점이라 1년이 열두 점이다.
+type OutlookDetails = {
+  month?: string;
+  bsi?: number;
+  prev?: number;
+  w_months?: string[];
+  w_bsi?: number[];
+  w_prev?: number[];
+};
+
+const monthLabel = (ym: string) => `${Number(ym.slice(5, 7))}월`;
+const fmtBsi = (x: number) => `${Math.round(x)}`;
+
+export function CardOutlook({ v }: { v: Pick }) {
+  const dt = v.details as unknown as OutlookDetails | null;
+  const months = dt?.w_months ?? [];
+  const bsi = dt?.w_bsi ?? [];
+  const prev = dt?.w_prev ?? [];
+  const hasChart = months.length >= 2 && bsi.length === months.length && prev.length === months.length;
+  return (
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
+      <TitleRow desc={v.headline} icon="apartment" name={v.name} />
+      {v.raw !== null && (
+        <Big disp={`${v.raw >= 0 ? "+" : ""}${v.raw.toFixed(0)}`} unit="p" color={v.color} size={32} sub="1년 새" />
+      )}
+      {hasChart && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+          <RefChart dates={months} main={bsi} base={prev} baseLabel="1년 전" color={v.color} fmt={fmtBsi} dateFmt={monthLabel} />
+          <span style={{ alignSelf: "flex-end", fontSize: "var(--fs-11)", color: C.sub }}>최근 1년</span>
+        </div>
+      )}
+      <RefRows
+        color={v.color}
+        fmt={fmtBsi}
+        rows={[
+          { label: dt?.month ? `${monthLabel(dt.month)} 전망` : "최근", value: dt?.bsi ?? null, dashed: false },
+          { label: "1년 전", value: dt?.prev ?? null, dashed: true },
+        ]}
+      />
       <Foot text={v.desc} />
     </Shell>
   );

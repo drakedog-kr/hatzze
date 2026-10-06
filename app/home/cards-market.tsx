@@ -5,7 +5,7 @@ import type { ClosePoint, StockHighGap } from "@/lib/data";
 import { formatEokMixed, formatIndicatorValue, shortDate } from "@/lib/format";
 import { stockHref } from "@/lib/stock-page";
 import { BLUE_SCALE, C, MONO, R } from "../ui";
-import { sourceDateBadge, Shell, TitleRow, Big, Foot, HeatKnob, HeatFill, HeatBar, HeatScale, AreaChart, SplitStats } from "./parts";
+import { sourceDateBadge, Shell, TitleRow, Big, Foot, HeatKnob, HeatFill, HeatBar, HeatScale, AreaChart, SplitStats, RefChart, RefRows } from "./parts";
 import type { Pick } from "./parts";
 
 export function CardBuffett({ v }: { v: Pick }) {
@@ -660,7 +660,6 @@ export function CardVolume({ v }: { v: Pick }) {
 // 처음엔 거래대금 카드 꼴(큰 숫자 + 가로 막대 두 줄)이었는데 "너무 없어 보인다"(2026-10-06). 막대 두 줄은
 // 오늘 하루의 두 숫자뿐이라 그 사이가 비었다. 차트가 남는 높이를 받는다 — 예탁금(면) 위에 그날그날의
 // '1년 평소'(점선)를 겹치면 둘이 벌어진 만큼이 곧 큰 숫자이고, 6월에 얼마나 불었다가 빠졌는지가 같이 보인다.
-// 아래 두 줄은 차트의 범례이자 오늘 값이다 — 선 모양 견본을 앞에 둬 범례 줄을 따로 두지 않는다.
 type DepositDetails = {
   deposit_jo?: number;
   median_jo?: number;
@@ -669,94 +668,12 @@ type DepositDetails = {
   w_med?: number[];
 };
 
-function DepositChart({ dates, dep, med, color }: { dates: string[]; dep: number[]; med: number[]; color: string }) {
-  const n = dates.length;
-  const all = [...dep, ...med];
-  const hi = Math.max(...all);
-  const lo = Math.min(...all);
-  const pad = (hi - lo) * 0.1 || 1;
-  // 세로는 0~100(%) 좌표다. SVG 를 칸 크기대로 늘리므로(preserveAspectRatio none) 점·끝점은 HTML 로 얹는다 — SVG 원은 찌그러진다.
-  const y = (v: number) => ((hi + pad - v) / (hi - lo + 2 * pad)) * 100;
-  const x = (i: number) => (i / (n - 1)) * 100;
-  const pts = (arr: number[]) => arr.map((v, i) => `${x(i)},${y(v)}`).join(" ");
-  let hsh = 0;
-  for (const ch of `${color}|${dates[0]}|${n}`) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
-  const gid = `hz-dep-${hsh.toString(36)}`;
-  return (
-    <div style={{ position: "relative", flex: 1, minHeight: 88 }}>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible" }}>
-        <defs>
-          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity={0.28} />
-            <stop offset="100%" stopColor={color} stopOpacity={0.02} />
-          </linearGradient>
-        </defs>
-        <polygon points={`0,100 ${pts(dep)} 100,100`} fill={`url(#${gid})`} />
-        <polyline points={pts(med)} fill="none" stroke={C.muted} strokeWidth={1.25} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
-        <polyline points={pts(dep)} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-      </svg>
-      {/* 끝점 — 큰 숫자가 말하는 그날이다. */}
-      <span
-        aria-hidden
-        style={{
-          position: "absolute",
-          left: "100%",
-          top: `${y(dep[n - 1])}%`,
-          width: 7,
-          height: 7,
-          borderRadius: R.pill,
-          background: color,
-          boxShadow: `0 0 0 2px ${C.card}`,
-          transform: "translate(-50%, -50%)",
-        }}
-      />
-      {/* 호버 — 공용 영역 차트(AreaChart)와 같은 어법. 끝쪽은 툴팁이 칸 밖으로 안 나가게 여는 방향을 튼다. */}
-      <div style={{ position: "absolute", inset: 0, display: "flex" }}>
-        {dates.map((d, i) => {
-          const at = i / (n - 1);
-          const edge = at < 0.25 ? " hz-tip-start" : at > 0.75 ? " hz-tip-end" : "";
-          return (
-            <div
-              key={d}
-              className={`hz-tip hz-vline${edge}`}
-              // 1년 차트라 첫 며칠은 끝 며칠과 월·일이 겹친다(9/26 이 둘) — 지난해 점엔 해를 붙인다.
-              data-tip={`${d.slice(0, 4) !== dates[n - 1].slice(0, 4) ? `${d.slice(2, 4)}년 ` : ""}${shortDate(d)} · ${dep[i].toFixed(1)}조 · 평소 ${med[i].toFixed(1)}조`}
-              style={{ flex: 1, position: "relative", ["--hz-x" as string]: `${at * 100}%` }}
-            >
-              <span className="hz-vdot" style={{ top: `${y(dep[i])}%`, background: color }} />
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export function CardDeposit({ v }: { v: Pick }) {
   const dt = v.details as unknown as DepositDetails | null;
-  const now = dt?.deposit_jo ?? null;
-  const usual = dt?.median_jo ?? null;
   const dates = dt?.w_dates ?? [];
   const dep = dt?.w_dep ?? [];
   const med = dt?.w_med ?? [];
   const hasChart = dates.length >= 2 && dep.length === dates.length && med.length === dates.length;
-  const swatch = (dashed: boolean) => (
-    <svg width={14} height={6} aria-hidden style={{ flexShrink: 0 }}>
-      <line
-        x1={0}
-        y1={3}
-        x2={14}
-        y2={3}
-        stroke={dashed ? C.muted : v.color}
-        strokeWidth={dashed ? 1.25 : 2}
-        strokeDasharray={dashed ? "4 3" : undefined}
-      />
-    </svg>
-  );
-  const rows = [
-    { label: "최근", value: now, dashed: false },
-    { label: "1년 평소", value: usual, dashed: true },
-  ];
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       {/* 자료일 배지('10/1 기준')는 달지 않는다(2026-10-06 운영자 결정). 공표가 하루이틀 늦지만 차트 끝점 툴팁이 날짜를 말한다. */}
@@ -766,22 +683,59 @@ export function CardDeposit({ v }: { v: Pick }) {
       )}
       {hasChart && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-          <DepositChart dates={dates} dep={dep} med={med} color={v.color} />
+          <RefChart dates={dates} main={dep} base={med} baseLabel="평소" color={v.color} />
           {/* 기간은 차트의 캡션이다 — 환율 카드와 같은 자리·같은 활자. */}
           <span style={{ alignSelf: "flex-end", fontSize: "var(--fs-11)", color: C.sub }}>최근 1년</span>
         </div>
       )}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {rows.map((r) => (
-          <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {swatch(r.dashed)}
-            <span style={{ flex: 1, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>{r.label}</span>
-            <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: r.dashed ? C.label : C.ink }}>
-              {r.value !== null ? `${r.value.toFixed(1)}조` : "-"}
-            </span>
-          </div>
-        ))}
-      </div>
+      <RefRows
+        color={v.color}
+        rows={[
+          { label: "최근", value: dt?.deposit_jo ?? null, dashed: false },
+          { label: "1년 평소", value: dt?.median_jo ?? null, dashed: true },
+        ]}
+      />
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 신용융자 잔고 — '빚투 속도'. 큰 숫자는 한 달(20영업일) 새 증가율이다.
+// 예탁금 카드와 같은 꼴이고 점선만 다르다 — 그날그날의 **한 달 전 잔고**라, 실선과 벌어진 만큼이 그날의 큰 숫자다.
+// 이 자리는 2026-10-06 까지 '신용융자 잔고 · 데이터 준비 중' 칸(CardComingSoon)이었다.
+type CreditDetails = {
+  loan_jo?: number;
+  prev_jo?: number;
+  w_dates?: string[];
+  w_loan?: number[];
+  w_prev?: number[];
+};
+
+export function CardCredit({ v }: { v: Pick }) {
+  const dt = v.details as unknown as CreditDetails | null;
+  const dates = dt?.w_dates ?? [];
+  const loan = dt?.w_loan ?? [];
+  const prev = dt?.w_prev ?? [];
+  const hasChart = dates.length >= 2 && loan.length === dates.length && prev.length === dates.length;
+  return (
+    <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
+      <TitleRow desc={v.headline} icon="credit_score" name={v.name} />
+      {v.raw !== null && (
+        <Big disp={`${v.raw >= 0 ? "+" : ""}${v.raw.toFixed(1)}`} unit="%" color={v.color} size={32} sub="한 달 새" />
+      )}
+      {hasChart && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+          <RefChart dates={dates} main={loan} base={prev} baseLabel="한 달 전" color={v.color} />
+          <span style={{ alignSelf: "flex-end", fontSize: "var(--fs-11)", color: C.sub }}>최근 1년</span>
+        </div>
+      )}
+      <RefRows
+        color={v.color}
+        rows={[
+          { label: "최근", value: dt?.loan_jo ?? null, dashed: false },
+          { label: "한 달 전", value: dt?.prev_jo ?? null, dashed: true },
+        ]}
+      />
       <Foot text={v.desc} />
     </Shell>
   );

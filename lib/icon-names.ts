@@ -78,6 +78,7 @@ export const ICON_NAMES = [
   "military_tech",
   "monitor_heart",
   "monitoring",
+  "new_releases",
   "newspaper",
   "north_east",
   "open_in_full",

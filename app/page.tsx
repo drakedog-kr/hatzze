@@ -8,8 +8,8 @@ import { ANCHOR_ALIAS, BAND_LABELS, DIST_FILL } from "./home/Hero";
 import type { BandItem } from "./home/Hero";
 import { BriefModule, IndexModule } from "./home/V2Briefing";
 import { CoverIndexCell, CoverLinkCell, CoverMeta, Module, type CoverLink } from "./kadera/V2Modules";
-import { CardBuffett, CardLeverage, CardMarketActions, CardTurnover, CardHighGap, CardSpeed, CardVkospi, CardAsia, CardGoldRatio, CardVolume, CardFx, CardNetBuy, CardLimitUp, CardPutCall, CardDeposit } from "./home/cards-market";
-import { CardComingSoon, CardDivergence, CardTrend, CardSentiment, CardYoutube, CardSpending, CardUpbit, CardBrokerage } from "./home/cards-sentiment";
+import { CardBuffett, CardLeverage, CardMarketActions, CardTurnover, CardHighGap, CardSpeed, CardVkospi, CardAsia, CardGoldRatio, CardVolume, CardFx, CardNetBuy, CardLimitUp, CardPutCall, CardDeposit, CardCredit } from "./home/cards-market";
+import { CardDivergence, CardTrend, CardSentiment, CardYoutube, CardSpending, CardUpbit, CardBrokerage, CardOutlook } from "./home/cards-sentiment";
 import type { IconName } from "@/lib/icon-names";
 import { loadSpotlight, type SpotChip } from "./home/spotlight-data";
 
@@ -25,8 +25,7 @@ import { loadSpotlight, type SpotChip } from "./home/spotlight-data";
  * 초고온 배지는 0일 때 회색이다. 빨간 알약에 "초고온 0"이라고 적으면 색이 먼저 읽혀서
  * 뜨겁다는 인상이 남는다. 색이 곧 값이어야 한다.
  *
- * ⚠️ count 는 **카드 수**지 지표 수가 아니다(감성은 명품·오마카세가 한 장이고, 시장엔
- * '준비 중' 카드가 한 장 더 있다). 사이드바의 SECTION_NAV 와 같은 값이라 함께 볼 것.
+ * ⚠️ 카드 수와 지표 수는 다르다(감성은 명품·오마카세가 한 장이다). 모듈 머리의 수(nMarket · nSocial)는 지표 수다.
  */
 // ── 페이지 ────────────────────────────────────────────────────────
 // 목업에서 명시적으로 배치·결합·순서가 정해진 slug들. 이 목록에 없는
@@ -35,11 +34,11 @@ const LAID_OUT = new Set([
   "buffett_index", "leverage_etf_volume", "market_actions_30d", "turnover_concentration",
   "kospi_high_gap", "kospi_speed_60d", "vkospi", "kospi_asia_relative_strength",
   "kospi_gold_ratio", "kospi_volume_surge", "usdkrw_volatility",
-  "foreign_sell_at_high", "put_call_ratio", "limit_up_breadth", "investor_deposit",
+  "foreign_sell_at_high", "put_call_ratio", "limit_up_breadth", "investor_deposit", "credit_loan_growth",
   "naver_search_trend", "dcinside_post_count", "news_sentiment", "bestseller_finance_ratio",
   "youtube_finance_search_views", "luxury_consumption_index", "fine_dining_search_index",
   "upbit_speculation_index", "github_trading_bot_repos", "brokerage_app_rank",
-  "small_business_crisis_index",
+  "small_business_crisis_index", "business_outlook",
 ]);
 
 const FALLBACK_ICONS: Record<string, IconName> = {
@@ -86,7 +85,7 @@ export default async function Home() {
   const extra = (cat: IndicatorCategory) =>
     indicators.filter((i) => i.category === cat && !LAID_OUT.has(i.slug));
 
-  // 히어로 '지표 분포' — 지표(26개)를 네 구간으로 센다. 과열도가 아직 없는 지표는 빼므로 햇쩨 지수 머리의 '지표 N개'도 이 합이다.
+  // 히어로 '지표 분포' — 지표(28개)를 네 구간으로 센다. 과열도가 아직 없는 지표는 빼므로 햇쩨 지수 머리의 '지표 N개'도 이 합이다.
   // 카드의 구간 판정(overheatColor)·초고온 배지(isHit)와 **같은 값**을 쓴다: capped(0~100)
   // 를 stageForScore 에 넣는다. 다른 기준으로 세면 "초고온 3개"라고 적어 놓고 시트에는
   // 빨간 셀이 둘만 보이는 일이 난다.
@@ -167,7 +166,25 @@ export default async function Home() {
             )}
 
             {/* 시장 지표 (category=시장) — 모듈 하나에 셀 격자. 구간 제목(SectionIntro)의 앵커 id 는 모듈이 그대로 잇는다. */}
-            <Module id="market" title="시장 지표" meta={hitsMeta(nMarket, countHits("시장"))} className="v2-sheet">
+            <Module
+              id="market"
+              title="시장 지표"
+              meta={hitsMeta(nMarket, countHits("시장"))}
+              className="v2-sheet"
+              // 지표 소개는 이름 말풍선에만 있다(parts.tsx Shell) — 이름이 링크처럼 생기지 않아 알려 줘야 한다. 첫 카드 이름 밑.
+              // 감성 판에는 안 단다(같은 가르침은 한 번 · app/V2Hint.tsx). together — 구간 쪽지(home-dist)를 닫아야 뜨면 첫 화면 아래라
+              // 아무도 못 본다(카더라 종목 쪽지와 같은 이유 · 2026-10-06 운영자 지시로 바로 뜨게).
+              hint={{
+                id: "indicator-name",
+                anchor: ".hz-cards > :first-child .hz-name-tip",
+                // 자리 표시를 떼는 기본값(targetOf)은 '.hz-cards > .hz-name-tip'(바로 밑 자식)이 돼 아무것도 못 잡는다 — 직접 준다.
+                target: ".hz-name-tip",
+                hover: true,
+                together: true,
+                text: "지표 이름에 마우스를 올리면 소개가 나옵니다",
+                touchText: "지표 이름을 누르면 소개가 나옵니다",
+              }}
+            >
               <div className="hz-cards">
                 {/* 순서 = 가중치(config/indicator_weights.py) × 직관성 × 변동성.
                     ① 가중치 1·2위(4.5/4.0)를 2칸으로 맨 앞에 — 둘 다 설명이 필요 없는 지표다.
@@ -189,14 +206,14 @@ export default async function Home() {
                 <CardGoldRatio v={p("kospi_gold_ratio")} />
                 <CardFx v={p("usdkrw_volatility")} />
                 <CardAsia v={p("kospi_asia_relative_strength")} />
-                {/* 예탁금은 바로 옆 '신용융자 잔고(준비 중)'와 짝이다 — 둘 다 개인이 증권계좌로 들인 돈이다. */}
+                {/* 예탁금과 신용융자는 짝이다 — 둘 다 개인이 증권계좌로 들인 돈이다(신용융자는 빌린 돈). */}
                 <CardDeposit v={p("investor_deposit")} />
-                <CardComingSoon />
+                <CardCredit v={p("credit_loan_growth")} />
                 {/* 순서 = 가중치 × 직관성 × 변동성. VIX 대비 VKOSPI 스프레드는 내렸다 — 1년의 76%가 과열도 0이라
                     종합점수에 기여하지 못했고, VKOSPI 에서 파생된 지표라 VKOSPI 카드와 겹쳤다.
                     v2 행 구성(4열, 칸 합계 16): [신고가·거래대금·속도·급등] [외국인·쏠림·풋콜·안전장치]
-                                                [VKOSPI·레버리지·버핏·금] [환율·아시아·예탁금·준비중]
-                    예탁금(2026-10-06)이 들어오며 '준비 중'이 두 칸에서 한 칸이 됐다. */}
+                                                [VKOSPI·레버리지·버핏·금] [환율·아시아·예탁금·신용융자]
+                    2026-10-06 예탁금이 들어오며 '준비 중'이 두 칸에서 한 칸이 됐고, 같은 날 신용융자가 그 칸을 채웠다. */}
                 {extra("시장").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["시장"]} />
                 ))}
@@ -209,7 +226,8 @@ export default async function Home() {
                 {/* 시장 지표와 같은 원칙으로 순서만 바꿨다. 검색량(가중치 3.0)과 코인 투기를 앞세우고,
                     명품·오마카세는 재미는 크지만 가중치 0.5+0.5에 후행 지표라 뒤로.
                     v2 행 구성(4열, 칸 합계 12): [검색량·뉴스·디씨·코인] [여윳돈·실물괴리·유튜브·베스트셀러]
-                                                [봇레포·증권앱·제보2] */}
+                                                [봇레포·증권앱·기업 전망·제보]
+                    2026-10-06 기업 체감 경기가 들어오며 제보 칸이 두 칸에서 한 칸이 됐다. */}
                 <CardTrend v={p("naver_search_trend")} icon="search" />
                 <CardSentiment v={p("news_sentiment")} icon="newspaper" countNoun="뉴스" />
                 <CardSentiment v={p("dcinside_post_count")} icon="forum" countNoun="글" />
@@ -220,11 +238,12 @@ export default async function Home() {
                 <CardTrend v={p("bestseller_finance_ratio")} icon="menu_book" />
                 <CardTrend v={p("github_trading_bot_repos")} icon="terminal" />
                 <CardBrokerage v={p("brokerage_app_rank")} />
+                <CardOutlook v={p("business_outlook")} />
                 {extra("감성").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["감성"]} />
                 ))}
                 <a
-                  className="hz-report-cell hz-cell-wide"
+                  className="hz-report-cell"
                   href="https://forms.gle/P4wzp2DkP2wyTPWP9"
                   target="_blank"
                   rel="noopener noreferrer"
