@@ -38,7 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import KSD_API_KEY  # noqa: E402
 from common.indicator import ensure_indicator, upsert_merged, write_preview  # noqa: E402
-from common.kofia import fetch_daily  # noqa: E402
+from common.kofia import KofiaUnavailableError, fetch_daily  # noqa: E402
 
 # 이 아래로 오면 저쪽이 잘린 응답을 준 것이다. 그대로 저장하면 전 기록이 짧은 자료로 다시 덮이므로 저장하지 않는다.
 MIN_ROWS = 1000
@@ -114,7 +114,14 @@ def main() -> None:
         indicator_id = ensure_indicator(client, INDICATOR_META)
         print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
-    series = fetch_all()
+    try:
+        series = fetch_all()
+    except KofiaUnavailableError as e:
+        # 해외 러너에서 금투협 API 가 가끔 통째로 막힌다(common/kofia.KofiaUnavailableError). 전 기록을 매번 다시 받으므로
+        # 다음 실행이 메운다 — 실패로 끝내지 않는다. 오래 멈추면 check_freshness 가 잡는다.
+        print(f"[WARNING] {e}")
+        print("[WARNING] 금투협 API 에 닿지 못해 오늘 신용융자 갱신을 건너뜁니다. 다음 실행이 전 기록을 다시 받습니다.")
+        return
     if len(series) < MIN_ROWS:
         raise RuntimeError(f"신용융자가 {len(series)}일치뿐입니다(하한 {MIN_ROWS}) — 잘린 응답으로 보고 저장하지 않습니다")
     rows = build_rows(series)
