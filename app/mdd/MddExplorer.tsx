@@ -7,7 +7,8 @@ import type { StockOption, SuggestGroups, MddResult } from "./shared";
 // page.tsx 가 여기서 가져가던 타입. 파일을 나누면서 shared 로 갔지만 바깥 import 는 그대로 둔다.
 export type { StockOption, SuggestGroups, Suggestion } from "./shared";
 import { Controls, Results } from "./Controls";
-import { Skeleton, ErrorCard } from "./sheet";
+import { CoverPlaceholder, Skeleton, ErrorCard, periodLabelOf } from "./sheet";
+import { MddCover } from "./V2Sheets";
 
 export function MddExplorer({
   stocks,
@@ -138,6 +139,15 @@ export function MddExplorer({
           제목과 한 줄 부제를 이미 그린다. 예전엔 그 아래에 세 갈래 설명("얼마나 빠졌는지 ·
           얼마나 드문지 · 얼마나 걸렸는지")을 한 문단 더 뒀는데, 바로 아래 시트들이 같은
           말을 제목으로 다시 하고 있어 걷어냈다(2026-08-04). */}
+      {/* 첫 줄 띠(판정표 7)는 조회 바보다 위 — 카더라 · 시장 브리핑 · 배당처럼 띠가 화면 맨 위에 선다(2026-10-06 요청).
+          조회 중엔 같은 키의 빈 띠(CoverPlaceholder)로 자리를 지킨다 — 앞 종목의 띠를 남기면 '종목 화면' 링크가 바뀌기 전 종목을 가리킨다.
+          조회 실패면 띠를 그리지 않는다(Results 와 같은 조건). */}
+      {loading ? (
+        // 칸 구성은 직전 결과를 따른다(data 는 조회 중에도 앞 결과를 들고 있다) — 기간만 바꿀 때 띠 키가 그대로다.
+        <CoverPlaceholder idx={data ? !data.attribution : false} theme={data ? !!data.theme?.href : true} />
+      ) : (
+        !error && data && <MddCover data={data} periodLabel={periodLabelOf(data)} />
+      )}
       <Controls
         stocks={stocks}
         selected={selected}

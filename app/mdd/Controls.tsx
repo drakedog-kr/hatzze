@@ -10,7 +10,7 @@ import { MAJOR_NAMES, PERIODS, marketBadge, benchName, fmtDay } from "./shared";
 import type { StockOption, Suggestion, SuggestGroups, MddResult } from "./shared";
 import { periodLabelOf, AbsentSheet } from "./sheet";
 import { HeroStrip, Underwater } from "./Hero";
-import { AttributionModule, CasesTable, LadderModule, LastDropModule, MddCover, RecoveryModule, ThemeModule, YearVsMarketModule, YearsModule } from "./V2Sheets";
+import { AttributionModule, CasesTable, LadderModule, LastDropModule, RecoveryModule, ThemeModule, YearVsMarketModule, YearsModule } from "./V2Sheets";
 
 const MAJOR_RANK = new Map(MAJOR_NAMES.map((n, i) => [n, i]));
 
@@ -369,8 +369,7 @@ export function Results({ data, onPick }: { data: MddResult; onPick: (s: StockOp
   return (
     // v2: 모듈 사이 간격은 v2 한 값(12). 구간 제목('01 과거 낙폭 사례' · '02 이 하락의 정체')은 걷었다 — 모듈 머리가 이름을 말한다.
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* 첫 줄 띠(판정표 7) — 같은 기간 지수 · 다른 화면 링크 · 종가 기준일. */}
-      <MddCover data={data} periodLabel={periodLabel} />
+      {/* 첫 줄 띠(MddCover)는 조회 바 위로 올라갔다(MddExplorer). */}
       <HeroStrip data={data} periodLabel={periodLabel} />
       <div id="mdd-uw">
         <Underwater

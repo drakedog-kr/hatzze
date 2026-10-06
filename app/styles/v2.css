@@ -1020,7 +1020,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 }
 
 /* ── v2 MDD(2026-10-03) — 카더라 · 시장 브리핑의 v2 규칙을 옮겼다 ─────────────────────────────
-   얼개: 조회 막대(검색 · 기간) → [종목 | 지금 낙폭 | 낙폭 요약](app/mdd/Hero.tsx HeroStrip) → 물속 차트
+   얼개: 첫 줄 띠(.v2-cover) → 조회 막대(검색 · 기간) → [종목 | 지금 낙폭 | 낙폭 요약](app/mdd/Hero.tsx HeroStrip) → 물속 차트
    → [역대 하락 사례 | 회복까지] → [시장탓 | 테마] → 해마다(app/mdd/Controls.tsx Results · V2Sheets.tsx).
    시트 머리(SectionHead)는 여섯 화면 공용이라 고치지 않고 이 범위에서 덮는다 — 아이콘 타일 · 부제(설명 문장) · 바닥 각주를 걷고
    제목 13/700 + 근거 글자. 구간 제목은 코드에서 걷었다(Controls.tsx). */

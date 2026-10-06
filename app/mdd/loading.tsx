@@ -1,6 +1,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { C } from "../ui";
+import { CoverPlaceholder } from "./sheet";
 
 /**
  * 클릭 직후 즉시 그려지는 자리표시자. 카더라(app/kadera/loading.tsx)와 같은 이유로 둔다 —
@@ -40,6 +41,9 @@ export default function Loading() {
     // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
     // v2(2026-10-03): 실제 화면과 같은 범위(v2-kd v2-md)라 시트 · 간격이 v2 꼴로 선다.
     <div className="hz-tx v2-kd v2-md" style={{ position: "relative" }}>
+      {/* 첫 줄 띠 — 결과의 MddCover 자리. 조회 바보다 위다(MddExplorer 와 같은 CoverPlaceholder). */}
+      <CoverPlaceholder />
+
       {/* 조회 바(종목 검색 + 기간 탭). 실제 Controls 가 앉을 자리를 그대로 비워 둔다(키 41 · 모서리 6). */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }} aria-hidden>
         <div style={{ flex: "1 1 260px", minWidth: 220 }}>
@@ -48,10 +52,8 @@ export default function Loading() {
         <Block h={41} w={218} r={6} bg={C.track} />
       </div>
 
-      {/* MddExplorer 의 Skeleton 과 같은 골격 — 첫 줄 띠 + 둘째 줄 모듈 셋 + 전폭 차트 + 사례 표 · 회복 짝(2:1). */}
+      {/* MddExplorer 의 Skeleton 과 같은 골격 — 둘째 줄 모듈 셋 + 전폭 차트 + 사례 표 · 회복 짝(2:1). */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }} aria-hidden>
-        {/* 첫 줄 띠(키 41) — 결과의 MddCover 자리. */}
-        <div className="v2-cover" style={{ height: 41 }} />
         <div className="v2-md-band">
           {/* 결과와 같은 자리 클래스(sheet.tsx Skeleton 과 같다). */}
           {(["v2-md-stock", "v2-md-dd", "v2-md-sum"] as const).map((cls) => (
