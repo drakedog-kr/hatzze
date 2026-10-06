@@ -84,6 +84,51 @@ export function StatCell({ label, value, tone }: { label: string; value: string;
 
 /* ── 보조 ─────────────────────────────────────────────────────── */
 /**
+ * 조회 중 첫 줄 띠(MddCover) 자리. 흔한 꼴(링크 둘 + 기준일)의 칸을 글자째 세우고 visibility:hidden 으로 감춘다 —
+ * 테두리만 보이는 빈 띠인데, 넓이마다 실제 띠와 같은 규칙으로 접혀 키가 맞는다.
+ *
+ * 띠가 조회 바 위로 올라간 뒤로(2026-10-06) 고정 키(41)로는 안 된다 — 폰(375)에선 실제 띠가 두 줄(92)이라,
+ * 종목 · 기간을 고를 때마다 바로 아래 검색창이 51px 튀었다(실측). 데스크톱은 실제 40 · 옛 자리표시자 41 이라 1px 튀었다.
+ *
+ * 칸 구성은 부르는 쪽이 직전 결과에서 넘긴다(idx · theme). 지수 칸이 서는 종목(NVDA 등)은 폰에서 띠가 156.5 라
+ * 기본 꼴(92)로 두면 기간만 바꿔도 64px 튀었다. 첫 진입은 흔한 꼴(지수 칸 없음 · 테마 있음)이다.
+ */
+export function CoverPlaceholder({ idx = false, theme = true }: { idx?: boolean; theme?: boolean }) {
+  const hidden = { visibility: "hidden" } as const;
+  return (
+    <div className="v2-cover" aria-hidden>
+      {idx && (
+        <div className="v2-cover-cell v2-cover-idx" style={hidden}>
+          <span className="v2-cover-k">최근 10년 고점 대비</span>
+          <span className="v2-cover-v">
+            <em>코스피</em>
+            <b>−10.0%</b>
+            <span className="v2-cover-chg">8월 13일 고점</span>
+          </span>
+        </div>
+      )}
+      {(theme ? ["종목 화면", "테마 리포트"] : ["종목 화면"]).map((cap) => (
+        // href 없는 <a> — 실제 링크 칸(CoverLinkCell 의 Link)과 같은 태그여야 폰 규칙 `a.v2-cover-go:last-of-type` 이 똑같이 걸린다
+        // (div 로 두면 NVDA 띠에서 마지막 칸이 10px 컸다). href 가 없어 누를 수도 포커스될 수도 없다.
+        <a key={cap} className="v2-cover-cell v2-cover-go" style={hidden}>
+          <span className="v2-cover-k">{cap}</span>
+          <span className="v2-cover-v">
+            <b>삼성전자</b>
+          </span>
+          <Icon name="chevron_right" />
+        </a>
+      ))}
+      <div className="v2-cover-cell v2-cover-meta" style={hidden}>
+        <span className="v2-cover-k">
+          <i className="v2-dot" />
+          10월 6일(화) 종가 기준 · 2,446거래일
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
  * 이 페이지의 **두 번째** 로딩이다. 첫 번째는 app/mdd/loading.tsx(라우트가 열릴 때까지),
  * 여기는 그 뒤 /api/mdd 로 낙폭을 받아올 때까지 — 그리고 종목·기간을 바꿀 때마다 다시 뜬다.
  *
@@ -113,8 +158,7 @@ export function Skeleton({ periodOnly }: { periodOnly: boolean }) {
     // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
     <div style={{ position: "relative" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }} aria-hidden>
-        {/* 첫 줄 띠(키 41) — 결과의 MddCover 자리. */}
-        <div className="v2-cover" style={{ height: 41 }} />
+        {/* 첫 줄 띠 자리는 조회 바 위에서 MddExplorer 가 지킨다. */}
         {/* v2: 둘째 줄은 모듈 셋(Hero.tsx HeroStrip 과 같은 .v2-md-band). */}
         <div className="v2-md-band">
           {/* 결과(HeroStrip)와 같은 자리 클래스 — 없으면 1,000 미만에서 셋째 칸이 첫 칸 밑 216px 에 서서 결과가 오면 판이 튀었다(2026-10-04 점검). */}
