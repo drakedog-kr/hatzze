@@ -46,17 +46,39 @@ export function usualShift(positive: number, negative: number, usual: number): "
   if (n === 0) return "same";
   const u = usual / 100;
   const diff = (positive / n - u) * 100;
-  const band = Math.max(THEME_USUAL_BAND, THEME_USUAL_Z * Math.sqrt((u * (1 - u)) / n) * 100);
+  const band = usualBand(n, usual);
   if (diff >= band) return "up";
   if (-diff >= band) return "down";
   return "same";
 }
 
+/** 판정 폭(%p) — 평소와 이만큼 벌어져야 '다르다'고 말한다. max(THEME_USUAL_BAND, THEME_USUAL_Z × 표준오차). n 은 낙관+비관(> 0).
+ *  usualShift(판정)와 themeLean('평소 수준' 줄의 길이)이 같이 쓴다. 식은 파이썬 usual_label 과 같다(연산 순서까지). */
+export function usualBand(n: number, usual: number): number {
+  const u = usual / 100;
+  return Math.max(THEME_USUAL_BAND, THEME_USUAL_Z * Math.sqrt((u * (1 - u)) / n) * 100);
+}
+
 // 서비스 말투는 합쇼체(~니다)다 — 해요체로 남아 있었다(2026-10-04 문구 점검, 국장 · 미장 카더라 테마별 낙관도 툴팁).
 const SHIFT_WORD = { up: "평소보다 더 낙관적입니다", down: "평소보다 덜 낙관적입니다", same: "평소와 비슷합니다" } as const;
 
-/** 막대 반쪽을 다 채우는 평소와의 차이(%p). 넘으면 끝까지 채운다. 실측상 큰 테마의 흔들림이 ±20 안팎이다. */
-export const THEME_LEAN_FULL = 20;
+/**
+ * 막대 반쪽을 다 채우는 평소와의 차이(%p). 넘으면 끝까지 채운다. **시장마다 다르다**(2026-10-06).
+ *
+ * 잣대는 '더·덜 낙관' 줄 열에 하나 정도만 끝에 붙는 값이다. 끝에 붙은 줄끼리는 누가 더 다른지 못 가린다.
+ * 실측(08-12~10-06 기준일 56일 × 상위 넷, 읽기 전용): 진한 줄의 |차이| 중앙 · 90% 가 국장 11.5 · 19.8,
+ * 미장 15.5 · 28.4 다. 둘 다 20 이던 때 미장은 진한 줄의 26% 가 끝에 붙었다. 국장 20 · 미장 30 이면
+ * 둘 다 9% 이고, 진한 줄 중앙 길이도 반쪽의 58% · 52% 로 비슷하다. 미장 테마는 줄마다 글이 적어 판정 폭이
+ * 넓고, 그래서 '다르다'고 말한 줄의 차이도 크다.
+ */
+export const THEME_LEAN_FULL = { kr: 20, us: 30 } as const;
+export type LeanMarket = keyof typeof THEME_LEAN_FULL;
+
+/**
+ * '평소 수준' 줄의 옅은 막대가 닿을 수 있는 끝 — 가장 짧은 진한 막대(차이가 THEME_USUAL_BAND 인 줄)의 이 비율.
+ * 1 보다 작아서 옅은 막대는 그날 어떤 진한 막대보다도 짧다. 판정 경계를 넘는 순간 길이는 거의 그대로이고 색만 진해진다.
+ */
+export const THEME_LEAN_SOFT_MAX = 0.9;
 
 export type ThemeLean = { shift: "up" | "down" | "same"; side: "left" | "right"; width: number };
 
@@ -66,15 +88,29 @@ export type ThemeLean = { shift: "up" | "down" | "same"; side: "left" | "right";
  * 길이는 평활 전 비율(낙관 ÷ 낙관+비관)과 평소의 차이다 — 판정(usualShift)과 같은 값이라 방향이 판정과
  * 어긋나지 않는다. 평활값(pos)으로 재면 글이 적은 테마가 50 쪽으로 당겨져, 평소와 같은 비율인데도
  * 왼쪽으로 뻗는다(usualShift 주석의 2026-09-30 실측과 같은 함정).
+ *
+ * '평소 수준'(same) 줄은 **판정 폭에 얼마나 다가갔나**(|차이| ÷ 판정 폭)만큼, 가장 짧은 진한 막대의 THEME_LEAN_SOFT_MAX
+ * 배까지 뻗는다. 화면은 옅은 색으로 그린다(parts.tsx, 2026-10-06 운영자 요청 "평소 73% 인데 지금 85% 면 조금이라도 오른쪽으로").
+ * 차이를 그대로 그리지 않는 이유(08-12~10-06 실측, 국장 · 미장 각 224줄):
+ *  - 같은 날 옅은 막대가 그날 가장 짧은 진한 막대보다 긴 줄이 국장 10 · 미장 5 였다. 10-05 점검에서 '평소 수준' 줄을
+ *    눈금만 남긴 것도 이것 때문이었다(회색이 '더 낙관'보다 길게 섰다).
+ *  - 낙관+비관 1~2건짜리 테마(09-26 · 09-27 연휴의 인터넷·플랫폼)가 트랙 끝까지 뻗었다. 판정 폭 대비로 재면 4~10% 다.
+ *  - 상한만 씌우면 옅은 줄의 절반이 상한에 붙어 길이가 다 같아진다.
+ * 판정 폭 대비는 겹침이 0 이고, 글이 적을수록 폭이 넓어 저절로 짧다.
  * 평소가 없거나 글이 없으면 null — 막대 없이 눈금만 그린다.
  */
-export function themeLean(t: ThemeRow): ThemeLean | null {
+export function themeLean(t: ThemeRow, market: LeanMarket = "kr"): ThemeLean | null {
   const n = t.positive + t.negative;
   if (t.usual === null || n === 0) return null;
+  const full = THEME_LEAN_FULL[market];
   const diff = (t.positive / n) * 100 - t.usual;
   const shift = usualShift(t.positive, t.negative, t.usual);
-  // 판정 폭이 5 이상이라(THEME_USUAL_BAND) '덜·더' 줄은 반쪽의 1/4 아래로 짧아지지 않는다 — 따로 최소 길이를 둘 일이 없다.
-  const width = (Math.min(Math.abs(diff), THEME_LEAN_FULL) / THEME_LEAN_FULL) * 50;
+  // 판정 폭이 5 이상이라(THEME_USUAL_BAND) '덜·더' 줄은 이 길이 아래로 짧아지지 않는다 — 따로 최소 길이를 둘 일이 없다.
+  const strongMin = (THEME_USUAL_BAND / full) * 50;
+  const width =
+    shift === "same"
+      ? (Math.abs(diff) / usualBand(n, t.usual)) * strongMin * THEME_LEAN_SOFT_MAX
+      : (Math.min(Math.abs(diff), full) / full) * 50;
   return { shift, side: diff < 0 ? "left" : "right", width: Math.round(width * 10) / 10 };
 }
 
@@ -87,7 +123,10 @@ export const LEAN_WORD = { up: "더 낙관", down: "덜 낙관", same: "평소 �
  *  늘 평소보다 낮게 읽혀, 30건 모두 낙관(막대는 오른쪽)인 전자·부품이 '낙관 88% (평소 92%)'로 떴다(2026-10-04 점검). */
 export function themeTip(t: ThemeRow): string {
   const n = t.positive + t.negative;
-  const pos = `낙관 ${n > 0 ? Math.round((t.positive / n) * 100) : t.pos}%`;
+  // 표본 하한이 없어져(2026-10-06, lib/theme-rows.ts) 중립 글만 있는 테마도 줄에 선다. 그때 아래로 가면
+  // 평활값 50 을 낙관도로 적고 '평소와 비슷합니다'라고 말한다 — 낙관도도 판정도 없는 줄이다.
+  if (n === 0) return "낙관·비관으로 읽힌 글이 없습니다";
+  const pos = `낙관 ${Math.round((t.positive / n) * 100)}%`;
   if (t.usual === null) return `${pos} · 평소 기록이 아직 적습니다`;
   return `${SHIFT_WORD[usualShift(t.positive, t.negative, t.usual)]} · ${pos} (평소 ${t.usual}%)`;
 }

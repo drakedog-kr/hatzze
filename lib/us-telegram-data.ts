@@ -22,6 +22,7 @@ import { cache } from "react";
 
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { sentimentTone } from "@/lib/format";
+import { pickThemeRows } from "@/lib/theme-rows";
 import {
   LLM_TEXT_CARRY_DAYS,
   SENTIMENT_WINDOW_MAX_DAYS,
@@ -440,9 +441,9 @@ export type UsIssueKeyword = {
 };
 
 /**
- * 히어로 센티먼트 칸에 막대로 그릴 테마 수와, 막대에 오를 최소 표본.
+ * 히어로 센티먼트 칸에 막대로 그릴 테마 수. 표본 하한은 없다(2026-10-06) — 건수가 적어도 넷을 채운다.
  *
- * 국장(lib/telegram-data.ts 의 THEME_TOP_N · THEME_MIN_DECIDED)과 **같은 값**이다.
+ * 국장(lib/telegram-data.ts 의 THEME_TOP_N · lib/theme-rows.ts pickThemeRows)과 **같은 값·같은 고르는 법**이다.
  * 두 화면이 같은 자리에서 다른 개수를 그리면 오갈 때 어느 쪽이 규칙인지 알 수 없다.
  * 4개인 것은 조판이 정한 값이다 — 이 칸은 히어로의 25% 폭이라 왼쪽 큰 숫자 블록과
  * 높이가 맞는 한계가 4줄이다.
@@ -452,7 +453,6 @@ export type UsIssueKeyword = {
  *    그래서 여기서는 짝이 없다. 미장 총평에 테마 톤을 넣게 되면 그때 같이 맞출 것.
  */
 const US_THEME_TOP_N = 4;
-const US_THEME_MIN_DECIDED = 20; // 8 → 20(2026-09-29, 국장 THEME_MIN_DECIDED 와 같은 이유)
 
 type UsSentimentRow = {
   date: string;
@@ -541,10 +541,8 @@ export async function getUsSentiment(): Promise<UsSentiment | null> {
   }
   // 언급이 많은 테마부터 넷. '가장 밝은 테마'로 세우면 표본 얇은 테마가 늘 위에 선다.
   // 툴팁은 그 테마의 평소와 견준다 — 절대값은 늘 밝다(국장 loadThemeUsual 주석).
-  const topThemes = [...themeAgg.entries()]
-    .filter(([, a]) => a.pos + a.neg >= US_THEME_MIN_DECIDED)
-    .sort((x, y) => y[1].total - x[1].total)
-    .slice(0, US_THEME_TOP_N);
+  // 고르는 법(하한 없음 · 동점 순서)은 국장과 같은 함수다(lib/theme-rows.ts 주석).
+  const topThemes = pickThemeRows(themeAgg, US_THEME_TOP_N);
   const usual = await loadThemeUsual("telegram_us_sentiment_daily", topThemes.map(([name]) => name), [...window].sort()[0]);
   const byTheme = topThemes.map(([name, a]) => ({
     name,
