@@ -56,7 +56,7 @@ export const ANCHOR_ALIAS: Record<string, string> = {
 
 /**
  * 지표 둘이 한 장인 카드의 이름(카드 쪽 slug → 카드 제목). 화면이 세는 단위는 **카드**다 — 모듈 머리('감성 지표 11개') · 햇쩨 지수 머리
- * ('지표 27개') · 구간 목록이 모두 이 카드를 한 줄로 센다(2026-10-08 운영자 "27개인데 28개로 뜬다"). CardSpending 제목도 이걸 읽는다.
+ * ('지표 28개') · 구간 목록이 모두 이 카드를 한 줄로 센다(2026-10-08 운영자 "27개인데 28개로 뜬다"). CardSpending 제목도 이걸 읽는다.
  */
 export const CARD_NAME: Record<string, string> = {
   luxury_consumption_index: "여윳돈이 향하는 곳",

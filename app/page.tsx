@@ -2,7 +2,7 @@ import { SCORE_TREND_DAYS, getKospiCloseSeries, getKrIndexClosesSide, getLatestD
 import { formatKstUpdate } from "@/lib/format";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import type { IndicatorCategory } from "@/lib/data";
-import { Icon, stageForScore } from "./ui";
+import { stageForScore } from "./ui";
 import { pick, GenericCard } from "./home/parts";
 import { ANCHOR_ALIAS, BAND_LABELS, CARD_NAME, DIST_FILL } from "./home/Hero";
 import type { BandItem } from "./home/Hero";
@@ -39,7 +39,7 @@ const LAID_OUT = new Set([
   "naver_search_trend", "dcinside_post_count", "news_sentiment", "bestseller_finance_ratio",
   "youtube_finance_search_views", "luxury_consumption_index", "fine_dining_search_index",
   "upbit_speculation_index", "github_trading_bot_repos", "brokerage_app_rank",
-  "small_business_crisis_index", "business_outlook",
+  "small_business_crisis_index", "business_outlook", "youtube_stock_shorts",
 ]);
 
 const FALLBACK_ICONS: Record<string, IconName> = {
@@ -234,7 +234,8 @@ export default async function Home() {
                 {/* 시장 지표와 같은 원칙으로 순서만 바꿨다. 검색량(가중치 3.0)과 코인 투기를 앞세우고,
                     명품·오마카세는 재미는 크지만 가중치 0.5+0.5에 후행 지표라 뒤로.
                     v2 행 구성(4열, 칸 합계 12): [검색량·뉴스·디씨·코인] [여윳돈·실물괴리·유튜브·베스트셀러]
-                                                [봇레포·증권앱·기업 전망·제보]
+                                                [베스트셀러·봇레포·증권앱·기업 전망] → 2026-10-08 주식 쇼츠가 유튜브 옆에 들어와
+                                                [여윳돈·실물괴리·유튜브·쇼츠] [베스트셀러·봇레포·증권앱·기업 전망] · 제보 칸은 걷었다(10-08)
                     2026-10-06 기업 체감 경기가 들어오며 제보 칸이 두 칸에서 한 칸이 됐다. */}
                 <CardTrend v={p("naver_search_trend")} icon="search" />
                 <CardSentiment v={p("news_sentiment")} icon="newspaper" countNoun="뉴스" />
@@ -243,6 +244,7 @@ export default async function Home() {
                 <CardSpending luxury={p("luxury_consumption_index")} dining={p("fine_dining_search_index")} />
                 <CardDivergence v={p("small_business_crisis_index")} />
                 <CardYoutube v={p("youtube_finance_search_views")} />
+                <CardYoutube v={p("youtube_stock_shorts")} />
                 <CardTrend v={p("bestseller_finance_ratio")} icon="menu_book" />
                 <CardTrend v={p("github_trading_bot_repos")} icon="terminal" />
                 <CardBrokerage v={p("brokerage_app_rank")} />
@@ -250,20 +252,6 @@ export default async function Home() {
                 {extra("감성").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["감성"]} />
                 ))}
-                <a
-                  className="hz-report-cell"
-                  href="https://forms.gle/P4wzp2DkP2wyTPWP9"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  data-ga="cta_click"
-                  data-ga-cta="report_indicator"
-                  data-ga-surface="sentiment_grid"
-                  // v2(2026-10-03): 점선 · 파란 면 · 아이콘 타일 · 곁말('아이디어가 있다면 알려주세요')을 걷고 칸 가운데 링크 한 줄로.
-                  // 꼴은 v2.css .hz-report-cell — 이 칸은 홈에만 있어 인라인 값을 !important 로 덮던 것을 걷었다.
-                >
-                  <Icon name="add_circle" />
-                  <strong>새로운 지표 제보하기</strong>
-                </a>
               </div>
             </Module>
     </div>
