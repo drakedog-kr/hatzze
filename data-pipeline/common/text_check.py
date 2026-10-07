@@ -11,7 +11,8 @@
 ## 세 겹으로 본다
 
 **[1] 문자 이상** — 대체문자·고립 자모·한글 사이 라틴 혼입·제어문자. 이번 오타는 여기서
-안 걸리지만, 예전에 실제로 겪은 `콜�션` 부류를 막는다. 공짜라 남긴다.
+안 걸리지만, 예전에 실제로 겪은 `콜�션` 부류를 막는다. 공짜라 남긴다. 라틴 혼입은 이름 속 라틴
+('스페이스X를')을 뺀다(2026-10-08, `_LATIN_IN_HANGUL` 주석).
 
 **[2] 비문** — 체언 바로 뒤에 계사 없이 종결어미가 붙은 자리. 아래 따로 적는다.
 
@@ -215,8 +216,93 @@ _BOUNDARY = re.compile(r"[\s.,!?·…“”\"'()\[\]{}:;/*~\-]")
 _REPLACEMENT = "�"
 # 완성형에 못 들어간 고립 자모(ㄱ, ㅏ …). 정상 문장엔 나올 일이 없다.
 _LONE_JAMO = re.compile(r"[ㄱ-ㆎ]")
-# 한글 사이에 낀 라틴 글자("메모리a반도체"). 실측 71건에 0회라 오탐 위험이 낮다.
-_LATIN_IN_HANGUL = re.compile(r"[가-힣][A-Za-z][가-힣]")
+# 한글 사이에 낀 라틴 글자("들a었습니다"). 앞뒤 한 자씩 같이 집어 로그에 자리가 보이게 한다('들a었').
+# 겹쳐 찾는다(?=) — 한 문장에 이름 속 라틴과 진짜 오타가 같이 있으면 둘 다 봐야 한다.
+#
+# ## 이름 속 라틴은 오타가 아니다 (2026-10-08)
+#
+# 이 검사를 세울 땐 "저장된 LLM 문장 71건에 0회"였다. 그 뒤 미장 사전에 '스페이스X'가 들어오고 언급이 늘자
+# '스페이스X를' · '스페이스X의'가 매일 걸렸다. 09-10 ~ 10-07 파이프라인 60회 로그에 이 검사가 137번 찍혔고
+# **137번 다 '스페이스X'+조사**였다(진짜 오타 0). 그동안
+#   · 미장 테마 요약 '우주·방산'은 재시도 셋을 매번 여기에 쓰고, 고칠 수 없는 지시를 다시 쓰기 요청에 얹었다.
+#     결국 검사를 못 지난 후보가 폴백으로 실렸다(저장된 LLM 문장에 이 꼴 33건, 전부 '스페이스X'+조사).
+#   · 다시 쓰지 않고 버리는 자리에선 글이 빠졌다 — 다이제스트 갈래 하나(10-05). 급등 이유는 셋을 다시 물었다.
+#
+# 그래서 두 길로 통과시킨다. 둘 다 아니면 예전처럼 건다.
+#   ① 사전에 있는 이름 — 라틴 글자가 그 이름 안에 있으면(_LATIN_NAMES).
+#   ② 원문에 그대로 있는 말 — 라틴 글자까지의 어절 머리('모델Y' · '300만t' · '현대차2우B')가 원문에
+#      낱말 머리로 있으면(_latin_in_source). [3] 의 '원문에 있는가'와 같은 생각이다. 오타는 원문에 없다.
+#
+# ② 가 필요한 이유: 사람이 쓴 원문 14일치(56,690건)에 이 꼴이 492번 나왔고 '스페이스X' 말고도 '아이온Q' ·
+# '모델Y' · '항셍H지수' · '시리즈B' · '300만t'이 있었다. 국장 정식 종목명은 DB(stocks 2,785개)에만 있어
+# 여기서 못 읽는데, 거기서 이 꼴이 되는 이름이 우선주 '…2우B' · '…우C' 20개와 '루트K'다. 모델은 이런 말을
+# 원문(digest)에서 옮겨 쓰므로 ② 가 받는다.
+#
+# 고친 뒤 실측(2026-10-08):
+#   · 저장된 LLM 문장 1,989개 중 예전 검사에 걸리던 18개 → 0개(원문 없이, ① 만으로).
+#   · 합성 오타 6,000개(저장된 LLM 문장의 한글 두 자 사이에 라틴 한 자를 끼운 것) — 원문 없이 6,000개 다 잡는다.
+#     원문을 텔레그램 14일치 전체(2,264만 자)로 줘도 5,993개를 잡는다. 놓친 7개는 '기업A' · '언급X'처럼 그 큰
+#     원문에 같은 머리가 우연히 있던 것이다. 실제 digest 는 훨씬 작다(테마 요약은 발췌 10건, 수천 자).
+_LATIN_IN_HANGUL = re.compile(r"(?=([가-힣][A-Za-z][가-힣]))")
+
+
+def _latin_names() -> tuple[str, ...]:
+    """종목 사전의 이름 중 '한글 사이 라틴'에 걸리는 것. 손으로 잇지 않고 사전에서 읽는다.
+
+    미장은 config/us_stock_extraction.US_NAMES 다 — 화면·요약이 쓰는 us_stocks.name_ko 가 여기서 매일
+    동기화된다(extract_telegram_us_stocks). 국장은 별칭(ALIASES)과 테마 종목(THEMES)이다.
+
+    '가{이름}가'가 검사에 걸리는 이름만 둔다. 2026-10-08 기준 '스페이스X'(뒤에 조사) · 'Z스케일러'(앞에 한글)
+    둘이다. 'SK하이닉스' · 'JP모건'처럼 라틴이 두 자 넘게 이어지면 애초에 안 걸린다. 사전에 'Q' · 'K'로 끝나는
+    종목이 들어오면 여기로 저절로 들어온다.
+    """
+    from config.stock_extraction import ALIASES
+    from config.stock_themes import THEMES
+    from config.us_stock_extraction import US_NAMES
+
+    pool = set(US_NAMES) | set(ALIASES) | set(ALIASES.values())
+    for members in THEMES.values():
+        pool.update(members)
+    return tuple(sorted(n for n in pool if _LATIN_IN_HANGUL.search(f"가{n}가")))
+
+
+_LATIN_NAMES = _latin_names()
+
+
+def _in_latin_name(text: str, at: int) -> bool:
+    """text[at] 의 라틴 글자가 사전 이름('스페이스X') 안에 있는가."""
+    for name in _LATIN_NAMES:
+        # at 를 덮을 수 있는 가장 왼쪽 자리부터 찾는다. 처음 나온 자리가 at 를 넘으면 덮는 자리가 없다.
+        k = text.find(name, max(0, at - len(name) + 1))
+        if k != -1 and k <= at:
+            return True
+    return False
+
+
+def _latin_in_source(text: str, at: int, source: str) -> bool:
+    """text[at] 의 라틴 글자까지의 어절 머리가 원문에 낱말 머리로 있는가.
+
+    '현대차2우B가' → '현대차2우B' · '300만t의' → '300만t'. 오타 '들a었습니다'는 머리가 '들a' 두 자라
+    원문 대조에 넣지 않는다(MIN_STEM — 짧으면 아무 데나 걸린다).
+    """
+    start = at
+    while start > 0 and re.match(r"[가-힣0-9]", text[start - 1]):
+        start -= 1
+    head = text[start : at + 1]
+    if len(head) < MIN_STEM:
+        return False
+    return re.search(r"(?<![가-힣0-9])" + re.escape(head), source) is not None
+
+
+def _latin_slips(text: str, source: str | None) -> list[str]:
+    """한글 사이 라틴 중 사전 이름도 원문의 말도 아닌 자리('들a었'). 비어 있으면 통과."""
+    found: list[str] = []
+    for m in _LATIN_IN_HANGUL.finditer(text):
+        at = m.start() + 1
+        if _in_latin_name(text, at) or (source and _latin_in_source(text, at, source)):
+            continue
+        found.append(m.group(1))
+    return found
 
 
 def _control_chars(text: str) -> list[str]:
@@ -383,8 +469,9 @@ def problems(text: str, source: str | None = None, *, slips: bool = True) -> lis
         found.append("대체문자(U+FFFD)")
     if _LONE_JAMO.search(text):
         found.append(f"고립 자모({_LONE_JAMO.search(text).group()})")
-    if _LATIN_IN_HANGUL.search(text):
-        found.append(f"한글 사이 라틴({_LATIN_IN_HANGUL.search(text).group()})")
+    latin = _latin_slips(text, source)
+    if latin:
+        found.append(f"한글 사이 라틴({latin[0]})")
     if _control_chars(text):
         found.append("제어문자")
     if source:
