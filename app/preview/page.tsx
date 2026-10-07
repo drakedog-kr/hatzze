@@ -524,7 +524,7 @@ export default async function PreviewPage() {
       {wall.length > 0 && (
         <Module
           id="links"
-          title="함께 움직인 국장 종목"
+          title="함께 움직이는 국장 종목"
           meta="최근 5년 이런 날 평균"
           // 국장 줄이 종목 화면으로 가는 링크다(카더라 · 데일리 노트와 같은 가르침 'stock-row' — 한 번 보면 셋 다 끝).
           hint={{ id: "stock-row", anchor: ".v2-pv-krs > li:first-child", text: "종목을 누르면 언급 추이와 요즘 도는 얘기가 나옵니다" }}
