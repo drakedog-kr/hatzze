@@ -990,11 +990,6 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-bf .hz-cell-graphic > :last-child:not(:first-child) { margin-top: auto; margin-bottom: 0; }
 /* 여윳돈 칸의 지표 이름 — 칸이 251px 이 되는 1,280 에서 '오마카세·파인다이닝 웨이팅 검색 지수'가 말줄임으로 잘렸다. 두 줄로 감는다. */
 .v2-bf .hz-subspend-name { white-space: normal !important; overflow: visible !important; word-break: keep-all; line-height: 1.35; }
-/* 지표 제보 칸 — 칸 가운데 링크 한 줄(아이콘 + 이름). 감성 판 끝 칸이다. */
-.v2-bf .hz-report-cell { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 14px; text-decoration: none; color: var(--t-ink2); }
-.v2-bf .hz-report-cell:hover { background: var(--t-tint); color: var(--t-down); }
-.v2-bf .hz-report-cell .ms { font-size: 18px; }
-.v2-bf .hz-report-cell strong { font-size: 13px; font-weight: 600; }
 
 /* 두 칸 셀(.hz-cell-wide)은 2026-10-06 에 걷었다. 판 끝의 자리 채움 칸(준비 중 · 지표 제보)을 두 칸으로 펴 끝 줄을 채우던 것인데,
    신용융자 · 기업 체감 경기가 들어와 시장 16장 · 감성 11장 + 제보 한 칸으로 4열 · 2열이 꽉 찬다. 지표가 늘거나 줄면 끝 줄을 다시 셀 것.

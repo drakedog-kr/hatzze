@@ -199,6 +199,8 @@ INDICATOR_THRESHOLDS = {
     # 급증(%)"을 과열도로 매핑한다 — 평균(급증 0%)=진행률 50(상온), +25%=75(초고온 진입/Hit),
     # +50%=100. 카드의 "평소 대비 X배"는 threshold(=평균) 그대로라 안 깨진다.
     "youtube_finance_search_views": {"kind": "cumulative_average", "surge_map": {"floor": -50.0, "ceil": 50.0}},
+    # youtube_stock_shorts: 어제 올라온 '주식' 쇼츠 수(fetch_youtube_shorts.py). 유튜브 조회수와 같은 꼴에 평소만 최근 30일.
+    "youtube_stock_shorts": {"kind": "cumulative_average", "window": 30, "surge_map": {"floor": -50.0, "ceil": 50.0}},
     # kospi_asia_relative_strength: 코스피 20거래일 수익률이 일본·홍콩·대만 평균보다
     # 몇 %p 앞섰나. 실측 p20으로 잡았던 floor −10 은 속도 지표와 같은 과적합이었다 —
     # 이웃보다 16%p 뒤처진 날도 0으로 뭉개진다. ±20%p 라는 대칭 절대 기준으로 되돌린다

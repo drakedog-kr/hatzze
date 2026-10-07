@@ -1,4 +1,4 @@
-"""28개 지표의 종합점수(햇쩨 지수) 가중치 — 코드가 소스 오브 트루스.
+"""29개 지표의 종합점수(햇쩨 지수) 가중치 — 코드가 소스 오브 트루스.
 
 daily_score.score = Σ(weight_i × capped_progress_i) / Σ(weight_i). 예전엔 이 weight를
 Supabase indicators.weight에서만 읽어 버전 관리가 안 됐는데, 재현성·이력을 위해 여기로
@@ -175,6 +175,7 @@ INDICATOR_WEIGHTS = {
     "kospi_gold_ratio": 1.0,        # 위험선호(+10.8, 향후 낙폭 −0.70)
     "bestseller_finance_ratio": 1.0,     # 책 열풍(표본 16일. 관측값이 2·4·5·6% 네 종류뿐이라 눈금이 거칠다)
     "youtube_finance_search_views": 1.0, # 콘텐츠 열기(표본 15일, 못 쟀다)
+    "youtube_stock_shorts": 0.5,    # 주식 쇼츠 업로드(2026-10-08 편입, 역대 자료 없음 · 못 쟀다)
     "luxury_consumption_index": 0.5,     # 후행 소비(+9.5)
     "fine_dining_search_index": 0.5,     # 후행 소비(+3.1)
     "github_trading_bot_repos": 0.5,     # 표본 14일, 못 쟀다

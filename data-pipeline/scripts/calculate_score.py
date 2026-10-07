@@ -1,4 +1,4 @@
-"""28개 지표의 현재값을 기준선과 비교해 과열도 스코어를 계산하고 daily_score/indicator_values에 저장.
+"""29개 지표의 현재값을 기준선과 비교해 과열도 스코어를 계산하고 daily_score/indicator_values에 저장.
 
 기준선(threshold)은 이제 전부 리서치/논리 기반의 고정값이다
 (config/indicator_thresholds.py의 INDICATOR_THRESHOLDS). 원래는 과거 데이터의
@@ -288,14 +288,12 @@ def kospi_market_strength(client) -> tuple[float, float] | None:
     return percentile_from_anchors(gap, KOSPI_DD_PCTILE_ANCHORS), gap
 
 
-def get_all_values(client, indicator_id: str) -> list[float]:
-    result = (
-        client.table("indicator_values")
-        .select("raw_value")
-        .eq("indicator_id", indicator_id)
-        .execute()
-    )
-    return [float(r["raw_value"]) for r in result.data]
+def get_all_values(client, indicator_id: str, last: int | None = None) -> list[float]:
+    """원값 전부(last 를 주면 최근 last 개)."""
+    q = client.table("indicator_values").select("raw_value").eq("indicator_id", indicator_id)
+    if last:
+        q = q.order("date", desc=True).limit(last)
+    return [float(r["raw_value"]) for r in q.execute().data]
 
 
 def compute_threshold(client, indicator_id: str, config: dict) -> float:
@@ -308,7 +306,8 @@ def compute_threshold(client, indicator_id: str, config: dict) -> float:
     # 이건 "판단을 보류"하는 게 아니라 의도된 결과다 — 데이터가 쌓일수록 평균이
     # 더 많은 날짜를 반영하며 자연스럽게 비교 기준이 안정된다. get_latest_value가
     # 이미 성공했다는 건 최소 1건은 있다는 뜻이라 표본이 몇 개든 그냥 계산한다.
-    values = get_all_values(client, indicator_id)
+    # window 가 있으면 최근 그만큼만 평균한다(주식 쇼츠 — '평소' = 최근 30일).
+    values = get_all_values(client, indicator_id, config.get("window"))
     return statistics.mean(values)
 
 
