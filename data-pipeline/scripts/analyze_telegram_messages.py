@@ -62,11 +62,12 @@ from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client, uses_subscription  # noqa: E402
 from common.supabase_client import get_client, has_column, load_keyset  # noqa: E402
 
-# Haiku 4.5 — 분류는 대량 호출이라 속도/비용이 중요하고, 3지선다 + 명사 추출 난이도엔
-# 충분하다. (히어로 요약도 같은 모델을 쓴다.)
-# ※ 프롬프트 캐싱은 이 조합에선 불가능하다 — Haiku 4.5 의 캐시 최소 프리픽스가 4,096
-#   토큰인데 아래 SYSTEM 은 804 토큰이다. 하한 미달이면 에러 없이 조용히 캐시가 안 걸린다.
-MODEL = "claude-haiku-4-5"
+# Haiku — 분류는 대량 호출이라 속도/비용이 중요하고, 3지선다 + 명사 추출 난이도엔
+# 충분하다. 2026-10-08 에 4.5 → 5.5.
+# ※ 4.5 땐 프롬프트 캐싱이 불가능했다 — 캐시 최소 프리픽스가 4,096 토큰인데 아래 SYSTEM 은
+#   804 토큰이다(하한 미달이면 에러 없이 조용히 캐시가 안 걸린다). 5.5 는 더 짧은 접두도 캐시된다
+#   (10-08 구독 경로에서 589토큰 읽기). 배치 경로엔 아직 cache_control 을 안 붙였다.
+MODEL = "claude-haiku-5-5"
 
 # 한 요청에 넣을 메시지 수. 크게 잡을수록 요청당 고정비(시스템 프롬프트 804 + 스키마 291
 # = 1,095 토큰)가 분산되지만, 너무 크면 모델이 뒤쪽 항목을 성의 없이 처리하고 한 요청
@@ -531,8 +532,11 @@ def submit_batch(client: Anthropic, db, reps: list[dict]) -> str | None:
                     "max_tokens": 2000,
                     "system": SYSTEM,
                     "messages": [{"role": "user", "content": build_prompt(group)}],
+                    # 배치는 래퍼를 안 거친다. 구독 경로의 --effort low 를 여기서 같이 준다(llm_client 의
+                    # HAIKU_EFFORT) — 빼면 Haiku 5.5 가 기본(medium)으로 생각해 출력이 는다.
                     "output_config": {
-                        "format": {"type": "json_schema", "schema": SCHEMA}
+                        "effort": "low",
+                        "format": {"type": "json_schema", "schema": SCHEMA},
                     },
                 },
             }

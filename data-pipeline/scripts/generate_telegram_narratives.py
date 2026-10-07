@@ -93,7 +93,7 @@ from common.timeutil import KST, md_with_weekday  # noqa: E402
 from config.stock_extraction import is_house  # noqa: E402
 from common.supabase_client import load_all  # noqa: E402
 
-MODEL = "claude-haiku-4-5"
+MODEL = "claude-haiku-5-5"
 # 총평 네 대목만 Opus 5.5 로 쓴다(2026-09-23). 카더라에서 가장 먼저 읽히는 글이다. 같은 재료로
 # 네 번씩 돌려 보니 Haiku 는 네 대목에 호출 11~18번(국장) · 11~14번(미장)이 들었고 Opus 는
 # 4~5번에 네 대목 모두 길이 안에 들었다.
