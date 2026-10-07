@@ -5,6 +5,7 @@ import { cache } from "react";
 import { isKstWeekday } from "./cron-schedule";
 import { getDevOverrides } from "./dev-overrides";
 import { getSupabaseServer } from "./supabase-server";
+import { yahooSymbol } from "./yahoo-history";
 import { changeRateOf, dateInZone, fetchYahooQuote } from "./yahoo-quote";
 
 /**
@@ -282,8 +283,15 @@ export type KrStockQuote = {
   changeRate: number | null;
   priceDate: string | null;
 };
-export type UsStockRef = { ticker: string; name: string };
-export type NoteStocks = { kr: KrStockQuote[]; us: UsStockRef[] };
+export type UsStockQuote = {
+  ticker: string;
+  name: string;
+  /** 야후 최근 시세(달러)와 등락률 · 그 미국 세션 날짜(뉴욕). 못 받으면 null — 줄은 이름만 선다. */
+  price: number | null;
+  changeRate: number | null;
+  priceDate: string | null;
+};
+export type NoteStocks = { kr: KrStockQuote[]; us: UsStockQuote[] };
 
 export const EMPTY_STOCKS: NoteStocks = { kr: [], us: [] };
 
@@ -309,8 +317,18 @@ async function liveQuote(code: string, market: string | null): Promise<{ price: 
 }
 
 /**
+ * 미국 종목 시세 — 야후(카더라 · 테마 화면의 usQuotes 와 같은 원천). 미국 종가는 매일 받아 두는 표가 없어 글마다 야후를 본다.
+ * 오늘 글은 10분, 지난 글은 하루 캐시 — 이 값이 노트 사본의 주기가 되므로(liveQuote 주석) 지난 글이 30분마다 다시
+ * 그려지지 않게 길게 둔다. 크롤러가 지난 글을 훑어도 같은 티커는 캐시를 타 바깥 요청이 티커 수를 넘지 않는다.
+ */
+async function usQuote(ticker: string, live: boolean): Promise<{ price: number; changeRate: number | null; date: string | null } | null> {
+  const q = await fetchYahooQuote(yahooSymbol(ticker, "US"), { next: { revalidate: live ? 600 : 86400 } });
+  return q ? { price: q.price, changeRate: changeRateOf(q), date: q.marketTime != null ? dateInZone(q.marketTime, "America/New_York") : null } : null;
+}
+
+/**
  * 언급된 종목의 이름과 시세. 국내는 `stocks` 표의 종가·등락률(KRX, 종목 실주소 화면과 같은
- * 열), 미국은 `us_stocks` 의 한글 이름만 — 미국 종가는 매일 받는 원천이 없다.
+ * 열), 미국은 `us_stocks` 의 한글 이름과 야후 최근 시세(usQuote — 2026-10-08 운영자 요청 "해외 종목에도 가격 및 등락 %").
  *
  * ## 오늘 글만 야후를 본다
  *
@@ -363,13 +381,18 @@ export async function getNoteStocks(refs: NoteStockRefs, noteDate: string): Prom
         ];
       }),
     );
-    return {
-      kr: krQuotes,
-      us: refs.us.flatMap((ticker) => {
+    const usQuotes = await Promise.all(
+      refs.us.flatMap((ticker) => {
         const r = usBy.get(ticker);
-        return r ? [{ ticker, name: r.name_ko || ticker }] : [];
+        if (!r) return [];
+        return [
+          usQuote(ticker, noteDate === todayKst(now)).then(
+            (q): UsStockQuote => ({ ticker, name: r.name_ko || ticker, price: q?.price ?? null, changeRate: q?.changeRate ?? null, priceDate: q?.date ?? null }),
+          ),
+        ];
       }),
-    };
+    );
+    return { kr: krQuotes, us: usQuotes };
   } catch (e) {
     console.error("[daily-note] 언급된 종목의 시세를 읽지 못했습니다:", e);
     return EMPTY_STOCKS;

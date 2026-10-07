@@ -1,7 +1,7 @@
 # 카더라 '많이 언급된 종목'의 흐름 요약(종목 요약) · 테마 요약(테마 흐름 '요즘 도는 얘기' · 급부상 이유)만 다시 만든다. 손으로만 돈다.
 # what: narratives(흐름 요약 · 기본) · themes(테마 요약) · both · talk. 테마 요약은 2026-10-05 저녁 첫 문장 55자 · 급부상 이유 42~58자로
 # 줄인 PR 을 머지한 직후 그날 것을 바로 고치려고 더했다. talk 는 테마 상세 '말 많은 종목'의 요즘 도는 얘기만(요약 · 급부상은 그대로,
-# 그날 요약 행의 talk 열만 고친다 · 마이그레이션 092).
+# 그날 요약 행의 talk 열만 고친다 · 마이그레이션 092). summary 는 시장 브리핑 '오늘의 브리핑' 네 줄(daily_score.ai_summary · Opus).
 # save=false 면 문장만 로그에 찍고 표는 안 건드린다 — 머지 전에 브랜치 코드로 리허설할 때(`gh workflow run … --ref <브랜치>`).
 #
 # ## 왜 따로 있나
@@ -28,7 +28,7 @@ on:
         description: "무엇을 (narratives=흐름 요약 · themes=테마 요약 · both=둘 다)"
         type: choice
         default: narratives
-        options: [narratives, themes, both, talk]
+        options: [narratives, themes, both, talk, summary]
       save:
         description: "표에 저장 (끄면 문장만 로그로 · 리허설)"
         type: boolean
@@ -89,6 +89,18 @@ jobs:
         if: ${{ !cancelled() && github.event.inputs.market != 'kr' && github.event.inputs.what == 'talk' }}
         run: python data-pipeline/scripts/generate_us_theme_briefs.py --talk-only $NO_SAVE
 
+      # 시장 브리핑 '오늘의 브리핑' 네 줄 — 최신 daily_score 행에 다시 쓴다.
+      - name: 오늘의 브리핑 다시 만들기
+        if: ${{ !cancelled() && github.event.inputs.what == 'summary' }}
+        run: python data-pipeline/scripts/generate_daily_summary.py $NO_SAVE
+
+      - name: 시장 브리핑 화면 비우고 데우기
+        if: ${{ !cancelled() && github.event.inputs.save != 'false' && github.event.inputs.what == 'summary' }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /
+
       # 새 문장이 바로 보이게 화면을 비우고 데운다(daily-update.yml 의 같은 자리와 같다).
       - name: 카더라 · 종목 화면 비우고 데우기
         if: ${{ !cancelled() && github.event.inputs.save != 'false' && (github.event.inputs.what == 'narratives' || github.event.inputs.what == 'both') }}
@@ -98,7 +110,7 @@ jobs:
         run: bash scripts/revalidate.sh /kadera /kadera/us '/stock/[code]'
 
       - name: 테마 화면 비우고 데우기
-        if: ${{ !cancelled() && github.event.inputs.save != 'false' && github.event.inputs.what != 'narratives' }}
+        if: ${{ !cancelled() && github.event.inputs.save != 'false' && github.event.inputs.what != 'narratives' && github.event.inputs.what != 'summary' }}
         continue-on-error: true
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}

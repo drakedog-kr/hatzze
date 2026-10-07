@@ -25,7 +25,8 @@ import { loadSpotlight, type SpotChip } from "./home/spotlight-data";
  * 초고온 배지는 0일 때 회색이다. 빨간 알약에 "초고온 0"이라고 적으면 색이 먼저 읽혀서
  * 뜨겁다는 인상이 남는다. 색이 곧 값이어야 한다.
  *
- * ⚠️ 카드 수와 지표 수는 다르다(감성은 명품·오마카세가 한 장이다). 모듈 머리의 수(nMarket · nSocial)는 지표 수다.
+ * ⚠️ 카드 수와 지표 수는 다르다(감성은 명품·오마카세가 한 장이다). 모듈 머리의 수(nMarket · nSocial)와 초고온 수는 **카드 수**다 —
+ *    지표 수로 세던 때 머리는 '감성 지표 12개'인데 카드는 열한 장이었다(2026-10-08 운영자 지적). 햇쩨 지수 머리의 '지표 N개'는 지표 수 그대로다.
  */
 // ── 페이지 ────────────────────────────────────────────────────────
 // 목업에서 명시적으로 배치·결합·순서가 정해진 slug들. 이 목록에 없는
@@ -78,9 +79,6 @@ export default async function Home() {
 
   const bySlug = new Map(indicators.map((i) => [i.slug, i]));
   const p = (slug: string) => pick(bySlug.get(slug));
-  // 카드 isHit과 완전히 동일한 기준(youtube 예외 포함)으로 히어로 카운트를 맞춘다.
-  const countHits = (cat: IndicatorCategory) =>
-    indicators.filter((i) => i.category === cat && pick(i).isHit).length;
 
   const extra = (cat: IndicatorCategory) =>
     indicators.filter((i) => i.category === cat && !LAID_OUT.has(i.slug));
@@ -135,8 +133,12 @@ export default async function Home() {
   });
   const coverLinks = [spotlight.timed.kadera, ...spotlight.fixed].filter((c): c is SpotChip => c !== null).map(toLink);
   const indexes = isLoadFailed(rawIndexes) ? null : rawIndexes;
-  const nMarket = indicators.filter((i) => i.category === "시장").length;
-  const nSocial = indicators.filter((i) => i.category === "감성").length;
+  // 모듈 머리 — 카드 수와 그중 초고온 카드 수. 지표 둘이 한 카드인 자리(ANCHOR_ALIAS)는 한 장으로 세고, 둘 중 하나라도 초고온이면 그 카드가 초고온이다(카드 Shell 의 hit 와 같다).
+  const cardOf = (slug: string) => ANCHOR_ALIAS[slug] ?? slug;
+  const cards = (cat: IndicatorCategory, hitOnly = false) =>
+    new Set(indicators.filter((i) => i.category === cat && (!hitOnly || pick(i).isHit)).map((i) => cardOf(i.slug))).size;
+  const nMarket = cards("시장");
+  const nSocial = cards("감성");
   const hitsMeta = (n: number, hits: number) => `${n}개${hits ? ` · 초고온 ${hits}` : ""}`;
 
 
@@ -169,7 +171,7 @@ export default async function Home() {
             <Module
               id="market"
               title="시장 지표"
-              meta={hitsMeta(nMarket, countHits("시장"))}
+              meta={hitsMeta(nMarket, cards("시장", true))}
               className="v2-sheet"
               // 지표 소개는 이름 말풍선에만 있다(parts.tsx Shell) — 이름이 링크처럼 생기지 않아 알려 줘야 한다. 첫 카드 이름 밑.
               // 감성 판에는 안 단다(같은 가르침은 한 번 · app/V2Hint.tsx). together — 구간 쪽지(home-dist)를 닫아야 뜨면 첫 화면 아래라
@@ -221,7 +223,7 @@ export default async function Home() {
             </Module>
 
             {/* 감성 지표 (category=감성) */}
-            <Module id="sentiment" title="감성 지표" meta={hitsMeta(nSocial, countHits("감성"))} className="v2-sheet">
+            <Module id="sentiment" title="감성 지표" meta={hitsMeta(nSocial, cards("감성", true))} className="v2-sheet">
               <div className="hz-cards">
                 {/* 시장 지표와 같은 원칙으로 순서만 바꿨다. 검색량(가중치 3.0)과 코인 투기를 앞세우고,
                     명품·오마카세는 재미는 크지만 가중치 0.5+0.5에 후행 지표라 뒤로.
