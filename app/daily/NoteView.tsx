@@ -178,11 +178,14 @@ function NoteStocksModule({ stocks, noteDate }: { stocks: NoteStocks; noteDate: 
   const usDates = stocks.us.map((u) => u.priceDate).filter((d): d is string => Boolean(d));
   const usLatest = usDates.length ? usDates.reduce((a, b) => (a > b ? a : b)) : null;
   // 날짜는 제 시장 수 바로 뒤에 — 국내 날짜를 맨 앞에 두면 미국 줄도 그날 종가로 읽혔다.
+  // ⚠️ 미국장 날짜는 **늘** 적는다. 글 날(KST) 본문이 다루는 미국장은 그 전날(뉴욕)이라, 글 날과 같은 날짜의 미국장은
+  //    글을 쓴 뒤에 열린 장이다. '글 날과 다를 때만' 적던 때는 그 장이 끝나면 날짜가 빠져, 10월 7일 글 옆에 본문
+  //    ('마이크론은 1.7% 내렸습니다', 10월 6일 장)과 다른 +4.06%(10월 7일 장)가 날짜 없이 섰다(2026-10-08 점검).
   const counts = [
     `국내 ${stocks.kr.length}`,
     ...(stale && latest ? [`${fmtNoteDay(latest)} 종가`] : []),
     `미국 ${stocks.us.length}`,
-    ...(usLatest && usLatest !== noteDate ? [`${fmtNoteDay(usLatest)} 미국장`] : []),
+    ...(usLatest ? [`${fmtNoteDay(usLatest)} 미국장`] : []),
   ].join(" · ");
   return (
     <Module

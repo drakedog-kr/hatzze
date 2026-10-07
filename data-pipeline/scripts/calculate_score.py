@@ -68,6 +68,7 @@ INDICATOR_THRESHOLDS의 threshold는 진행률 100을 맞추는 매핑 상한이
 
 from __future__ import annotations
 
+import os
 import statistics
 import sys
 from datetime import date, datetime, timedelta, timezone
@@ -601,6 +602,27 @@ def main() -> None:
     print(
         f"[Supabase] daily_score upsert 완료: date={today}, score={round(weighted_score, 2)}, "
         f"stage={stage}, updated_at={now_utc}"
+    )
+    warn_missing_summary(client, today)
+
+
+def warn_missing_summary(client, today: str) -> None:
+    """파이프라인 밖에서 돌려 오늘 행에 히어로 요약이 없으면 다시 쓰는 길을 알린다.
+
+    요약이 없는 동안 화면은 앞 날 요약을 빌려 쓴다(lib/data.ts getLatestDailyScore) — 숫자는 오늘 것, 문장은 어제 것이라
+    '오늘 20℃' 옆에 21℃ 가 선다. 파이프라인 안에서는 바로 다음 스텝(generate_daily_summary)이 30초 안에 채우니 이 틈이
+    짧다. 손으로 돌릴 때는 그 스텝이 없어 다음 정기 실행까지 벌어진다 — 2026-10-08 04:27 KST 새 지표(주식 쇼츠) 편입 뒤
+    점수를 다시 계산해 10-08 행이 요약 없이 생겼고, 아침 실행이 채울 때까지 다섯 시간을 어긋났다.
+    요약은 로컬에서 쓰지 않는다(토큰이 없어 조용히 API 로 간다 · common/llm_client.py) — 러너의 수동 워크플로로 쓴다.
+    """
+    if os.environ.get("GITHUB_ACTIONS"):
+        return
+    rows = client.table("daily_score").select("ai_summary").eq("date", today).limit(1).execute().data or []
+    if rows and (rows[0].get("ai_summary") or "").strip():
+        return
+    print(
+        f"[주의] {today} 행에 히어로 요약이 없습니다. 화면은 앞 날 요약을 빌려 써 숫자와 문장이 어긋납니다.\n"
+        "       러너에서 요약을 다시 쓰세요: gh workflow run narratives-rerun.yml -f what=summary"
     )
 
 

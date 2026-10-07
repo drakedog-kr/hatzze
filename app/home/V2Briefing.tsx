@@ -31,7 +31,7 @@ export function IndexModule({
   days: number;
   /** 저온 · 상온 · 고온 · 초고온 순서. */
   bands: Band[];
-  /** 과열도가 들어온 지표 수(자료가 늦거나 새 지표가 첫 점수 계산 전이면 27 이 아니다). */
+  /** 과열도가 들어온 카드 수(app/page.tsx bandTotal · 자료가 늦거나 새 지표가 첫 점수 계산 전이면 28 이 아니다). */
   total: number;
 }) {
   const temp = Math.round(Math.max(0, Math.min(100, dailyScore.score)));

@@ -236,7 +236,7 @@
      이어붙인 꼴("var(--c-hot)22")이라 CSS가 통째로 버린다 — 실제로 급부상 종목의
      "언급 ▲ 4.3배" 배지가 배경 없이 글자만 떠 있었다. 색마다 변수로 둔다. */
   --c-blue-tint: #e8f3fe;
-  --c-blue-tint2: #e9f3fe; /* 제보 CTA 칸 바탕 — --c-blue-tint 보다 한 톤 차분하다 */
+  --c-blue-tint2: #e9f3fe; /* 소식 띠 닫기 단추(.hz-news-x)의 호버 바탕 — --c-blue-tint 보다 한 톤 차분하다 */
   --c-cold-tint: #e8f3fe;
   --c-neutral-tint: #e7f1fb;
   --c-hot-tint: #fdecee;
