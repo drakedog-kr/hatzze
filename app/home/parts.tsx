@@ -251,7 +251,7 @@ function HitBadge({ label = "초고온" }: { label?: string }) {
           fontWeight: 600,
           fontSize: "var(--fs-11)",
           lineHeight: 1.2,
-          padding: "5px 10px",
+          padding: "4px 10px",
           borderRadius: R.pill,
           whiteSpace: "nowrap",
         }}

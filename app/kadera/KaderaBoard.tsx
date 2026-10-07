@@ -58,8 +58,8 @@ const chgCls = (r: number | null) => (r === null ? "" : r > 0 ? " is-up" : r < 0
 
 export function SignalTable({ sec }: { sec: BoardSection }) {
   const last = sec.heads.length - 1;
-  // 머리 칸 차례 — 순위 · 종목 · 문장(heads 의 마지막) · 숫자들.
-  const headOrder = [0, 1, last, ...Array.from({ length: Math.max(0, last - 2) }, (_, k) => k + 2)];
+  // 머리 칸 차례 — 순위 · 종목 · 문장(heads 의 마지막) · 숫자들 · 등락(heads[2]). 등락을 끝에 둬야 위아래 표의 등락 칸이 한 x 에 선다.
+  const headOrder = [0, 1, last, ...Array.from({ length: Math.max(0, last - 3) }, (_, k) => k + 3), 2];
   return (
     /* AI 표시는 모듈 제목 앞에 둔다(네 표 같은 자리). 머리 칸에 두면 폰(머리 줄을 숨긴다)에서 고지가 사라졌다(2026-10-04 점검). */
     <Module
@@ -104,13 +104,13 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
                     )}
                   </span>
                   <span className={`v2-td-text${r.text ? "" : " is-pending"}`}>{r.text ?? r.pending ?? ""}</span>
-                  {/* 값이 없으면 '-' 대신 '없음' — 바로 옆 칸들의 '-0.73%' 와 같은 글자라 내렸다는 뜻으로 읽혔다. */}
-                  <span className={`v2-td-num v2-td-chg${chgCls(r.change)}${r.change === null ? " is-none" : ""}`}>{r.change === null ? "없음" : pct(r.change)}</span>
                   {r.cells.map((c, k) => (
                     <span key={k} className={`v2-td-num v2-td-c${k}${c.hot ? " is-hot" : ""}`} data-k={k === 0 ? (c.k === undefined ? sec.key0 : c.k || undefined) : undefined}>
                       {c.v}
                     </span>
                   ))}
+                  {/* 값이 없으면 '-' 대신 '없음' — 바로 옆 칸들의 '-0.73%' 와 같은 글자라 내렸다는 뜻으로 읽혔다. */}
+                  <span className={`v2-td-num v2-td-chg${chgCls(r.change)}${r.change === null ? " is-none" : ""}`}>{r.change === null ? "없음" : pct(r.change)}</span>
                 </Link>
               </li>
             ))}

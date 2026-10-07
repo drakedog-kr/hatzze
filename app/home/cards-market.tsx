@@ -89,7 +89,7 @@ export function CardLeverage({ v }: { v: Pick }) {
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
+        <strong className="hz-big" style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
           {heat ?? "-"}
           <span style={{ fontSize: "var(--fs-13)", fontWeight: 500, color: C.sub }}>/100</span>
         </strong>
@@ -168,7 +168,7 @@ export function CardMarketActions({ v }: { v: Pick }) {
       {/* '최근 한 달' 꼬리표는 걷었다 — 지표 이름('최근 한 달 매매 안전장치 동향')이 이미 말한다. */}
       <TitleRow desc={v.headline} icon="shield" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-        <strong style={{ fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: dir.color, lineHeight: 1 }}>{dir.label}</strong>
+        <strong className="hz-big" style={{ fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: dir.color, lineHeight: 1 }}>{dir.label}</strong>
         {/* 곁말은 판정을 풀어 쓴 문장('양쪽이 비슷했습니다')이었다 — 문장 대신 셋을 합친 건수. 판정은 아래 막대가 증명한다. */}
         {total > 0 && <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2, whiteSpace: "nowrap" }}>{total}건 발동</span>}
       </div>
@@ -226,7 +226,7 @@ export function CardTurnover({ v }: { v: Pick }) {
           {segs.map((s2) => (s2.pct <= 0 ? null : <div key={s2.key} style={{ width: `${s2.pct}%`, background: s2.fill }} />))}
         </div>
         {/* 범례는 두 열 — 여섯 줄이 한 열이면 이 카드가 둘째 줄 높이를 정해 옆 카드 가운데가 비었다(1440 풋/콜 84px). */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: 12, rowGap: 8 }}>
+        <div className="hz-turnover-legend" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: 12, rowGap: 8 }}>
           {segs.map((s2) =>
             s2.pct <= 0 ? null : (
               <div key={s2.key} className="hz-rowlink" style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -291,7 +291,7 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={`${gap > 0 ? "+" : ""}${v.disp}`} unit={v.unit} color={v.color} size={32} sub={gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"} />
         {typeof priorHigh === "number" && (
-          <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "4px 10px", whiteSpace: "nowrap" }}>
             전고점 {num(priorHigh)}
           </span>
         )}
@@ -435,7 +435,7 @@ export function CardVkospi({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         {/* 곁말 '변동성지수'는 걷었다 — 지표 이름 'VKOSPI (변동성지수)'와 같은 말이다(v2, 2026-10-03). */}
         <Big disp={v.disp} color={v.color} size={32} />
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "4px 10px", whiteSpace: "nowrap" }}>
           {verdict}
         </span>
       </div>
@@ -1018,7 +1018,7 @@ export function CardPutCall({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="casino" name={v.name} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={ratio.toFixed(2)} color={v.color} size={32} sub="풋/콜" />
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "4px 10px", whiteSpace: "nowrap" }}>
           {greedy ? "콜 우세" : "풋 우세"}
         </span>
       </div>

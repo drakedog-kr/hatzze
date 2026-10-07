@@ -837,7 +837,7 @@ function Sidebar() {
                 aria-label={child.isNew ? `${child.label} · 새로 생긴 화면` : child.label}
                 style={{
                   ...rowStyle,
-                  color: on ? undefined : C.sub,
+                  color: on ? undefined : C.label,
                   fontWeight: on ? 700 : 600,
                   textDecoration: "none",
                 }}
@@ -879,7 +879,7 @@ function Sidebar() {
                 // 비활성일 때 background 를 인라인으로 두면(예전 "transparent") 인라인이
                 // 우선순위에서 이겨 .hz-nav-item:hover 회색 배경이 먹히지 않는다. 값을 아예
                 // 빼서 호버는 CSS 가 담당하게 한다. 활성 색도 같은 이유로 인라인에 두지 않는다.
-                color: active ? undefined : C.sub,
+                color: active ? undefined : C.label,
                 fontWeight: active ? 700 : 600,
                 // ⚠️ 활성 항목에 파란 그림자를 주지 않는다. 0 10px 20px 이라 **바로 아래
                 // 항목 위로 번져서**, 그 항목만 호버 배경이 푸르스름하게 도드라졌다
@@ -992,12 +992,13 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
     alignItems: "center",
     gap: 12,
     padding: "13px 14px",
-    borderRadius: R.nav,
-    color: active ? C.blueInk : C.sub,
+    borderRadius: 6,
+    // 활성 줄의 바탕 · 글자는 사이드바와 같은 v2 규칙(.hz-menu-panel .hz-nav-item.hz-nav-active)이 맡는다 — 인라인 파랑이 이겼다(2026-10-08).
+    // 항목은 묶음 머리(muted)보다 한 단 진한 label.
+    color: active ? undefined : C.label,
     fontWeight: active ? 700 : 600,
     // 사이드바와 같은 이유로 비활성 background 는 인라인에서 뺀다 — 값을 두면
     // .hz-nav-item:hover 를 인라인이 이겨버린다.
-    background: active ? "var(--c-blue-tint)" : undefined,
     textDecoration: "none",
   });
 
@@ -1915,6 +1916,7 @@ function PcHint() {
         type="button"
         onClick={dismiss}
         aria-label="닫기"
+        className="hz-pc-hint-x"
         style={{
           display: "inline-flex",
           alignItems: "center",

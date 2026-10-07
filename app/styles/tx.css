@@ -1248,8 +1248,8 @@
 .dv-range::-moz-range-progress { height: 8px; border-radius: 999px; background: var(--c-blue); }
 .dv-range::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--c-card); border: 2px solid var(--c-blue); box-shadow: 0 1px 4px rgba(14, 33, 54, 0.18); }
 .dv-range:focus-visible { outline: none; }
-.dv-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(49, 130, 246, 0.25); }
-.dv-range:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(49, 130, 246, 0.25); }
+.dv-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-blue) 25%, transparent); }
+.dv-range:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-blue) 25%, transparent); }
 /* 세 판이 서려면 판 하나에 300px 은 있어야 한다(사이드바 160 을 뺀 본문 폭 기준 — 1,024px 뷰포트에서 판 안폭이 204px 였다). */
 @media (max-width: 1100px) {
   .dv-groups { grid-template-columns: 1fr; }

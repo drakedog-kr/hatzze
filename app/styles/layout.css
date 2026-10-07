@@ -222,6 +222,8 @@
   }
   .hz-main {
     padding-top: calc(54px + var(--hz-main-pad));
+    /* 바닥 76 — 끝까지 내리면 '맨 위로'(44 원 · 바닥 12)가 푸터 문의 링크를 덮었다(2026-10-08 점검). PC 권유 띠가 떠 있을 때와 같은 값. */
+    padding-bottom: calc(var(--hz-main-pad) + 64px);
     /* #앵커·포커스로 스크롤할 때 고정 탑바(54) 밑에 숨지 않게 그만큼 띄운다(WCAG 2.4.11 · 2026-10-01 점검 shell#0). */
     scroll-padding-top: calc(54px + var(--hz-main-pad));
   }
@@ -280,6 +282,14 @@
   }
   /* 토스트가 떠 있는 동안 본문 끝(푸터 링크)이 그 밑에 깔리지 않게 토스트 키만큼 바닥을 띄운다(2026-10-04 점검). */
   body:has(.hz-pc-hint) .hz-main { padding-bottom: 76px; }
+  /* 닫기 ✕(26)는 겉 그대로, 누르는 자리만 44(2026-10-08 폰 점검). */
+  .hz-pc-hint-x { position: relative; }
+  .hz-pc-hint-x::after { content: ""; position: absolute; inset: -9px; }
+  /* 탑바 로고(23) · 푸터 버전(12) — 누르는 자리만 넓힌다. */
+  .hz-topbar .hz-logo-link { position: relative; }
+  .hz-topbar .hz-logo-link::after { content: ""; position: absolute; inset: -11px -6px; }
+  .hz-version-link { position: relative; }
+  .hz-version-link::after { content: ""; position: absolute; inset: -12px -6px; }
 
 
   /* '맨 위로' 버튼 — 한 화면 넘게 내려가면 오른쪽 아래에 나타난다

@@ -53,7 +53,8 @@ export function ShareBar({
           />
         ))}
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
+      {/* 링크 목록이면 줄 간격 16 — 이름 링크(20) 누르는 자리를 ::after 로 36 까지 넓혀도 이웃 줄과 안 겹친다(v2.css 폰 블록). */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: hrefOf ? "16px 14px" : "6px 14px" }}>
         {segs.map((s) => (
           <span key={s.key} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "var(--fs-12)", color: C.sub, whiteSpace: "nowrap" }}>
             <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flex: "none" }} />

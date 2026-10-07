@@ -134,7 +134,7 @@ export function CardDivergence({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="compare_arrows" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
         {/* 큰 숫자는 아래 두 칸 점수의 차이다(실물 73 − 증시 20 = 53). '실물 경제 53% 강세'는 53% 가 무엇인지 안 읽혔다(2026-10-04 점검). */}
-        <strong style={{ fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
+        <strong className="hz-big" style={{ fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
           {leadWho}가 <span style={{ fontFamily: MONO }}>{Math.round(Math.abs(lead))}점</span>
         </strong>
         <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>앞섬</span>
@@ -182,7 +182,7 @@ export function CardTrend({ v, icon }: { v: Pick; icon: IconName }) {
       {vsAvg !== null ? (
         <>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
+            <strong className="hz-big" style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
               {vsAvg.toFixed(1)}배
             </strong>
             {/* 화살표·막대·숫자가 **한 색**이어야 한다. 예전엔 숫자만 온도색이고
@@ -296,7 +296,7 @@ export function CardSentiment({
             {/* 순서는 앱 전체에서 '비관 : 낙관'으로 통일한다(카더라 테마 막대도 동일). */}
             {/* 숫자도 막대와 같은 편을 든다 — 비관은 저온색, 낙관은 초고온색.
                 한 색으로 적으면 "63:37" 중 어느 쪽이 어느 편인지 다시 라벨을 봐야 한다. */}
-            <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", lineHeight: 1 }}>
+            <strong className="hz-big" style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", lineHeight: 1 }}>
               <span style={{ color: C.cold }}>{ratio.neg}</span>
               <span style={{ color: C.sub2 }}>:</span>
               <span style={{ color: C.mania }}>{ratio.pos}</span>
@@ -325,7 +325,7 @@ export function CardSentiment({
               자릿수가 늘면 이 여유 7px 이 바로 사라지므로(다섯 자리 248 ✗ · 여섯 자리 255 ✗)
               건수는 formatSampleCount 가 만 단위로 묶는다 — 폭이 자릿수에 안 딸리게 하는 게
               핵심이고, 그 함수 주석에 이 예산의 근거를 적어 뒀다. */}
-          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "5px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "4px 10px", whiteSpace: "nowrap" }}>
             {ratio.days > 1 ? `${ratio.days}일` : countNoun} {formatSampleCount(ratio.total)}건
           </span>
         </div>
@@ -369,7 +369,7 @@ export function CardYoutube({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="play_circle" name={v.name} />
       {ratio !== null && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
+          <strong className="hz-big" style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
             {ratio.toFixed(1)}배
           </strong>
           {/* 초보 검색량 카드와 같은 화살표 규칙 — 기준은 1배(평소)다. */}
@@ -468,7 +468,7 @@ export function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick })
       <TitleRow icon="local_mall" name={CARD_NAME.luxury_consumption_index} desc="명품·외식 검색량으로 본 소비 심리" />
       {lead && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <strong style={{ fontFamily: bothUsual ? undefined : MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: lead.v.color, lineHeight: 1, whiteSpace: "nowrap" }}>
+          <strong className="hz-big" style={{ fontFamily: bothUsual ? undefined : MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: lead.v.color, lineHeight: 1, whiteSpace: "nowrap" }}>
             {bothUsual ? "평소 수준" : `${lead.r.toFixed(1)}배`}
           </strong>
           <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2, whiteSpace: "nowrap" }}>
@@ -508,7 +508,7 @@ export function CardUpbit({ v }: { v: Pick }) {
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="currency_bitcoin" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <strong style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
+        <strong className="hz-big" style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
           {heat ?? "-"}
           <span style={{ fontSize: "var(--fs-13)", fontWeight: 500, color: C.sub }}>/100</span>
         </strong>

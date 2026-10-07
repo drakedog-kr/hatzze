@@ -456,7 +456,8 @@ export const MARK_GROUPS = [
 ] as const;
 
 /** 방향 색 — 매수 빨강 · 매도 파랑(이 화면 줄 글자와 같은 뜻). */
-const SIDE_COLOR = { buy: "var(--c-hot)", sell: "var(--c-blue)" } as const;
+// v2 범위에선 v2 오름 · 내림(가격선 --c-blue 와 갈린다). 확대 판도 같은 범위 안에 그려 토큰이 닿는다.
+const SIDE_COLOR = { buy: "var(--t-up, var(--c-hot))", sell: "var(--t-down, var(--c-blue))" } as const;
 
 /** 갈래 모양 하나 — 가운데(cx, cy) · 반지름 r. 원 · 네모 · 마름모(넓이가 비슷하게 네모는 조금 작게). */
 function MarkShape({ shape, cx, cy, r, ...rest }: { shape: "circle" | "square" | "diamond"; cx: number; cy: number; r: number } & React.SVGProps<SVGElement>) {
@@ -692,7 +693,7 @@ export function PriceChart({
         <path
           d={line}
           fill="none"
-          stroke="var(--c-blue)"
+          stroke="var(--isd-line, var(--c-blue))"
           strokeWidth="1"
           strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
@@ -1117,7 +1118,7 @@ export function wideMoveRows(rows: ManagerMove[], kind: "add" | "trim") {
 const RATING = [
   { key: "strongBuy", label: "적극 매수", tone: "var(--c-hot)" },
   { key: "buy", label: "매수", tone: "color-mix(in srgb, var(--c-hot) 55%, var(--c-card))" },
-  { key: "hold", label: "보유", tone: "var(--c-bar)" },
+  { key: "hold", label: "보유", tone: "var(--t-ink4, var(--c-bar))" },
   { key: "sell", label: "매도", tone: "color-mix(in srgb, var(--c-blue) 55%, var(--c-card))" },
   { key: "strongSell", label: "적극 매도", tone: "var(--c-blue)" },
 ] as const;
