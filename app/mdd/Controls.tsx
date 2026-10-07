@@ -272,9 +272,8 @@ export function Controls({
               padding: showSuggest ? "14px 8px 8px" : 6,
               background: "var(--c-float)",
               border: `1px solid ${C.line}`,
-              /* 14 였다. 2026-09-04 눈금 재정렬에서 카드 16 · 타일/오버레이 12 로 통일했다 —
-                 토스 실측이 카드 16 다수, 컨트롤 10~12 다. 14 는 어느 쪽도 아니었다. */
-              borderRadius: 12,
+              /* v2 모서리(모듈 · 입력칸 6)와 같게(2026-10-08). */
+              borderRadius: 6,
               // 카드에는 그림자를 안 쓰지만 오버레이는 예외다 — 아래 내용을 실제로 가리고
               // 떠 있어서, 경계선만으로는 "위에 있다"가 안 읽힌다(globals.css 의 팝오버와 같은 규칙).
               boxShadow: "0 4px 16px var(--c-shadow-strong)",
@@ -293,9 +292,6 @@ export function Controls({
                   <SuggestSection title="급부상 종목" hint="평소 대비 언급 급증" items={suggest.surging} onPick={(s) => pick(s, "suggest")} />
                   <SuggestSection title="주요 종목" hint="최근 주목도 상위" items={suggest.report} onPick={(s) => pick(s, "suggest")} />
                 </div>
-                <p style={{ margin: "10px 10px 2px", fontSize: "var(--fs-11)", color: C.muted, lineHeight: 1.5 }}>
-                  텔레그램에서 많이 언급된 종목입니다. 매수·매도 신호가 아닙니다.
-                </p>
               </>
             ) : (
               <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>

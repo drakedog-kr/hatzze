@@ -92,7 +92,6 @@
   gap: 12px;
   border-bottom: 1px solid var(--c-hairline);
 }
-.hz-actionrow:last-child { border-bottom: 0; }
 /* ⚠️ 아주 좁은 화면에서는 **이름 칸이 먼저 무너진다.** 목표가 칸이 96px 고정이고 등급
    칸이 내용 폭이라, 줄어들 수 있는 건 이름 칸뿐이다. 320px 에서 65px 까지 내려가
    증권사 이름이 세 줄로 접혔다(2026-08-25 실측).

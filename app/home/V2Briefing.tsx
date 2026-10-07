@@ -51,7 +51,10 @@ export function IndexModule({
     >
       <div className="v2-bigcard v2-index">
         <span className="v2-card-val is-big">
-          <b className={`is-${tone}`}>{temp}℃</b>
+          <b className={`is-${tone}`}>
+            {temp}
+            <span className="hz-big-unit">℃</span>
+          </b>
           <span className="v2-reason">{stageForScore(temp)}</span>
           {delta !== null && (
             <span className="v2-index-delta">
