@@ -398,16 +398,17 @@ def main() -> None:
     print(f"[유령감시] 기준일 {base} · 창 끝 {end} · 급부상 카드 {len(res)}개 · 판정 기록 {len(judged)}종목")
     print(f"{'언급':>4} {'복붙':>5} {'흔적':>5} {'코드':>4}  {'위험이름':<14} 종목")
     print("-" * 74)
+    flagged = [r for r in res if r["reasons"]]
+    # 사람이 진짜로 판정한 묶음뿐이면 울리지 않는다(문두 절).
+    seen = [r for r in flagged if already_judged(r, judged)]
     for r in res:
-        flag = "  ← 의심" if r["reasons"] else ""
+        flag = ("  ← 이미 판정" if r in seen else "  ← 의심") if r["reasons"] else ""
         print(
             f"{r['mentions']:>4} {r['dup']:>5.0%} {r['traced']:>2}/{r['mentions']:<2} {'있음' if r['has_code'] else '없음':>4}  "
             f"{('·'.join(r['risky']) or '-'):<14} {r['name']}({r['code']}){flag}"
         )
 
-    flagged = [r for r in res if r["reasons"]]
-    # 사람이 진짜로 판정한 묶음뿐이면 울리지 않는다(문두 절). 이 줄은 '  - ' 로 열지 않는다 — 알림 스텝이 그 줄만 의심으로 옮긴다.
-    seen = [r for r in flagged if already_judged(r, judged)]
+    # 이 줄은 '  - ' 로 열지 않는다 — 알림 스텝이 그 줄만 의심으로 옮긴다.
     for r in seen:
         print(f"  = {r['name']}({r['code']}): {' · '.join(r['reasons'])} — 이미 진짜로 판정한 묶음뿐이라 울리지 않습니다")
     hit = [r for r in flagged if r not in seen]
