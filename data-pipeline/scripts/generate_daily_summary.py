@@ -85,10 +85,16 @@ def stage_for_score(score: float) -> str:
 # 1,280 화면에서 633px · 13px 글자라 보이는 글자 65자 안팎이 한 줄이다(실측 글자당 9.0px). 그래서 줄마다 한 문장 ·
 # LINE_MAX 자 안쪽으로 쓰게 하고, 넘치면 sized_sentence 가 줄여 쓰게 한다. 그 전엔 '한두 문장'이라 달라진 것 81 ·
 # 뜨거운 곳 102 · 여론 96자로 두 줄씩 넘겼다(10-03 저녁 실행).
-LINE_MAX = 65
+#
+# 2026-10-08 상한을 25% 늘렸다(65 → 81, 운영자 "25% 정도 더 길어도 될 것 같아 · 꼭 길어야 할 필요는 없고 상한을 더 놔둬도 · 지금은
+# 좀 짧은 느낌"). 한 줄이던 줄이 1,280 에서 두 줄로 꺾일 수 있다. 길이는 다시 쓰기에서만 적히던 것을 첫 프롬프트에도
+# 적는다(LINE_GUIDE) — 상한만 늘리면 모델이 저절로 쓰는 길이(10-05~07 실측 41~64자)가 그대로라 바뀌는 게 없다. 아래 끝은
+# 강제하지 않는다(줄마다 *_LEN 의 아래 끝 그대로) — 늘릴 말이 없는 날 덧붙인 말로 채우지 않게.
+LINE_MAX = 81
+LINE_GUIDE = 60
 COMMON = """\
 당신은 한국 주식시장의 "과열도(온도)"를 보여주는 대시보드 '햇쩨(hatzze)'의 오늘의 요약을 쓰는 작성자입니다.
-아래 데이터를 보고, 지시된 '한 문장'만 씁니다.
+아래 데이터를 보고, 지시된 '한 문장'만 씁니다. 한 문장은 공백을 넣어 """ + f"{LINE_GUIDE}~{LINE_MAX}" + """자 정도입니다.
 
 [말투]
 - **모든 문장을 '~습니다'/'~ㅂ니다'로 끝맺습니다**(예: "~한 흐름입니다", "~로 보입니다", "~가 눈에 띕니다").
@@ -370,10 +376,15 @@ def skipped_hotter(rows: list[dict]) -> bool:
 # 처럼 문장에 옮겼다(2026-09-28 이름 쉬는 날 첫 시도). 읽는 사람에겐 뜻이 없는 말이다.
 INNER_WORDS_RE = re.compile(r"표시|목록|\[갈림\]|\[지표별\]")
 
+# '뜨거운 곳' 줄은 지표 **하나**만, 식은 지표는 말하지 않는다(2026-10-08 운영자 "뜨거운 곳에 식은 지표는 표현하지 않기").
+# 지시문(HOT_SYSTEM)만으로 막아 왔는데 10-02~04 줄엔 "시장 지표 중 … 과열도 0%로 식어 있습니다"가 붙어 있었다 — 상한을 81자로
+# 늘리며 코드로 막는다. '인식은'처럼 낱말 속 '식은'은 안 걸리게 앞 글자가 한글이면 뺀다.
+COLD_RE = re.compile(r"(?<![가-힣])식(?:어|은|었|는)|저온|상온|과열도 0(?![0-9])")
+
 
 def hot_problems(text: str, rows: list[dict], hot: dict[str, int], top: dict[str, int]) -> list[str]:
     """'뜨거운 곳' 줄이 표시 붙은 지표를 꺼냈거나, 건너뛴 날에 '가장 뜨거운'이라 불렀거나, 개수가 틀렸거나,
-    자료 안쪽 말을 옮겼으면."""
+    자료 안쪽 말을 옮겼거나, 지표를 둘 넘게 꺼냈거나, 식은 지표를 말했으면."""
     plain = text.replace("**", "")
     found = [
         f"쓰지 않을 지표 {r['name']}"
@@ -384,6 +395,10 @@ def hot_problems(text: str, rows: list[dict], hot: dict[str, int], top: dict[str
         found.append("'가장' 표현")
     if INNER_WORDS_RE.search(plain):
         found.append("안쪽 말")
+    if len(names_in_line(plain, [r["name"] for r in rows])) > 1:
+        found.append("지표 둘 이상")
+    if COLD_RE.search(plain):
+        found.append("식은 지표 표현")
     return found + balance_count_problems(plain, hot, top)
 
 
@@ -1099,6 +1114,10 @@ def main() -> None:
     summary = "\n".join(f"[{label}] {keep_bold_names(t, names)}" for label, t in zip(BRIEF_LABELS, lines))
     print("[요약]\n  " + summary.replace("\n", "\n  "))
 
+    if "--no-save" in sys.argv[1:]:
+        # 문장만 보고 저장하지 않는다 — 길이·규칙을 바꾼 브랜치를 러너에서 리허설할 때(narratives-rerun.yml what=summary save=false).
+        print("[안내] --no-save — 저장하지 않습니다.")
+        return
     client.table("daily_score").update({"ai_summary": summary}).eq(
         "date", target_date
     ).execute()

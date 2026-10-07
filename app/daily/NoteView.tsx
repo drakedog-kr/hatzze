@@ -160,7 +160,7 @@ function NoteTocModule({ blocks }: { blocks: NoteBlock[] }) {
 }
 
 /**
- * 언급된 종목 — 국내는 이름 · 종가 · 등락, 미국은 이름 · 티커. 오른쪽 칸에 한 단으로 선다(좁은 판에선 글 아래 여러 단).
+ * 언급된 종목 — 국내는 이름 · 종가 · 등락, 미국은 이름 · 티커 · 달러 시세 · 등락 · 미국 세션 날짜. 오른쪽 칸에 한 단으로 선다(좁은 판에선 글 아래 여러 단).
  *
  * ⚠️ 종가는 오늘 글이면 야후 실시간(카더라 카드와 같은 소스), 지난 글이면 `stocks` 표의 **최근** KRX 값이다 —
  *    지난 글을 열어도 오늘 시세가 보인다. 그래서 기준일이 글 날과 다르면 머리에 'n월 n일 종가'를 적고 등락률은 뺀다 —
@@ -174,12 +174,21 @@ function NoteStocksModule({ stocks, noteDate }: { stocks: NoteStocks; noteDate: 
   const dates = stocks.kr.map((s) => s.priceDate).filter((d): d is string => Boolean(d));
   const latest = dates.length ? dates.reduce((a, b) => (a > b ? a : b)) : null;
   const stale = latest !== null && latest !== noteDate;
-  const counts = `국내 ${stocks.kr.length} · 미국 ${stocks.us.length}`;
+  // 미국 시세의 세션 날짜(뉴욕) — 국내 종가 날과 대개 하루 어긋나 머리에 따로 적는다(테마 띠의 '10월 2일 미국장'과 같은 말).
+  const usDates = stocks.us.map((u) => u.priceDate).filter((d): d is string => Boolean(d));
+  const usLatest = usDates.length ? usDates.reduce((a, b) => (a > b ? a : b)) : null;
+  // 날짜는 제 시장 수 바로 뒤에 — 국내 날짜를 맨 앞에 두면 미국 줄도 그날 종가로 읽혔다.
+  const counts = [
+    `국내 ${stocks.kr.length}`,
+    ...(stale && latest ? [`${fmtNoteDay(latest)} 종가`] : []),
+    `미국 ${stocks.us.length}`,
+    ...(usLatest && usLatest !== noteDate ? [`${fmtNoteDay(usLatest)} 미국장`] : []),
+  ].join(" · ");
   return (
     <Module
       id="stocks"
       title="언급된 종목"
-      meta={stale ? `${fmtNoteDay(latest)} 종가 · ${counts}` : counts}
+      meta={counts}
       // 종목 쪽지는 두지 않는다 — 글을 읽는 화면이라 줄 위에 뜬 쪽지가 걸렸다(2026-10-05 운영자 지시 "여긴 뜰 필요 없어").
       className="v2-nt-stockmod"
     >
@@ -207,19 +216,35 @@ function NoteStocksModule({ stocks, noteDate }: { stocks: NoteStocks; noteDate: 
             </li>
           );
         })}
-        {/* 미국 종목은 종가 원천이 없어 이름 · 티커만. 같은 줄 꼴로 이어 세운다(예전 칩 꼴은 v2 결과 안 맞는다). */}
-        {stocks.us.map((u) => (
-          <li key={u.ticker}>
-            <Link href={stockDetailHref(u.ticker)} className="v2-nt-stock is-us" data-ga="note_stock_click">
-              <StockLogo code={u.ticker} name={u.name} market="US" size={20} />
-              {/* 티커는 이름 꼬리로 — 값 자리에 서면 머리 '10월 2일 종가'의 값으로 읽혔다(2026-10-05 점검). */}
-              <span className="v2-nt-stock-name">
-                {u.name}
-                {u.name !== u.ticker && <em>{u.ticker}</em>}
-              </span>
-            </Link>
-          </li>
-        ))}
+        {/* 미국 종목도 같은 줄 꼴로 달러 시세 · 등락을 선다(야후 · lib/daily-note usQuote). 세션 날짜는 머리('n월 n일 미국장')가 말하고,
+            그와 다른 날의 줄만 줄 끝에 적는다(국내 줄과 같은 규칙). */}
+        {stocks.us.map((u) => {
+          const chg = u.changeRate;
+          return (
+            <li key={u.ticker}>
+              <Link href={stockDetailHref(u.ticker)} className="v2-nt-stock is-us" data-ga="note_stock_click">
+                <StockLogo code={u.ticker} name={u.name} market="US" size={20} />
+                {/* 티커는 이름 꼬리로 — 값 자리에 서면 머리 '10월 2일 종가'의 값으로 읽혔다(2026-10-05 점검). */}
+                <span className="v2-nt-stock-name">
+                  {u.name}
+                  {u.name !== u.ticker && <em>{u.ticker}</em>}
+                </span>
+                {u.price != null && (
+                  <span className="v2-nt-stock-px">
+                    <b>${u.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+                    {chg != null && (
+                      <i className={chg > 0 ? "is-up" : chg < 0 ? "is-down" : undefined}>
+                        {chg > 0 ? "+" : chg < 0 ? "-" : ""}
+                        {Math.abs(chg).toFixed(2)}%
+                      </i>
+                    )}
+                    {u.priceDate && usLatest && u.priceDate !== usLatest && <em>{fmtNoteDay(u.priceDate)}</em>}
+                  </span>
+                )}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </Module>
   );
