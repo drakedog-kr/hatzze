@@ -75,7 +75,7 @@ import generate_us_telegram_narratives as US  # noqa: E402
 # 그대로 받아 12개 중 7개를 "~가 화제였습니다"로 끝냈다. Haiku 는 규칙(숫자 금지·"체결" 금지)을
 # 더 자주 어기지만 카드에서 더 직접적으로 읽힌다(그날 판정). 규칙 낱말을 바꾸면 되풀이가 줄지는
 # 돌려 봐야 안다 — 바꿀 거면 그것만 따로 재고 판단할 것.
-MODEL = "claude-haiku-4-5"
+MODEL = "claude-haiku-5-5"
 CARDS = 10         # 화면 급부상 표 줄 수(국장·미장 둘 다 — lib/kadera-why.ts BOARD_TILES · kadera-us-why.ts US_BOARD_TILES 와 짝). 6 이던 때 7~10행이 비었다
 LEN_MIN, LEN_MAX = 22, 30
 MAX_RETRIES = 1    # 한 번만 다시 쓴다. 못 맞추면 후보 중 목표에 가장 가까운 걸 쓴다

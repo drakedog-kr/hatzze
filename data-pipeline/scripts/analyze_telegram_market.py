@@ -65,7 +65,7 @@ from common.market_sentiment import MARKET_DAILY_TABLE  # noqa: E402
 from common.supabase_client import get_client, has_column, load_keyset  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 
-MODEL = "claude-haiku-4-5"
+MODEL = "claude-haiku-5-5"
 MARKET_TABLE = "telegram_message_market"
 
 # 한 호출에 넣는 글 수. 40 이면 호출이 줄지만 한 번은 답이 10건 빠져 왔다(2026-09-29). 30 에선 안 빠졌다.

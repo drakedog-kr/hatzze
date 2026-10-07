@@ -60,24 +60,56 @@ _MAX_CONSECUTIVE_FAILURES = 3
 # 한 호출의 상한. 실측 중앙값이 12초라 넉넉히 잡았다(재시도가 CLI 안에서 도는 경우 포함).
 _TIMEOUT_SEC = 180
 
-# ── Opus 를 부를 때만 달라지는 것 ──────────────────────────────────────────────
+# ── 모델마다 생각을 줄이는 법 ──────────────────────────────────────────────────
 # 사람이 가장 먼저 읽는 글 세 자리(카더라 총평 대목 · 채널 발송 글 2026-09-23 부터 · 히어로 요약
-# 09-28 부터)만 Opus 5.5 로 쓴다. 나머지는 Haiku 그대로다(분류·감성은 과열지수 눈금이 Haiku
-# 출력에 맞춰져 있어 바꾸면 안 된다).
+# 09-28 부터)만 Opus 5.5 로 쓴다. 나머지는 Haiku 다(2026-10-08 에 4.5 → 5.5). 분류·감성은 과열지수
+# 눈금이 Haiku 출력에 맞춰져 있어 다른 등급(Sonnet 등)으로 바꾸면 안 된다.
+# ⚠️ 디시·뉴스 제목 감성(common/llm_sentiment)만 아직 4.5 다. 같은 제목 287건에서 4.5끼리는 판정이
+#    91% 같았는데 5.5 와는 73~75% 였다(5.5 가 중립을 51 → 64% 로 더 고른다). 뜨겁거나 차가운 날 값을
+#    0 쪽으로 누르는지 재 보고 옮긴다. 메시지 톤·시장 판정은 4.5 끼리의 흔들림 안이었다(10-08 실측).
 #
-# ⚠️ Opus 5.5 는 thinking 을 끌 수 없다. Haiku 에 주는 MAX_THINKING_TOKENS=0 을 줘도 오류는
+# ⚠️ Opus 5.5 는 thinking 을 끌 수 없다. Haiku 4.5 에 주던 MAX_THINKING_TOKENS=0 을 줘도 오류는
 #    안 나지만 thinking 은 그대로 돈다(09-23 실측: 짧은 과제에 출력 934토큰, 답은 80토큰
 #    남짓). 양을 정하는 건 effort 다 — low 733 · medium 961. 길이를 코드가 따로 붙잡는
 #    글이라 low 로 둔다.
 OPUS_EFFORT = "low"
-# 구독이 막혀 API 로 넘어갈 때 Opus 대신 쓰는 모델. API 로 Opus 를 부르면 토큰당 4배가
-# 청구된다. 폴백은 한도가 모자란 날의 비상구라, 그날 글은 예전(Haiku) 글로 나가고 청구는
-# 지금 수준에 머무는 편이 낫다.
-API_FALLBACK_MODEL = "claude-haiku-4-5"
+# ⚠️ Haiku 5.5 도 생각이 기본으로 켜지고 MAX_THINKING_TOKENS=0 이 안 듣는다(10-08 구독 경로 실측:
+#    제목 3개 분류에 출력 109~403토큰 · --effort low 를 주면 104~109). 4.5 때 생각을 껐던 자리라
+#    가장 가까운 low 로 둔다.
+HAIKU_EFFORT = "low"
+# 구독이 막혀 API 로 넘어갈 때 Opus 대신 쓰는 모델. API 로 Opus 5.5 를 부르면 Haiku 5.5 의 토큰당
+# 40배가 청구된다. 폴백은 한도가 모자란 날의 비상구라, 그날 글은 Haiku 글로 나가고 청구는
+# 낮게 머무는 편이 낫다.
+API_FALLBACK_MODEL = "claude-haiku-5-5"
+# API 로 갈 때 max_tokens 에 얹는 몫. Haiku 5.5 는 생각한 토큰도 max_tokens 에 들어가서, 4.5 에
+# 맞춰 작게 잡은 상한(한 줄 200 등)이면 생각만 하고 글 없이 끝날 수 있다. CLI 는 max_tokens 를
+# 안 받으니 구독 경로와 같은 조건으로 맞추는 셈이다.
+_API_THINKING_HEADROOM = 1024
 
 
 def _is_opus(model: str) -> bool:
     return model.startswith("claude-opus")
+
+
+def _effort(model: str) -> str | None:
+    """생각을 effort 로 줄이는 모델이면 그 값. MAX_THINKING_TOKENS=0 으로 끄는 모델(Haiku 4.5)은 None."""
+    if _is_opus(model):
+        return OPUS_EFFORT
+    if model.startswith("claude-haiku-5"):
+        return HAIKU_EFFORT
+    return None
+
+
+def _api_kwargs(kw: dict) -> dict:
+    """API 로 보낼 때 구독 경로의 --effort 를 같은 값으로 옮긴다. 생각한 몫만큼 max_tokens 도 늘린다."""
+    effort = _effort(kw.get("model", ""))
+    oc = kw.get("output_config") or {}
+    if not effort or "effort" in oc:
+        return kw
+    out = {**kw, "output_config": {**oc, "effort": effort}}
+    if kw.get("max_tokens"):
+        out["max_tokens"] = kw["max_tokens"] + _API_THINKING_HEADROOM
+    return out
 
 
 @dataclass
@@ -117,10 +149,10 @@ def _cli_env(model: str) -> dict[str, str]:
     # 호출마다 붙어, 모델이 문장 끝에 사람 이름을 부르며 인사했다(2026-09-23 실측). 러너엔
     # 메모리가 없지만 로컬 검증이 러너와 같은 조건이 되게 끈다.
     env["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] = "1"
-    # Haiku 도 기본으로 생각을 한다. 분류·문장화에는 필요 없고 출력 토큰만 는다.
-    # Opus 5.5 는 thinking 을 끌 수 없는 모델이라 이 값을 안 준다 — 줘도 무시되지만, CLI 가
+    # Haiku 4.5 도 기본으로 생각을 한다. 분류·문장화에는 필요 없고 출력 토큰만 는다.
+    # Opus 5.5 · Haiku 5.5 는 이 값이 안 듣는 모델이라 안 준다 — 줘도 무시되지만, CLI 가
     # 언젠가 이걸 '끔'으로 API 에 옮기면 400 이 난다. 양은 --effort 로 정한다(_run_cli).
-    if not _is_opus(model):
+    if _effort(model) is None:
         env["MAX_THINKING_TOKENS"] = "0"
     return env
 
@@ -151,8 +183,9 @@ def _run_cli(
         "--output-format",
         "json",
     ]
-    if _is_opus(model):
-        argv += ["--effort", OPUS_EFFORT]
+    effort = _effort(model)
+    if effort:
+        argv += ["--effort", effort]
     if system:
         argv += ["--system-prompt", system]
     if schema:
@@ -237,10 +270,10 @@ class _Messages:
                 owner.note_success(time.time() - t0, resp.usage)
                 return resp
         if _is_opus(kw.get("model", "")):
-            # 구독이 막힌 날엔 예전 모델로 쓴다(API_FALLBACK_MODEL 주석).
+            # 구독이 막힌 날엔 Haiku 로 쓴다(API_FALLBACK_MODEL 주석).
             print(f"[LLM] API 로 넘어가며 {kw['model']} 대신 {API_FALLBACK_MODEL} 로 씁니다.")
             kw = {**kw, "model": API_FALLBACK_MODEL}
-        return owner.api.messages.create(**kw)
+        return owner.api.messages.create(**_api_kwargs(kw))
 
 
 class SubscriptionClient:

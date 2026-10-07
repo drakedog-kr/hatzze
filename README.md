@@ -40,7 +40,7 @@ flowchart LR
     G -.-> V1["fetch_*_dividend*.py<br/>예탁원 · KIND · SEC · stockanalysis"]
     A --> B["calculate_score.py<br/>지표 28개 → 온도"]
     T1 --> T2["종목·테마 집계<br/>국장 · 미장"]
-    B --> L["Claude Haiku 4.5 · Opus 5.5<br/>요약 · 총평 · 테마 요약"]
+    B --> L["Claude Haiku 5.5 · Opus 5.5<br/>요약 · 총평 · 테마 요약"]
     T2 --> L
     L --> D[("Supabase")]
     P1 --> D
@@ -76,7 +76,7 @@ flowchart LR
 - **절대량이 아니라 점유율로 비교합니다.** 주말엔 메시지가 평일의 1/10로 떨어져, 언급 수로 증감을 재면 모든 항목이 일제히 ▼로 나옵니다.
 - **유령 언급을 셈에서 뺍니다.** 종목명이 일반 단어나 다른 고유명사에 얹히면 없는 언급이 잡힙니다(하이브 ← 하이브**로**자임). 실행마다 급부상 카드에 오른 종목을 한 번 더 보고, 유령이 의심되면 알림 이슈를 엽니다.
 - **LLM이 쓴 문장은 검수 레이어(`common/text_check.py`)를 지나야 저장됩니다.** 화면에는 ✨ 표시가 붙습니다.
-- **LLM은 구독으로 먼저 부르고, 막히면 API 키로 다시 부릅니다**(`common/llm_client.py`). 분류·감성은 과열지수 눈금이 Haiku 출력에 맞춰져 있어 Haiku 4.5로 고정하고, 사람이 가장 먼저 읽는 세 자리(시장 브리핑 요약 · 카더라 총평 · 채널 글)만 Opus 5.5로 씁니다.
+- **LLM은 구독으로 먼저 부르고, 막히면 API 키로 다시 부릅니다**(`common/llm_client.py`). 분류·감성은 과열지수 눈금이 Haiku 출력에 맞춰져 있어 Haiku로 두고(디시·뉴스 제목 감성만 4.5, 나머지는 5.5), 사람이 가장 먼저 읽는 세 자리(시장 브리핑 요약 · 카더라 총평 · 채널 글)만 Opus 5.5로 씁니다.
 - **조회 실패를 빈 자료로 보이지 않게 합니다.** 카드는 '없습니다' 대신 '불러오지 못했습니다'라고 적고, 실패한 렌더는 사본에 담지 않습니다. 자료 서버가 잠시 멈추면 마지막으로 잘 만든 사본이 그대로 나갑니다(`lib/load-state.ts`).
 - **화면 한 벌이 같은 시각 언어를 씁니다.** 색·간격·모서리는 전역 토큰(`app/globals.css` · `app/styles/` · `app/ui.tsx`)에서만 나오고, 검색·다이얼로그·이동 경로는 shadcn/ui 부품을 옮겨 씁니다(`components/ui/`). 라이트·다크와 모바일(≤560px) 구성을 모두 지원합니다.
 
@@ -115,7 +115,7 @@ flowchart LR
 | | |
 |---|---|
 | **프론트엔드** | Next.js 16 (App Router · ISR) · React 19 · TypeScript · Tailwind CSS 4 · shadcn/ui 부품(Base UI · cmdk) |
-| **파이프라인** | Python 3.11 · Claude Haiku 4.5 · Claude Opus 5.5 (Claude Code 구독, 안 되면 Anthropic API) · Telethon |
+| **파이프라인** | Python 3.11 · Claude Haiku 5.5 · Claude Opus 5.5 (Claude Code 구독, 안 되면 Anthropic API) · Telethon |
 | **데이터베이스** | Supabase (PostgreSQL, RLS) |
 | **자동화·배포** | Vercel Cron → GitHub Actions · Vercel (서울 리전 `icn1`) |
 | **검사** | PR마다 타입 · lint · 단위 테스트(Node 테스트 러너 · pytest) · 라우트와 사이트맵 대조 |
