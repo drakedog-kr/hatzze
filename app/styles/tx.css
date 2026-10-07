@@ -40,8 +40,8 @@
 }
 [data-theme="dark"] .hz-tx {
   --tx-tile: var(--c-soft);
-  --tx-btn: rgba(255, 255, 255, 0.07);
-  --tx-btn-hover: rgba(255, 255, 255, 0.12);
+  --tx-btn: rgba(214, 224, 239, 0.09);
+  --tx-btn-hover: rgba(213, 223, 244, 0.13);
   /* 끌고 있는 줄 — 다크는 그림자가 안 보여 한 단 밝은 면(backgroundLevel02) + 헤어라인으로 띄운다(2026-09-20 다크 검사). */
   --tx-drag-bg: var(--c-float);
   --tx-drag-shadow: 0 8px 22px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--c-line);

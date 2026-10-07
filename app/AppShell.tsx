@@ -705,7 +705,8 @@ function Sidebar() {
         width: 210,
         flexShrink: 0,
         background: C.card,
-        borderRight: `1px solid var(--c-divider)`,
+        // 본문과 가르는 선은 사이드바 전용 --sd-edge(v2.css) — 모듈 테두리보다 한 단 진하다(2026-10-08 요청).
+        borderRight: `1px solid var(--sd-edge)`,
         // v2(2026-10-03): 본문 모듈과 같은 눈금으로 줄였다 — 글자 13 · 줄 34 · 모서리 6 · 1px 가는 선.
         padding: "22px 12px 16px",
         // 28: 묶음 머리를 넣으며 사이드바가 782 → 930px 로 늘어 노트북에서 스크롤이 생겼다(2026-09-25). 줄 여백과 함께 줄였다.
