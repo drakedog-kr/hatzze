@@ -8,17 +8,17 @@
  * TSX(og-card.tsx)와 떼어 둔 까닭은 테스트가 JSX 없이 부를 수 있게 하려는 것뿐이다. 카드 파일들은 og-card.tsx 에서 가져온다.
  */
 
-export const INK = "#0e2136"; // --c-ink
-export const SUB = "#556a84"; // --c-sub
+export const INK = "#333840"; // --c-ink
+export const SUB = "#6a707a"; // --c-sub
 export const CARD_BG = "#ffffff"; // --c-card
-export const TRACK = "#eef3f9"; // --c-track
+export const TRACK = "#ebedf1"; // --c-track
 export const BLUE = "#3182f6"; // --c-blue
 export const COLD = "#2371b2"; // --c-cold
 
 /** 테마 지도(Treemap)의 칸 색 — 늘어남은 따뜻한 색, 줄어듦은 파랑, 그대로는 칩 회색(kadera.css .hz-tm-tile). */
 export const WARM_2 = "#ef8f9a"; // --c-warm-2
 export const BLUE_2 = "#3d9cf5"; // --c-blue-2
-export const CHIP = "#f2f6fb"; // --c-chip
+export const CHIP = "#eef0f3"; // --c-chip
 
 /**
  * 과열도 네 구간. 화면(홈 히어로)과 같은 **50 경계 2색 체계**다 — 색은 차갑다·뜨겁다만 말하고, 네 구간의 구분은

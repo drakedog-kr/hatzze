@@ -102,13 +102,13 @@ export const revalidate = 3600;
  * ⚠️ 라이트가 또 한 번 뒤처져 있었다(#e8f0fa · --c-bg 는 #f7fafd). 토글을 누르면 ThemeToggle 이 --c-bg 를 읽어
  *    다시 맞추므로 **첫 화면과 토글 뒤의 주소창 색이 달랐다**(2026-09-30). 이제 tests/og-colors.test.ts 가 맞춰 본다.
  */
-const THEME_COLOR = { light: "#f7fafd", dark: "#101013" } as const;
+const THEME_COLOR = { light: "#f4f5f8", dark: "#101013" } as const;
 /**
  * 폰(≤560)의 주소창 색 — 폰은 탑바(카드색)가 맨 위 면이라 화면 바탕(--c-bg)이 아니라 **--c-card** 와 맞춘다. 다크에서 #101013 주소창
- * 아래 #202027 탑바가 두 단으로 갈렸다(2026-10-05 모바일 점검). media 가 붙은 메타가 앞에 있어 폰에선 이쪽이 이긴다.
+ * 아래 #202027(지금 #17171c) 탑바가 두 단으로 갈렸다(2026-10-05 모바일 점검). media 가 붙은 메타가 앞에 있어 폰에선 이쪽이 이긴다.
  * tests/og-colors.test.ts 가 --c-card 와 맞춰 본다.
  */
-const THEME_COLOR_PHONE = { light: "#ffffff", dark: "#202027" } as const;
+const THEME_COLOR_PHONE = { light: "#ffffff", dark: "#17171c" } as const;
 
 /**
  * 테마·통화 쿠키를 **브라우저가** 페인트 전에 읽어 <html> 에 붙이는 스크립트.
