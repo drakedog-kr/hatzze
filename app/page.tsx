@@ -4,7 +4,7 @@ import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import type { IndicatorCategory } from "@/lib/data";
 import { Icon, stageForScore } from "./ui";
 import { pick, GenericCard } from "./home/parts";
-import { ANCHOR_ALIAS, BAND_LABELS, DIST_FILL } from "./home/Hero";
+import { ANCHOR_ALIAS, BAND_LABELS, CARD_NAME, DIST_FILL } from "./home/Hero";
 import type { BandItem } from "./home/Hero";
 import { BriefModule, IndexModule } from "./home/V2Briefing";
 import { CoverIndexCell, CoverLinkCell, CoverMeta, Module, type CoverLink } from "./kadera/V2Modules";
@@ -83,7 +83,9 @@ export default async function Home() {
   const extra = (cat: IndicatorCategory) =>
     indicators.filter((i) => i.category === cat && !LAID_OUT.has(i.slug));
 
-  // 히어로 '지표 분포' — 지표(28개)를 네 구간으로 센다. 과열도가 아직 없는 지표는 빼므로 햇쩨 지수 머리의 '지표 N개'도 이 합이다.
+  // 히어로 '지표 분포' — **카드**(27장)를 네 구간으로 센다. 과열도가 아직 없는 지표는 빼므로 햇쩨 지수 머리의 '지표 N개'도 이 합이다.
+  // 지표 둘이 한 장인 카드(ANCHOR_ALIAS · 명품 + 오마카세)는 한 줄로 세고, 둘 중 더 뜨거운 쪽의 구간에 선다 — 카드의 초고온 표시(둘 중
+  // 하나라도 초고온)와 같은 규칙이다. 지표로 세던 때 모듈 머리는 16 + 11 인데 이 머리는 28 이었다(2026-10-08 운영자 지적).
   // 카드의 구간 판정(overheatColor)·초고온 배지(isHit)와 **같은 값**을 쓴다: capped(0~100)
   // 를 stageForScore 에 넣는다. 다른 기준으로 세면 "초고온 3개"라고 적어 놓고 시트에는
   // 빨간 셀이 둘만 보이는 일이 난다.
@@ -93,11 +95,15 @@ export default async function Home() {
   // 세는 김에 **이름도 같이 담는다** — 줄에 마우스를 올리면 그 구간의 지표가 목록으로
   // 열린다. 개수와 목록이 같은 순회에서 나오므로 둘이 갈릴 자리가 없다.
   const bandItems: BandItem[][] = [[], [], [], []];
+  const byCard = new Map<string, BandItem>();
   for (const i of indicators) {
     const v = pick(i).capped;
     if (v === null) continue;
-    bandItems[BAND_LABELS.indexOf(stageForScore(v))].push({ slug: i.slug, name: i.name, heat: v });
+    const card = ANCHOR_ALIAS[i.slug] ?? i.slug;
+    const prev = byCard.get(card);
+    if (!prev || v > prev.heat) byCard.set(card, { slug: card, name: CARD_NAME[card] ?? i.name, heat: v });
   }
+  for (const it of byCard.values()) bandItems[BAND_LABELS.indexOf(stageForScore(it.heat))].push(it);
   // 구간 안에서는 뜨거운 것부터. 목록이 열두 줄까지 가는 구간이 있어서, 순서가 없으면
   // 그 구간에서 무엇이 경계에 가까운지가 안 읽힌다.
   for (const list of bandItems) list.sort((a, b) => b.heat - a.heat);

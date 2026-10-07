@@ -55,6 +55,14 @@ export const ANCHOR_ALIAS: Record<string, string> = {
 };
 
 /**
+ * 지표 둘이 한 장인 카드의 이름(카드 쪽 slug → 카드 제목). 화면이 세는 단위는 **카드**다 — 모듈 머리('감성 지표 11개') · 햇쩨 지수 머리
+ * ('지표 27개') · 구간 목록이 모두 이 카드를 한 줄로 센다(2026-10-08 운영자 "27개인데 28개로 뜬다"). CardSpending 제목도 이걸 읽는다.
+ */
+export const CARD_NAME: Record<string, string> = {
+  luxury_consumption_index: "여윳돈이 향하는 곳",
+};
+
+/**
  * 히어로 — 목업은 **두 장**이다(왼쪽 햇쩨 지수 · 오른쪽 오늘의 브리핑).
  *
  * 반원 게이지를 걷어냈다. 게이지는 눈금이 호를 따라 휘어 있어 "지금 어디쯤인가"를
@@ -292,7 +300,7 @@ function IndexTile({
     <div className="hz-tx-tile-cap">
       <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
         햇쩨 지수
-        <span className="hz-tip hz-tip-wide hz-tip-below" data-tip="지표 28개 가중 평균" data-ga-tip="hatzze_index" style={{ display: "inline-flex", cursor: "help" }}>
+        <span className="hz-tip hz-tip-wide hz-tip-below" data-tip={`지표 ${bandTotal}개 가중 평균`} data-ga-tip="hatzze_index" style={{ display: "inline-flex", cursor: "help" }}>
           <Icon name="help" style={{ fontSize: "var(--fs-14)", color: C.muted }} />
         </span>
       </span>

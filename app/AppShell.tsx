@@ -234,7 +234,7 @@ const NEW_INDICATORS_HINT: Omit<HintSpec, "at"> = {
 
 function buildNav(themeNav: boolean): NavItem[] {
   return [
-  { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 28개로 잰 오늘의 시장 온도" },
+  { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 27개로 잰 오늘의 시장 온도" },
   // 카더라가 국장·미장 둘로 갈린다. **부모는 그대로 두고 밑에 서브 항목을 단다** —
   // 부모를 국장으로 바꿔 버리면 카더라라는 이름이 사이드바에서 사라지고, 나중에 시장을
   // 하나 더 붙일 자리도 없어진다.
