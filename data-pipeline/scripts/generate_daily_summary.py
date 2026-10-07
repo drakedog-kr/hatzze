@@ -661,10 +661,28 @@ BALANCE_KINDS = ("시장", "감성")
 BALANCE_TOP_N = 5
 
 
+# 지표 둘이 카드 한 장인 짝 — 화면(app/home/Hero.tsx ANCHOR_ALIAS)이 카드로 센다. 개수 말('감성 지표 N개')도 같은 단위여야 한다(2026-10-08).
+CARD_ALIAS = {"fine_dining_search_index": "luxury_consumption_index"}
+
+
 def balance_counts(rows: list[dict]) -> tuple[dict[str, int], dict[str, int]]:
-    """종류별 (초고온에 든 개수, 상위 BALANCE_TOP_N 안의 개수). rows 는 과열도 내림차순."""
-    hot = {k: sum(1 for r in rows if r["hot"] and r["category"] == k) for k in BALANCE_KINDS}
-    top = {k: sum(1 for r in rows[:BALANCE_TOP_N] if r["category"] == k) for k in BALANCE_KINDS}
+    """종류별 (초고온에 든 개수, 상위 BALANCE_TOP_N 안의 개수). rows 는 과열도 내림차순.
+
+    **카드 단위로** 센다 — 짝(CARD_ALIAS)은 더 뜨거운 쪽(먼저 나온 행) 하나만 남긴다. 화면의 모듈 머리 · 햇쩨 지수 머리가 카드를 세는데
+    여기서 지표로 세면 둘 다 초고온인 날 문장이 '감성 지표 2개'라고 적어 화면의 '초고온 1'과 갈린다."""
+    paired = set(CARD_ALIAS) | set(CARD_ALIAS.values())
+    seen: set = set()
+    cards = []
+    for r in rows:
+        slug = r.get("slug") or ""
+        # 짝이 아닌 행은 행마다 따로 센다(slug 가 비거나 같은 값이어도 — 테스트 행은 slug 가 다 'x' 다).
+        key = CARD_ALIAS.get(slug, slug) if slug in paired else id(r)
+        if key in seen:
+            continue
+        seen.add(key)
+        cards.append(r)
+    hot = {k: sum(1 for r in cards if r["hot"] and r["category"] == k) for k in BALANCE_KINDS}
+    top = {k: sum(1 for r in cards[:BALANCE_TOP_N] if r["category"] == k) for k in BALANCE_KINDS}
     return hot, top
 
 

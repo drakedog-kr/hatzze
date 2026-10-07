@@ -4,6 +4,7 @@ import { formatIndicatorValue, formatSampleCount, sentimentTone, shortDate } fro
 import { C, MONO, R } from "../ui";
 import { overheatColor, Shell, TitleRow, Big, Foot, HeatFill, HeatScale, AreaChart, SplitStats, RefChart, RefRows } from "./parts";
 import type { Pick } from "./parts";
+import { CARD_NAME } from "./Hero";
 import type { IconName } from "@/lib/icon-names";
 
 // ── 소셜 지표 카드들 ──────────────────────────────────────────────
@@ -464,7 +465,7 @@ export function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick })
   // 스크롤은 ANCHOR_ALIAS 가 이 id 로 돌려보낸다.
   return (
     <Shell slug={luxury.ind?.slug} hit={luxury.isHit || dining.isHit} warm={luxury.warm || dining.warm} minH={230}>
-      <TitleRow icon="local_mall" name="여윳돈이 향하는 곳" desc="명품·외식 검색량으로 본 소비 심리" />
+      <TitleRow icon="local_mall" name={CARD_NAME.luxury_consumption_index} desc="명품·외식 검색량으로 본 소비 심리" />
       {lead && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
           <strong style={{ fontFamily: bothUsual ? undefined : MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: lead.v.color, lineHeight: 1, whiteSpace: "nowrap" }}>

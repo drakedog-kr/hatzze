@@ -269,3 +269,15 @@ def test_change_streak_rests_name_seen_two_days_in_row():
     assert change_streak_names([d1, ""], names) == set()
     assert change_streak_names([d1], names) == set()
 
+
+
+def test_balance_counts_by_card():
+    # 명품 · 오마카세는 카드 한 장 — 둘 다 초고온이어도 1개로 센다(화면 모듈 머리와 같은 단위)
+    rows = [
+        _row("오마카세·파인다이닝 웨이팅 검색 지수", "감성", 90, slug="fine_dining_search_index"),
+        _row("명품·수입차 소비 검색 지수", "감성", 80, slug="luxury_consumption_index"),
+        _row("경제 베스트셀러 비중", "감성", 78, slug="bestseller_finance_ratio"),
+        _row("버핏지수", "시장", 76, slug="buffett_index"),
+    ]
+    hot, _top = balance_counts(rows)
+    assert hot == {"시장": 1, "감성": 2}
