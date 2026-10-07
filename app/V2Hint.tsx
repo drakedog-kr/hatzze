@@ -67,6 +67,11 @@ export type HintSpec = {
   order?: number;
   anchor?: string;
   at?: "below" | "inside" | "right";
+  /**
+   * at="right" 에서 가로 자리만 이 요소(판 안 CSS 선택자)의 오른쪽 끝에 맞춘다. 세로는 그대로 anchor 가운데다.
+   * 사이드바 맨 아래 줄처럼 가리킬 단추 옆에 다른 단추가 붙어 있는 자리 — 단추 오른쪽에 띄우면 옆 단추를 덮는다.
+   */
+  edge?: string;
   className?: string;
   /** 호버가 없는 기기(폰)에서 text 대신 보일 문구 — '올리면' 과 '누르면' 처럼 기기마다 동작이 다를 때. */
   touchText?: string;
@@ -94,6 +99,7 @@ export function V2Hint({
   order = 0,
   anchor,
   at = "below",
+  edge,
   className,
   target,
   together = false,
@@ -172,8 +178,10 @@ export function V2Hint({
       if (at === "right") {
         // 화면 좌표(fixed). 가리킨 줄의 세로 가운데에 쪽지 가운데를 맞춘다. 줄이 안 보이면(폭 0) 감춘다.
         // 16 = 사이드바 안쪽 여백(12) + 쪽지 몸이 사이드바 테두리 밖에서 시작할 틈 — 꼭지(5)만 테두리를 넘어 줄을 가리킨다.
+        // edge 가 있으면 가로만 그 요소 끝에 맞춘다(HintSpec.edge).
         slot.style.visibility = r.width > 0 ? "" : "hidden";
-        slot.style.left = `${Math.round(r.right + 16)}px`;
+        const e = edge ? host.querySelector<HTMLElement>(edge) : null;
+        slot.style.left = `${Math.round((e ? e.getBoundingClientRect().right : r.right) + 16)}px`;
         slot.style.top = `${Math.round(r.top + r.height / 2 - slot.offsetHeight / 2)}px`;
         return;
       }
@@ -199,7 +207,7 @@ export function V2Hint({
       window.removeEventListener("scroll", place, true);
       window.removeEventListener("resize", place);
     };
-  }, [show, anchor, at]);
+  }, [show, anchor, at, edge]);
 
   return (
     // ⚠️ `hidden` 이지 `return null` 이 아니다(app/hint-store.ts 머리 주석 ①).
