@@ -222,7 +222,7 @@ type NavItem = {
    ⚠️ 다음 소식은 id 를 새로 딴다(같은 id 면 이번 소식을 닫은 사람에게 안 뜬다). 문구만 고칠 땐 그대로 둔다. */
 const NEW_INDICATORS_HINT: Omit<HintSpec, "at"> = {
   id: "news-indicators-2026-10",
-  text: "새 지표 4개가 추가됐습니다. 투자자예탁금 · 신용융자 잔고 · 기업 체감 경기 · 주식 쇼츠",
+  text: "새 지표 4개가 추가됐습니다. 투자자예탁금 · 신용융자 잔고 · 기업 체감 경기 · 주식 쇼츠 수",
   anchor: 'a[data-label="시장 브리핑"]',
   together: true,
   icon: "new_releases",

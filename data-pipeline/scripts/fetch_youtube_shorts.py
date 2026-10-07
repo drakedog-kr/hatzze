@@ -37,7 +37,7 @@ MAX_PAGES_PER_WINDOW = 10
 INDICATOR_SLUG = "youtube_stock_shorts"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
-    "name": "주식 쇼츠",
+    "name": "주식 쇼츠 수",
     "category": "감성",
     "headline": "하루에 올라온 주식 쇼츠",
     "description_beginner": "주식 쇼츠가 평소보다 쏟아지면 과열 신호입니다",
