@@ -113,9 +113,10 @@ def build_rows(days: dict[str, tuple[float, float]]) -> list[dict]:
                     "base": round(base, 3),
                     "lev_20d_jo": round(lev / 1e12, 1),
                     "inv_20d_jo": round(inv / 1e12, 1),
-                    # 카드 '1년 평소' 막대의 말풍선 — 앞 1년 20일 거래대금의 중앙값(비율의 중앙값과 꼭 같은 날은 아니다).
-                    "lev_base_jo": round(median(r[2] for r in prior) / 1e12, 1),
-                    "inv_base_jo": round(median(r[3] for r in prior) / 1e12, 1),
+                    # 카드 '1년 평소' 막대의 말풍선 — 앞 1년 20일 거래대금 합계의 중앙값을 평소 몫(base)으로 나눈 것.
+                    # 레버리지 · 인버스를 따로 중앙값 내면 둘의 비율이 base 와 달라 막대 %와 말풍선이 어긋난다(10-08 53.1 · 30.5 = 64% vs 막대 61%).
+                    "lev_base_jo": round(median(r[2] + r[3] for r in prior) * base / (1 + base) / 1e12, 1),
+                    "inv_base_jo": round(median(r[2] + r[3] for r in prior) / (1 + base) / 1e12, 1),
                 },
             }
         )
