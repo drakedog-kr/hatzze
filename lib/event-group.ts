@@ -30,6 +30,8 @@ export function periodStart(date: string, precision: DatePrecision): string {
 /**
  * 같은 이야기인가를 가르는 열쇠. 공백 · 구두점을 걷고, 채널마다 표기가 갈리는 흔한 종류(실적 · 배당 · 자사주 …)는 그 낱말 하나로 묶는다
  * ('3분기 잠정 실적 발표' · '잠정실적발표' · '분기 실적 발표'). 종류 낱말이 없으면 걷은 글 그대로다.
+ * ⚠️ 텔레그램 발송이 손으로 맞춘 사본을 쓴다(data-pipeline/common/event_group.py). KINDS · ONE_SHOT · NEAR_DAYS 를 바꾸면 거기도 고친다
+ *    (data-pipeline/tests/test_event_group.py 가 이 파일을 읽어 견준다).
  */
 const KINDS: [string, RegExp][] = [
   // 매출은 실적보다 먼저 따로 — 'TSMC 9월 매출 실적 공개' · '9월 매출 발표'가 두 줄로 갈렸고(10/8), 3분기 실적과는 다른 이야기다(2026-10-05 점검).
@@ -68,6 +70,14 @@ const NEAR_DAYS = 3;
 /** 가까운 날에 두 번 있을 수 없는 종류 — 한 채널씩 갈린 두 줄도 하나로 접는다(③). */
 const ONE_SHOT = new Set(["실적", "매출", "주총", "공개", "출시", "인수"]);
 const KIND_NAMES = new Set(KINDS.map(([k]) => k));
+
+type Rank = { channels: number; firstSeen: string; date: string };
+/** ③의 잣대 — 채널이 많은 줄, 같으면 먼저 짚인 줄, 그것도 같으면 이른 날이 앞선다. */
+function outranks(a: Rank, b: Rank): boolean {
+  if (a.channels !== b.channels) return a.channels > b.channels;
+  if (a.firstSeen !== b.firstSeen) return a.firstSeen < b.firstSeen;
+  return a.date < b.date;
+}
 
 /** 두 글의 편집 거리(글자 단위). 짧은 글끼리만 부른다. */
 function editDistance(a: string, b: string): number {
@@ -168,8 +178,10 @@ export function groupEventRows(rows: EventRowLike[]): GroupedEvent[] {
   // ③ 한 번뿐인 일(실적 · 매출 · 주총 · 공개 · 출시 · 인수)이 가까운 날 여러 줄이면 채널이 가장 많은 줄(같으면 먼저 짚인 줄) 하나만 —
   //    삼성전자 '3분기 잠정실적 발표'가 10/7(2곳) · 10/8(11곳) 두 줄로 섰다(2026-10-05 점검). 채널은 합치지 않는다(다른 날을 말한 채널이다).
   //    배당 · 증자처럼 날마다 다른 절차가 이어지는 종류는 이 규칙을 안 탄다.
+  //    오늘 경계 너머(이미 지난 날)의 줄과는 dropOutrankedByPast 가 같은 잣대로 견준다.
   const shots = [...alive].filter((a) => a.precision === "day" && ONE_SHOT.has(a.kind));
-  shots.sort((a, b) => b.channels.size - a.channels.size || (a.firstSeen < b.firstSeen ? -1 : a.firstSeen > b.firstSeen ? 1 : a.date < b.date ? -1 : 1));
+  const rank = (a: Acc): Rank => ({ channels: a.channels.size, firstSeen: a.firstSeen, date: a.date });
+  shots.sort((a, b) => (outranks(rank(a), rank(b)) ? -1 : 1));
   for (const one of shots) {
     if (!alive.has(one)) continue;
     for (const o of shots) {
@@ -199,4 +211,32 @@ export function dropAlreadyHappened<T extends { code: string; event: string; cha
     const kind = eventKind(f.event);
     return f.channels >= 2 || !ONE_SHOT.has(kind) || !done.has(`${f.code}|${kind}`);
   });
+}
+
+type DayLine = { code: string; date: string; precision: DatePrecision; event: string; channels: number; firstSeen: string };
+
+/**
+ * 가까운 지난 날(NEAR_DAYS 안)의 같은 이야기 줄이 ③의 잣대로 앞서면 앞으로의 줄을 뺀다(앞날 줄의 채널 수와 무관) — ③을 오늘 경계 너머로 잇는다.
+ * 일정을 오늘부터 읽으면 어제 줄이 안 보여 ③이 못 접는다. 삼성전자 '3분기 잠정실적 발표'를 34곳이 10/8, 5곳이 10/9 로 적었는데
+ * (10/8 아침 발표 · 10/9 한글날 휴장) 10/9 가 되면 5곳 줄이 다가오는 일정에 선다(2026-10-08 점검). 텔레그램 '내일 일정'은
+ * 10/8 저녁에 이미 그 줄을 실었다(data-pipeline/common/event_group.py 가 같은 규칙).
+ * ③처럼 한 번뿐인 종류의 day 줄에만 걸고, 이기는 쪽도 ③의 잣대(outranks)다.
+ */
+export function dropOutrankedByPast<T extends DayLine>(future: T[], past: GroupedEvent[]): T[] {
+  const shots = past.filter((p) => p.precision === "day" && ONE_SHOT.has(eventKind(p.event)));
+  return future.filter((f) => {
+    if (f.precision !== "day") return true;
+    const kind = eventKind(f.event);
+    if (!ONE_SHOT.has(kind)) return true;
+    return !shots.some((p) => p.code === f.code && eventKind(p.event) === kind && dayDiff(p.date, f.date) <= NEAR_DAYS && outranks(p, f));
+  });
+}
+
+/**
+ * 지난 일정을 물어야 할 종목 — 한 채널 줄(dropAlreadyHappened)과, 오늘에서 NEAR_DAYS 안쪽인 한 번뿐인 일의 day 줄(dropOutrankedByPast).
+ * 그보다 먼 줄은 어제 이전 줄과 NEAR_DAYS 안에 들 수 없다.
+ */
+export function pastLookupCodes(future: Omit<DayLine, "firstSeen">[], today: string): string[] {
+  const near = (e: Omit<DayLine, "firstSeen">) => e.precision === "day" && ONE_SHOT.has(eventKind(e.event)) && dayDiff(e.date, today) < NEAR_DAYS;
+  return [...new Set(future.filter((e) => e.channels < 2 || near(e)).map((e) => e.code))];
 }
