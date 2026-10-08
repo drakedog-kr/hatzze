@@ -438,7 +438,8 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
           {/* 이번 하락이 급락형인지 완만형인지 — 고점에서 저점까지 CHARACTER_SPLIT_DAYS 안이면 급락형(사례 표 유형 칸과 같은 셈, 10-08 "있어야 한다"). */}
           {ch && (
             <div>
-              <dt>이번 하락</dt>
+              {/* 이름은 사례 표 머리 '유형'과 같은 낱말로(2026-10-09). */}
+              <dt>이번 하락 유형</dt>
               <dd>{kindName[ch.currentClass]}</dd>
             </div>
           )}

@@ -1239,6 +1239,17 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-reccol-plot > i > em { position: absolute; bottom: 100%; left: 50%; margin-bottom: 6px; transform: translateX(-50%); font-style: normal; font-size: 13px; font-weight: 600; line-height: 18px; color: var(--t-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .v2-md-reccol-k { flex: none; margin-top: 8px; text-align: center; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink2); white-space: nowrap; }
 .v2-md-reccol.is-now .v2-md-reccol-k { color: var(--t-ink); }
+/* 사례 표 옆(판 1,000 이상) — 이 칸의 가로선을 사례 표 줄 선(44 간격, 칸 바닥에서 위로)과 같은 높이에 둔다(2026-10-09).
+   ① 줄 둘은 칸 바닥에 붙인다 — 바닥 안쪽 14 만큼 떠 사례 표 선과 14px 어긋났다. 직전 큰 하락(같은 자리)도 같다.
+   ② 기둥 바닥선에서 줄 윗선까지 44 — 이름 칸을 표 한 줄처럼(위 13 · 아래 14). 38 이면 바닥선만 사례 선과 6px 어긋났다.
+   ③ 그림 하한 90 — 이 칸이 사례 표보다 길면 사례 줄이 44 보다 늘어 선이 다시 어긋난다(사례 5줄 종목 칸 294). */
+@container kd (min-width: 1000px) {
+  .v2-md-rec .v2-md-body,
+  .v2-md-lastdrop .v2-md-body { padding-bottom: 0; }
+  .v2-md-reccols { min-height: 90px; }
+  .v2-md-reccol-k { margin-top: 13px; }
+  .v2-md-rec .v2-md-kv { margin-top: 4px; }
+}
 /* 이름 · 값 줄 — 회복까지(이만큼 빠진 적 · 이번 하락)와 직전 큰 하락(고점 부근 종목의 회복까지 자리)이 함께 쓴다. */
 .v2-md-kv { flex: none; display: flex; flex-direction: column; margin: 4px 0 0; border-top: 1px solid var(--t-line); }
 .v2-md-kv > div { flex: none; display: flex; align-items: center; justify-content: space-between; min-height: 44px; border-bottom: 1px solid var(--t-line); font-variant-numeric: tabular-nums; }
