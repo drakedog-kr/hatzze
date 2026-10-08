@@ -483,7 +483,11 @@ jobs:
       #   → 종목 추출 → 종목 일별 집계.
       #   (상장사 사전은 이 잡 앞의 krx_master 잡이 돌린다. 이 잡은 그 잡을 기다린다.)
       # 각 스텝은 DB에서 읽어 이어가므로 하나가 실패해도 다음 스텝은 직전까지의
-      # 저장분으로 동작한다(graceful degradation). 지표용 실패 알림/요약과는
+      # 저장분으로 동작한다(graceful degradation).
+      # ⛔ **종목 추출 둘은 예외다**(2026-10-08 #684). 태그만 직전 실행 것이고 메시지·기간 판정은
+      #    이번 실행 것이라, 둘을 섞은 결과는 '어제 값'이 아니라 **반쪽 값**이다. 그래서 추출이 끝내
+      #    실패하면 그 시장 태그를 주재료로 읽는 스텝을 건너뛰어 직전 실행 판을 그대로 둔다
+      #    (아래 '종목 추출' 스텝 주석). 지표용 실패 알림/요약과는
       # 분리하려고 아래 Summarize results 집계 배열에는 넣지 않는다.
       # 대신 이 파이프라인의 '재료' 두 스텝(sync·fetch)만 따로 재는 집계·알림이
       # 잡 끝에 붙어 있다(Summarize 카더라 collection).
@@ -521,14 +525,46 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/calculate_channel_influence.py
 
+      # ── 종목 추출이 실패한 날(국장·미장 같은 규칙) ──────────────────────────
+      # 2026-10-08 저녁(run 37750316790) 추출이 연결 끊김으로 20초 만에 죽었는데 하류는 전부
+      # 돌았다. 태그는 아침 07시대 것이고 메시지는 저녁 것이라 그날 종목 일별이 61종목·93건
+      # (평소 800종목·4,399건)이었고, 급부상 기간은 `common/surging.window_end_for` 가
+      # **메시지** 시각으로 판정해 그 반쪽 하루를 넣었다. 테마 톤·급부상 한 줄·총평·테마 요약·
+      # 저녁 글이 다 그 재료로 나갔다. 사람이 21시에 손으로 다시 돌려 복구했다(#684).
+      #
+      # 그래서 세 겹으로 받는다.
+      #   ① 추출 스텝은 실패하면 60초 뒤 **한 번 더** 돈다. 스크립트 안의 재시도(execute_with_retry,
+      #      1·3·8초 세 번)가 못 넘는 긴 끊김·콜드 57014 를 받는다. 표 갈아 끼우기(replace_rows)가
+      #      upsert 뒤 옛 행 지우기라 두 번 돌려도 표가 안 망가진다. 평소 비용은 0이고, 실패한 날만
+      #      늦어진다(최근 소요 국장 18~31분 · 미장 7~13분, 끝에서 죽으면 그만큼).
+      #   ② 그래도 실패하면 그 시장 태그를 **주재료로** 읽는 스텝을 건너뛴다. 화면에는 직전 실행
+      #      판이 남는다 — 저녁이면 그날 아침 판이다. 아침 판은 오늘을 기간에서 빼고 한 줄 요약·총평·
+      #      테마 톤을 같은 아침 태그로 만들어 서로 맞는다(반쪽 재료로 다시 만든 판은 안 맞는다).
+      #      ⭐ 다른 시장 태그를 **곁으로만** 읽는 자리는 그대로 돈다 — 한 시장 실패가 짝 화면까지
+      #         직전 판에 묶지 않게(2026-10-08 결정). 그날 하루 덜 정확해지는 곳은 둘이다:
+      #         국장 트렌딩·센티먼트·총평의 '미장 글 빼기', 미장 종목 일별의 '국장 대 미장 배분'.
+      #      ⭐ 두 시장을 함께 쓰는 스텝(동시 언급)은 둘 다 성공해야 돈다. 한 스텝이 두 시장을 다
+      #         만드는 급부상 한 줄·등락 이유는 성공한 시장만 돈다(--kr-only / --us-only).
+      #   ③ 발송은 그 글이 등락 꼬리표를 다는 시장의 추출이 성공해야 나간다 — 저녁 글은 국장,
+      #      개장 전 요약은 미장(각 발송 스텝 주석).
+      #
+      # ⚠️ 새 스텝이 telegram_message_stocks · telegram_message_us_stocks 를 읽게 되면 여기 규칙에
+      #    맞춰 `if:` 를 달 것. 안 달면 그 스텝만 반쪽 재료로 돈다.
+      # ⚠️ 건너뛴 스텝은 아래 '국장 집계'·'미장 카더라' 요약표에 "추출 실패로 건너뜀"으로 적고
+      #    실패로 다시 세지 않는다. 추출 실패 하나로 알림은 이미 열린다.
       - name: (텔레그램) 종목 추출
         id: telegram_extract
         continue-on-error: true
-        run: python data-pipeline/scripts/extract_telegram_stocks.py
+        run: |
+          if python data-pipeline/scripts/extract_telegram_stocks.py; then exit 0; fi
+          echo "종목 추출이 실패해 60초 뒤 한 번 더 돌립니다(위 ①)"
+          sleep 60
+          python data-pipeline/scripts/extract_telegram_stocks.py
 
       - name: (텔레그램) 종목 일별 집계
         id: telegram_stock_daily
         continue-on-error: true
+        if: steps.telegram_extract.outcome == 'success'
         run: python data-pipeline/scripts/calculate_stock_daily.py
 
       # 급부상 카드에 오른 여섯이 유령인지 본다. 규칙이 제자리에 있나가 아니라 **결과**를
@@ -546,6 +582,7 @@ jobs:
       - name: (텔레그램) 급부상 카드 유령 감시
         id: telegram_phantom
         continue-on-error: true
+        if: steps.telegram_extract.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PHANTOM_JUDGED_ISSUES: /tmp/phantom_judged.json
@@ -562,14 +599,21 @@ jobs:
       #
       # ⚠️ 국내 추출(telegram_extract) **뒤에** 와야 한다. 동시 언급 집계가
       #    telegram_message_stocks 를 읽는데, 국내 추출이 그걸 매 실행 전량 재생성한다.
+      # 실패하면 한 번 더 돌고, 끝내 실패하면 미장 태그를 주재료로 읽는 스텝을 건너뛴다(국장 '종목 추출' 주석).
       - name: (텔레그램) 미국 종목 추출
         id: telegram_us_extract
         continue-on-error: true
-        run: python data-pipeline/scripts/extract_telegram_us_stocks.py
+        run: |
+          if python data-pipeline/scripts/extract_telegram_us_stocks.py; then exit 0; fi
+          echo "미국 종목 추출이 실패해 60초 뒤 한 번 더 돌립니다(국장 '종목 추출' 주석 ①)"
+          sleep 60
+          python data-pipeline/scripts/extract_telegram_us_stocks.py
 
+      # 국장 태그는 채널 집계의 '국장 대 미장 배분'에만 곁으로 쓴다 — 국장 추출이 실패해도 돈다(그날 배분만 덜 정확).
       - name: (텔레그램) 미국 종목·채널 일별 집계
         id: telegram_us_daily
         continue-on-error: true
+        if: steps.telegram_us_extract.outcome == 'success'
         run: python data-pipeline/scripts/calculate_us_stock_daily.py
 
       # ⚠️ **발송 스텝보다 앞에 둔다.** 아래 아침 발송이 파이프라인 중간으로 올라오면서
@@ -615,6 +659,11 @@ jobs:
       #    스크립트 안에도 짝이 되는 게이트가 있다(telegram_staleness_problems).
       # ⛔ 게이트를 **없앤 게 아니다.** 수집이 죽은 날은 두 겹 다 막는다.
       #
+      # ⚠️ **미국 종목 추출도 성공해야 나간다**(2026-10-08 결정, 국장 '종목 추출' 주석 ③).
+      #    이 글은 밤사이 발췌의 미국 종목 줄에 간밤 세션 등락을 단다. 추출이 죽으면 밤사이 글에
+      #    미국 태그가 없어 그 줄이 통째로 빠진 채 나간다. 국내 종목 줄은 개장 전이라 등락을 안
+      #    달아서 국장 추출은 조건에 넣지 않았다.
+      #
       # ⚠️ 5분 대기는 남겨 뒀다(요청받은 사항). 다만 뜻이 달라졌다 — '파이프라인 완료 후'가
       #    아니라 '집계가 표에 앉은 뒤'다. 이 시점의 화면은 급부상 카드까지는 오늘 것이고
       #    총평 문장은 아직 어제 것이다(그 스텝이 09:29 에 끝난다).
@@ -625,6 +674,7 @@ jobs:
         continue-on-error: true
         if: >-
           steps.telegram_coverage.outcome == 'success'
+          && steps.telegram_us_extract.outcome == 'success'
           && github.run_attempt == '1'
           && (
             (
@@ -702,14 +752,18 @@ jobs:
       #    테마 요약은 원래 국장이 먼저다.
       #    텔레그램 스텝이 만든 표 가운데 두 시장이 서로 읽는 것은 종목 추출 둘(telegram_message_stocks · _us_stocks)뿐이고 그
       #    둘은 위에서 이미 끝났다. 그래서 이 뒤의 순서는 어느 화면이 먼저 새로워지느냐만 가른다.
+      # ⚠️ 이 아래 `if:` 는 국장 '종목 추출' 주석 ②의 규칙이다. 국장 트렌딩·센티먼트·총평은 미장 태그를
+      #    '미장 글 빼기'에만 곁으로 써서 국장 추출만 본다. 동시 언급은 두 추출을 다 본다.
       - name: (텔레그램) 트렌딩 메시지 선별
         id: telegram_trending
         continue-on-error: true
+        if: steps.telegram_extract.outcome == 'success'
         run: python data-pipeline/scripts/calculate_telegram_trending.py
 
       - name: (텔레그램) 테마 일별 집계
         id: telegram_theme_daily
         continue-on-error: true
+        if: steps.telegram_extract.outcome == 'success'
         run: python data-pipeline/scripts/calculate_theme_daily.py
 
       # 미장 동시 언급·트렌딩·테마는 미국 종목 추출 바로 뒤여도 되지만(입력이 telegram_message_(us_)stocks
@@ -718,16 +772,19 @@ jobs:
       - name: (텔레그램) 미국×국내 동시 언급
         id: telegram_us_comention
         continue-on-error: true
+        if: steps.telegram_extract.outcome == 'success' && steps.telegram_us_extract.outcome == 'success'
         run: python data-pipeline/scripts/calculate_us_comention.py
 
       - name: (텔레그램) 미장 트렌딩 메시지 선별
         id: telegram_us_trending
         continue-on-error: true
+        if: steps.telegram_us_extract.outcome == 'success'
         run: python data-pipeline/scripts/calculate_us_trending.py
 
       - name: (텔레그램) 미장 테마 일별 집계
         id: telegram_us_theme
         continue-on-error: true
+        if: steps.telegram_us_extract.outcome == 'success'
         run: python data-pipeline/scripts/calculate_us_theme_daily.py
 
       # LLM 계층 — 메시지별 분류(돈이 드는 단계, 증분) → 결정적 집계 → 문장 생성.
@@ -743,6 +800,7 @@ jobs:
       - name: (텔레그램) 센티먼트·화제어 집계
         id: telegram_sentiment
         continue-on-error: true
+        if: steps.telegram_extract.outcome == 'success'
         run: python data-pipeline/scripts/calculate_telegram_sentiment.py
 
       # ⚠️ **미장 센티먼트는 여기 있어야 한다** — 위 미장 세 스텝 옆이 아니다.
@@ -753,6 +811,7 @@ jobs:
       - name: (텔레그램) 미장 센티먼트·화제어 집계
         id: telegram_us_sentiment
         continue-on-error: true
+        if: steps.telegram_us_extract.outcome == 'success'
         run: python data-pipeline/scripts/calculate_us_telegram_sentiment.py
 
       # 카더라 헤드라인 낙관도의 재료 — 글마다 '국내·미국 증시 전체'에 대한 분위기를 묻고 날짜별로 센다
@@ -777,22 +836,46 @@ jobs:
       #    마지막 날에서 집으므로 두 센티먼트 집계 뒤여야 한다. 앞에 두면 어제 날짜로
       #    저장돼 화면이 영영 못 찾는다.
       # ⚠️ 순서를 바꿔도 앞 단계 실패에 안 끌려간다 — 스텝마다 continue-on-error 다.
+      # ⚠️ 추출이 실패한 시장은 빼고 돈다(국장 '종목 추출' 주석 ②). 국장을 빼면 telegram_surging_window 도
+      #    안 쓰여 화면 급부상 카드가 직전 실행의 기간 그대로 남는다 — 그게 노린 것이다.
       - name: (텔레그램) 급부상 한 줄 요약 생성
         id: telegram_surging_oneliners
         continue-on-error: true
-        run: python data-pipeline/scripts/generate_surging_oneliners.py
+        if: steps.telegram_extract.outcome == 'success' || steps.telegram_us_extract.outcome == 'success'
+        env:
+          KR_TAGS: ${{ steps.telegram_extract.outcome }}
+          US_TAGS: ${{ steps.telegram_us_extract.outcome }}
+        run: |
+          only=""
+          [ "$KR_TAGS" = success ] || only="--us-only"
+          [ "$US_TAGS" = success ] || only="--kr-only"
+          python data-pipeline/scripts/generate_surging_oneliners.py $only
 
       # '왜 올랐나' — 그날 크게 움직인 종목에 채널이 말한 까닭. 저녁 실행에서만 만든다
       # (아침 슬롯은 `--slot morning` 을 받아 만들지 않고 KRX 확정값만 채운다).
       # 입력은 telegram_stock_daily(그날) + 메시지 본문이라 stock_daily 뒤면 어디든 된다.
       # ⚠️ 슬롯을 꼭 넘길 것. 한때 스크립트가 그날 글 수(1,500건)로 아침을 짐작했는데, 주말·연휴
       #    저녁도 그 아래라 2026-09-24~26 추석에 미장 판이 안 생겼다(스크립트 머리 주석).
+      # ⚠️ 추출이 실패한 시장은 빼고 돈다(국장 '종목 추출' 주석 ②). **저녁만이다** — 아침은 어느 판도
+      #    안 만들고 KRX 확정값만 채우는데(태그를 안 읽는다), --us-only 를 주면 그 채우기까지 빠진다.
       - name: (텔레그램) 등락 종목 까닭 생성
         id: telegram_move_reasons
         continue-on-error: true
+        if: >-
+          github.event.inputs.slot == 'morning'
+          || steps.telegram_extract.outcome == 'success'
+          || steps.telegram_us_extract.outcome == 'success'
         env:
           SLOT: ${{ github.event.inputs.slot }}
-        run: python data-pipeline/scripts/generate_move_reasons.py --slot "$SLOT"
+          KR_TAGS: ${{ steps.telegram_extract.outcome }}
+          US_TAGS: ${{ steps.telegram_us_extract.outcome }}
+        run: |
+          only=""
+          if [ "$SLOT" != morning ]; then
+            [ "$KR_TAGS" = success ] || only="--us-only"
+            [ "$US_TAGS" = success ] || only="--kr-only"
+          fi
+          python data-pipeline/scripts/generate_move_reasons.py --slot "$SLOT" $only
 
       # 국장 LLM 문장. 국장 센티먼트·테마·트렌딩이 전부 끝난 뒤여야 digest 가 찬다.
       # ⭐ 미장 총평보다 앞이다(2026-09-28, 위 트렌딩 머리 주석). 예전엔 미장 동시 언급·트렌딩·테마·
@@ -800,6 +883,7 @@ jobs:
       - name: (텔레그램) 총평·종목 요약 생성
         id: telegram_narratives
         continue-on-error: true
+        if: steps.telegram_extract.outcome == 'success'
         run: python data-pipeline/scripts/generate_telegram_narratives.py
 
       # ⚠️ **이 스텝은 테마 요약 두 스텝보다 앞에 있어야 한다.** 뒤에 두면 카더라 화면이 테마 요약 42회(국장 26 · 미장 16)를
@@ -834,6 +918,7 @@ jobs:
       - name: (텔레그램) 미장 총평·종목 요약 생성
         id: telegram_us_narratives
         continue-on-error: true
+        if: steps.telegram_us_extract.outcome == 'success'
         run: python data-pipeline/scripts/generate_us_telegram_narratives.py
 
       # 미장 카더라도 제 총평 직후에 비운다(위 국장 것과 같은 규칙). 이 화면이 읽는 표는 전부
@@ -850,6 +935,7 @@ jobs:
       - name: (텔레그램) 테마 요약 생성
         id: telegram_theme_briefs
         continue-on-error: true
+        if: steps.telegram_extract.outcome == 'success'
         run: python data-pipeline/scripts/generate_theme_briefs.py
 
       # 미장 테마 리포트(/theme/us/[테마]) — 위와 같은 것을 미장 테마 16개에. 기준일은 telegram_us_sentiment_daily 라
@@ -857,6 +943,7 @@ jobs:
       - name: (텔레그램) 미장 테마 요약 생성
         id: telegram_us_theme_briefs
         continue-on-error: true
+        if: steps.telegram_us_extract.outcome == 'success'
         run: python data-pipeline/scripts/generate_us_theme_briefs.py
 
       # ⭐ 테마 리포트도 자료가 쓰인 직후에 비운다(PR #543 의 규칙 그대로). 요약·급부상 이유가 방금 들어갔고,
@@ -1158,6 +1245,11 @@ jobs:
       #   (calculate_score) 화면엔 어제 값이 남는데, 그걸 방송하면 회수가 안 된다.
       #   스크립트 안에도 같은 취지의 게이트가 하나 더 있다(daily_score 행 날짜 검사) —
       #   워크플로 밖에서 손으로 돌릴 때를 막기 위해서다.
+      # [4-1] 국장 종목 추출 결과 — 저녁 글만(2026-10-08 결정, 위 '종목 추출' 주석 ③)
+      #   이 글은 오늘 발췌의 국내 종목 줄에 그날 등락을 달고, '오늘 처음 회자된 종목'·등락 이유를
+      #   종목 일별에서 집는다. 추출이 죽으면 셋 다 아침치 태그로 만들어져 얇게 나간다(10-08 저녁).
+      #   막힌 날은 국장 집계 알림을 보고 손으로 다시 돌리면 늦게라도 온전한 글이 나간다
+      #   (force=true · broadcast=evening). 화면은 그사이 아침 판에 머문다(위 ②).
       # [5] 요일 판정 — 아래 네 발송 스텝이 공유한다.
       #   **KST 기준으로 센다.** 러너는 UTC 라 `date +%u` 를 그냥 쓰면 요일이 밀릴 수
       #   있다(오후 실행 19:50 KST = 10:50 UTC 라 지금은 같은 날이지만, 큐 지연이 커지면
@@ -1179,7 +1271,8 @@ jobs:
       # (C 는 토요일에 나간다 — 재료가 시장 숫자가 아니라 카더라 채널 메시지라 주말에도
       #  새 이야기가 쌓인다. telegram-broadcast.yml 의 '발송 요일 판정' 주석 참고.)
       #
-      # 위 [1]~[4] 게이트는 두 스텝에 똑같이 걸린다. --ignore-staleness 는 **절대**
+      # 위 [1]~[4] 게이트는 두 스텝에 똑같이 걸린다([4-1] 은 저녁 글만 — 개장 전 요약은 미국 종목
+      # 추출을 본다. 그 스텝 주석). --ignore-staleness 는 **절대**
       # 여기 넣지 않는다 — 그걸 켜면 낡은 값 차단이 통째로 사라진다.
       #
       # [5] 완료 후 5분 — `sleep 300`
@@ -1195,6 +1288,7 @@ jobs:
         if: >-
           steps.check_freshness.outcome == 'success'
           && steps.calculate_score.outcome == 'success'
+          && steps.telegram_extract.outcome == 'success'
           && github.run_attempt == '1'
           && (
             ((github.event.schedule == '30 8 * * *' || github.event.schedule == '30 9 * * *') && steps.broadcast_when.outputs.weekday == 'true')
@@ -1422,6 +1516,12 @@ jobs:
         run: |
           names=("extract_telegram_stocks.py" "calculate_channel_influence.py" "calculate_stock_daily.py" "calculate_telegram_trending.py" "calculate_theme_daily.py" "calculate_telegram_sentiment.py" "generate_telegram_narratives.py" "generate_theme_briefs.py" "generate_move_reasons.py" "extract_telegram_events.py")
           outcomes=("${{ steps.telegram_extract.outcome }}" "${{ steps.telegram_influence.outcome }}" "${{ steps.telegram_stock_daily.outcome }}" "${{ steps.telegram_trending.outcome }}" "${{ steps.telegram_theme_daily.outcome }}" "${{ steps.telegram_sentiment.outcome }}" "${{ steps.telegram_narratives.outcome }}" "${{ steps.telegram_theme_briefs.outcome }}" "${{ steps.telegram_move_reasons.outcome }}" "${{ steps.telegram_events.outcome }}")
+          # 스텝마다 기대는 추출의 결과(없으면 빈칸). 추출이 실패해 `if:` 로 건너뛴 스텝은 실패로 다시
+          # 세지 않는다 — 추출 실패 하나로 알림은 이미 열리고, 목록이 열 줄로 불면 원인이 묻힌다.
+          # 추출이 멀쩡한데 skipped 면 잡이 앞에서 멈춘 것이라 예전처럼 실패로 센다.
+          kr="${{ steps.telegram_extract.outcome }}"
+          us="${{ steps.telegram_us_extract.outcome }}"
+          gates=("" "" "$kr" "$kr" "$kr" "$kr" "$kr" "$kr" "$kr $us" "")
 
           {
             echo "## 국장 집계"
@@ -1434,6 +1534,12 @@ jobs:
           for i in "${!names[@]}"; do
             script="${names[$i]}"
             outcome="${outcomes[$i]}"
+            if [ "$outcome" = "skipped" ] && [[ "${gates[$i]}" == *failure* ]]; then
+              outcome="skipped (추출 실패로 건너뜀)"
+              echo "$script: $outcome"
+              echo "| $script | $outcome |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
             echo "$script: $outcome"
             echo "| $script | $outcome |" >> "$GITHUB_STEP_SUMMARY"
             [ "$outcome" = "success" ] || { failed=1; failed_list="${failed_list:+$failed_list, }$script"; }
@@ -1441,6 +1547,10 @@ jobs:
 
           echo "failed=$failed" >> "$GITHUB_OUTPUT"
           echo "KR_CALC_FAILED_SCRIPTS=$failed_list" >> "$GITHUB_ENV"
+          # 알림 본문에 붙일 한 문단(printf %b 로 펼친다). 추출이 멀쩡하면 빈칸이다.
+          if [ "$kr" = "failure" ]; then
+            echo 'KR_EXTRACT_NOTE=\n\n**종목 추출이 재시도까지 실패해 국장 태그를 읽는 스텝을 건너뛰었습니다.** 카더라·테마 화면은 직전 실행 판 그대로이고, 평일 저녁 실행이면 저녁 글도 막혔습니다. 미장 쪽은 돌았고 그중 미장 종목 일별의 국장 대 미장 배분만 그날 덜 정확합니다. 지금 채우려면 Actions 에서 이 워크플로를 손으로 다시 돌릴 것(force=true · 저녁 글까지 보내려면 broadcast=evening).' >> "$GITHUB_ENV"
+          fi
 
       - name: Alert on 국장 집계 failure (open/update GitHub issue)
         if: ${{ !cancelled() && steps.telegram_calc_health.outputs.failed == '1' }}
@@ -1453,8 +1563,8 @@ jobs:
           # ⚠️ 본문은 **한 줄**로 둔다. 여러 줄로 적으면 이어지는 줄이 1열에 놓여
           #    블록 스칼라가 거기서 끊기고, 워크플로 파일 전체가 파싱에 실패한다
           #    (그러면 이 잡만이 아니라 그날 파이프라인이 통째로 안 돈다).
-          note=$(printf '카더라 화면을 채우는 집계 스텝이 실패했습니다. 그 시점의 값이 화면에 그대로 남아 있습니다(수집 자체는 별개이며, 그쪽이 멀쩡하면 원문은 계속 쌓입니다).\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n먼저 볼 것: job 로그의 해당 스텝 traceback.\n\n`statement timeout(57014)` 이라면 **전에 겪은 그것과는 다른 원인입니다.** 10만 행대 표 셋(`telegram_messages`·`telegram_message_analysis`·`telegram_message_stocks`)을 읽는 자리는 2026-08-13 에 전부 키셋으로 옮겼습니다(`common/supabase_client.load_keyset`). 남은 OFFSET 은 `stocks`·`telegram_channels` 같은 작은 표뿐이고, `calculate_channel_influence` 의 `count=exact` 도 같은 날 실측으로 콜드 0.34초·웜 0.06초라 후보가 아닙니다.\n\n일곱 스텝 모두 전량 재계산이라 **다음 실행이 성공하면 과거분까지 저절로 복구**됩니다. 며칠 연속 열리면 그때는 미루지 말 것.' \
-            "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
+          note=$(printf '카더라 화면을 채우는 집계 스텝이 실패했습니다. 그 시점의 값이 화면에 그대로 남아 있습니다(수집 자체는 별개이며, 그쪽이 멀쩡하면 원문은 계속 쌓입니다).\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s%b\n\n먼저 볼 것: job 로그의 해당 스텝 traceback.\n\n`statement timeout(57014)` 이라면 **전에 겪은 그것과는 다른 원인입니다.** 10만 행대 표 셋(`telegram_messages`·`telegram_message_analysis`·`telegram_message_stocks`)을 읽는 자리는 2026-08-13 에 전부 키셋으로 옮겼습니다(`common/supabase_client.load_keyset`). 남은 OFFSET 은 `stocks`·`telegram_channels` 같은 작은 표뿐이고, `calculate_channel_influence` 의 `count=exact` 도 같은 날 실측으로 콜드 0.34초·웜 0.06초라 후보가 아닙니다.\n\n일곱 스텝 모두 전량 재계산이라 **다음 실행이 성공하면 과거분까지 저절로 복구**됩니다. 며칠 연속 열리면 그때는 미루지 말 것.' \
+            "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url" "${KR_EXTRACT_NOTE:-}")
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body "$note"
@@ -1595,6 +1705,10 @@ jobs:
         run: |
           names=("extract_telegram_us_stocks.py" "calculate_us_stock_daily.py" "calculate_us_comention.py" "calculate_us_trending.py" "calculate_us_theme_daily.py" "calculate_us_telegram_sentiment.py" "generate_us_telegram_narratives.py" "generate_us_theme_briefs.py")
           outcomes=("${{ steps.telegram_us_extract.outcome }}" "${{ steps.telegram_us_daily.outcome }}" "${{ steps.telegram_us_comention.outcome }}" "${{ steps.telegram_us_trending.outcome }}" "${{ steps.telegram_us_theme.outcome }}" "${{ steps.telegram_us_sentiment.outcome }}" "${{ steps.telegram_us_narratives.outcome }}" "${{ steps.telegram_us_theme_briefs.outcome }}")
+          # 스텝마다 기대는 추출의 결과 — 국장 집계 요약과 같은 규칙. 동시 언급은 두 추출을 다 본다.
+          kr="${{ steps.telegram_extract.outcome }}"
+          us="${{ steps.telegram_us_extract.outcome }}"
+          gates=("" "$us" "$kr $us" "$us" "$us" "$us" "$us" "$us")
 
           {
             echo "## 미장 카더라"
@@ -1607,6 +1721,12 @@ jobs:
           for i in "${!names[@]}"; do
             script="${names[$i]}"
             outcome="${outcomes[$i]}"
+            if [ "$outcome" = "skipped" ] && [[ "${gates[$i]}" == *failure* ]]; then
+              outcome="skipped (추출 실패로 건너뜀)"
+              echo "$script: $outcome"
+              echo "| $script | $outcome |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
             echo "$script: $outcome"
             echo "| $script | $outcome |" >> "$GITHUB_STEP_SUMMARY"
             [ "$outcome" = "success" ] || { failed=1; failed_list="${failed_list:+$failed_list, }$script"; }
@@ -1614,6 +1734,10 @@ jobs:
 
           echo "failed=$failed" >> "$GITHUB_OUTPUT"
           echo "US_FAILED_SCRIPTS=$failed_list" >> "$GITHUB_ENV"
+          # 알림 본문에 붙일 한 문단(printf %b 로 펼친다). 추출이 멀쩡하면 빈칸이다.
+          if [ "$us" = "failure" ]; then
+            echo 'US_EXTRACT_NOTE=\n\n**미국 종목 추출이 재시도까지 실패해 미장 태그를 읽는 스텝을 건너뛰었습니다.** 미장 카더라·테마 화면은 직전 실행 판 그대로이고, 평일 아침 실행이면 개장 전 요약도 막혔습니다. 국장 쪽은 돌았고 그중 트렌딩·센티먼트·총평의 미장 글 빼기만 그날 덜 정확합니다. 지금 채우려면 Actions 에서 이 워크플로를 손으로 다시 돌릴 것(force=true).' >> "$GITHUB_ENV"
+          fi
 
       - name: Alert on 미장 failure (open/update GitHub issue)
         if: ${{ !cancelled() && steps.us_health.outputs.failed == '1' }}
@@ -1623,8 +1747,8 @@ jobs:
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           failed="${US_FAILED_SCRIPTS:-요약 탭에서 확인}"
           title="⚠️ 미장 카더라 집계 중단"
-          note=$(printf '미장 스텝이 실패했습니다. 미국 종목 언급·집계가 그 시점에 멈춰 있습니다(국내는 영향 없습니다).\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n먼저 볼 것: job 로그의 해당 스텝 traceback. 지금까지 나온 고장은 `statement timeout(57014)` 하나이고, 원인은 전량 조회의 페이징이었다(load_messages 주석 참고).\n\n모든 스텝이 전량 재계산이라 **다음 실행이 성공하면 과거분까지 저절로 복구**됩니다. 며칠 연속 열리면 그때는 조회가 표 크기를 못 버티는 것이니 페이징·창을 볼 것.' \
-            "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
+          note=$(printf '미장 스텝이 실패했습니다. 미국 종목 언급·집계가 그 시점에 멈춰 있습니다(국내는 영향 없습니다).\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s%b\n\n먼저 볼 것: job 로그의 해당 스텝 traceback. 지금까지 나온 고장은 `statement timeout(57014)` 하나이고, 원인은 전량 조회의 페이징이었다(load_messages 주석 참고).\n\n모든 스텝이 전량 재계산이라 **다음 실행이 성공하면 과거분까지 저절로 복구**됩니다. 며칠 연속 열리면 그때는 조회가 표 크기를 못 버티는 것이니 페이징·창을 볼 것.' \
+            "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url" "${US_EXTRACT_NOTE:-}")
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body "$note"
