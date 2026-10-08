@@ -554,8 +554,6 @@ export function PriceChart({
   const x = (i: number) => PAD_L + (i / (n - 1)) * (W - PAD_L);
   const y = (v: number) => PAD_T + (1 - (v - min) / (max - min)) * (H - PAD_T - PAD_B);
 
-  const line = bars.map((b, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(b.close).toFixed(1)}`).join(" ");
-  const area = `${line} L${W},${H - PAD_B} L${PAD_L},${H - PAD_B} Z`;
 
   // 가로축 — 달이 바뀌는 지점. 일봉 반년이면 6~7개라 겹치지 않는다. 해가 바뀌는 1월은 '26년'으로 — 2년 차트에 같은 달 이름이
   // 두 번 나와 어느 해인지 몰랐다(2026-10-04 점검).
@@ -624,8 +622,10 @@ export function PriceChart({
   // ⭐ 겹친 표식 — 나중에 그려 위에 선 것(앞)을 흐리게 해 아래 것이 비쳐 보이게 한다(2026-10-05 운영자 판단 "겹쳐 있다는 걸 표현").
   //    같은 봉의 다른 축(완전히 같은 자리)과 가까운 날끼리 반쯤 겹친 것 둘 다다. 문턱은 두 모양이 맞닿는 거리(반지름 둘 남짓 —
   //    마름모 · 네모 모서리가 원보다 1.2배 나간다). 흐리는 건 '전체'를 볼 때만(sheets.css) — 한 축만 고르면 나머지가 흐려져 겹침이 없다.
-  const ctr = drawn.map((s) => [x(s.i), y(bars[s.i].close)] as const);
-  const over = drawn.map((_, k) => ctr.slice(0, k).some(([px, py]) => Math.hypot(px - ctr[k][0], py - ctr[k][1]) < MARK_R * 2.2));
+  const overOf = (xv: (i: number) => number) => {
+    const ctr = drawn.map((s) => [xv(s.i), y(bars[s.i].close)] as const);
+    return drawn.map((_, k) => ctr.slice(0, k).some(([px, py]) => Math.hypot(px - ctr[k][0], py - ctr[k][1]) < MARK_R * 2.2));
+  };
 
   /**
    * 호버에 뜰 한 줄 — **누가 · 언제 · 얼마나.**
@@ -657,36 +657,32 @@ export function PriceChart({
       .join(" · ");
   };
 
-  return (
-    <div className="hz-chart-axes" style={{ ["--hz-chart-y" as string]: "44px" }}>
-      {/* 세로축 — 값이 무엇인지 안 적으면 축이 0 에서 시작하지 않는다는 걸 알 길이 없다.
-          ⚠️ 두 통화를 다 그려 두고 CSS 가 하나만 보여 준다 — 화면의 다른 금액과 같은 수다. */}
-      <div className="hz-chart-y" aria-hidden>
-        {rows.map((v, i) => (
-          <Fragment key={i}>
-            <span className="hz-krw" style={{ top: `${(y(v) / H) * 100}%` }}>
-              {rate ? `${(Math.round((v * rate) / 1000) / 10).toFixed(1)}만` : `$${Math.round(v)}`}
-            </span>
-            <span className="hz-usd" style={{ top: `${(y(v) / H) * 100}%` }}>
-              ${Math.round(v).toLocaleString("en-US")}
-            </span>
-          </Fragment>
-        ))}
-      </div>
-    <div style={{ position: "relative", minWidth: 0 }}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", overflow: "visible" }} role="img"
-           aria-label={`주가 ${bars[0].date}~${bars[n - 1].date}, 매매 시점 ${marks.length}곳`}>
+  /**
+   * 그림 한 벌 — 뷰박스 폭(VW)만 다르다. 폰(≤679)은 360 짜리를 쓴다(v2.css): 720 을 화면 폭(≈290)에 눌러 담으면
+   * 키 70 · 표식 지름 3px 로 납작했다(2026-10-08). 표식이 SVG 안이라 높이만 늘리면 동그라미가 타원이 된다 — 그래서 한 벌 더 그린다.
+   * 위에 얹는 HTML(호버 띠 · 표식 손닿는 자리 · 축 글자)은 자리가 비율(%)이라 두 벌이 같이 쓴다.
+   * ⚠️ 그라데이션 id 를 벌마다 다르게 — 숨은(display:none) 그림의 defs 를 가리키면 면이 안 칠해진다.
+   */
+  const svgOf = (VW: number, cls: "is-wide" | "is-narrow", gid: string) => {
+    const xv = (i: number) => PAD_L + (i / (n - 1)) * (VW - PAD_L);
+    const line = bars.map((b, i) => `${i === 0 ? "M" : "L"}${xv(i).toFixed(1)},${y(b.close).toFixed(1)}`).join(" ");
+    const area = `${line} L${VW},${H - PAD_B} L${PAD_L},${H - PAD_B} Z`;
+    const over = overOf(xv);
+    return (
+      <svg className={`hz-pc-svg ${cls}`} viewBox={`0 0 ${VW} ${H}`} width="100%" style={{ overflow: "visible" }} role="img"
+           aria-hidden={cls === "is-narrow" ? true : undefined}
+           aria-label={cls === "is-narrow" ? undefined : `주가 ${bars[0].date}~${bars[n - 1].date}, 매매 시점 ${marks.length}곳`}>
         <defs>
-          <linearGradient id="hz-pc" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--c-blue)" stopOpacity="0.28" />
             <stop offset="100%" stopColor="var(--c-blue)" stopOpacity="0.03" />
           </linearGradient>
         </defs>
         {/* shadcn 영역 차트 꼴(MDD 언더워터와 같은 방식) — 격자는 옅은 가로 실선, 선은 화면에서 늘 1px(non-scaling-stroke). */}
         {gridRows.map((v, i) => (
-          <line key={i} x1={PAD_L} y1={y(v)} x2={W} y2={y(v)} stroke={C.line} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          <line key={i} x1={PAD_L} y1={y(v)} x2={VW} y2={y(v)} stroke={C.line} strokeWidth="1" vectorEffect="non-scaling-stroke" />
         ))}
-        <path d={area} fill="url(#hz-pc)" />
+        <path d={area} fill={`url(#${gid})`} />
         {/* ⚠️ 선을 먼저, 마커를 나중에. **고리 안으로 선이 지나가면 안 된다** — 순서를
             뒤집어 봤다가 되돌렸다. 마커가 선을 덮는 게 맞는 그림이다.
             ⚠️ 선은 마우스를 안 먹는다. 안 그러면 마커 호버 영역을 가린다. */}
@@ -713,7 +709,7 @@ export function PriceChart({
               key={`${s.i}-${s.who}`}
               shape={SHAPE_OF[s.who]}
               className={`hz-mk hz-mk-${s.who}${over[k] ? " is-over" : ""}`}
-              cx={x(s.i)}
+              cx={xv(s.i)}
               cy={y(bars[s.i].close)}
               r={MARK_R}
               fill={buyish ? color : "var(--c-card)"}
@@ -723,6 +719,30 @@ export function PriceChart({
           );
         })}
       </svg>
+    );
+  };
+  // 표식 손닿는 자리의 폭 — 뷰박스 폭에 비례한다(폰은 v2.css 가 --hz-mkw 를 좁은 값으로 바꾼다).
+  const mkw = (VW: number) => `${(((MARK_R + 2.4) * 2) / VW) * 100}%`;
+
+  return (
+    <div className="hz-chart-axes" style={{ ["--hz-chart-y" as string]: "44px" }}>
+      {/* 세로축 — 값이 무엇인지 안 적으면 축이 0 에서 시작하지 않는다는 걸 알 길이 없다.
+          ⚠️ 두 통화를 다 그려 두고 CSS 가 하나만 보여 준다 — 화면의 다른 금액과 같은 수다. */}
+      <div className="hz-chart-y" aria-hidden>
+        {rows.map((v, i) => (
+          <Fragment key={i}>
+            <span className="hz-krw" style={{ top: `${(y(v) / H) * 100}%` }}>
+              {rate ? `${(Math.round((v * rate) / 1000) / 10).toFixed(1)}만` : `$${Math.round(v)}`}
+            </span>
+            <span className="hz-usd" style={{ top: `${(y(v) / H) * 100}%` }}>
+              ${Math.round(v).toLocaleString("en-US")}
+            </span>
+          </Fragment>
+        ))}
+      </div>
+    <div className="hz-pc-box" style={{ position: "relative", minWidth: 0, ["--hz-mkw-w" as string]: mkw(W), ["--hz-mkw-n" as string]: mkw(360) }}>
+      {svgOf(W, "is-wide", "hz-pc")}
+      {svgOf(360, "is-narrow", "hz-pc-n")}
       {/* 호버 띠 — 데이터 점마다 하나. MDD 크로스헤어와 같은 어법이라 새 언어를 안 만든다. */}
       <div
         className="hz-xhair"
@@ -773,7 +793,7 @@ export function PriceChart({
         const at2 = (cx - PAD_L) / (W - PAD_L);
         const edge = at2 > 0.66 ? " hz-tip-end" : at2 < 0.34 ? " hz-tip-start" : "";
         // 뷰박스 비율로 크기와 자리를 잡는다 — 창이 달라져도 점과 손닿는 자리가 같이 움직인다.
-        const wPct = (((MARK_R + 2.4) * 2) / W) * 100;
+        // 폭은 그림 벌(넓은 · 좁은)마다 달라 CSS 변수(--hz-mkw)로 받는다. 세로 반폭은 (반지름 + 2.4) ÷ H 라 두 벌이 같다.
         return (
           <div
             key={`spot-${i}`}
@@ -785,10 +805,10 @@ export function PriceChart({
               //    `position: fixed` 자손의 컨테이닝 블록이 되는데, 이 화면의 말풍선은 시트의
               //    `overflow: hidden` 을 피하려고 fixed 로 서 있다. 그래서 점에 translate 를
               //    주는 순간 **말풍선이 다시 카드 경계에서 잘렸다.** 절반만큼 미리 빼서 놓는다.
-              left: `${(cx / W) * 100 - wPct / 2}%`,
+              left: `calc(${(cx / W) * 100}% - var(--hz-mkw, var(--hz-mkw-w)) / 2)`,
               // 세로는 컨테이너 높이 기준이라 가로세로 비를 곱해 환산한다(둘 다 같이 늘어난다).
-              top: `${(cy / H) * 100 - (wPct / 2) * (W / H)}%`,
-              width: `${wPct}%`,
+              top: `${(cy / H) * 100 - ((MARK_R + 2.4) / H) * 100}%`,
+              width: "var(--hz-mkw, var(--hz-mkw-w))",
               aspectRatio: "1",
               // 겹쳐 있으면 맨 위 마커의 색으로 불을 켠다.
               ["--mk" as string]: list[list.length - 1].buy >= list[list.length - 1].sell ? SIDE_COLOR.buy : SIDE_COLOR.sell,
