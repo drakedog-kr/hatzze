@@ -45,7 +45,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import PAGE_SIZE, get_client, replace_rows  # noqa: E402
+from common.supabase_client import PAGE_SIZE, get_client, load_window_keyset, replace_rows  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
 from config.stock_extraction import is_house  # noqa: E402
 
@@ -190,10 +190,11 @@ def us_only_keys(db, rows: list[dict]) -> set[tuple[str, int]]:
     return us - kr
 
 
-def pick_top(db, start: datetime) -> tuple[list[dict], int]:
+def pick_top(db, start: datetime, whole_window: bool = False) -> tuple[list[dict], int]:
     """창 안에서 점수 상위 STORE_N 건과, 그 앞에서 뺀 미장 전용 글의 수.
 
-    후보는 조회수 순 CANDIDATES 건에서 고른다.
+    후보는 조회수 순 CANDIDATES 건에서 고른다. `whole_window` 면 그 후보를 DB 에 맡기지 않고
+    창 안 행을 전부 받아 여기서 자른다('오늘' 창 전용 — 아래 ⛔ 문단).
 
     ⚠️ **줄 세울 때는 본문을 받지 않는다.** 점수(score)가 조회·공유·댓글만 쓰므로 본문은
     정렬에 아무 쓸모가 없는데, 같이 실으면 DB 가 **본문을 품은 넓은 행 수만 건을 정렬**
@@ -213,17 +214,38 @@ def pick_top(db, start: datetime) -> tuple[list[dict], int]:
 
     본문은 아래에서 후보 id 로 따로 받는다. 받는 대상이 같으니 결과는 같다 —
     필터(`text is not null`)·정렬(`views desc`)·후보 수가 그대로이기 때문이다.
+
+    ⛔ **'오늘' 창은 줄 세우기를 DB 에 맡기지 않는다**(2026-10-08). 본문을 뺀 뒤에도 그
+    질의는 플래너가 views 인덱스(migration_026)를 걷는 계획을 고를 수 있고, 오늘 글은 아직
+    조회수가 낮아 인덱스 끝자락에 몰려 있으니 200건을 채우려면 표를 거의 다 걷는다. 표가
+    41.9만 행이 된 2026-10-08 저녁 실행이 이 자리에서 다시 57014 로 죽었다(run 37750316790).
+    같은 날 실측: 콜드 6.86초 → 웜 0.46·0.12·0.11초. 7일·30일 창은 같은 때 0.41초·0.06초다
+    — 창 안에 조회수 높은 글이 많아 금방 200건을 채운다.
+
+    그래서 '오늘' 창만 창 안 행을 `(posted_at, id)` 키셋으로 전부 받아(load_window_keyset)
+    여기서 조회수 순으로 자른다. 창이 하루치라 행 수가 묶여 있다 — 같은 날 4,456행 5쪽,
+    쪽 최악 0.11초·총 0.41초였고, 고른 200건은 DB 가 고른 것과 한 건도 다르지 않았다
+    (하루·3일 창으로 넓혀도 같았다).
     """
-    rows = (
-        db.table("telegram_messages")
-        .select("id,channel_handle,message_id,views,forwards,replies,posted_at")
-        .gte("posted_at", start.isoformat())
-        .not_.is_("text", "null")
-        .order("views", desc=True, nullsfirst=False)
-        .limit(CANDIDATES)
-        .execute()
-        .data
-    ) or []
+    cols = "id,channel_handle,message_id,views,forwards,replies,posted_at"
+    if whole_window:
+        rows = load_window_keyset(
+            db, "telegram_messages", cols, start.isoformat(), narrow=lambda q: q.not_.is_("text", "null")
+        )
+        # DB 의 `views desc nulls last` 와 같은 순서.
+        rows.sort(key=lambda m: (m.get("views") is None, -(m.get("views") or 0)))
+        rows = rows[:CANDIDATES]
+    else:
+        rows = (
+            db.table("telegram_messages")
+            .select(cols)
+            .gte("posted_at", start.isoformat())
+            .not_.is_("text", "null")
+            .order("views", desc=True, nullsfirst=False)
+            .limit(CANDIDATES)
+            .execute()
+            .data
+        ) or []
     # 미장 전용 글은 **본문을 받기 전에** 뺀다 — 어차피 안 실을 것의 본문까지 나를
     # 이유가 없다.
     drop = us_only_keys(db, rows)
@@ -297,7 +319,7 @@ def main() -> None:
 
     for key, days in WINDOWS:
         start = window_start(days)
-        top, dropped = pick_top(db, start)
+        top, dropped = pick_top(db, start, whole_window=days is None)
         tags = stock_tags(db, top)
         for rank, m in enumerate(top, 1):
             payload.append(

@@ -49,7 +49,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.supabase_client import get_client  # noqa: E402
+from common.supabase_client import execute_with_retry, get_client  # noqa: E402
 from common.supabase_client import load_all  # noqa: E402
 # 표 갈아 끼우기는 집계 표들도 쓰게 되어 common 으로 옮겼다(2026-10-01). 미장 짝이 여기서 가져가므로 이름을 남긴다.
 from common.supabase_client import replace_rows  # noqa: E402, F401
@@ -671,7 +671,10 @@ def load_messages(db) -> list[dict]:
         )
         if last_id:
             q = q.gt("id", last_id)
-        page = q.execute().data
+        # 연결이 끊기면 같은 페이지를 다시 받는다(execute_with_retry 주석). 2026-10-08 저녁
+        # 실행이 스텝 시작 20초 만에 이 루프에서 `RemoteProtocolError: ConnectionTerminated` 로
+        # 죽었다 — 08-27 에 재시도를 load_all·load_keyset 에만 달아 손수 짠 이 루프가 빠져 있었다.
+        page = execute_with_retry(q).data
         if not page:
             break
         msgs += page

@@ -265,7 +265,9 @@ def load_messages(db) -> list[dict]:
         )
         if last_id:
             q = q.gt("id", last_id)
-        page = q.execute().data
+        # 연결이 끊기면 같은 페이지를 다시 받는다. 국내 짝이 2026-10-08 저녁 이 루프에서
+        # `ConnectionTerminated` 로 죽었다(extract_telegram_stocks.load_messages 주석).
+        page = execute_with_retry(q).data
         if not page:
             break
         msgs += page
