@@ -383,8 +383,10 @@ export function CasesTable({
 /**
  * '회복까지' — 이 칸의 질문 셋에 쉬운 낱말로 바로 답한다(2026-10-08 Hun "무슨 뜻인지 모르겠다").
  *   ① 얼마나 올라야 하나 — 큰 숫자 '전고점까지 +38.4%'. 제목과 이어 '회복까지 +38.4%'로 읽힌다. '지금 낙폭'(−27.7%)과 다른 숫자다.
- *   ② 과거엔 얼마나 걸렸나 — 이만큼 빠진 적 · 그중 회복 · 저점에서 회복까지(보통) · 가장 오래 걸린 회복.
- *   ③ 지금은 어디쯤 — 이번 하락의 꼴(급락형 · 완만형) · 저점 이후 지난 기간. 뒤엣것은 ②의 '저점에서 회복까지'와 같은 기준이다.
+ *   ② 과거엔 얼마나 걸렸나 — 이만큼 빠진 적(n번 중 m번 회복) · 저점에서 회복까지(보통).
+ *   ③ 이런 꼴은 얼마나 — 이번 하락의 꼴(급락형 · 완만형), 바로 아래 같은 꼴 하락의 회복 기간, 다른 꼴은 견줄 거리로(옛 꼴별 두 줄,
+ *      Hun "역사적으로 이런 형태의 하락이 회복까지 얼마나 걸린지 보여 주는 게 좋다").
+ *   ④ 지금은 어디쯤 — 저점 이후 지난 기간. ②의 '저점에서 회복까지'와 같은 기준이다.
  * ⛔ 한 줄에 정보 하나 · 지시어('그때')로 다른 자리를 가리키지 않는다 — 막대 · 꼴별 줄 · '그때 하락'을 두었더니
  *    서로를 가리켜 따라가기 어려웠다(같은 날 Hun).
  * ⭐ 문턱은 지금 낙폭 그대로(소수 한 자리) — 반올림하면(23.9 → 24) 센 하락과 글자가 조금 어긋난다.
@@ -399,7 +401,10 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
   const toPeak = a.price > 0 ? (a.ath / a.price - 1) * 100 : null;
   // 처음이면 이 기간에 되찾은 (지금보다 얕은) 하락 중 가장 깊은 것 — 과거 회복을 가늠할 유일한 자료다.
   const shallow = firstTime ? a.topDrawdowns.find((e) => e.recovered) : undefined;
-  const hasMax = r.recoveredCount >= 2 && r.maxDays !== null && r.medianDays !== null && r.maxDays > r.medianDays;
+  // 꼴별 회복 기간 — 지금만큼 깊었다 되찾은 하락이 셋 이상일 때만 있다(lib/mdd.ts drawdownCharacter). 이번 꼴을 먼저, 다른 꼴은 견줄 거리로.
+  const ch = a.character;
+  const kindName = { fast: "급락형", slow: "완만형" } as const;
+  const kinds = ch && (ch.fast || ch.slow) ? ([ch.currentClass, ch.currentClass === "fast" ? "slow" : "fast"] as const) : [];
   return (
     <Module title="회복까지" className="v2-md-rec">
       <div className="v2-md-body">
@@ -416,24 +421,12 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
         <dl className="v2-md-kv">
           <div>
             <dt>{depth}</dt>
-            <dd>{firstTime ? "이번이 처음" : `${r.similarCount}번`}</dd>
+            <dd>{firstTime ? "이번이 처음" : `${r.similarCount}번 중 ${r.recoveredCount}번 회복`}</dd>
           </div>
-          {!firstTime && (
-            <div>
-              <dt>그중 회복</dt>
-              <dd>{r.recoveredCount}번</dd>
-            </div>
-          )}
           {!firstTime && (
             <div>
               <dt>저점에서 회복까지</dt>
               <dd>{r.recoveredCount === 1 ? fmtDur(r.medianDays!) : `보통 ${fmtDur(r.medianDays!)}`}</dd>
-            </div>
-          )}
-          {hasMax && (
-            <div>
-              <dt>가장 오래 걸린 회복</dt>
-              <dd>{fmtDur(r.maxDays!)}</dd>
             </div>
           )}
           {shallow && (
@@ -443,12 +436,21 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
             </div>
           )}
           {/* 이번 하락이 급락형인지 완만형인지 — 고점에서 저점까지 CHARACTER_SPLIT_DAYS 안이면 급락형(사례 표 유형 칸과 같은 셈, 2026-10-08 Hun "있어야 한다"). */}
-          {a.character && (
+          {ch && (
             <div>
               <dt>이번 하락</dt>
-              <dd>{a.character.currentClass === "fast" ? "급락형" : "완만형"}</dd>
+              <dd>{kindName[ch.currentClass]}</dd>
             </div>
           )}
+          {kinds.map((key) => {
+            const k = ch![key];
+            return (
+              <div key={key}>
+                <dt>{kindName[key]} 회복까지</dt>
+                <dd>{k ? (k.count === 1 ? `${fmtDur(k.medianRecovery)} 걸림` : `보통 ${fmtDur(k.medianRecovery)}`) : "기록 없음"}</dd>
+              </div>
+            );
+          })}
           <div>
             <dt>저점 이후</dt>
             <dd>{sinceLow === 0 ? "오늘이 저점" : `${fmtDur(sinceLow)}째`}</dd>
