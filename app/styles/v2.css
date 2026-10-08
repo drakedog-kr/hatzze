@@ -2729,12 +2729,19 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-isd-facts b span { margin-left: 1px; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-isd-facts em { font-style: normal; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); }
 /* 펼친 종목 목록(옆 칸이 이 모듈 하나일 때) — 로고 16 · 티커 한 줄씩. 폰은 옆으로 흘린다(아래 폰 규칙). */
-.v2-isd-tklist { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; }
+.v2-isd-tklist { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 0; padding: 0; list-style: none; }
+/* 줄은 flex — 블록 줄이면 로고 그림(img) 줄은 글자 기준선 아래 몫까지 23, 글자 배지(DVA) 줄은 21 이라 줄 사이가 22~30 으로 들쭉날쭉했다. */
+.v2-isd-tklist > li { display: flex; align-items: center; }
 .v2-isd-tklist .v2-isd-tk { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; line-height: 18px; }
 .v2-isd-tkmore { font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); }
+/* '외 N'에 올리면 가려진 티커(page.tsx restTip) — 점선 밑줄이 말풍선 자리 표시. 세로 목록에선 글자 폭만(줄 폭 전체가 앵커면 말풍선이 칸 가운데 떴다).
+   접힌 줄(em) 안에선 그 줄의 글자 크기 · 줄 높이를 따른다. */
+.v2-isd-tkmore.hz-tip { text-decoration: underline dotted var(--t-ink4); text-underline-offset: 3px; }
+.v2-isd-tklist > .v2-isd-tkmore { align-self: flex-start; }
+.v2-isd-facts em .v2-isd-tkmore { font-size: inherit; line-height: inherit; }
 /* 1,000 미만은 옆 칸이 판 폭(또는 폰)이라 목록을 옆으로 흘린다. 680~999 판 폭이면 줄 넷을 두 단으로 — 이름과 수가 멀어지지 않게. */
 @container kd (max-width: 999px) {
-  .v2-isd-tklist { flex-direction: row; flex-wrap: wrap; column-gap: 12px; row-gap: 4px; }
+  .v2-isd-tklist { flex-direction: row; flex-wrap: wrap; column-gap: 12px; row-gap: 8px; }
 }
 @container kd (min-width: 680px) and (max-width: 999px) {
   .v2-isd-inv .v2-tm-side > .v2-mod:only-child .v2-isd-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
@@ -2995,6 +3002,8 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
   .v2-bf .hz-name-tip::before { content: ""; position: absolute; inset: -8px -4px; }
   .v2-isd-tk { position: relative; }
   .v2-isd-tk::after { content: ""; position: absolute; inset: -10px -4px; }
+  /* '외 N'은 말풍선이 ::after 라 ::before 로 넓힌다. */
+  .v2-isd-tkmore.hz-tip::before { content: ""; position: absolute; inset: -10px -4px; }
   .v2-dv .dv-goal-inline,
   .v2-dv-amt-v input { height: 34px; }
   .v2-dv .v2-dv-amt-range { height: 34px; }

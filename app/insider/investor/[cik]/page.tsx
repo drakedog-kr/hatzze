@@ -112,6 +112,13 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
   // 전량 정리가 둘 이하면 모듈을 안 세운다 — 한두 줄 모듈이 옆 칸 키로 늘어 바닥 100px 가 비었다(버핏 1,100, 2026-10-05 점검).
   // 그때는 '분기에 한 것'의 전량 정리 줄이 종목을 말한다.
   const exitedMod = d.exited.length > 2;
+  // '외 N'에 올리면 가려진 티커 — 한 줄에 넷, 스물까지(국민연금은 갈래 하나가 350종목을 넘는다). 홈 '외 N개'와 같은 말풍선(hz-tip-lines).
+  const restTip = (rest: string[]) => {
+    const lines: string[] = [];
+    for (let i = 0; i < Math.min(rest.length, 20); i += 4) lines.push(rest.slice(i, Math.min(i + 4, 20)).join(" · "));
+    if (rest.length > 20) lines.push(`외 ${rest.length - 20}종목`);
+    return lines.join("\n");
+  };
   const moves = [
     { label: "새로 담음", list: byKind("new") },
     { label: "늘림", list: byKind("add") },
@@ -246,7 +253,11 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                               </Link>
                             </li>
                           ))}
-                          {s.list.length > 4 && <li className="v2-isd-tkmore">외 {s.list.length - 4}</li>}
+                          {s.list.length > 4 && (
+                            <li className="v2-isd-tkmore hz-tip hz-tip-wide hz-tip-lines hz-tip-start" data-tip={restTip(s.list.slice(4))}>
+                              외 {s.list.length - 4}
+                            </li>
+                          )}
                         </ul>
                       )}
                       {s.list.length > 0 && exitedMod && s.label !== "전량 정리" && (
@@ -260,8 +271,22 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                               </Link>
                             </Fragment>
                           ))}
-                          {s.list.length > 4 && <span className="v2-isd-narrow"> 외 {s.list.length - 4}</span>}
-                          {s.list.length > 6 && <span className="v2-isd-wide"> 외 {s.list.length - 6}</span>}
+                          {s.list.length > 4 && (
+                            <span className="v2-isd-narrow">
+                              {" "}
+                              <span className="v2-isd-tkmore hz-tip hz-tip-wide hz-tip-lines hz-tip-start" data-tip={restTip(s.list.slice(4))}>
+                                외 {s.list.length - 4}
+                              </span>
+                            </span>
+                          )}
+                          {s.list.length > 6 && (
+                            <span className="v2-isd-wide">
+                              {" "}
+                              <span className="v2-isd-tkmore hz-tip hz-tip-wide hz-tip-lines hz-tip-start" data-tip={restTip(s.list.slice(6))}>
+                                외 {s.list.length - 6}
+                              </span>
+                            </span>
+                          )}
                         </em>
                       )}
                     </dt>
