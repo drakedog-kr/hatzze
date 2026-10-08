@@ -401,7 +401,7 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
   const once = r.recoveredCount === 1;
   // 전고점까지 올라야 하는 폭 — '지금 낙폭'(−27.7%)과 다른 숫자다(되찾으려면 +38.4%). 화면 어디에도 없던 값이다.
   const toPeak = a.price > 0 ? (a.ath / a.price - 1) * 100 : null;
-  // 회복이 한 번뿐이면 그 하락 — 언제 얼마나 빠졌었나.
+  // 회복이 한 번뿐이면 그 하락 — 얼마나 빠졌었나.
   const prev = once ? a.topDrawdowns.find((e) => e.recovered && e.depth <= a.currentDd) : undefined;
   // 이번 하락의 꼴과 같은 꼴 하락의 회복 기간(표본이 셋 이상일 때만 있다, lib/mdd.ts drawdownCharacter).
   const kindName = ch?.currentClass === "fast" ? "급락형" : "완만형";
@@ -428,9 +428,11 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
             <dt>{depth}</dt>
             <dd>{firstTime ? "이번이 처음" : `${r.similarCount}번 중 ${r.recoveredCount}번 회복`}</dd>
           </div>
+          {/* 회복이 한 번뿐이면 큰 숫자(○ 걸림)가 그 한 번의 값이다 — 이름표가 큰 숫자를 가리켜 어느 하락인지 잇는다.
+              날짜를 이름표로 두니('2021.02 하락') 큰 숫자와 이어지지 않아 갑자기 나온 줄로 읽혔다(2026-10-08 Hun). 날짜는 옆 사례 표에 있다. */}
           {prev && (
             <div>
-              <dt>{fmtYm(prev.peakDate)} 하락</dt>
+              <dt>{fmtDur(r.medianDays!)} 걸린 하락</dt>
               <dd>{fmtPct(prev.depth)}</dd>
             </div>
           )}
