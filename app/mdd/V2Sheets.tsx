@@ -421,12 +421,11 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
           )}
         </span>
         {hasRange && <RangeLine min={r.minDays!} median={r.medianDays!} max={r.maxDays!} />}
-        {/* 범위 줄이 없고 꼴별 줄도 없으면 이 기간에 되찾은 (지금보다 얕은) 하락들을 적는다 — 큰 숫자 하나만 남아 판이 비었다
-            (2026-10-04 점검, 1년 조회). 회복이 한 번뿐인 때(SK하이닉스 8줄)도 같아 칸 위아래가 178 · 181px 비었다(2026-10-08 마지막 점검). */}
-        {!hasRange && !kinds.some(([, , k]) => k) && a.topDrawdowns.some((e) => e.recovered && e.depth > a.currentDd) && (
+        {/* 이만큼 빠진 게 처음이고 꼴별 줄도 없으면(짧은 조회) 이 기간에 되찾은 작은 하락들을 적는다 — 큰 숫자 하나만 남아 판이 비었다(2026-10-04 점검, 1년 조회). */}
+        {r.recoveredCount === 0 && !kinds.some(([, , k]) => k) && a.topDrawdowns.some((e) => e.recovered) && (
           <dl className="v2-md-kv">
             {a.topDrawdowns
-              .filter((e) => e.recovered && e.depth > a.currentDd)
+              .filter((e) => e.recovered)
               .slice(0, 3)
               .map((e) => (
                 <div key={e.peakDate}>
