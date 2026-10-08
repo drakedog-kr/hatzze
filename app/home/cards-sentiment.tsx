@@ -382,6 +382,31 @@ export function CardYoutube({ v }: { v: Pick }) {
           <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>평소 대비</span>
         </div>
       )}
+      {/* [판단 4 · 2026-10-08 마지막 점검] 거래대금 칸과 같이 흐름 위에 평소(점선) — 막대 두 줄이면 가운데가 85px 비었다. 감성 둘째 줄 키(225)를 지키려고 그림 최소 키 64. */}
+      {v.historyPoints.length >= 2 && v.threshold != null ? (
+        <>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+            <RefChart
+              dates={v.historyPoints.map((p) => p.date)}
+              main={v.historyPoints.map((p) => p.value)}
+              base={v.historyPoints.map(() => v.threshold as number)}
+              baseLabel="평소"
+              color={v.color}
+              fmt={fmt}
+              minH={64}
+            />
+            <span style={{ alignSelf: "flex-end", fontSize: "var(--fs-11)", color: C.sub }}>최근 30일</span>
+          </div>
+          <RefRows
+            color={v.color}
+            fmt={fmt}
+            rows={[
+              { label: "오늘", value: v.raw, dashed: false },
+              { label: "평소", value: v.threshold, dashed: true },
+            ]}
+          />
+        </>
+      ) : (
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -396,6 +421,7 @@ export function CardYoutube({ v }: { v: Pick }) {
           </div>
         ))}
       </div>
+      )}
       <Foot text={v.desc} />
     </Shell>
   );

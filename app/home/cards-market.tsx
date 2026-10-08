@@ -620,6 +620,7 @@ export function CardVolume({ v }: { v: Pick }) {
   const avg = dt?.avg_30d ?? null;
   const today = v.raw ?? null;
   const surge = dt?.surge_pct ?? null;
+  const pts = v.historyPoints;
   const fmt = (n: number) => {
     const f = formatIndicatorValue(n, "억원");
     return `${f.display}${f.displayUnit}`;
@@ -639,6 +640,23 @@ export function CardVolume({ v }: { v: Pick }) {
       {surge !== null && (
         <Big disp={`${surge >= 0 ? "+" : ""}${surge}`} unit="%" color={v.color} size={32} sub="평소 대비" />
       )}
+      {/* [판단 4 · 2026-10-08 마지막 점검] 30일 흐름 위에 30일 평균(점선) — 막대 두 줄이면 큰 숫자 아래가 155px 비었다(예탁금 칸과 같은 꼴, 10-06 '너무 없어 보인다' 전례). */}
+      {pts.length >= 2 && avg !== null ? (
+        <>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+            <RefChart dates={pts.map((p) => p.date)} main={pts.map((p) => p.value)} base={pts.map(() => avg)} baseLabel="30일 평균" color={v.color} fmt={fmt} />
+            <span style={{ alignSelf: "flex-end", fontSize: "var(--fs-11)", color: C.sub }}>최근 30일</span>
+          </div>
+          <RefRows
+            color={v.color}
+            fmt={fmt}
+            rows={[
+              { label: "최근 거래일", value: today, dashed: false },
+              { label: "30일 평균", value: avg, dashed: true },
+            ]}
+          />
+        </>
+      ) : (
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -652,6 +670,7 @@ export function CardVolume({ v }: { v: Pick }) {
           </div>
         ))}
       </div>
+      )}
       <Foot text={v.desc} />
     </Shell>
   );

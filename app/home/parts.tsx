@@ -711,10 +711,13 @@ export function RefChart({
   color,
   fmt = fmtJo,
   dateFmt = shortDate,
+  minH = 88,
 }: {
   dates: string[];
   main: number[];
   base: number[];
+  /** 그림의 최소 키 — 감성 둘째 줄(키 225)에 서는 칸은 64 로 줄인다(그 줄 키를 그대로 두려고). */
+  minH?: number;
   /** 툴팁에서 기준값 앞에 붙는 말 — '평소' · '한 달 전'. */
   baseLabel: string;
   color: string;
@@ -735,7 +738,7 @@ export function RefChart({
   for (const ch of `${color}|${baseLabel}|${dates[0]}|${n}`) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
   const gid = `hz-ref-${hsh.toString(36)}`;
   return (
-    <div style={{ position: "relative", flex: 1, minHeight: 88 }}>
+    <div style={{ position: "relative", flex: 1, minHeight: minH }}>
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible" }}>
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
