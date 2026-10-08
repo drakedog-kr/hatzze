@@ -2802,6 +2802,8 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-isd-list { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 0 14px; list-style: none; }
 /* 줄은 남는 높이를 나눠 받되 한 줄 64 까지 — 줄 셋뿐인 목록이 키 큰 짝에 맞춰 한 줄 207px 까지 늘었다(2026-10-04 점검). 짝은 키가 비슷한 것끼리 고른다(detail.tsx pairUp). */
 .v2-isd-list > li { flex: 1 0 auto; display: flex; max-height: 64px; }
+/* 애널리스트 칸의 짝인데 줄이 다 떨어져 10줄을 못 펴는 목록은 80 까지(detail.tsx is-fill) — 64 로는 TSLA 거물 여덟 줄 아래가 117px 비었다(2026-10-08). */
+.v2-tm-band.is-fill .v2-isd-list > li { max-height: 80px; }
 .v2-isd-list > li + li { border-top: 1px solid var(--t-line); }
 .v2-isd-row {
   flex: 1;
@@ -2921,6 +2923,11 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
   .v2-nt-pager button::after { content: ""; position: absolute; inset: -12px -10px; }
   .v2-tm-pill { height: 34px; line-height: 32px; }
   .v2-tm-pills { gap: 8px; }
+  /* 내부자 종목 주가 차트 — 좁은 뷰박스(360) 그림으로. 720 을 화면 폭(≈290)에 눌러 담으면 키 70 · 표식 지름 3px 로 납작했다(2026-10-08).
+     표식 손닿는 자리 폭(--hz-mkw)도 그 그림에 맞춘다. */
+  .v2-kd .hz-pc-svg.is-wide { display: none; }
+  .v2-kd .hz-pc-svg.is-narrow { display: block; }
+  .v2-kd .hz-pc-box { --hz-mkw: var(--hz-mkw-n); }
   .v2-dv-goal-presets { grid-auto-rows: minmax(34px, 1fr); }
   /* 2026-10-08 폰 점검 — 겉은 그대로, 누르는 자리만 넓힌다. '전체 보기'(24) · '여론 ›'(14) · 확대(30) · 사례 번호(18) ·
      배당 더 보기 · 체크 · 점유율 범례 링크(20) · 뒤로 가기(28). */

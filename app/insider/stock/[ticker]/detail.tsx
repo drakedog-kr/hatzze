@@ -108,8 +108,35 @@ function zeroDays(end: string, days: number) {
 /** 목록 모듈의 키 어림 — 펴는 줄(8)까지 + 넘치면 '더 보기' 한 줄. */
 const rowsWeight = (n: number) => Math.min(n, 8) + (n > 8 ? 1 : 0);
 
-/** 짝지을 모듈 하나 — w 는 줄 수로 어림한 키(펴는 줄 8 + '더 보기' 1, 애널리스트 칸은 줄 12쯤). */
-type PairMod = { key: string; node: React.ReactNode; w: number };
+/** 짝지을 모듈 하나 — w 는 줄 수로 어림한 키(펴는 줄 8 + '더 보기' 1, 애널리스트 칸은 줄 12쯤). n 은 목록의 전체 줄 수(애널리스트 칸은 없음).
+    render 는 처음 펼 줄 수를 받는다 — 짝이 정해진 뒤에야 몇 줄을 펼지 안다(openFor). */
+type PairMod = { key: string; render: (open?: number) => React.ReactNode; w: number; n?: number };
+
+/**
+ * 짝 안에서 목록이 처음 펼 줄 수 — 짝 키에 맞춰 빈 자리 없이(2026-10-08 점검). 줄은 남는 높이를 받아 64 까지 늘어나지만(v2.css .v2-isd-list),
+ * 그것만으론 모자라 TSLA · PLTR 거물 칸 바닥이 139 · 167px, 애널리스트 칸 짝인 목록은 '더 보기' 위가 70px 안팎 비었다.
+ * - 애널리스트 칸과 짝: 목록을 10줄까지 펴서 실제 줄로 채운다. 애널리스트 칸 키가 폭마다 달라(1,280 671 · 1,440 이상 560 안팎) 12줄이면
+ *   넓은 화면에서 목록(610)이 더 길어 애널리스트 칸 바닥이 60px 비었다. 10줄(522)은 1,280 에서 줄을 59 까지 늘려 채우고 넓은 화면에선 안에 든다.
+ * - 목록끼리: 펴는 줄이 적은 쪽이 키를 정하고(줄을 64 까지 늘린 키), 긴 쪽은 그 키에 들 만큼만 먼저 편다 — 나머지는 '더 보기'에 그대로 있다.
+ * 키 셈은 v2 값이다 — 머리 42 · 줄 44 · 늘린 줄 64 · '더 보기' 줄 40.
+ */
+function openFor(g: PairMod[]): Map<string, number> {
+  const out = new Map<string, number>();
+  if (g.length !== 2) return out;
+  const lists = g.filter((m) => m.n != null);
+  if (lists.length === 1) {
+    out.set(lists[0].key, Math.min(lists[0].n!, 10));
+    return out;
+  }
+  if (lists.length !== 2) return out;
+  const vis = (m: PairMod) => Math.min(m.n!, 8);
+  const [short, long] = vis(lists[0]) <= vis(lists[1]) ? [lists[0], lists[1]] : [lists[1], lists[0]];
+  if (vis(short) === vis(long)) return out;
+  const shortMax = 42 + 64 * vis(short) + (short.n! > 8 ? 40 : 0);
+  const k = Math.max(3, Math.floor((shortMax - 42 - 40) / 44));
+  if (k < vis(long)) out.set(long.key, k);
+  return out;
+}
 
 /**
  * 모듈을 둘씩 짝짓는다 — 키가 비슷한 것끼리. [거물 | 애널리스트] · [임원 | 의원]으로 못박았을 땐 한쪽이 없으면 남은 것이 판 폭을
@@ -235,11 +262,13 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
         : `${q} 변화 없음`.trim();
 
   const holdersMod =
-    d.holders.length > 0 ? (
-      <Module title="이 종목을 든 월가 거물" meta={`${d.holders.length}/${d.managerCount}명 · ${q ? `${q} 말` : "분기말"}`} className="v2-isd-mod">
-        <DetailList name="stock_holders" cols="holder" items={holderLines(d.holders.slice(0, ROWS_MAX), d.usdKrw)} />
-      </Module>
-    ) : null;
+    d.holders.length > 0
+      ? (open?: number) => (
+          <Module title="이 종목을 든 월가 거물" meta={`${d.holders.length}/${d.managerCount}명 · ${q ? `${q} 말` : "분기말"}`} className="v2-isd-mod">
+            <DetailList name="stock_holders" cols="holder" items={holderLines(d.holders.slice(0, ROWS_MAX), d.usdKrw)} open={open} />
+          </Module>
+        )
+      : null;
   const consensusMod = d.consensus ? (
     <Module title="월가 애널리스트의 시선" meta={fmtDate(d.consensus.asOf)} className="v2-isd-mod v2-isd-consensus">
       <ConsensusBody c={d.consensus} price={d.price} rate={d.usdKrw}>
@@ -248,18 +277,25 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
     </Module>
   ) : null;
   const execMod =
-    execTrades.length > 0 ? (
-      // 머리는 기간만 — 수는 둘째 줄 '공시에 남은 것'이 말한다(네 조각이었다, 2026-10-05 점검). '~ 순' 정렬 표기는 걷었다(운영자 판단).
-      <Module title="임원 신고" meta={since(d.insiderSince) ? `${since(d.insiderSince)} 접수` : undefined} className="v2-isd-mod">
-        <DetailList name="stock_insider" cols="trade" items={insiderLines(execTrades.slice(0, ROWS_MAX), d.usdKrw)} />
-      </Module>
-    ) : null;
+    execTrades.length > 0
+      ? (open?: number) => (
+          // 머리는 기간만 — 수는 둘째 줄 '공시에 남은 것'이 말한다(네 조각이었다, 2026-10-05 점검). '~ 순' 정렬 표기는 걷었다(운영자 판단).
+          <Module title="임원 신고" meta={since(d.insiderSince) ? `${since(d.insiderSince)} 접수` : undefined} className="v2-isd-mod">
+            <DetailList name="stock_insider" cols="trade" items={insiderLines(execTrades.slice(0, ROWS_MAX), d.usdKrw)} open={open} />
+          </Module>
+        )
+      : null;
   const cgMod =
-    cgTrades.length > 0 ? (
-      <Module title="미 하원의원 신고" meta={since(d.congressSince) ? `${since(d.congressSince)} 접수` : undefined} className="v2-isd-mod">
-        <DetailList name="stock_congress" cols="congress" items={congressLines(cgTrades.slice(0, ROWS_MAX), d.usdKrw)} />
-      </Module>
-    ) : null;
+    cgTrades.length > 0
+      ? (open?: number) => (
+          <Module title="미 하원의원 신고" meta={since(d.congressSince) ? `${since(d.congressSince)} 접수` : undefined} className="v2-isd-mod">
+            <DetailList name="stock_congress" cols="congress" items={congressLines(cgTrades.slice(0, ROWS_MAX), d.usdKrw)} open={open} />
+          </Module>
+        )
+      : null;
+  const holdersN = Math.min(d.holders.length, ROWS_MAX);
+  const execN = groupInsiderLines(execTrades.slice(0, ROWS_MAX)).length;
+  const cgN = groupCongressLines(cgTrades.slice(0, ROWS_MAX)).length;
 
   return (
     // ⭐ 내부자 리포트는 **달러가 기본**이다 — 재료가 전부 미국 공시라 달러가 원본이고,
@@ -486,19 +522,24 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
       {pairUp(
         (
           [
-            holdersMod ? { key: "holders", node: holdersMod, w: rowsWeight(d.holders.length) } : null,
-            consensusMod ? { key: "consensus", node: consensusMod, w: 12 } : null,
-            execMod ? { key: "exec", node: execMod, w: rowsWeight(groupInsiderLines(execTrades.slice(0, ROWS_MAX)).length) } : null,
-            cgMod ? { key: "congress", node: cgMod, w: rowsWeight(groupCongressLines(cgTrades.slice(0, ROWS_MAX)).length) } : null,
+            holdersMod ? { key: "holders", render: holdersMod, w: rowsWeight(holdersN), n: holdersN } : null,
+            consensusMod ? { key: "consensus", render: () => consensusMod, w: 12 } : null,
+            execMod ? { key: "exec", render: execMod, w: rowsWeight(execN), n: execN } : null,
+            cgMod ? { key: "congress", render: cgMod, w: rowsWeight(cgN), n: cgN } : null,
           ] as (PairMod | null)[]
         ).filter((m): m is PairMod => m != null),
-      ).map((g) => (
-        <div key={g.map((m) => m.key).join("-")} className={g.length === 2 ? "v2-tm-band is-pair" : "v2-tm-band is-hot is-solo"}>
-          {g.map((m) => (
-            <Fragment key={m.key}>{m.node}</Fragment>
-          ))}
-        </div>
-      ))}
+      ).map((g) => {
+        const open = openFor(g);
+        // 애널리스트 칸 짝인 목록이 10줄도 못 채우면(줄이 다 떨어짐) 줄을 80 까지 늘린다(v2.css .is-fill) — 64 로는 TSLA 거물 여덟 줄 아래가 117px 비었다.
+        const fill = g.length === 2 && g.some((m) => m.n == null) && g.some((m) => m.n != null && m.n < 10);
+        return (
+          <div key={g.map((m) => m.key).join("-")} className={g.length === 2 ? `v2-tm-band is-pair${fill ? " is-fill" : ""}` : "v2-tm-band is-hot is-solo"}>
+            {g.map((m) => (
+              <Fragment key={m.key}>{m.render(open.get(m.key))}</Fragment>
+            ))}
+          </div>
+        );
+      })}
 
       {/* 임원 목록은 산 것과 판 것을 한 목록에(최신 순).
           ⚠️⚠️ 산 것 · 판 것으로 가르면 **어느 쪽도 아닌 신고**가 남는다(옵션 행사 M · 무상 취득 A · 전환 C, 임원 전체의 19%).

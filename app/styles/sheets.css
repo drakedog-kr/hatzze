@@ -196,6 +196,10 @@
     0 0 0 2px var(--c-card),
     0 0 0 4px color-mix(in srgb, var(--mk) 60%, transparent);
 }
+/* 내부자 종목 주가 차트는 그림을 두 벌 그린다(app/insider/parts.tsx PriceChart) — 넓은 뷰박스(720)가 기본이고,
+   좁은 것(360)은 v2.css 의 폰 규칙이 켠다. 확대 창(포털 · v2 범위 밖)은 늘 넓은 것. */
+.hz-pc-svg { display: block; }
+.hz-pc-svg.is-narrow { display: none; }
 
 /* 고른 배지에 불을 켜고, 그 축이 아닌 마커를 흐린다. 축마다 두 줄씩 — 셀렉터가 서로
    달라 Lightning CSS 가 합칠 수 없고, 합쳐도 `~` 는 `:is()` 안에서 멀쩡하다. */
