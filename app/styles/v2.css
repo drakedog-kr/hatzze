@@ -1933,6 +1933,10 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
    폰(679 이하)은 한 단. */
 .v2-tm-stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .v2-tm-stack > .v2-mod { display: flex; flex-direction: column; }
+/* [판단 8] 일정 1건 이하 — 넓은 화면에선 두 칸 짝(키는 큰 쪽). */
+@container kd (min-width: 1000px) {
+  .v2-tm-stack.is-short { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+}
 @container kd (min-width: 680px) {
   .v2-tm-stack .v2-tm-events .v2-events {
     grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
