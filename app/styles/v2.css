@@ -2042,9 +2042,6 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-tm-band.is-hot > .v2-tm-side { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
   /* 옆 칸 모듈이 하나면 판 폭으로 — 왼쪽 반만 쓰고 오른쪽 379×267 이 비었다(거물 상세, 2026-10-08 마지막 점검). 줄 넷은 두 단으로 둬 이름과 수가 멀어지지 않게. */
   .v2-tm-band.is-hot > .v2-tm-side > .v2-mod:only-child { grid-column: 1 / -1; }
-  .v2-isd-inv .v2-tm-side > .v2-mod:only-child .v2-isd-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
-  .v2-isd-inv .v2-tm-side > .v2-mod:only-child .v2-isd-facts > div + div { border-top: 0; }
-  .v2-isd-inv .v2-tm-side > .v2-mod:only-child .v2-isd-facts > div:nth-child(n + 3) { border-top: 1px solid var(--t-line); }
   /* 테마 한 장 — 일정 | 함께 거론되는 테마 두 칸이면 알약 칸이 일정 키로 늘어 아래 171~363px 가 비었다(2026-10-05 점검).
      한 줄기(일정 → 함께 거론되는 테마)로 쌓는다. 일정 두 단은 아래 680 이상 규칙. */
   .v2-tm:not(.v2-sk) .v2-tm-band.is-hot > .v2-tm-side { display: flex; }
@@ -2730,8 +2727,14 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-isd-tklist { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; }
 .v2-isd-tklist .v2-isd-tk { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; line-height: 18px; }
 .v2-isd-tkmore { font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); }
-@container kd (max-width: 679px) {
+/* 1,000 미만은 옆 칸이 판 폭(또는 폰)이라 목록을 옆으로 흘린다. 680~999 판 폭이면 줄 넷을 두 단으로 — 이름과 수가 멀어지지 않게. */
+@container kd (max-width: 999px) {
   .v2-isd-tklist { flex-direction: row; flex-wrap: wrap; column-gap: 12px; row-gap: 4px; }
+}
+@container kd (min-width: 680px) and (max-width: 999px) {
+  .v2-isd-inv .v2-tm-side > .v2-mod:only-child .v2-isd-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
+  .v2-isd-inv .v2-tm-side > .v2-mod:only-child .v2-isd-facts > div + div { border-top: 0; }
+  .v2-isd-inv .v2-tm-side > .v2-mod:only-child .v2-isd-facts > div:nth-child(n + 3) { border-top: 1px solid var(--t-line); }
 }
 .v2-isd-tk { color: var(--t-ink2); text-decoration: none; }
 .v2-isd-tk:hover { color: var(--t-ink); text-decoration: underline; }

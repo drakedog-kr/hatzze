@@ -235,10 +235,10 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                       {s.label}
                       {/* 전량 정리는 아래 모듈이 종목을 말하면 이 줄은 수만 — 같은 사실이 한 화면에 두 번 섰다(2026-10-05 점검). */}
                       {/* 옆 칸이 이 모듈 하나면(전량 정리 모듈 없음) 종목을 로고 · 티커로 한 줄씩 편다 — 접어 두면 옆 보유 표 키를 받아
-                          줄마다 위아래 43px 씩 비었다(2026-10-08 마지막 점검). 갈래마다 여섯까지 · 나머지는 수로. */}
+                          줄마다 위아래 43px 씩 비었다(2026-10-08 마지막 점검). 갈래마다 넷까지 · 나머지는 수로 — 여섯이면 이 칸(601)이 옆 보유 표(533)보다 길어졌다. */}
                       {s.list.length > 0 && !exitedMod && (
                         <ul className="v2-isd-tklist">
-                          {s.list.slice(0, 6).map((t) => (
+                          {s.list.slice(0, 4).map((t) => (
                             <li key={t}>
                               <Link href={`/insider/stock/${encodeURIComponent(t)}`} className="v2-isd-tk" data-ga="insider_investor_move_click">
                                 <StockLogo code={t} name={t} market="US" size={16} lazy />
@@ -246,7 +246,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                               </Link>
                             </li>
                           ))}
-                          {s.list.length > 6 && <li className="v2-isd-tkmore">외 {s.list.length - 6}</li>}
+                          {s.list.length > 4 && <li className="v2-isd-tkmore">외 {s.list.length - 4}</li>}
                         </ul>
                       )}
                       {s.list.length > 0 && exitedMod && s.label !== "전량 정리" && (
