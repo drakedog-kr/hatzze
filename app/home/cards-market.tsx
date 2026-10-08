@@ -429,6 +429,7 @@ export function CardVkospi({ v }: { v: Pick }) {
   const pos = cur !== null && lo !== null && hi !== null && hi > lo ? (cur - lo) / (hi - lo) : 0.5;
   const verdict = pos >= 0.66 ? "최근 30일 중 높은 편" : pos <= 0.33 ? "최근 30일 중 낮은 편" : "최근 30일 평균 수준";
   const knob = v.color;
+  const pts = v.historyPoints.map((b) => ({ key: b.date, value: b.value }));
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="monitor_heart" name={v.name} />
@@ -440,12 +441,18 @@ export function CardVkospi({ v }: { v: Pick }) {
         </span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {/* [판단 5 · 2026-10-08 마지막 점검] 30일 선 — 범위 막대는 바닥에 붙어 칸 가운데가 96~112px 비었다. 환율 칸과 같은 그림이고,
+            남는 높이를 선이 받는다(v2.css .hz-area). 선이 없으면(점이 모자라면) 예전 범위 막대. */}
+        {pts.length >= 2 ? (
+          <AreaChart points={pts} color={v.color} tip={(x) => `${shortDate(x.key)} · ${x.value.toFixed(1)}`} />
+        ) : (
         <div style={{ position: "relative", height: 10 }}>
           <div style={{ height: "100%", borderRadius: R.pill, background: C.track, overflow: "hidden" }}>
             <div style={{ width: `${pos * 100}%`, height: "100%", borderRadius: R.pill, background: knob }} />
           </div>
           <HeatKnob left={pos * 100} color={knob} />
         </div>
+        )}
         {/* 양 끝은 막대의 눈금 — 최근 30일 최저 · 최고. '잔잔 39 · 출렁 58'은 숫자가 무엇인지(30일 최저 · 최고) 안 읽혔다(2026-10-04 점검).
             그 전엔 '방심 ↔ 불안'이었다(평가라서 걷음, 2026-08-04). 낮은 쪽이 왜 과열 신호인지는 셀 맨 아래 설명 한 줄이 맡는다. */}
         {/* 가운데 '최근 30일 범위'는 걷었다 — 위 알약('최근 30일 중 낮은 편')이 같은 기간을 말한다. */}
