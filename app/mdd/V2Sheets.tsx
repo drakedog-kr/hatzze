@@ -394,6 +394,14 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
   // 저점 이후 — 위 '보통 ○년'과 같은 기준(저점에서 되찾기까지, lib/mdd.ts recoveryStats). 고점 이후 날수와 견주면 기준이 달랐다(2026-10-05 점검).
   const sinceLow = Math.round((Date.parse(a.asOf) - Date.parse(a.lowDate)) / 86_400_000);
   const hasRange = r.recoveredCount >= 2 && r.minDays !== null && r.maxDays !== null && r.maxDays > r.minDays;
+  // 지금 자리(2026-10-08 Hun "회복까지 카드가 비어 보인다 · 유용한 데이터를 더해") — 전고점까지 올라야 하는 폭은 '지금 낙폭'(−25.9%)과
+  // 다른 숫자다(되찾으려면 +35.0%). 화면 어디에도 없던 값이라 이 칸의 질문('얼마나 남았나')에 바로 답한다.
+  const toPeak = a.price > 0 ? (a.ath / a.price - 1) * 100 : null;
+  const firstTime = r.recoveredCount === 0;
+  // 되찾은 게 한 번뿐이면 큰 숫자 하나만 남아 칸 위아래가 154~179px 비었다(SK하이닉스 · 현대차). 그 한 번이 언제 얼마나 빠졌었나와,
+  // 저점 이후 지난 기간을 그때 걸린 기간에 견준 막대를 더한다.
+  const once = r.recoveredCount === 1 && r.medianDays !== null;
+  const prev = once ? a.topDrawdowns.find((e) => e.recovered && e.depth <= a.currentDd) : undefined;
   const kinds = ch
     ? ([
         ["fast", "급락형", ch.fast],
@@ -433,8 +441,15 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
                   <dd>회복까지 {fmtDur(e.days - e.troughDays)}</dd>
                 </div>
               ))}
+            {toPeak !== null && toPeak >= 0.05 && (
+              <div>
+                <dt>전고점까지</dt>
+                <dd>{fmtPct(toPeak)}</dd>
+              </div>
+            )}
           </dl>
         )}
+        {once && <SinceLowLine done={sinceLow} took={r.medianDays!} />}
         {kinds.some(([, , k]) => k) && (
           <div className="v2-md-kinds">
             {/* 머리 줄은 걷었다 — 아래 두 줄도 위 큰 숫자 옆('이만큼 빠졌던 n번 중 m번 회복함')과 같은 하락을 센다(lib/mdd.ts drawdownCharacter, 2026-10-05). */}
@@ -452,8 +467,61 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
             ))}
           </div>
         )}
+        {!firstTime && (
+          <dl className="v2-md-kv">
+            {/* 회복이 한 번뿐인 칸 — 이번 하락과 그때 하락의 꼴(급락형 · 완만형)을 나란히. 꼴별 두 줄(표본 셋 이상)이 없는 칸이라 여기서 견준다. */}
+            {once && ch && (
+              <div>
+                <dt>이번 하락</dt>
+                <dd>
+                  {ch.currentClass === "fast" ? "급락형" : "완만형"} · 저점까지 {fmtDur(ch.currentTroughDays)}
+                </dd>
+              </div>
+            )}
+            {prev && (
+              <div>
+                <dt>그때 하락</dt>
+                <dd>
+                  {fmtYm(prev.peakDate)} {fmtPct(prev.depth)} · {prev.troughDays <= CHARACTER_SPLIT_DAYS ? "급락형" : "완만형"}
+                </dd>
+              </div>
+            )}
+            {!once && (
+              <div>
+                <dt>저점 이후</dt>
+                <dd>{sinceLow === 0 ? "오늘 저점" : `${fmtDur(sinceLow)}째`}</dd>
+              </div>
+            )}
+            {toPeak !== null && toPeak >= 0.05 && (
+              <div>
+                <dt>전고점까지</dt>
+                <dd>{fmtPct(toPeak)}</dd>
+              </div>
+            )}
+          </dl>
+        )}
       </div>
     </Module>
+  );
+}
+
+/**
+ * 저점 이후 지난 기간을 그때(지금만큼 빠졌다 되찾은 한 번) 걸린 기간에 견준 막대 — 왼쪽 저점 이후, 오른쪽 그때 걸린 기간.
+ * 걸린 기간을 넘기면 끝까지 찬다(글자는 실제 기간). 회복이라 빨강 계열(범위 줄과 같은 색).
+ */
+function SinceLowLine({ done, took }: { done: number; took: number }) {
+  const at = took > 0 ? Math.min(1, Math.max(0, done / took)) * 100 : 0;
+  return (
+    <div className="v2-md-range v2-md-since">
+      <span className="v2-md-range-track">
+        <b style={{ width: `${at}%` }} />
+      </span>
+      <span className="v2-md-range-lab">
+        {/* 오늘이 저점이면 '저점 이후 0일'이 아니라 '오늘 저점'(현대차 실측). */}
+        <span>{done === 0 ? "오늘 저점" : `저점 이후 ${fmtDur(done)}`}</span>
+        <span>그때 {fmtDur(took)}</span>
+      </span>
+    </div>
   );
 }
 
