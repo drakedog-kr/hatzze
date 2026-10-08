@@ -12,3 +12,9 @@ def test_ends_as_sentence():
 def test_pick_prefers_noun_ending():
     cands = ["원전 정책 수혜 기대감이 크게 높아졌습니다", "미국 원전 정책 수혜 기대가 커진 흐름"]
     assert G.pick(cands, "원전 정책 수혜 기대", "카메코") == "미국 원전 정책 수혜 기대가 커진 흐름"
+
+
+def test_pick_drops_leaked_instruction():
+    leak = "AST스페이스모바일 관련 화제는 위성 사업과 경쟁 우주기업 비교에 쏠려 있어 이를 담담하게 적습니다."
+    assert G.pick([leak], "위성 사업 경쟁", "AST스페이스모바일") is None
+    assert G.pick([leak, "위성 통신 사업과 경쟁사 비교"], "위성 통신 사업 경쟁사 비교", "AST스페이스모바일") == "위성 통신 사업과 경쟁사 비교"

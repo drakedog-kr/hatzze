@@ -332,6 +332,15 @@ html[data-sidebar="icon"] .hz-sidebar {
 html[data-sidebar="icon"] .hz-sidebar .hz-side-text {
   display: none !important;
 }
+/* 묶음 머리 자리는 14px 틈으로 남긴다 — 다 걷으면 아이콘 열 개가 42px 등간격이라 세 묶음의 경계가 사라졌다(2026-10-08 마지막 점검). */
+html[data-sidebar="icon"] .hz-sidebar nav > .hz-side-text:not(:first-child) {
+  display: block !important;
+  height: 0;
+  margin: 14px 0 0 !important;
+  padding: 0 !important;
+  font-size: 0;
+  overflow: hidden;
+}
 /* 로고는 유령 심볼만 남긴다(워드마크는 LogoLockup 의 둘째 칸). 접기 단추는 심볼 아래로 내린다(한 줄에 둘이 안 들어간다).
    ⚠️ !important 가 필요하다 — 워드마크 칸이 인라인 display 를 들고 있어 그냥 두면 인라인이 이긴다. 안 먹으면 124px 로고가
       64px 막대 가운데 놓여 심볼은 왼쪽 밖으로 밀리고 "hatz" 만 보인다(2026-09-25 실제로 그랬다). */

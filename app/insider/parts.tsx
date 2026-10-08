@@ -134,6 +134,19 @@ export const CODE_LABEL: Record<string, { text: string }> = {
   C: { text: "전환" },
   G: { text: "증여" },
   J: { text: "기타" },
+  // 나머지 Form 4 코드 — 없으면 원문 글자('D')가 그대로 섰다(TSLA, 2026-10-08 마지막 점검).
+  D: { text: "회사 반환" },
+  K: { text: "스와프" },
+  U: { text: "공개매수 응모" },
+  W: { text: "상속" },
+  E: { text: "만기" },
+  H: { text: "만기" },
+  I: { text: "재량 거래" },
+  L: { text: "소액 취득" },
+  O: { text: "옵션 행사" },
+  X: { text: "옵션 행사" },
+  Z: { text: "신탁" },
+  V: { text: "자발 신고" },
 };
 
 // 변화를 "유지"로 접는 문턱(%)은 판정(lib/insider-13f.ts quarterShift)과 하나다 — 그대로 반올림하면 "0% 줄임"이라는 없는 말이 나온다.
@@ -212,7 +225,7 @@ export function moveBadge(
 export function codeSummary(codes: { code: string; n: number }[]): string {
   // ⚠️ 단위를 붙인다. "장내 매도 165" 는 165가 건수인지 금액인지 주식 수인지 안 말한다 —
   //    바로 옆 칸이 금액이라 특히 헷갈렸다.
-  const head = codes.slice(0, 2).map((c) => `${CODE_LABEL[c.code]?.text ?? c.code} ${c.n}건`);
+  const head = codes.slice(0, 2).map((c) => `${CODE_LABEL[c.code]?.text ?? "기타"} ${c.n}건`);
   // 셋째부터는 '등'으로 접는다 — '외 2종'은 무엇이 두 종류인지 되짚게 했다(2026-10-04).
   return head.join(" · ") + (codes.length > 2 ? " 등" : "");
 }
@@ -1352,9 +1365,10 @@ export function ConsensusBody({
                 />
               ))}
             </span>
-            <span style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {RATING.filter((r) => counts[r.key] > 0).map((r) => (
-                <span key={r.key} style={{ display: "inline-flex", alignItems: "center", gap: 5, ...ROW.sub }}>
+            {/* 고르게 줄바꿈(balance) — 줄바꿈 꼴이면 마지막 항목('적극 매도 1')만 혼자 둘째 줄로 떨어졌다(2026-10-08 마지막 점검). */}
+            <span style={{ display: "block", textWrap: "balance", lineHeight: "20px" }}>
+              {RATING.filter((r) => counts[r.key] > 0).map((r, k, arr) => (
+                <span key={r.key} style={{ display: "inline-flex", alignItems: "center", gap: 5, marginRight: k === arr.length - 1 ? 0 : 12, verticalAlign: "middle", ...ROW.sub }}>
                   <span style={{ width: 8, height: 8, borderRadius: 2, background: r.tone, flexShrink: 0 }} />
                   {r.label} <strong style={{ fontFamily: MONO, color: C.ink, fontWeight: 600 }}>{counts[r.key]}</strong>
                 </span>

@@ -284,7 +284,7 @@ COMMON = """\
 - 대시(—, –)를 문장 부호로 쓰지 마세요. 절을 이을 땐 마침표로 문장을 끊습니다.
 - **'창'이라는 말을 쓰지 마세요. '기간'으로 씁니다**(나쁜 예: "이 창 안에서", "3일 창의
   평균", "최근 창"). '창'은 우리가 코드 안에서만 쓰는 말이라 읽는 사람에게는 창문으로
-  읽힙니다. 좋은 예: "이 기간에", "3일 동안", "최근 3일".
+  읽힙니다. 좋은 예: "이 기간에". 날수를 적을 땐 [전체] 줄에 적힌 그대로 씁니다.
 - **날수는 '사흘'·'닷새'·'열흘'이 아니라 '3일'·'5일'·'10일'처럼 숫자로 씁니다.** 화면의 라벨이 전부 숫자라
   글만 토박이말이면 어긋나 보입니다(2026-09-22).
 - **로마자·숫자 뒤에 조사를 띄우지 마세요**(나쁜 예: "HBM 과", "13F 는", "AI 가").
@@ -943,6 +943,21 @@ def percent_count(text: str) -> int:
     같은 자리에서 한 번 더 시킨다.
     """
     return text.count("%") + text.count("퍼센트")
+
+
+def period_mismatch(text: str, digest: str) -> tuple[int, int] | None:
+    """첫째 대목이 적은 '최근 N일'이 digest [전체] 줄의 기간과 다르면 (적은 날수, 맞는 날수).
+
+    [전체]는 최근 2일인데 문장이 '최근 3일'이라 적어, 바로 옆 여론 칸('최근 2일 시장 글 39%')과 같은 숫자를 다른 기간으로
+    말했다(국장 · 미장 둘 다, 2026-10-08 마지막 점검). 같은 digest 의 '[최근 3일 화제어]' 블록과 말투 지시의 좋은 예에 끌린 것으로 본다.
+    문장은 고치지 않고 이 검사로 한 번 다시 쓰게 한다. 날수를 안 적었으면(None) 그대로 둔다.
+    """
+    want = re.search(r"\[전체\] 최근 (\d+)일", digest)
+    got = re.search(r"최근\s*(\d+)\s*일", text)
+    if not want or not got:
+        return None
+    w, g = int(want.group(1)), int(got.group(1))
+    return (g, w) if g != w else None
 
 
 def count_mentions(text: str) -> int:
@@ -2289,6 +2304,12 @@ def main() -> None:
                            if n > 1 else "퍼센트가 없었습니다. [전체] 낙관도 퍼센트를 **한 번** 적으세요.")
                     text = ask_brief_sentence(
                         system + f"\n\n[다시 쓰기] 방금 쓴 문장에 {fix}",
+                        brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
+                    )
+                if key == "tone" and (pm := period_mismatch(text, brief_digest)):
+                    print(f"[WARNING] 첫째 대목의 기간(최근 {pm[0]}일)이 [전체](최근 {pm[1]}일)와 달라 다시 씁니다: {text[:50]}…")
+                    text = ask_brief_sentence(
+                        system + f"\n\n[다시 쓰기] 방금 쓴 문장의 기간이 '최근 {pm[0]}일'이었습니다. [전체] 줄에 적힌 기간(최근 {pm[1]}일)을 그대로 쓰세요.",
                         brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
                     )
                 if key == "news" and "합친 것" in text:

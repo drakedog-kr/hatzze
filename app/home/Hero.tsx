@@ -242,7 +242,7 @@ export function DistPop({ b }: { b: Band }) {
   return b.count > 0 ? (
     <div className="hz-dist-pop hz-scroll">
       <div className="hz-dist-pop-head">
-        {b.label} {b.count}개 · 과열도순 · 눌러서 이동
+        {b.label} {b.count}개 · 과열도순
       </div>
       {b.items.map((it) => (
         <a key={it.slug} href={`#ind-${ANCHOR_ALIAS[it.slug] ?? it.slug}`} className="hz-dist-pop-item">

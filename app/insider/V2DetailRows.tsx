@@ -75,8 +75,9 @@ export function holderLines(rows: StockHolder[], rate: number | null) {
  */
 export function insiderLines(rows: StockInsider[], rate: number | null) {
   return groupInsiderLines(rows).map((t, i) => {
-    const tone = t.code === "P" ? "up" : t.acquiredDisposed === "D" ? "down" : "flat";
-    const what = t.code ? (CODE_LABEL[t.code]?.text ?? t.code) : "종류 미상";
+    // 색은 장내 매매에만 — 증여 · 세금 원천징수 · 회사 반환까지 매도 파랑이면 매도로 읽혔다(차트도 이것들을 매매로 치지 않는다, 2026-10-08 마지막 점검).
+    const tone = t.code === "P" ? "up" : t.code === "S" ? "down" : "flat";
+    const what = t.code ? (CODE_LABEL[t.code]?.text ?? "기타") : "종류 미상";
     const title = shortTitle(t.ownerTitle);
     return (
       <li key={`${t.ownerName}-${t.transactionDate ?? t.filedDate}-${i}`}>

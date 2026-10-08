@@ -429,6 +429,7 @@ export function CardVkospi({ v }: { v: Pick }) {
   const pos = cur !== null && lo !== null && hi !== null && hi > lo ? (cur - lo) / (hi - lo) : 0.5;
   const verdict = pos >= 0.66 ? "최근 30일 중 높은 편" : pos <= 0.33 ? "최근 30일 중 낮은 편" : "최근 30일 평균 수준";
   const knob = v.color;
+  const pts = v.historyPoints.map((b) => ({ key: b.date, value: b.value }));
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="monitor_heart" name={v.name} />
@@ -440,12 +441,18 @@ export function CardVkospi({ v }: { v: Pick }) {
         </span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {/* [판단 5 · 2026-10-08 마지막 점검] 30일 선 — 범위 막대는 바닥에 붙어 칸 가운데가 96~112px 비었다. 환율 칸과 같은 그림이고,
+            남는 높이를 선이 받는다(v2.css .hz-area). 선이 없으면(점이 모자라면) 예전 범위 막대. */}
+        {pts.length >= 2 ? (
+          <AreaChart points={pts} color={v.color} tip={(x) => `${shortDate(x.key)} · ${x.value.toFixed(1)}`} />
+        ) : (
         <div style={{ position: "relative", height: 10 }}>
           <div style={{ height: "100%", borderRadius: R.pill, background: C.track, overflow: "hidden" }}>
             <div style={{ width: `${pos * 100}%`, height: "100%", borderRadius: R.pill, background: knob }} />
           </div>
           <HeatKnob left={pos * 100} color={knob} />
         </div>
+        )}
         {/* 양 끝은 막대의 눈금 — 최근 30일 최저 · 최고. '잔잔 39 · 출렁 58'은 숫자가 무엇인지(30일 최저 · 최고) 안 읽혔다(2026-10-04 점검).
             그 전엔 '방심 ↔ 불안'이었다(평가라서 걷음, 2026-08-04). 낮은 쪽이 왜 과열 신호인지는 셀 맨 아래 설명 한 줄이 맡는다. */}
         {/* 가운데 '최근 30일 범위'는 걷었다 — 위 알약('최근 30일 중 낮은 편')이 같은 기간을 말한다. */}
@@ -506,7 +513,7 @@ export function CardAsia({ v }: { v: Pick }) {
         <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 10 }}>
           {/* 파선은 막대 칸에만 걸쳐야 한다 — 라벨·값 칸까지 가로지르면 표를 관통하는
               줄이 돼서 기준선으로 안 읽힌다. 좌우를 그 두 칸 폭만큼 물린 상자를 깔고
-              그 안에서 %로 세운다. 아래 캡션 줄(12+gap 10)만큼 bottom 도 물린다.
+              그 안에서 %로 세운다. 아래 캡션 줄(20+gap 10)만큼 bottom 도 물린다.
               ⚠️ zIndex 1 — 이 상자는 DOM 에서 막대보다 **앞**이라, 그냥 두면 뒤에 깔려
               KOSPI 를 넘어선 나라의 막대가 파선을 덮는다. 기준선은 자기가 가르는 막대
               위에 보여야 "여기까지가 우리"로 읽히므로 맨 앞 레이어로 올린다. */}
@@ -515,7 +522,7 @@ export function CardAsia({ v }: { v: Pick }) {
             style={{
               position: "absolute",
               top: 0,
-              bottom: 22,
+              bottom: 30,
               left: LABEL_W + ROW_GAP,
               right: VALUE_W + ROW_GAP,
               pointerEvents: "none",
@@ -568,13 +575,15 @@ export function CardAsia({ v }: { v: Pick }) {
               뒤집어 잡는다 — left 로 두면 캡션이 길어질 때 왼쪽으로 자라 선에서 밀린다. */}
           <div style={{ display: "flex", alignItems: "center", gap: ROW_GAP }}>
             <span style={{ width: LABEL_W, flexShrink: 0 }} />
-            <div style={{ position: "relative", flex: 1, minWidth: 0, height: 12 }}>
+            {/* 줄 높이 20 — 12 칸에 20 글자를 얹으면 칸 바닥 여백이 옆 칸(17~18)보다 7px 좁아 격자선에 붙었다(2026-10-08 마지막 점검). */}
+            <div style={{ position: "relative", flex: 1, minWidth: 0, height: 20 }}>
               <span
                 style={{
                   position: "absolute",
                   right: `calc(100% - ${kospiPct})`,
                   top: 0,
                   transform: "translateX(50%)",
+                  lineHeight: "20px",
                   fontSize: "var(--fs-11)",
                   fontWeight: 500,
                   color: "var(--c-cold-ink)",
@@ -618,6 +627,7 @@ export function CardVolume({ v }: { v: Pick }) {
   const avg = dt?.avg_30d ?? null;
   const today = v.raw ?? null;
   const surge = dt?.surge_pct ?? null;
+  const pts = v.historyPoints;
   const fmt = (n: number) => {
     const f = formatIndicatorValue(n, "억원");
     return `${f.display}${f.displayUnit}`;
@@ -637,6 +647,23 @@ export function CardVolume({ v }: { v: Pick }) {
       {surge !== null && (
         <Big disp={`${surge >= 0 ? "+" : ""}${surge}`} unit="%" color={v.color} size={32} sub="평소 대비" />
       )}
+      {/* [판단 4 · 2026-10-08 마지막 점검] 30일 흐름 위에 30일 평균(점선) — 막대 두 줄이면 큰 숫자 아래가 155px 비었다(예탁금 칸과 같은 꼴, 10-06 '너무 없어 보인다' 전례). */}
+      {pts.length >= 2 && avg !== null ? (
+        <>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+            <RefChart dates={pts.map((p) => p.date)} main={pts.map((p) => p.value)} base={pts.map(() => avg)} baseLabel="30일 평균" color={v.color} fmt={fmt} />
+            <span style={{ alignSelf: "flex-end", fontSize: "var(--fs-11)", color: C.sub }}>최근 30일</span>
+          </div>
+          <RefRows
+            color={v.color}
+            fmt={fmt}
+            rows={[
+              { label: "최근 거래일", value: today, dashed: false },
+              { label: "30일 평균", value: avg, dashed: true },
+            ]}
+          />
+        </>
+      ) : (
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -650,6 +677,7 @@ export function CardVolume({ v }: { v: Pick }) {
           </div>
         ))}
       </div>
+      )}
       <Foot text={v.desc} />
     </Shell>
   );
@@ -922,7 +950,7 @@ export function CardLimitUp({ v }: { v: Pick }) {
   const buckets = [
     { label: "상한가", n: dt?.limit_n ?? 0, items: norm(dt?.limit_names) },
     { label: "+20~29%", n: dt?.up20_n ?? 0, items: norm(dt?.up20_names) },
-    { label: "+10~20%", n: dt?.up10_n ?? 0, items: norm(dt?.up10_names) },
+    { label: "+10~19%", n: dt?.up10_n ?? 0, items: norm(dt?.up10_names) },
   ];
   const surged = buckets.reduce((a, b) => a + b.n, 0);
   const listed = dt?.listed_n ?? 0;

@@ -323,7 +323,7 @@
    한 줄로 선다(page.tsx 의 MONO 도 별도 서체가 아니라 같은 Pretendard 다). */
 .hz-dist-pop-heat {
   font-size: var(--fs-11);
-  font-weight: 800;
+  font-weight: 600;
   color: var(--c-sub);
 }
 

@@ -125,6 +125,9 @@ def ends_as_sentence(text: str) -> bool:
 def pick(cands: list[str], digest: str, name: str) -> str | None:
     """후보 가운데 쓸 것 하나. 깨진 글자가 있는 후보는 어느 단계에서도 안 고른다."""
     clean = [t for t in cands if t.strip() and is_clean(t, digest)] or [t for t in cands if t.strip()]
+    # 이름으로 시작해 '~습니다'로 끝나는 후보는 지시문이 샌 것이다 — 'AST스페이스모바일 관련 화제는 … 담담하게 적습니다.'(2026-10-08 마지막 점검).
+    # 아예 버린다. 남는 게 없으면 화면이 흐름 요약 · 움직인 이유로 물러난다(app/kadera/page.tsx).
+    clean = [t for t in clean if not (starts_with_name(t, name) and ends_as_sentence(t))]
     if not clean:
         return None
     # 이름으로 시작하지 않는 후보를 먼저 본다. 전부 그러면 어쩔 수 없이 쓴다(빈칸이 더 나쁘다).

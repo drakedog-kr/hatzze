@@ -395,7 +395,9 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
         {!solo && <div className="v2-tm-side">{sideMods}</div>}
       </div>
 
-      {solo && <div className="v2-tm-stack">{sideMods}</div>}
+      {/* [판단 8 · 2026-10-08 마지막 점검] 일정이 1건 이하면 두 칸으로 나란히(is-short) — 판 폭으로 쌓으면 함께 거론 알약 끝(622)부터
+          모듈 오른끝까지 790px 가 비었다. 일정이 여럿이면 10-05 결정대로 쌓는다(알약 칸이 일정 키로 늘어 비었다). */}
+      {solo && <div className={`v2-tm-stack${events.length <= 1 ? " is-short" : ""}`}>{sideMods}</div>}
 
       {/* 넷째 줄 — 등락의 이유(기준일까지의 이레). 날짜 머리 하나 아래 그날 종목들 — 줄은 종목 · 까닭(남는 폭) · 종가 · 등락 · 채널 수.
           숫자는 줄 오른쪽 끝에 모은다(2026-10-04) — 등락이 종목과 까닭 사이에 있을 땐 '+3.27%'와 까닭 첫 낱말이 붙어 읽혔다.

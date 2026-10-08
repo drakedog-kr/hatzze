@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Fragment } from "react";
 
+import { StockLogo } from "../../../StockLogo";
+
 import { getManagerDetail } from "@/lib/insider-detail";
 import { isCik } from "@/lib/insider-13f";
 
@@ -110,6 +112,13 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
   // 전량 정리가 둘 이하면 모듈을 안 세운다 — 한두 줄 모듈이 옆 칸 키로 늘어 바닥 100px 가 비었다(버핏 1,100, 2026-10-05 점검).
   // 그때는 '분기에 한 것'의 전량 정리 줄이 종목을 말한다.
   const exitedMod = d.exited.length > 2;
+  // '외 N'에 올리면 가려진 티커 — 한 줄에 넷, 스물까지(국민연금은 갈래 하나가 350종목을 넘는다). 홈 '외 N개'와 같은 말풍선(hz-tip-lines).
+  const restTip = (rest: string[]) => {
+    const lines: string[] = [];
+    for (let i = 0; i < Math.min(rest.length, 20); i += 4) lines.push(rest.slice(i, Math.min(i + 4, 20)).join(" · "));
+    if (rest.length > 20) lines.push(`외 ${rest.length - 20}종목`);
+    return lines.join("\n");
+  };
   const moves = [
     { label: "새로 담음", list: byKind("new") },
     { label: "늘림", list: byKind("add") },
@@ -232,7 +241,26 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                     <dt>
                       {s.label}
                       {/* 전량 정리는 아래 모듈이 종목을 말하면 이 줄은 수만 — 같은 사실이 한 화면에 두 번 섰다(2026-10-05 점검). */}
-                      {s.list.length > 0 && !(s.label === "전량 정리" && exitedMod) && (
+                      {/* 옆 칸이 이 모듈 하나면(전량 정리 모듈 없음) 종목을 로고 · 티커로 한 줄씩 편다 — 접어 두면 옆 보유 표 키를 받아
+                          줄마다 위아래 43px 씩 비었다(2026-10-08 마지막 점검). 갈래마다 넷까지 · 나머지는 수로 — 여섯이면 이 칸(601)이 옆 보유 표(533)보다 길어졌다. */}
+                      {s.list.length > 0 && !exitedMod && (
+                        <ul className="v2-isd-tklist">
+                          {s.list.slice(0, 4).map((t) => (
+                            <li key={t}>
+                              <Link href={`/insider/stock/${encodeURIComponent(t)}`} className="v2-isd-tk" data-ga="insider_investor_move_click">
+                                <StockLogo code={t} name={t} market="US" size={16} lazy />
+                                {t}
+                              </Link>
+                            </li>
+                          ))}
+                          {s.list.length > 4 && (
+                            <li className="v2-isd-tkmore hz-tip hz-tip-wide hz-tip-lines hz-tip-start" data-tip={restTip(s.list.slice(4))}>
+                              외 {s.list.length - 4}
+                            </li>
+                          )}
+                        </ul>
+                      )}
+                      {s.list.length > 0 && exitedMod && s.label !== "전량 정리" && (
                         <em>
                           {/* 넓은 판은 여섯까지 — 여덟이면 '353종 / 목' · 'AMD 외 / 345'로 꺾였다(국민연금 1,440, 2026-10-05 점검). */}
                           {s.list.slice(0, 6).map((t, i) => (
@@ -243,8 +271,22 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                               </Link>
                             </Fragment>
                           ))}
-                          {s.list.length > 4 && <span className="v2-isd-narrow"> 외 {s.list.length - 4}</span>}
-                          {s.list.length > 6 && <span className="v2-isd-wide"> 외 {s.list.length - 6}</span>}
+                          {s.list.length > 4 && (
+                            <span className="v2-isd-narrow">
+                              {" "}
+                              <span className="v2-isd-tkmore hz-tip hz-tip-wide hz-tip-lines hz-tip-start" data-tip={restTip(s.list.slice(4))}>
+                                외 {s.list.length - 4}
+                              </span>
+                            </span>
+                          )}
+                          {s.list.length > 6 && (
+                            <span className="v2-isd-wide">
+                              {" "}
+                              <span className="v2-isd-tkmore hz-tip hz-tip-wide hz-tip-lines hz-tip-start" data-tip={restTip(s.list.slice(6))}>
+                                외 {s.list.length - 6}
+                              </span>
+                            </span>
+                          )}
                         </em>
                       )}
                     </dt>
