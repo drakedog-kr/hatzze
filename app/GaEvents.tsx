@@ -12,7 +12,7 @@ import { track } from "@/lib/ga";
  * 재려고 "use client" 를 붙이면 페이지 전체가 클라이언트 번들로 넘어간다. 대신
  * 마크업에는 속성만 달고, 실제 리스너는 여기 클라이언트 컴포넌트 하나가 가진다:
  *
- *   <a data-ga="cta_click" data-ga-cta="report_indicator" data-ga-surface="sentiment_grid">
+ *   <Link href="/kadera" data-ga="cta_click" data-ga-cta="brief_yeoron" data-ga-surface="home_hero">
  *
  * 이미 클라이언트인 컴포넌트(ThemeToggle·MddExplorer 등)는 이 위임을
  * 거치지 말고 track() 을 직접 부른다 — state 를 함께 실어야 해서 속성으로는 부족하다.

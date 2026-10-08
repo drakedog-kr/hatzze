@@ -90,7 +90,7 @@ export function Hero({
   socialHits: number;
   /** 저온·상온·고온·초고온 순서 고정. 색까지 같이 넘겨 셀 안에서 인덱스로 안 찾게 한다. */
   bandCounts: { label: string; count: number; fill: string; items: BandItem[] }[];
-  /** 위 넷의 합. 25가 아니라 **오늘 값이 들어온 지표 수**다(자료가 늦는 날 24가 된다). */
+  /** 위 넷의 합. 전체 카드 수가 아니라 **오늘 값이 들어온 카드 수**다(자료가 늦는 날 하나 준다). */
   bandTotal: number;
   /** 햇쩨 지수 추이의 점(날짜 오름차순). null 이면 조회 실패. */
   trend: ScorePoint[] | null;

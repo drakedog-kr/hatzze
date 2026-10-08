@@ -320,6 +320,8 @@ async function liveQuote(code: string, market: string | null): Promise<{ price: 
  * 미국 종목 시세 — 야후(카더라 · 테마 화면의 usQuotes 와 같은 원천). 미국 종가는 매일 받아 두는 표가 없어 글마다 야후를 본다.
  * 오늘 글은 10분, 지난 글은 하루 캐시 — 이 값이 노트 사본의 주기가 되므로(liveQuote 주석) 지난 글이 30분마다 다시
  * 그려지지 않게 길게 둔다. 크롤러가 지난 글을 훑어도 같은 티커는 캐시를 타 바깥 요청이 티커 수를 넘지 않는다.
+ * ⚠️ 값은 늘 **가장 최근 미국장**이다 — 글이 다룬 장(글 날 전날 뉴욕)이 아닐 수 있고, 화면 머리엔 장 날짜를 안 적는다
+ *    (app/daily/NoteView.tsx NoteStocksModule 의 ⛔ 주석).
  */
 async function usQuote(ticker: string, live: boolean): Promise<{ price: number; changeRate: number | null; date: string | null } | null> {
   const q = await fetchYahooQuote(yahooSymbol(ticker, "US"), { next: { revalidate: live ? 600 : 86400 } });
