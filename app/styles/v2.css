@@ -1148,16 +1148,6 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-dd .v2-md-body { justify-content: space-between; }
 /* 통계 칸을 바닥에 붙이던 margin-top:auto 가 남는 높이를 한곳(게이지 아래)에 다 모았다 — 고르게 나누도록 푼다. */
 .v2-md-dd .v2-md-stats { margin-top: 0; }
-/* 회복 범위 — 최단~최장 선 위에 중앙값 점, 양 끝 글자(V2Sheets.tsx RangeLine). */
-.v2-md-range { display: flex; flex-direction: column; gap: 6px; }
-.v2-md-range-track { position: relative; height: 4px; margin: 4px 0; border-radius: 2px; background: color-mix(in srgb, var(--t-up) 28%, transparent); }
-.v2-md-range-track > i { position: absolute; top: 50%; width: 12px; height: 12px; margin-left: -6px; transform: translateY(-50%); border-radius: 50%; background: var(--t-up); box-shadow: 0 0 0 2px var(--t-card); }
-.v2-md-range-lab { display: flex; justify-content: space-between; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
-/* 회복 막대(V2Sheets.tsx RecoveryLine) — 회색 길 위에 최단~최장 띠(옅은 빨강) · 보통 점(빨강) · 지금 눈금(잉크 세로선). 왼쪽 글자 '지금'도 잉크. */
-.v2-md-recline .v2-md-range-track { background: var(--t-bar-off); }
-.v2-md-recline .v2-md-range-track > em { position: absolute; top: 0; bottom: 0; border-radius: 2px; background: color-mix(in srgb, var(--t-up) 32%, transparent); }
-.v2-md-recline .v2-md-range-track > b { position: absolute; top: 50%; width: 2px; height: 14px; margin-left: -1px; transform: translateY(-50%); border-radius: 1px; background: var(--t-ink); }
-.v2-md-recline .v2-md-range-lab > :first-child { color: var(--t-ink); }
 
 /* 시장 탓 · 종목 탓(V2Sheets.tsx AttributionModule) — 줄마다 이름 · 막대 · 값, 남는 높이를 나눠 받는다(옆 '해마다'와 키가 같다). */
 /* 줄은 44 고정(옆 사례 표와 같은 줄 꼴) — 남는 높이는 큰 숫자 덩어리가 받는다. 줄이 둘 · 셋뿐인 칸이 높이를 줄 사이 틈으로 채워
@@ -1230,15 +1220,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-case-kind { font-size: 12px; font-weight: 500; color: var(--t-ink2); }
 .v2-yc-bare { display: none; }
 
-/* 회복까지 — 중앙값 · 범위 선 · 빠진 속도별 두 줄(지금 꼬리표). 두 줄이 남는 높이를 받는다. */
-.v2-md-kinds { flex: none; display: flex; flex-direction: column; margin-top: 4px; border-top: 1px solid var(--t-line); }
-.v2-md-kind { flex: none; min-height: 44px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 12px; border-bottom: 1px solid var(--t-line); font-variant-numeric: tabular-nums; }
-.v2-md-kind:last-child { border-bottom: 0; }
-.v2-md-kind-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
-.v2-md-kind-n { font-size: 12px; font-weight: 500; color: var(--t-ink3); }
-.v2-md-kind-v { text-align: right; font-weight: 600; }
-.v2-md-kind.is-now .v2-md-kind-v { color: var(--t-up); }
-/* 직전 큰 하락(고점 부근 종목의 회복까지 자리) — 이름 · 값 세 줄. 회복까지 칸의 줄 꼴과 같다. */
+/* 이름 · 값 줄 — 회복까지(이만큼 빠진 적 · 그중 회복 · 저점에서 회복까지 …)와 직전 큰 하락(고점 부근 종목의 회복까지 자리)이 함께 쓴다. */
 .v2-md-kv { flex: none; display: flex; flex-direction: column; margin: 4px 0 0; border-top: 1px solid var(--t-line); }
 .v2-md-kv > div { flex: none; display: flex; align-items: center; justify-content: space-between; min-height: 44px; border-bottom: 1px solid var(--t-line); font-variant-numeric: tabular-nums; }
 .v2-md-kv > div:last-child { border-bottom: 0; }

@@ -381,113 +381,81 @@ export function CasesTable({
 
 /* ── 회복까지 ───────────────────────────────────────────────────── */
 /**
- * 지금만큼(또는 더) 빠졌던 하락이 고점을 되찾기까지 걸린 기간(저점부터) — 세 덩어리로 둔다(2026-10-08 Hun "깔끔하면서 알차게").
- *   ① 큰 숫자: 보통(중앙값) 걸린 기간. 지금만큼 빠졌다 되찾은 게 없으면 저점 이후 지난 기간.
- *   ② 막대 하나: 지난 회복의 최단~최장 띠 · 보통(점) 위에 '지금'(저점 이후 지난 기간) 눈금 — 지금 어디쯤인지 한눈에.
- *   ③ 같은 꼴 줄: 근거(이만큼 빠졌던 n번 중 m번 회복) · 그때 하락(회복이 한 번뿐일 때) · 이번 하락의 꼴 · 전고점까지 필요한 상승률.
- *      ⭐ 한 줄에 정보 하나 — '2021.02 −49.5% · 완만형'처럼 가운뎃점으로 둘을 이으면 복잡해 보였다(2026-10-08 Hun). 무엇인지는 이름표가 말한다.
- * 예전엔 큰 숫자 옆 문장 · 범위 줄 · 꼴별 두 줄 · 덧붙인 줄 · 막대가 다섯 꼴로 섞여 복잡했고, 회복이 한 번뿐인 칸은 큰 숫자 하나만
- * 남아 위아래가 154~179px 비었다(SK하이닉스 · 현대차).
+ * '회복까지' — 이 칸의 질문 셋에 쉬운 낱말로 바로 답한다(2026-10-08 Hun "무슨 뜻인지 모르겠다").
+ *   ① 얼마나 올라야 하나 — 큰 숫자 '전고점까지 +38.4%'. 제목과 이어 '회복까지 +38.4%'로 읽힌다. '지금 낙폭'(−27.7%)과 다른 숫자다.
+ *   ② 과거엔 얼마나 걸렸나 — 이만큼 빠진 적 · 그중 회복 · 저점에서 회복까지(보통) · 가장 오래 걸린 회복.
+ *   ③ 지금은 어디쯤 — 이번 하락의 꼴(급락형 · 완만형) · 저점 이후 지난 기간. 뒤엣것은 ②의 '저점에서 회복까지'와 같은 기준이다.
+ * ⛔ 한 줄에 정보 하나 · 지시어('그때')로 다른 자리를 가리키지 않는다 — 막대 · 꼴별 줄 · '그때 하락'을 두었더니
+ *    서로를 가리켜 따라가기 어려웠다(같은 날 Hun).
  * ⭐ 문턱은 지금 낙폭 그대로(소수 한 자리) — 반올림하면(23.9 → 24) 센 하락과 글자가 조금 어긋난다.
  */
 export function RecoveryModule({ a }: { a: MddAnalysis }) {
   const r = a.recovery!;
-  const ch = a.character;
-  const depth = `${Math.abs(a.currentDd).toFixed(1)}% 넘게 빠진 하락`;
-  // 저점 이후 — 큰 숫자(보통 ○)와 같은 기준(저점에서 되찾기까지, lib/mdd.ts recoveryStats).
+  const depth = `${Math.abs(a.currentDd).toFixed(1)}% 넘게 빠진 적`;
+  // 저점 이후 — '저점에서 회복까지'와 같은 기준(저점에서 되찾기까지, lib/mdd.ts recoveryStats).
   const sinceLow = Math.round((Date.parse(a.asOf) - Date.parse(a.lowDate)) / 86_400_000);
-  // 회복한 게 없으면 이번이 처음이다(진행 중인 하락은 마지막 하나뿐) — '1번 중 0번 되찾음'으로 적혔다(카카오 5년 실측).
+  // 이만큼 빠진 게 처음이면(진행 중인 하락뿐) 셀 회복이 없다 — '1번 중 0번'으로 적혔다(카카오 5년 실측).
   const firstTime = r.recoveredCount === 0;
-  const once = r.recoveredCount === 1;
-  // 전고점까지 올라야 하는 폭 — '지금 낙폭'(−27.7%)과 다른 숫자다(되찾으려면 +38.4%). 화면 어디에도 없던 값이다.
   const toPeak = a.price > 0 ? (a.ath / a.price - 1) * 100 : null;
-  // 회복이 한 번뿐이면 그 하락 — 얼마나 빠졌었나.
-  const prev = once ? a.topDrawdowns.find((e) => e.recovered && e.depth <= a.currentDd) : undefined;
-  // 이번 하락의 꼴과 같은 꼴 하락의 회복 기간(표본이 셋 이상일 때만 있다, lib/mdd.ts drawdownCharacter).
-  const kindName = ch?.currentClass === "fast" ? "급락형" : "완만형";
-  const sameKind = ch ? ch[ch.currentClass] : null;
+  // 처음이면 이 기간에 되찾은 (지금보다 얕은) 하락 중 가장 깊은 것 — 과거 회복을 가늠할 유일한 자료다.
+  const shallow = firstTime ? a.topDrawdowns.find((e) => e.recovered) : undefined;
+  const hasMax = r.recoveredCount >= 2 && r.maxDays !== null && r.medianDays !== null && r.maxDays > r.medianDays;
   return (
     <Module title="회복까지" className="v2-md-rec">
       <div className="v2-md-body">
         <span className="v2-card-val is-big">
-          {firstTime ? (
+          {toPeak !== null && toPeak >= 0.05 ? (
             <>
-              <b className="is-down">{sinceLow === 0 ? "오늘" : `${fmtDur(sinceLow)}째`}</b>
-              <span className="v2-reason">{sinceLow === 0 ? "저점" : "저점 이후"}</span>
+              <b>{fmtPct(toPeak)}</b>
+              <span className="v2-md-aside">전고점까지</span>
             </>
           ) : (
-            <>
-              <b>{fmtDur(r.medianDays!)}</b>
-              <span className="v2-reason">{once ? "걸림" : "보통"}</span>
-            </>
+            <b>전고점 부근</b>
           )}
         </span>
-        {!firstTime && <RecoveryLine now={sinceLow} min={r.minDays} median={r.medianDays!} max={r.maxDays} once={once} />}
         <dl className="v2-md-kv">
           <div>
             <dt>{depth}</dt>
-            <dd>{firstTime ? "이번이 처음" : `${r.similarCount}번 중 ${r.recoveredCount}번 회복`}</dd>
+            <dd>{firstTime ? "이번이 처음" : `${r.similarCount}번`}</dd>
           </div>
-          {/* 회복이 한 번뿐이면 큰 숫자(○ 걸림)가 그 한 번의 값이다 — 이름표가 큰 숫자를 가리켜 어느 하락인지 잇는다.
-              날짜를 이름표로 두니('2021.02 하락') 큰 숫자와 이어지지 않아 갑자기 나온 줄로 읽혔다(2026-10-08 Hun). 날짜는 옆 사례 표에 있다. */}
-          {prev && (
+          {!firstTime && (
             <div>
-              <dt>{fmtDur(r.medianDays!)} 걸린 하락</dt>
-              <dd>{fmtPct(prev.depth)}</dd>
+              <dt>그중 회복</dt>
+              <dd>{r.recoveredCount}번</dd>
             </div>
           )}
-          {/* 처음이면 이 기간에 되찾은 (지금보다 얕은) 하락 중 가장 깊은 것 하나 — 큰 숫자 하나만 남아 판이 비었다(2026-10-04 점검, 1년 조회).
-              둘이면 줄이 다섯이라 칸이 옆 사례 표보다 길어졌다. */}
-          {firstTime &&
-            a.topDrawdowns
-              .filter((e) => e.recovered)
-              .slice(0, 1)
-              .map((e) => (
-                <div key={e.peakDate}>
-                  <dt>{fmtPct(e.depth)} 빠졌을 때</dt>
-                  <dd>{fmtDur(e.days - e.troughDays)} 만에 회복</dd>
-                </div>
-              ))}
-          {/* 이번 하락의 꼴 — 같은 꼴 하락이 되찾기까지 걸린 기간이 있으면 이름표에 꼴을 싣고 값은 그 기간. 없으면 꼴만. */}
-          {ch && (
+          {!firstTime && (
             <div>
-              <dt>{sameKind ? `이번 같은 ${kindName}` : "이번 하락"}</dt>
-              <dd>{sameKind ? (sameKind.count === 1 ? `${fmtDur(sameKind.medianRecovery)} 걸림` : `보통 ${fmtDur(sameKind.medianRecovery)}`) : kindName}</dd>
+              <dt>저점에서 회복까지</dt>
+              <dd>{r.recoveredCount === 1 ? fmtDur(r.medianDays!) : `보통 ${fmtDur(r.medianDays!)}`}</dd>
             </div>
           )}
-          {toPeak !== null && toPeak >= 0.05 && (
+          {hasMax && (
             <div>
-              <dt>전고점까지</dt>
-              <dd>{fmtPct(toPeak)}</dd>
+              <dt>가장 오래 걸린 회복</dt>
+              <dd>{fmtDur(r.maxDays!)}</dd>
             </div>
           )}
+          {shallow && (
+            <div>
+              <dt>{fmtPct(shallow.depth)} 빠졌을 때 회복</dt>
+              <dd>{fmtDur(shallow.days - shallow.troughDays)}</dd>
+            </div>
+          )}
+          {/* 이번 하락이 급락형인지 완만형인지 — 고점에서 저점까지 CHARACTER_SPLIT_DAYS 안이면 급락형(사례 표 유형 칸과 같은 셈, 2026-10-08 Hun "있어야 한다"). */}
+          {a.character && (
+            <div>
+              <dt>이번 하락</dt>
+              <dd>{a.character.currentClass === "fast" ? "급락형" : "완만형"}</dd>
+            </div>
+          )}
+          <div>
+            <dt>저점 이후</dt>
+            <dd>{sinceLow === 0 ? "오늘이 저점" : `${fmtDur(sinceLow)}째`}</dd>
+          </div>
         </dl>
       </div>
     </Module>
-  );
-}
-
-/**
- * 회복 막대 하나 — 왼끝이 저점, 오른끝이 지난 회복의 최장(회복이 한 번뿐이면 그때 걸린 기간). 최단~최장 띠 · 보통(점) 위에
- * '지금'(저점 이후 지난 기간) 눈금을 세운다. 지금이 최장을 넘으면 막대 끝이 지금이다. 회복이라 빨강 계열, 지금은 잉크.
- */
-function RecoveryLine({ now, min, median, max, once }: { now: number; min: number | null; median: number; max: number | null; once: boolean }) {
-  const end = Math.max(max ?? median, median, now, 1);
-  const at = (d: number) => Math.min(100, (d / end) * 100);
-  const band = !once && min !== null && max !== null && max > min;
-  return (
-    <div className="v2-md-range v2-md-recline">
-      <span className="v2-md-range-track">
-        {band && <em style={{ left: `${at(min!)}%`, width: `${at(max!) - at(min!)}%` }} />}
-        <i style={{ left: `${at(median)}%` }} />
-        <b style={{ left: `${at(now)}%` }} />
-      </span>
-      <span className="v2-md-range-lab">
-        <span>{now === 0 ? "오늘 저점" : `지금 ${fmtDur(now)}째`}</span>
-        {/* 오른쪽 글자는 하나 — 최단~최장은 막대의 옅은 띠가 보여 준다. */}
-        <span>{once ? `그때 ${fmtDur(median)}` : band ? `최장 ${fmtDur(max!)}` : `보통 ${fmtDur(median)}`}</span>
-      </span>
-    </div>
   );
 }
 
