@@ -381,10 +381,11 @@ export function CasesTable({
 
 /* ── 회복까지 ───────────────────────────────────────────────────── */
 /**
- * '회복까지' — 큰 숫자 · 막대 그림 하나 · 줄 둘(2026-10-08 Hun "무슨 뜻인지 모르겠다" → "텍스트로만이면 이해가 안 된다, 인포그래픽이 필요").
+ * '회복까지' — 큰 숫자 · 기둥 그림 하나 · 줄 둘(2026-10-08 "무슨 뜻인지 모르겠다" → "텍스트로만이면 이해가 안 된다, 인포그래픽이 필요").
  *   ① 큰 숫자 '전고점까지 +38.4%' — 제목과 이어 '회복까지 +38.4%'로 읽힌다. '지금 낙폭'(−27.7%)과 다른 숫자다.
- *   ② 막대 — 과거 회복에 걸린 기간과 지금(저점 이후 지난 기간)을 한 눈금에 나란히. 이번과 같은 꼴(급락형 · 완만형)은 진한 빨강,
+ *   ② 기둥 — 과거 회복에 걸린 기간과 지금(저점 이후 지난 기간)을 한 바닥선 위에 나란히. 이번과 같은 꼴(급락형 · 완만형)은 진한 빨강,
  *      다른 꼴은 옅은 빨강, 지금은 회색. 꼴별 기록(지금만큼 깊었다 되찾은 하락 셋 이상)이 없으면 지난 회복 하나, 처음이면 그보다 얕았던 하락.
+ *      칸 키는 옆 사례 표가 정하고 기둥 그림이 남는 높이를 받는다 — 가로 막대일 땐 큰 숫자가 늘어난 칸 가운데 떴다(사례 8줄 종목 위아래 100px 넘게 빔).
  *   ③ 줄 — 이만큼 빠진 적(n번 중 m번 회복) · 이번 하락의 꼴.
  * ⛔ 한 줄에 정보 하나 · 지시어('그때')로 다른 자리를 가리키지 않는다 — 막대 · 꼴별 줄 · '그때 하락'이 서로를 가리켜 따라가기 어려웠다.
  * ⭐ 문턱은 지금 낙폭 그대로(소수 한 자리) — 반올림하면(23.9 → 24) 센 하락과 글자가 조금 어긋난다.
@@ -434,7 +435,7 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
             <dt>{depth}</dt>
             <dd>{firstTime ? "이번이 처음" : `${r.similarCount}번 중 ${r.recoveredCount}번 회복`}</dd>
           </div>
-          {/* 이번 하락이 급락형인지 완만형인지 — 고점에서 저점까지 CHARACTER_SPLIT_DAYS 안이면 급락형(사례 표 유형 칸과 같은 셈, Hun "있어야 한다"). */}
+          {/* 이번 하락이 급락형인지 완만형인지 — 고점에서 저점까지 CHARACTER_SPLIT_DAYS 안이면 급락형(사례 표 유형 칸과 같은 셈, 10-08 "있어야 한다"). */}
           {ch && (
             <div>
               <dt>이번 하락</dt>
@@ -450,20 +451,21 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
 type RecoveryBar = { key: string; label: string; days: number | null; value: string; tone: "kind" | "other" | "now" };
 
 /**
- * 회복 막대 — 한 눈금(가장 긴 막대 = 끝) 위에 과거 회복 기간과 지금. 이름 · 막대 · 값 세 칸 격자라 막대 시작선이 같다.
- * 막대는 그림, 값 글자가 정확한 수다. 기록이 없는 꼴은 빈 길만 남긴다.
+ * 회복 기둥 — 한 눈금(가장 긴 기둥 = 그림 키) 위에 과거 회복 기간과 지금. 기둥 위에 값, 바닥선 아래에 이름(해마다 차트와 같은 꼴).
+ * 기둥은 그림, 값 글자가 정확한 수다. 기록이 없는 꼴 · 오늘이 저점이면 기둥 없이 값만 바닥선 위에 선다.
  */
 function RecoveryBars({ bars }: { bars: RecoveryBar[] }) {
   const end = Math.max(1, ...bars.map((b) => b.days ?? 0));
   return (
-    <div className="v2-md-recbars">
+    <div className="v2-md-reccols" style={{ ["--n" as string]: bars.length }}>
       {bars.map((b) => (
-        <div key={b.key} className={`v2-md-recbar is-${b.tone}`}>
-          <span className="v2-md-recbar-k">{b.label}</span>
-          <span className="v2-md-recbar-track">
-            {b.days !== null && b.days > 0 && <i style={{ width: `${Math.max(2, (b.days / end) * 100)}%` }} />}
+        <div key={b.key} className={`v2-md-reccol is-${b.tone}`}>
+          <span className="v2-md-reccol-plot">
+            <i style={{ ["--h" as string]: `${b.days ? Math.max(2, (b.days / end) * 100) : 0}%` }}>
+              <em>{b.value}</em>
+            </i>
           </span>
-          <span className="v2-md-recbar-v">{b.value}</span>
+          <span className="v2-md-reccol-k">{b.label}</span>
         </div>
       ))}
     </div>

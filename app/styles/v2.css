@@ -23,6 +23,8 @@
   /* 칸 하나를 통째로 칠하는 옅은 빨강(시장 브리핑 초고온 칸). 알약용 up-weak 와 라이트는 같고 다크만 옅다 — 아래 다크 블록. */
   --t-up-cell: var(--t-up-weak);
   --t-down-deep: #1362d9;
+  /* 옅은 면(--t-tint) 위 빨간 글자 — 라이트는 오름 빨강 그대로 넘는다(4.7). 다크만 한 단 밝다 — 아래 다크 블록. */
+  --t-up-deep: var(--t-up);
   --t-green: #03b26c;
   --t-heat: var(--c-blue);
   --t-frame: rgba(2, 32, 71, 0.08);
@@ -63,6 +65,8 @@
   --t-up-cell: rgba(219, 81, 87, 0.1);
   /* 파란 면(알약·배지) 위 파란 글자 — 내림 파랑보다 한 단 밝게. down-weak 면 위 6.2. */
   --t-down-deep: #74b1f8;
+  /* 옅은 면(--t-tint) 위 빨간 글자 — 오름 빨강이면 4.04(MDD 사례 표 진행 중 줄 '+102.2%', 2026-10-08). 옛 다크 오름색으로 5.1. */
+  --t-up-deep: #f76b7c;
   --t-green: #1cd28a;
   --t-frame: rgba(214, 224, 239, 0.09);
   --t-line: rgba(214, 224, 239, 0.06);
@@ -1154,8 +1158,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
    두 줄 간격이 114px 였다(2026-10-05 점검). 값 칸 60 · 한 줄 — 56 이면 '+113.8%'가 두 줄로 꺾였다. */
 .v2-md-attr-rows { flex: none; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--t-line); }
 .v2-md-attr-rows > li { flex: none; display: grid; grid-template-columns: 96px minmax(0, 1fr) 60px; align-items: center; column-gap: 10px; min-height: 44px; }
-.v2-md-lastdrop .v2-md-body > .v2-card-val.is-big,
-.v2-md-rec .v2-md-body > .v2-card-val.is-big { flex: 1; align-items: center; }
+.v2-md-lastdrop .v2-md-body > .v2-card-val.is-big { flex: 1; align-items: center; }
 /* [판단 2 · 2026-10-08 마지막 점검] 시장 탓 큰 숫자는 머리 바로 밑(옆 해마다 '연 +22.8%'와 같은 윗선), 줄은 바닥에 — 가운데 맞춤이면 큰 숫자 윗선이
    옆 칸보다 49px(8줄 종목 93~115px) 아래였다. */
 .v2-md-attr .v2-md-attr-rows { margin-top: auto; }
@@ -1211,6 +1214,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-case > :nth-child(n + 2):nth-child(-n + 5) { text-align: right; }
 .v2-md-case > :last-child { text-align: right; }
 .v2-md-case.is-now { background: var(--t-tint); }
+.v2-md-case.is-now .is-num.is-up { color: var(--t-up-deep); }
 .v2-md-case-span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v2-md-case-span b { font-weight: 600; color: var(--t-down); }
 .v2-md-case .is-num { font-weight: 500; }
@@ -1220,17 +1224,20 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-case-kind { font-size: 12px; font-weight: 500; color: var(--t-ink2); }
 .v2-yc-bare { display: none; }
 
-/* 회복 막대(V2Sheets.tsx RecoveryBars) — 이름 · 막대 · 값 세 칸을 한 격자로(막대 시작선이 같다). 이번과 같은 꼴은 진한 빨강,
-   다른 꼴 · 얕은 하락은 옅은 빨강, 지금(저점 이후)은 회색에 글자는 잉크. 회복이라 빨강 계열(옛 범위 줄과 같은 색). */
-.v2-md-recbars { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: center; column-gap: 10px; row-gap: 12px; margin: 4px 0 14px; }
-.v2-md-recbar { display: contents; }
-.v2-md-recbar-k { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink2); white-space: nowrap; }
-.v2-md-recbar-track { height: 8px; border-radius: 4px; background: var(--t-bar-off); overflow: hidden; }
-.v2-md-recbar-track > i { display: block; height: 100%; border-radius: 4px; background: color-mix(in srgb, var(--t-up) 38%, transparent); }
-.v2-md-recbar.is-kind .v2-md-recbar-track > i { background: var(--t-up); }
-.v2-md-recbar.is-now .v2-md-recbar-track > i { background: var(--t-ink4); }
-.v2-md-recbar-v { font-size: 12px; font-weight: 600; line-height: 16px; color: var(--t-ink); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.v2-md-recbar.is-now .v2-md-recbar-k { color: var(--t-ink); }
+/* 회복 기둥(V2Sheets.tsx RecoveryBars) — 해마다 차트와 같은 꼴(바닥선 · 기둥 위 값 · 아래 이름). 그림이 칸의 남는 높이를 받는다.
+   이번과 같은 꼴은 진한 빨강, 다른 꼴 · 얕은 하락은 옅은 빨강, 지금(저점 이후, 회복 중)은 해마다의 덜 찬 해와 같은 빗금에 이름은 잉크.
+   회복이라 빨강 계열. 그림 칸 위 24 는 가장 높은 기둥의 값 자리다.
+   하한 104 — 사례 5줄 종목(칸 키 294)에서 그림이 83 이라 기둥이 납작했다. 128 이면 사례 줄이 44 → 53 으로 늘었다. */
+.v2-md-reccols { flex: 1; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); min-height: 104px; }
+.v2-md-reccol { display: flex; flex-direction: column; min-width: 0; }
+.v2-md-reccol-plot { position: relative; flex: 1; margin-top: 24px; border-bottom: 1px solid var(--t-grid); }
+.v2-md-reccol-plot > i { position: absolute; bottom: 0; left: 50%; width: min(44px, 40%); height: var(--h); transform: translateX(-50%); border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--t-up) 38%, transparent); }
+.v2-md-reccol.is-kind .v2-md-reccol-plot > i { background: var(--t-up); }
+.v2-md-reccol.is-now .v2-md-reccol-plot > i { background: repeating-linear-gradient(45deg, var(--t-up) 0 2px, transparent 2px 5px); box-shadow: inset 0 0 0 1px var(--t-up); }
+[data-theme="dark"] .v2-md-reccol.is-other .v2-md-reccol-plot > i { background: color-mix(in srgb, var(--t-up) 60%, transparent); }
+.v2-md-reccol-plot > i > em { position: absolute; bottom: 100%; left: 50%; margin-bottom: 6px; transform: translateX(-50%); font-style: normal; font-size: 13px; font-weight: 600; line-height: 18px; color: var(--t-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2-md-reccol-k { flex: none; margin-top: 8px; text-align: center; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink2); white-space: nowrap; }
+.v2-md-reccol.is-now .v2-md-reccol-k { color: var(--t-ink); }
 /* 이름 · 값 줄 — 회복까지(이만큼 빠진 적 · 이번 하락)와 직전 큰 하락(고점 부근 종목의 회복까지 자리)이 함께 쓴다. */
 .v2-md-kv { flex: none; display: flex; flex-direction: column; margin: 4px 0 0; border-top: 1px solid var(--t-line); }
 .v2-md-kv > div { flex: none; display: flex; align-items: center; justify-content: space-between; min-height: 44px; border-bottom: 1px solid var(--t-line); font-variant-numeric: tabular-nums; }
