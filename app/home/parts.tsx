@@ -639,7 +639,7 @@ export function AreaChart({
   for (const ch of `${color}|${points[0].key}|${points.length}|${H}`) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
   const gid = `hz-area-${hsh.toString(36)}`;
   return (
-    <div style={{ position: "relative", height: H }}>
+    <div className="hz-area" style={{ position: "relative", height: H }}>
       <svg viewBox={`0 0 100 ${H}`} style={{ width: "100%", height: H, display: "block" }} preserveAspectRatio="none">
         {/* shadcn 영역 차트 꼴(2026-09-27, MDD 언더워터와 같은 방식) — 선은 1px, 면은 선 쪽이 진하고 바닥으로 옅어지는 그라데이션.
             SVG 그라데이션은 id 가 문서 전역이라 카드마다 색이 다르면 서로 덮어쓴다 — 그래서 한때 반투명 한 겹이었고,
