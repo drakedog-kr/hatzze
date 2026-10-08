@@ -36,7 +36,7 @@ export default function Footer() {
   return (
     // 위 여백 56 — 셸 세로 간격을 20 → 12 로 줄여(AppShell) 합(68)을 그대로 둔다.
     <footer style={{ marginTop: 56, borderTop: `1px solid var(--c-frame)`, paddingTop: 18 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: "10px 24px" }}>
+      <div className="hz-footer-row" style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: "10px 24px" }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "6px 14px" }}>
           <span style={{ display: "inline-flex", alignItems: "baseline", gap: 7 }}>
             <span style={{ alignSelf: "center", display: "inline-flex" }}>

@@ -285,11 +285,12 @@
   /* 닫기 ✕(26)는 겉 그대로, 누르는 자리만 44(2026-10-08 폰 점검). */
   .hz-pc-hint-x { position: relative; }
   .hz-pc-hint-x::after { content: ""; position: absolute; inset: -9px; }
-  /* 탑바 로고(23) · 푸터 버전(12) — 누르는 자리만 넓힌다. */
+  /* 탑바 로고(23) · 푸터 버전(12) — 누르는 자리만 넓힌다. 버전 링크는 말풍선(.hz-tip::after)을 겸해 ::before 로 넓힌다. */
   .hz-topbar .hz-logo-link { position: relative; }
   .hz-topbar .hz-logo-link::after { content: ""; position: absolute; inset: -11px -6px; }
-  .hz-version-link { position: relative; }
-  .hz-version-link::after { content: ""; position: absolute; inset: -12px -6px; }
+  .hz-version-link::before { content: ""; position: absolute; inset: -12px -6px; }
+  /* 푸터 두 줄(로고 · 버전 / 문서 링크) 사이 20 — 10 이면 버전 링크와 문서 링크(위아래 안쪽 10)의 누르는 자리가 겹쳤다(2026-10-08 점검). */
+  .hz-footer-row { row-gap: 20px !important; }
 
 
   /* '맨 위로' 버튼 — 한 화면 넘게 내려가면 오른쪽 아래에 나타난다
