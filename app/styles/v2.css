@@ -1119,7 +1119,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-band { display: grid; grid-template-columns: calc(25% - 6px) minmax(0, 1fr) var(--md-r); align-items: stretch; gap: 12px; }
 .v2-md-band > .v2-mod { display: flex; flex-direction: column; }
 .v2-md-body { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 12px 14px 14px; }
-.v2-md-price { display: flex; align-items: center; gap: 10px; }
+/* [판단 2] 가격 글자선을 옆 '지금 낙폭' 큰 숫자와 같은 윗선에 — 가운데 맞춤이면 2px 엇갈렸다. */
+.v2-md-price { display: flex; align-items: flex-start; gap: 10px; }
 .v2-md-chg { font-size: 12px; font-weight: 500; line-height: 16px; font-variant-numeric: tabular-nums; color: var(--t-ink3); }
 .v2-md-chg.is-up { color: var(--t-up); }
 .v2-md-chg.is-down { color: var(--t-down); }
@@ -1155,9 +1156,11 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
    두 줄 간격이 114px 였다(2026-10-05 점검). 값 칸 60 · 한 줄 — 56 이면 '+113.8%'가 두 줄로 꺾였다. */
 .v2-md-attr-rows { flex: none; display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--t-line); }
 .v2-md-attr-rows > li { flex: none; display: grid; grid-template-columns: 96px minmax(0, 1fr) 60px; align-items: center; column-gap: 10px; min-height: 44px; }
-.v2-md-attr .v2-md-body > .v2-card-val.is-big,
 .v2-md-lastdrop .v2-md-body > .v2-card-val.is-big,
 .v2-md-rec .v2-md-body > .v2-card-val.is-big { flex: 1; align-items: center; }
+/* [판단 2 · 2026-10-08 마지막 점검] 시장 탓 큰 숫자는 머리 바로 밑(옆 해마다 '연 +22.8%'와 같은 윗선), 줄은 바닥에 — 가운데 맞춤이면 큰 숫자 윗선이
+   옆 칸보다 49px(8줄 종목 93~115px) 아래였다. */
+.v2-md-attr .v2-md-attr-rows { margin-top: auto; }
 .v2-md-attr-name { min-width: 0; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink2); word-break: keep-all; overflow-wrap: anywhere; }
 .v2-md-attr-val { text-align: right; white-space: nowrap; font-size: 13px; font-weight: 600; line-height: 20px; color: var(--t-ink); font-variant-numeric: tabular-nums; }
 .v2-md-attr-val.is-up { color: var(--t-up); }
@@ -1179,8 +1182,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 /* 짝 줄 — 표가 넓은 쪽을 차지한다(사례 표 2 : 회복 1 · 시장 탓 1 : 업종 2). 짧은 쪽은 안쪽 줄이 늘어 키를 맞춘다. */
 .v2-md-row { display: grid; gap: 12px; align-items: stretch; }
 .v2-md-row.is-21 { grid-template-columns: minmax(0, 1fr) var(--md-r); }
-/* 사례 · 회복 / 해마다 · 시장 탓 네 칸을 한 격자에 — 두 줄의 키가 같다(키 큰 줄에 맞춘다). 좁은 폭에선 한 단이라 풀어 준다. */
-.v2-md-row.is-quad { grid-auto-rows: 1fr; }
+/* 사례 · 회복 / 해마다 · 시장 탓 네 칸을 한 격자에. [판단 2] 두 줄 키를 같게 묶던 grid-auto-rows: 1fr 을 걷었다 — 둘째 줄이 첫 줄 키(338)에
+   묶여 시장 탓 칸이 큰 숫자 위아래로 비었다. 줄마다 제 키(둘째 줄 260 안팎). */
 .v2-md-row > .v2-mod,
 .v2-md-row > .hz-sheet { display: flex; flex-direction: column; }
 
