@@ -1136,6 +1136,9 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 /* 둘째 줄의 빈 곳 — 셋 중 가장 긴 칸이 키를 정하고, 나머지는 안쪽 줄이 남는 높이를 나눠 받는다.
    종목: 전고점 · 저점 두 줄이 늘어난다. 지금 낙폭: 덩어리 사이가 고르게 벌어진다. */
 .v2-md-rows { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; }
+/* [판단 3] 종목 칸의 가격 선이 남는 높이를 받는다 — 두 줄은 바닥에. */
+.v2-md-stock .v2-spark { flex: 1 1 48px; min-height: 48px; margin: 8px 0 0; }
+.v2-md-stock .v2-md-rows { flex: none; }
 /* 전고점 · 저점 줄 — 이름 · 날짜(12/500) · 값(13/700). 줄은 남는 높이를 나눠 받고 가는 선으로 가른다. */
 /* 줄 키 44 고정 · 칸 바닥에 붙는다 — 늘어난 칸 가운데에 뜨면 옆 두 칸 바닥 줄과 26px 어긋났다(2026-10-05 점검). */
 .v2-md-pr { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; border-top: 1px solid var(--t-line); }
