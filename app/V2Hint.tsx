@@ -36,6 +36,7 @@ import { Icon } from "./ui";
  * 가르치는 동작이 호버인 쪽지(hover) — 마우스 기기에선 대상 위에 잠깐(HOVER_SEEN_MS) 머물러도 '봤음'이다. 말풍선이 이미 떴으니 가르친 대로 해 본 것이다.
  * 문구가 기기마다 다르면 touchText 를 준다(호버가 없는 기기에서 text 대신 보인다 · CSS 미디어 쿼리라 하이드레이션이 안 어긋난다).
  * until(ISO 시각)이 지나면 안 뜬다 — 새 소식처럼 시효가 있는 쪽지. 개발 서버에선 시각과 무관하게 뜬다(소식 띠 NEWS 와 같은 규칙).
+ * weekly 는 '한 번 보면 끝'의 예외다 — 매주 월요일 0시(KST)에 다시 뜬다(HintSpec.weekly).
  */
 const { storeFor, markSeen } = createHintStore("hz-v2hint-", "hz-v2hint-change");
 
@@ -45,6 +46,13 @@ const HOVER_SEEN_MS = 600;
 // 모듈이 읽힐 때 한 번만 본다(렌더 안에서 Date.now() 를 부르면 React 컴파일러 린트가 막는다). 서버 스냅샷은 늘 false 라 서버는 안 쓴다.
 const HINT_NOW = Date.now();
 const hintLive = (until: string | undefined) => !until || process.env.NODE_ENV !== "production" || HINT_NOW < Date.parse(until);
+
+/** 이번 주 월요일(KST)의 날짜 'YYYY-MM-DD' — weekly 쪽지의 '봤음'이 이 주에만 통한다. +9h 로 KST 시계를 만든 뒤 UTC 메서드로 읽는다. */
+const HINT_WEEK = (() => {
+  const kst = new Date(HINT_NOW + 9 * 3600e3);
+  const sinceMonday = (kst.getUTCDay() + 6) % 7; // 월 0 · 화 1 … 일 6
+  return new Date(kst.getTime() - sinceMonday * 86400e3).toISOString().slice(0, 10);
+})();
 
 /** 지금 화면에 붙은 쪽지 — id → 차례 · 붙은 수(같은 id 가 폭에 따라 두 자리에 설 수 있다 · 테마 지도와 흐름 표) · 차례 밖인가. */
 const mounted = new Map<string, { order: number; n: number; together: boolean }>();
@@ -85,6 +93,11 @@ export type HintSpec = {
   target?: string;
   /** 차례를 안 기다리고 바로 뜬다(다른 쪽지의 차례에도 안 낀다) — 머리 주석의 예외. */
   together?: boolean;
+  /**
+   * 매주 월요일 0시(KST)에 다시 뜬다 — '봤음'을 그 주에만 기억한다(저장 키 `hz-v2hint-<id>@<그 주 월요일>`).
+   * 한 번 닫으면 끝인 다른 쪽지와 달리, 재방문자에게도 주마다 다시 알리고 싶은 것에만 쓴다(텔레그램 구독 단추).
+   */
+  weekly?: boolean;
 };
 
 /** anchor 의 자리 표시(첫째 · 끝 · n째)를 뗀 선택자 — '첫 줄'을 가리키는 쪽지의 가르침은 '아무 줄이나 누르면'이다. */
@@ -94,7 +107,7 @@ export function targetOf(anchor: string | undefined): string | null {
 }
 
 export function V2Hint({
-  id,
+  id: name,
   text,
   order = 0,
   anchor,
@@ -107,9 +120,13 @@ export function V2Hint({
   hover = false,
   icon = "touch_app",
   until,
+  weekly = false,
   style,
 }: HintSpec & { style?: React.CSSProperties }) {
   const ref = useRef<HTMLDivElement>(null);
+  // 기억 · 차례에 쓰는 이름. weekly 면 주마다 바뀌어 지난주의 '봤음'이 안 통한다. 화면(data-hint)에는 원래 이름을 쓴다 —
+  // 서버와 클라이언트가 주 경계에서 다른 주를 볼 수 있어, 주가 든 이름을 그리면 하이드레이션이 어긋난다.
+  const id = weekly ? `${name}@${HINT_WEEK}` : name;
   const store = storeFor(id);
   const show = useSyncExternalStore(store.subscribe, () => hintLive(until) && myTurn(id, order), () => false);
 
@@ -213,7 +230,7 @@ export function V2Hint({
     // ⚠️ `hidden` 이지 `return null` 이 아니다(app/hint-store.ts 머리 주석 ①).
     <div
       ref={ref}
-      data-hint={id}
+      data-hint={name}
       className={`v2-hint-slot${at === "inside" ? " is-inside" : at === "right" ? " is-right" : ""}${className ? ` ${className}` : ""}`}
       style={style}
       hidden={!show}

@@ -349,7 +349,7 @@ const TELEGRAM: { href: string; label: string; aria: string; icon: IconName } = 
 };
 
 /* 처음 온 사람에게 이 단추가 무엇인지 한 번 알려 주는 쪽지(app/V2Hint.tsx) — 2026-10-08 운영자 지시. 사이드바는 단추 줄 오른쪽,
-   폰 메뉴는 그 줄 밑(마지막 줄이라 위로 뒤집힌다). 단추를 누르거나 ✕ 를 누르면 '봤음'.
+   폰 메뉴는 그 줄 밑(마지막 줄이라 위로 뒤집힌다). 단추를 누르거나 ✕ 를 누르면 그 주 동안 '봤음'(weekly).
    order 100 — 화면 맨 아래 자리라 차례도 맨 뒤다. 본문 쪽지(홈의 구간 등)를 다 본 뒤에 뜬다. together 쪽지는 차례 밖이라 같이 설 수 있다.
    ⚠️ 문구만 고칠 땐 id 를 그대로 둔다(바꾸면 닫은 사람에게 다시 뜬다). */
 const TELEGRAM_HINT: Omit<HintSpec, "at"> = {
@@ -358,6 +358,8 @@ const TELEGRAM_HINT: Omit<HintSpec, "at"> = {
   text: "평일 아침과 저녁에 시황을 정리해 보내 드립니다",
   anchor: 'a[data-ga-cta="community"]',
   order: 100,
+  // 닫은 사람에게도 매주 월요일 0시(KST)에 다시 뜬다 — 재방문자에게도 주마다 구독을 알린다(2026-10-08 운영자 지시).
+  weekly: true,
 };
 
 // 아직 페이지가 없는 예고 항목. NAV 에 넣지 않는 이유가 둘이다.
@@ -949,7 +951,7 @@ function Sidebar() {
           // ⚠️ 두 값을 여기 인라인으로 되돌리면 인라인이 :hover 를 이겨 호버가 죽는다.
           //
           // `hz-tip` 은 이 화면의 공용 말풍선이다. 라벨("시황 구독하기")이 어디로 나가는지
-          // 말하지 않아서, 올려 보면 한 줄로 알려 준다. 처음 온 사람에겐 TELEGRAM_HINT 쪽지가 오른쪽에 한 번 뜬다.
+          // 말하지 않아서, 올려 보면 한 줄로 알려 준다. TELEGRAM_HINT 쪽지가 오른쪽에 주마다 한 번 뜬다.
           // ⚠️ `.hz-tip` 이 커서를 default 로 못박으므로 `.hz-tg-cta` 가 pointer 를
           //    되찾는다(globals.css). 누르면 나가는 링크인데 화살표면 거짓말이 된다.
           className="hz-tip hz-tg-cta"
