@@ -199,7 +199,8 @@
      사이드바의 같은 묶음(AppShell 의 LogoTag)과 같은 5 로 맞춘다. */
   .hz-topbar-logo { display: inline-flex; align-items: flex-start; gap: 5px; }
   .hz-menu-btn { display: inline-flex; }
-  .hz-topbar { display: flex; padding: 0 16px; }
+  /* 좌우 여백은 본문과 같은 --hz-main-pad(12) — 16 이면 탑바 단추와 본문 첫 줄 띠가 4px 어긋났다(2026-10-08 마지막 점검). */
+  .hz-topbar { display: flex; padding: 0 var(--hz-main-pad); }
   /* 탑바 단추(검색 · 메뉴 · 테마)는 겉 38(AppShell 인라인) 그대로 두고 누르는 자리만 44 로 — 사이 8px 라 이웃과 2px 가 남는다
      (2026-10-05 모바일 점검). */
   .hz-topbar .hz-menu-btn,
@@ -291,6 +292,8 @@
   .hz-version-link::before { content: ""; position: absolute; inset: -12px -6px; }
   /* 푸터 두 줄(로고 · 버전 / 문서 링크) 사이 20 — 10 이면 버전 링크와 문서 링크(위아래 안쪽 10)의 누르는 자리가 겹쳤다(2026-10-08 점검). */
   .hz-footer-row { row-gap: 20px !important; }
+  /* 문서 링크가 두 줄로 갈리면(375 이하) 줄 사이도 20 — 6 이면 '문의'의 누르는 자리가 윗줄을 14px 덮었다(2026-10-08 마지막 점검). */
+  .hz-footer-links { row-gap: 20px !important; }
 
 
   /* '맨 위로' 버튼 — 한 화면 넘게 내려가면 오른쪽 아래에 나타난다

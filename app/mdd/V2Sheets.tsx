@@ -369,7 +369,8 @@ export function CasesTable({
                 {/* 진행 중도 같은 단위(1.2년 · 2개월)로 — 날수('687일째')면 같은 칸의 다른 줄과 단위가 달랐다. */}
                 {e.recovered ? fmtDur(e.days - e.troughDays) : <em>{fmtDur(e.days - e.troughDays)}째</em>}
               </span>
-              <span className="v2-md-case-kind">{e.troughDays <= CHARACTER_SPLIT_DAYS ? "급락" : "완만"}</span>
+              {/* 옆 회복까지 칸과 같은 낱말(급락형 · 완만형) — 한 화면에 두 꼴이었다(2026-10-08 마지막 점검). */}
+              <span className="v2-md-case-kind">{e.troughDays <= CHARACTER_SPLIT_DAYS ? "급락형" : "완만형"}</span>
             </li>
           ))}
         </ol>
@@ -501,8 +502,9 @@ export function AttributionModule({
   const bench = benchName(market);
   // 받침에 따라 와 · 과(요약 줄 mddSummary 의 은 · 는과 같은 셈 — S&P500 은 '오백', 코스닥은 받침이 있다).
   const wa = market === "US" || market === "KOSDAQ" ? "과" : "와";
-  // '○○ 평균' — '인터넷·플랫폼 대표 종목'은 96px 이름 칸에서 모든 폭 두 줄이었다(2026-10-05 점검).
-  const themeLabel = `${themeName ?? "업종"} 평균`;
+  // 업종 이름만 — '○○ 평균'이면 바로 아래 업종 칸 머리 '평균 −26.9%'(각자 고점 대비)와 섞여 읽혔다(2026-10-08 마지막 점검).
+  //    대표 종목 평균이라는 뜻은 바로 위 낙폭 요약이 말한다. '인터넷·플랫폼 대표 종목'은 96px 칸에서 두 줄이었다(10-05).
+  const themeLabel = themeName ?? "업종";
   const rows: { key: string; label: string; v: number; self?: boolean }[] = [];
   if (attr.market !== null) rows.push({ key: "market", label: bench, v: attr.market });
   if (attr.theme !== null) rows.push({ key: "theme", label: themeLabel, v: attr.theme });
@@ -577,7 +579,8 @@ export function LastDropModule({ d, asOf }: { d: NonNullable<MddAnalysis["lastDr
       <div className="v2-md-body">
         <span className="v2-card-val is-big">
           <b className="is-down">{fmtPct(d.depth)}</b>
-          <span className="v2-reason">고점 대비</span>
+          {/* 곁글 — 회색 알약은 판정 낱말에만 쓴다(지금 낙폭 '전고점 대비'와 같은 꼴, 2026-10-08 마지막 점검). */}
+          <span className="v2-md-aside">고점 대비</span>
         </span>
         <dl className="v2-md-kv">
           <div>

@@ -119,6 +119,8 @@ export function BasketBoard({
   );
   const [sel, setSel] = useState(0);
   const readRef = useRef<HTMLElement>(null);
+  // 마우스가 지나가기만 하면 고르지 않는다 — 담기 단추로 가는 길에 지나간 줄이 골라져 다른 바스켓이 담겼다(2026-10-08 마지막 점검).
+  const hoverT = useRef<number | undefined>(undefined);
   const cur = rows[sel] ?? rows[0];
   if (!cur) return null;
   const rules = mode === "irp" && cur.b.rulesIrp ? cur.b.rulesIrp : mode === "pension" && cur.b.rulesPension ? cur.b.rulesPension : cur.b.rules;
@@ -147,7 +149,11 @@ export function BasketBoard({
                     role="option"
                     aria-selected={sel === i}
                     className={`v2-dv-bk-row${sel === i ? " is-on" : ""}`}
-                    onMouseEnter={() => setSel(i)}
+                    onMouseMove={() => {
+                      window.clearTimeout(hoverT.current);
+                      hoverT.current = window.setTimeout(() => setSel(i), 120);
+                    }}
+                    onMouseLeave={() => window.clearTimeout(hoverT.current)}
                     onFocus={() => setSel(i)}
                     onClick={() => {
                       setSel(i);

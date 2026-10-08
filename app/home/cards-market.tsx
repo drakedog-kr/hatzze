@@ -506,7 +506,7 @@ export function CardAsia({ v }: { v: Pick }) {
         <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 10 }}>
           {/* 파선은 막대 칸에만 걸쳐야 한다 — 라벨·값 칸까지 가로지르면 표를 관통하는
               줄이 돼서 기준선으로 안 읽힌다. 좌우를 그 두 칸 폭만큼 물린 상자를 깔고
-              그 안에서 %로 세운다. 아래 캡션 줄(12+gap 10)만큼 bottom 도 물린다.
+              그 안에서 %로 세운다. 아래 캡션 줄(20+gap 10)만큼 bottom 도 물린다.
               ⚠️ zIndex 1 — 이 상자는 DOM 에서 막대보다 **앞**이라, 그냥 두면 뒤에 깔려
               KOSPI 를 넘어선 나라의 막대가 파선을 덮는다. 기준선은 자기가 가르는 막대
               위에 보여야 "여기까지가 우리"로 읽히므로 맨 앞 레이어로 올린다. */}
@@ -515,7 +515,7 @@ export function CardAsia({ v }: { v: Pick }) {
             style={{
               position: "absolute",
               top: 0,
-              bottom: 22,
+              bottom: 30,
               left: LABEL_W + ROW_GAP,
               right: VALUE_W + ROW_GAP,
               pointerEvents: "none",
@@ -568,13 +568,15 @@ export function CardAsia({ v }: { v: Pick }) {
               뒤집어 잡는다 — left 로 두면 캡션이 길어질 때 왼쪽으로 자라 선에서 밀린다. */}
           <div style={{ display: "flex", alignItems: "center", gap: ROW_GAP }}>
             <span style={{ width: LABEL_W, flexShrink: 0 }} />
-            <div style={{ position: "relative", flex: 1, minWidth: 0, height: 12 }}>
+            {/* 줄 높이 20 — 12 칸에 20 글자를 얹으면 칸 바닥 여백이 옆 칸(17~18)보다 7px 좁아 격자선에 붙었다(2026-10-08 마지막 점검). */}
+            <div style={{ position: "relative", flex: 1, minWidth: 0, height: 20 }}>
               <span
                 style={{
                   position: "absolute",
                   right: `calc(100% - ${kospiPct})`,
                   top: 0,
                   transform: "translateX(50%)",
+                  lineHeight: "20px",
                   fontSize: "var(--fs-11)",
                   fontWeight: 500,
                   color: "var(--c-cold-ink)",
@@ -922,7 +924,7 @@ export function CardLimitUp({ v }: { v: Pick }) {
   const buckets = [
     { label: "상한가", n: dt?.limit_n ?? 0, items: norm(dt?.limit_names) },
     { label: "+20~29%", n: dt?.up20_n ?? 0, items: norm(dt?.up20_names) },
-    { label: "+10~20%", n: dt?.up10_n ?? 0, items: norm(dt?.up10_names) },
+    { label: "+10~19%", n: dt?.up10_n ?? 0, items: norm(dt?.up10_names) },
   ];
   const surged = buckets.reduce((a, b) => a + b.n, 0);
   const listed = dt?.listed_n ?? 0;

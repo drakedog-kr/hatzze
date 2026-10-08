@@ -194,7 +194,8 @@ export function Treemap({
           order={hint.order}
           text={hint.text(byKey.get(biggest.key)!.label)}
           target=".hz-tm-tile"
-          style={{ left: `calc(${biggest.x}% + 10px)`, top: `calc(${(biggest.y / H) * 100}% + 56px)` }}
+          // 곁줄('말 많은 종목')이 있으면 그 아래로 — 56 이면 쪽지가 곁줄을 통째로 덮었다(2026-10-08 마지막 점검).
+          style={{ left: `calc(${biggest.x}% + 10px)`, top: `calc(${(biggest.y / H) * 100}% + ${byKey.get(biggest.key)!.sub ? 80 : 56}px)` }}
         />
       )}
     </div>

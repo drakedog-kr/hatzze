@@ -115,7 +115,7 @@ export function CardDivergence({ v }: { v: Pick }) {
       heat: 100 - real,
       tip:
         ccsi != null
-          ? `한국은행 소비자심리지수(CCSI) 최신값은 ${ccsi}입니다.`
+          ? `CCSI ${ccsi}`
           : undefined,
     },
     {
@@ -125,7 +125,7 @@ export function CardDivergence({ v }: { v: Pick }) {
       heat: market,
       tip:
         gap != null
-          ? `코스피는 최근 종가 기준 전고점보다 ${Math.abs(gap)}% 아래입니다.`
+          ? `전고점보다 ${Math.abs(gap)}% 아래`
           : undefined,
     },
   ];
@@ -183,7 +183,8 @@ export function CardTrend({ v, icon }: { v: Pick; icon: IconName }) {
         <>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <strong className="hz-big" style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
-              {vsAvg.toFixed(1)}배
+              {vsAvg.toFixed(1)}
+              <span className="hz-big-unit">배</span>
             </strong>
             {/* 화살표·막대·숫자가 **한 색**이어야 한다. 예전엔 숫자만 온도색이고
                 화살표·막대는 평균 대비 방향(>1 이면 빨강)이라, 1.1배(과열도 저온) 카드가
@@ -370,7 +371,8 @@ export function CardYoutube({ v }: { v: Pick }) {
       {ratio !== null && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <strong className="hz-big" style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: v.color, lineHeight: 1 }}>
-            {ratio.toFixed(1)}배
+            {ratio.toFixed(1)}
+            <span className="hz-big-unit">배</span>
           </strong>
           {/* 초보 검색량 카드와 같은 화살표 규칙 — 기준은 1배(평소)다. */}
           {!nearUsual(ratio) && (
@@ -469,7 +471,12 @@ export function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick })
       {lead && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
           <strong className="hz-big" style={{ fontFamily: bothUsual ? undefined : MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: lead.v.color, lineHeight: 1, whiteSpace: "nowrap" }}>
-            {bothUsual ? "평소 수준" : `${lead.r.toFixed(1)}배`}
+            {bothUsual ? "평소 수준" : (
+              <>
+                {lead.r.toFixed(1)}
+                <span className="hz-big-unit">배</span>
+              </>
+            )}
           </strong>
           <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2, whiteSpace: "nowrap" }}>
             {bothUsual ? "명품 · 오마카세 검색" : `${lead.name} · 평소 대비`}
@@ -549,7 +556,7 @@ export function CardBrokerage({ v }: { v: Pick }) {
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="leaderboard" name={v.name} />
       {/* '최고 n위' 알약을 걷었다 — 아래 목록 첫 줄이 같은 순위를 적는다(v2, 2026-10-03). */}
-      <Big disp={`${count}개`} color={v.color} size={32} sub="인기차트 진입" />
+      <Big disp={String(count)} unit="개" color={v.color} size={32} sub="인기차트 진입" />
       {/* 회색 둥근 행 넷 → 가는 선으로 나눈 목록(v2). 순위는 왼쪽 고정 폭 숫자라 이름 길이와 상관없이 같은 자리에 선다. */}
       <div className="hz-rank-list">
         {charted.slice(0, 4).map((app, i) => (

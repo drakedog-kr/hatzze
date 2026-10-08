@@ -56,7 +56,7 @@ export default function Footer() {
         {/* 문서 셋은 법정 고지라 서비스 메뉴(사이드바)가 아니라 여기 둔다. 순서는 이용약관이 먼저다 — 서비스 전반을 정하는
             쪽이 앞이고, 처리방침은 그중 개인정보 한 갈래를 떼어 놓은 문서다(약관 10항이 그쪽을 가리킨다). 투자 유의사항은
             약관 3·4·5조를 줄인 안내라 그 뒤. */}
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "6px 14px" }}>
+        <div className="hz-footer-links" style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "6px 14px" }}>
           <Link href="/terms" className="hz-footer-link" style={LINK}>
             이용약관
           </Link>

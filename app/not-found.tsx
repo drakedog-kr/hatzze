@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
-import { DOC_WIDTH } from "./legal";
-import { C, Icon } from "./ui";
+import { DocCover } from "./legal";
 
 /**
  * 없는 주소가 왔을 때의 화면. 루트 레이아웃(사이드바·탑바·푸터) 안에 그려진다.
@@ -40,32 +38,21 @@ export const metadata: Metadata = {
   alternates: { canonical: null },
 };
 
+/**
+ * v2 문서 화면과 같은 첫 줄 띠 하나(2026-10-08 마지막 점검). 꼬리표 '404' · 안내 문장 · 아이콘 단추를 걷었다 — 설명 문장은 두지 않고,
+ * 갈 곳 셋은 띠의 링크 칸이 맡는다.
+ */
 export default function NotFound() {
   return (
-    <div style={{ maxWidth: DOC_WIDTH }}>
-      {/* 꼬리표는 500 — 곁줄은 굵게 하지 않는다(2026-10-05 점검). */}
-      <p style={{ margin: 0, fontSize: "var(--fs-12)", fontWeight: 500, letterSpacing: "0.08em", color: "var(--c-muted)" }}>404</p>
-      <h1 style={{ margin: "8px 0 0", fontSize: "var(--fs-24)", fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
-        찾을 수 없는 주소입니다
-      </h1>
-      <p style={{ margin: "14px 0 0", fontSize: "var(--fs-14)", lineHeight: 1.85, color: C.sub }}>
-        주소가 바뀌었거나 잘못 적혔거나, 아직 없는 종목·날짜일 수 있습니다. 아래에서 다시 시작하십시오.
-      </p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 22 }}>
-        <Link href="/" className="hz-btn-soft" style={{ padding: "0 14px" }}>
-          {/* 아이콘은 사이드바와 같은 것(AppShell 메뉴 정의) — 'home'이라 사이드바의 시장 브리핑과 달랐다. */}
-          <Icon name="monitoring" style={{ fontSize: "var(--fs-18)" }} />
-          시장 브리핑
-        </Link>
-        <Link href="/kadera" className="hz-btn-soft" style={{ padding: "0 14px" }}>
-          <Icon name="forum" style={{ fontSize: "var(--fs-18)" }} />
-          국장 카더라
-        </Link>
-        <Link href="/insider" className="hz-btn-soft" style={{ padding: "0 14px" }}>
-          <Icon name="contact_page" style={{ fontSize: "var(--fs-18)" }} />
-          내부자 리포트
-        </Link>
-      </div>
+    <div className="hz-tx v2-kd v2-dc">
+      <DocCover
+        title="찾을 수 없는 주소입니다"
+        links={[
+          { href: "/", label: "시장 브리핑" },
+          { href: "/kadera", label: "국장 카더라" },
+          { href: "/insider", label: "내부자 리포트" },
+        ]}
+      />
     </div>
   );
 }

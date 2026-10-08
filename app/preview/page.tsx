@@ -263,7 +263,7 @@ function OvernightModule({ overnight }: { overnight: OvernightData & { live: boo
           <span>해외 값</span>
           {/* '국장 대비'면 국장 종가와 견준 것으로 읽힌다 — '종가'까지 풀어 쓰면 길기만 했다(2026-10-04 지적). */}
           <span>국장 대비</span>
-          <span>24H 거래량</span>
+          <span>24H 거래대금</span>
         </div>
         <ol className="v2-tbody">
           {overnight.rows.map((r) => (
@@ -315,7 +315,7 @@ function PerpRow({ r }: { r: OvernightRow }) {
           {won.toLocaleString("ko-KR")}원
         </em>
       </span>
-      <span className="v2-td-num v2-pv-vol" data-k="거래">
+      <span className="v2-td-num v2-pv-vol" data-k="거래대금">
         {VOL(r.volumeUsd)}
       </span>
     </div>
@@ -432,7 +432,8 @@ function MoverGroup({ m, when }: { m: PreviewMover; when: string }) {
         <span className="v2-pv-usname">
           <span>
             <b>{m.ticker}</b>
-            <em>{m.usName}</em>
+            {/* 티커와 이름이 같으면('RTX RTX') 한 번만 — 데일리 노트와 같은 규칙. */}
+            {m.usName !== m.ticker && <em>{m.usName}</em>}
           </span>
           <em>{m.sector}</em>
         </span>

@@ -567,6 +567,16 @@ button.hz-tip:not(:disabled) {
       bottom span-left,
       top center;
   }
+  /* 끝 쪽 자리는 안쪽으로 연다(앵커 없는 바닥 규칙 .hz-tip-end · .hz-tip-start 와 같은 뜻) — 가운데로 열면 오른쪽 막대 말풍선이
+     모듈 밖 옆 '다가오는 일정' 글자를 덮었다(종목 화면 일별 언급 추이, 2026-10-08 마지막 점검). */
+  .hz-tip-end::after {
+    position-area: top span-left;
+    position-try-fallbacks: top span-right, bottom span-left;
+  }
+  .hz-tip-start::after {
+    position-area: top span-right;
+    position-try-fallbacks: top span-left, bottom span-right;
+  }
 }
 
 /* 사이드바 CTA 말풍선 — 버튼과 왼쪽 끝을 맞춘다.
@@ -602,8 +612,9 @@ button.hz-tip:not(:disabled) {
    hit 영역만 넓힌다. */
 .hz-ai-mark {
   display: block;
-  padding: 9px;
-  margin: -9px;
+  /* 11 — 9 면 폰에서 누르는 자리가 31 이었다(2026-10-08 마지막 점검). 음수 margin 이라 배치는 그대로. */
+  padding: 11px;
+  margin: -11px;
   border: 0;
   background: none;
   color: inherit;

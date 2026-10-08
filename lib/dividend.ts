@@ -799,7 +799,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
     {
       key: "monthly",
       title: "달마다 받기",
-      desc: "지급 달이 다른 종목을 엮어 열두 달을 채운 조합",
+      desc: "지급 달이 겹치지 않게 엮은 조합",
       rules: ["국내 분기·반기 먼저", "빈 달은 미국 분기", "시총 1조+"],
       icon: "calendar_month",
       codes: codes(monthly),
@@ -837,7 +837,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
     {
       key: "usgrowth",
       title: "미국 배당성장",
-      desc: "10년 넘게 늘려 온 회사 가운데 빠르게 늘리는 곳",
+      desc: "10년 넘게 빠르게 늘려 온 회사",
       rules: ["10년 넘게 늘림", "5년 연평균 +7%", "배당성향 80% 이하"],
       icon: "rocket_launch",
       codes: codes(usGrowth),
@@ -855,7 +855,7 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: Divi
     {
       key: "septax",
       title: "분리과세",
-      desc: "배당이 2,000만원을 넘어도 종합과세에 안 합치는 회사",
+      desc: "2,000만원 넘어도 따로 과세하는 회사",
       rules: haveHighDiv ? ["고배당기업 공시", "수익률 3%+", "시총 1조+"] : ["고배당기업 목록이 아직 없습니다"],
       icon: "receipt_long",
       codes: codes(septax),

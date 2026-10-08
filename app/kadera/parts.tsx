@@ -110,7 +110,8 @@ export function ThemeVsUsualRows({ themes, market = "kr" }: { themes: (ThemeRow 
   if (!themes.length) return null;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(62px, max-content) minmax(0, 1fr) max-content", columnGap: 10, rowGap: 6, paddingTop: 2 }}>
-      <span style={{ gridColumn: "1 / -1", fontSize: "var(--fs-11)", fontWeight: 500, letterSpacing: ".04em", color: C.sub }}>인기 테마 · 평소 대비</span>
+      {/* v2 곁줄 꼴(12 · 자간 0 · ink3) — 11px · 자간 .04em 은 이 화면에 하나뿐인 꼴이었다(2026-10-08 마지막 점검). */}
+      <span style={{ gridColumn: "1 / -1", fontSize: "var(--fs-12)", fontWeight: 500, color: "var(--t-ink3, var(--c-sub))" }}>인기 테마 · 평소 대비</span>
       {themes.map((t) => {
         const lean = themeLean(t, market);
         // 색은 바로 위 큰 비관·낙관 막대, 테마 로테이션 줄의 오르내림과 같은 -2 단이다 — 한 화면에서 같은 말을 같은 색으로.
@@ -124,7 +125,8 @@ export function ThemeVsUsualRows({ themes, market = "kr" }: { themes: (ThemeRow 
               : lean.side === "right"
                 ? "var(--tx-lean-up-soft)"
                 : "var(--tx-lean-down-soft)";
-        const ink = lean?.shift === "up" ? "var(--c-hot-ink)" : lean?.shift === "down" ? "var(--c-cold-ink)" : C.sub;
+        // 글자는 v2 오름 · 내림 — 같은 모듈 큰 숫자 · 선과 같은 빨강 · 파랑(옛 hot-ink · cold-ink 는 다른 빨강 · 파랑이었다).
+        const ink = lean?.shift === "up" ? "var(--t-up, var(--c-hot-ink))" : lean?.shift === "down" ? "var(--t-down, var(--c-cold-ink))" : "var(--t-ink3, var(--c-sub))";
         return (
           <div
             key={t.name}
@@ -132,7 +134,7 @@ export function ThemeVsUsualRows({ themes, market = "kr" }: { themes: (ThemeRow 
             data-tip={themeTip(t)}
             style={{ display: "grid", gridColumn: "1 / -1", gridTemplateColumns: "subgrid", alignItems: "center", minWidth: 0 }}
           >
-            <span style={{ ...clip, fontSize: "var(--fs-11)", fontWeight: 500, color: C.label }}>{t.name}</span>
+            <span style={{ ...clip, fontSize: "var(--fs-12)", fontWeight: 500, color: "var(--t-ink2, var(--c-label))" }}>{t.name}</span>
             <span style={{ position: "relative", minWidth: 0, height: 7 }}>
               {/* 트랙·눈금은 잉크를 섞은 타일 전용 색(tx.css --tx-track · --tx-tick) — --c-track 은 회색 타일 위에서 사라진다. */}
               <span style={{ position: "absolute", inset: 0, borderRadius: 999, background: "var(--tx-track)", overflow: "hidden" }}>
