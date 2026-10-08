@@ -163,29 +163,24 @@ function NoteTocModule({ blocks }: { blocks: NoteBlock[] }) {
  * 언급된 종목 — 국내는 이름 · 종가 · 등락, 미국은 이름 · 티커 · 달러 시세 · 등락. 오른쪽 칸에 한 단으로 선다(좁은 판에선 글 아래 여러 단).
  *
  * ⚠️ 종가는 오늘 글이면 야후 실시간(카더라 카드와 같은 소스), 지난 글이면 `stocks` 표의 **최근** KRX 값이다 —
- *    지난 글을 열어도 오늘 시세가 보인다. 그래서 기준일이 글 날과 다르면 머리에 'n월 n일 종가'를 적고 등락률은 뺀다 —
- *    다른 날의 하루 등락을 글 옆에 두면 그날 등락으로 읽혔다(2026-10-04 점검, 9월 28일 글 옆 HLB −0.25%).
- *    기준일이 다른 줄은 그 줄에 따로 적는다(lib/daily-note getNoteStocks 머리말).
+ *    지난 글을 열어도 오늘 시세가 보인다. KRX 는 그날 종가를 다음 날 아침에 주고 표는 저녁 실행이 받으므로, 어제 글은
+ *    오늘 저녁까지 그 전날 종가를 보인다. 예전엔 그럴 때 머리에 'n월 n일 종가'를 적었는데 2026-10-08 운영자가 미국장
+ *    날짜와 함께 뺐다("복잡해보여"). 기준일이 다른 줄만 그 줄 끝에 따로 적는다(lib/daily-note getNoteStocks 머리말).
  * ⭐ 미국 종목은 미장 종목 화면(/insider/stock)으로 잇는다 — 국내 줄만 눌리고 미국 줄은 안 눌렸다.
  * ⭐ 등락은 +/− 부호(v2 공통) — ▲▼ 는 걷었다.
  */
-function NoteStocksModule({ stocks, noteDate }: { stocks: NoteStocks; noteDate: string }) {
+function NoteStocksModule({ stocks }: { stocks: NoteStocks }) {
   if (!stocks.kr.length && !stocks.us.length) return null;
   const dates = stocks.kr.map((s) => s.priceDate).filter((d): d is string => Boolean(d));
   const latest = dates.length ? dates.reduce((a, b) => (a > b ? a : b)) : null;
-  const stale = latest !== null && latest !== noteDate;
   // 미국 시세의 세션 날짜(뉴욕) — 줄 끝 날짜를 가를 때만 쓴다(아래 미국 줄).
   const usDates = stocks.us.map((u) => u.priceDate).filter((d): d is string => Boolean(d));
   const usLatest = usDates.length ? usDates.reduce((a, b) => (a > b ? a : b)) : null;
-  // 날짜는 제 시장 수 바로 뒤에 — 국내 날짜를 맨 앞에 두면 미국 줄도 그날 종가로 읽혔다.
-  // ⛔ 머리에 'n월 n일 미국장'은 적지 않는다(2026-10-08 운영자 "복잡해보여"). 미국 시세는 늘 가장 최근 미국장이라
+  // ⛔ 머리엔 시장별 종목 수만 적는다 — 'n월 n일 종가' · 'n월 n일 미국장'은 적지 않는다(2026-10-08 운영자 "복잡해보여").
+  //    국내 날짜를 국내 수 뒤에 두어도 미국 줄까지 걸리는지 헷갈렸다. 미국 시세는 늘 가장 최근 미국장이라
   //    지난 글에선 본문이 다룬 장(글 날 전날 뉴욕)과 다를 수 있다 — 10월 7일 글 본문 '마이크론은 1.7% 내렸습니다'(10월 6일 장)
   //    옆에 +4.06%(10월 7일 장)가 섰다. 날짜를 적는 대신 값을 맞추려면 lib/daily-note usQuote 가 그 장의 종가를 받아야 한다.
-  const counts = [
-    `국내 ${stocks.kr.length}`,
-    ...(stale && latest ? [`${fmtNoteDay(latest)} 종가`] : []),
-    `미국 ${stocks.us.length}`,
-  ].join(" · ");
+  const counts = [`국내 ${stocks.kr.length}`, `미국 ${stocks.us.length}`].join(" · ");
   return (
     <Module
       id="stocks"
@@ -197,7 +192,7 @@ function NoteStocksModule({ stocks, noteDate }: { stocks: NoteStocks; noteDate: 
       <ul className="v2-nt-stocks">
         {stocks.kr.map((s) => {
           // 등락률은 늘 보인다 — 글 날의 값일 때만 두었더니 주말 · 연휴 글엔 등락이 통째로 빠졌다(2026-10-05 운영자 판단 "기존처럼 등락 %").
-          // 어느 날 종가 · 등락인지는 모듈 머리('10월 2일 종가')와 줄 끝 날짜가 말한다.
+          // 다른 줄과 기준일이 다른 줄만 줄 끝에 날짜를 적는다(머리엔 날짜를 안 적는다 — 위 ⛔).
           const chg = s.changeRate;
           return (
             <li key={s.code}>
@@ -302,7 +297,7 @@ export function NoteView({
         <div className="v2-nt-main">{note ? <NoteArticle note={note} blocks={blocks} dated={dated} /> : <NoteEmpty failed={failed} />}</div>
         <aside className="v2-nt-rail" aria-label="글의 곁">
           {note && <NoteTocModule blocks={blocks} />}
-          {note && <NoteStocksModule stocks={stocks} noteDate={note.date} />}
+          {note && <NoteStocksModule stocks={stocks} />}
           {items.length > 0 && <NoteArchiveList items={items} current={note?.date ?? null} />}
         </aside>
       </div>
