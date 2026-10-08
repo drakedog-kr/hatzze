@@ -42,6 +42,8 @@ from __future__ import annotations
 
 from config.stock_extraction import is_house
 
+from .supabase_client import execute_with_retry
+
 PAGE = 1000
 # `.in_()` 에 넣을 종목 수 상한 — 넘으면 서버에서 안 좁히고 전부 받아 고른다.
 IN_LIST_MAX = 200
@@ -61,7 +63,7 @@ def _keys_at_instant(db, instant: str) -> set[tuple[str, int]]:
         )
         if last_id is not None:
             q = q.gt("id", last_id)
-        page = q.execute().data or []
+        page = execute_with_retry(q).data or []
         if not page:
             break
         keys.update((r["channel_handle"], r["message_id"]) for r in page)
@@ -104,15 +106,17 @@ def _window_message_keys(db, first_date: str, last_date: str) -> set[tuple[str, 
     keys: set[tuple[str, int]] = set()
     cursor = f"{first_date}T00:00:00+09:00"
     while True:
+        # 연결이 끊기면 같은 페이지를 다시 받는다 — 30일 창이면 한 연결에 백 번 넘게 왕복한다
+        # (execute_with_retry 주석 · 2026-10-08 extract_telegram_stocks 가 같은 끊김으로 죽었다).
         page = (
-            db.table("telegram_messages")
-            .select("posted_at,channel_handle,message_id")
-            .gte("posted_at", cursor)
-            .lt("posted_at", end_iso)
-            .order("posted_at")
-            .limit(PAGE)
-            .execute()
-            .data
+            execute_with_retry(
+                db.table("telegram_messages")
+                .select("posted_at,channel_handle,message_id")
+                .gte("posted_at", cursor)
+                .lt("posted_at", end_iso)
+                .order("posted_at")
+                .limit(PAGE)
+            ).data
             or []
         )
         if not page:
@@ -127,14 +131,14 @@ def _window_message_keys(db, first_date: str, last_date: str) -> set[tuple[str, 
         # 한 시각이 페이지를 통째로 채웠다(위 주석). 그 시각을 마저 읽고 다음으로 넘긴다.
         keys |= _keys_at_instant(db, cursor)
         after = (
-            db.table("telegram_messages")
-            .select("posted_at")
-            .gt("posted_at", cursor)
-            .lt("posted_at", end_iso)
-            .order("posted_at")
-            .limit(1)
-            .execute()
-            .data
+            execute_with_retry(
+                db.table("telegram_messages")
+                .select("posted_at")
+                .gt("posted_at", cursor)
+                .lt("posted_at", end_iso)
+                .order("posted_at")
+                .limit(1)
+            ).data
             or []
         )
         if not after:
@@ -164,7 +168,7 @@ def _mentions_by_code(db, codes: set[str]) -> dict[str, list[tuple[str, int]]]:
             q = q.in_("stock_code", sorted(codes))
         if last_id is not None:
             q = q.gt("id", last_id)
-        page = q.execute().data or []
+        page = execute_with_retry(q).data or []
         if not page:
             break
         for r in page:
