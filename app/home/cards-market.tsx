@@ -769,34 +769,47 @@ export function CardCredit({ v }: { v: Pick }) {
   );
 }
 
-// 원/달러 환율 변동성 — 최근 30일 출렁임.
-// 알약 막대 열 개로 줄였다가 되돌렸다(2026-08-03). 이 지표의 뜻이 "잔잔한가"라서
-// 값 하나하나보다 **선이 얼마나 평평한가**가 답이고, 막대는 그 평평함을 못 보여 준다.
-export function CardFx({ v }: { v: Pick }) {
-  const pts = v.historyPoints.map((b) => ({ key: b.date, value: b.value }));
-  // 이 카드는 '얼마나 출렁였나'만 말해서, 정작 환율이 지금 얼마인지는 알 수가 없었다.
-  // 파이프라인이 변동성을 계산한 **바로 그 종가**를 details 로 보내 준다 — 실시간이
-  // 아니라 파이프라인이 받은 확정 종가라 왼쪽 ±%와 같은 시점을 가리킨다.
-  const close = v.details?.usdkrw_close;
+// 레버리지 대 인버스 — 최근 20영업일 대표지수(코스피200·코스닥150) 레버리지 ÷ 인버스 거래대금을 앞 1년 중앙값('평소')과 견준 배수.
+// 두 줄 갈림 막대(2026-10-08 운영자 "차트보다 비율 막대가 직관적") — 줄마다 레버리지 몫 · 인버스 몫. 최근 20일 줄이 평소 줄보다
+// 레버리지 쪽으로 더 차 있으면 쏠린 것이다. 몫 = 비율 ÷ (1 + 비율).
+type LevInvDetails = { ratio?: number; base?: number; lev_20d_jo?: number; inv_20d_jo?: number; lev_base_jo?: number; inv_base_jo?: number };
+
+export function CardLevInv({ v }: { v: Pick }) {
+  const dt = v.details as unknown as LevInvDetails | null;
+  const share = (r?: number) => (r != null ? (r / (1 + r)) * 100 : null);
+  // 막대에 올리면(폰은 누르면) 그 줄의 20일 거래대금 — 평소 줄은 앞 1년 20일 거래대금의 중앙값.
+  const amt = (l?: number, i?: number) => (l != null && i != null ? `레버리지 ${l.toFixed(1)}조 · 인버스 ${i.toFixed(1)}조` : undefined);
+  const rows = [
+    { label: "최근 20일", lev: share(dt?.ratio), tip: amt(dt?.lev_20d_jo, dt?.inv_20d_jo) },
+    { label: "1년 평소", lev: share(dt?.base), tip: amt(dt?.lev_base_jo, dt?.inv_base_jo) },
+  ];
+  const INV = "var(--c-blue-3)";
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
-      <TitleRow desc={v.headline} icon="waves" name={v.name} />
-      {/* 환율은 큰 숫자 곁말로 — 알약이면 바로 아래 선이 환율 추이로 읽혔다(선은 변동성이다, 2026-10-05 점검). */}
-      <Big
-        disp={`±${v.disp}`}
-        unit={v.unit}
-        color={v.color}
-        size={32}
-        sub={typeof close === "number" ? `환율 ${close.toLocaleString("ko-KR", { maximumFractionDigits: 0 })}원` : undefined}
-      />
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <AreaChart points={pts} color={v.color} tip={(x) => `${shortDate(x.key)} · ±${x.value.toFixed(2)}%`} />
-        {/* 기간은 차트의 캡션이지 큰 수치의 곁말이 아니다 — 차트 밑 오른쪽에 둔다
-            (경제 베스트셀러 비중이 쓰는 CardTrend 와 같은 자리·같은 활자).
-            큰 수치 옆을 비워 주는 덤도 있다: 곁말이 있으면 4열 하한(칸 안쪽 237px)에서
-            164+12+65=241 이라 배지가 아랫줄로 내려갔는데, 빼면 99+12+65=176 으로
-            한 줄에 붙어 배지가 오른쪽 끝에 선다. */}
-        <span style={{ alignSelf: "flex-end", fontSize: "var(--fs-11)", color: C.sub }}>최근 30일</span>
+      <TitleRow desc={v.headline} icon="swap_vert" name={v.name} />
+      {v.raw !== null && <Big disp={v.raw.toFixed(2)} unit="배" color={v.color} size={32} sub="평소 대비" />}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", gap: 12, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>
+          {[{ k: "레버리지", c: v.color }, { k: "인버스", c: INV }].map((x) => (
+            <span key={x.k} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: x.c }} />
+              {x.k}
+            </span>
+          ))}
+        </div>
+        {rows.map((r) => (
+          <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ width: 56, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>{r.label}</span>
+            <div className={r.tip ? "hz-tip" : undefined} data-tip={r.tip} style={{ flex: 1, display: "flex", alignItems: "center", height: 18 }}>
+              <div style={{ flex: 1, display: "flex", height: 10, borderRadius: R.pill, overflow: "hidden", background: INV }}>
+                <div style={{ width: `${r.lev ?? 0}%`, background: v.color }} />
+              </div>
+            </div>
+            <span style={{ width: 34, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.ink }}>
+              {r.lev != null ? `${Math.round(r.lev)}%` : "-"}
+            </span>
+          </div>
+        ))}
       </div>
       <Foot text={v.desc} />
     </Shell>

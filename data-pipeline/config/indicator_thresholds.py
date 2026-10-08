@@ -154,7 +154,15 @@ INDICATOR_THRESHOLDS = {
     # 옛 임계값 0.25는 **관측 최저(0.2704)보다도 낮아** 진행률 100에 영원히 못 닿았고
     # 초고온이 1.9%뿐이었다. floor 0.85(≈p90) / ceiling 0.20으로 잡으면 초고온 8.9%가 되고
     # 구조적 하한 22.6도 사라진다.
-    "usdkrw_volatility": {"kind": "fixed", "threshold": 0.20, "floor": 0.85},
+    # usdkrw_volatility 는 2026-10-08 점수·화면에서 내렸다(레버리지 대 인버스에 자리를 내줌). 수집은 그대로 —
+    # 되돌리려면 이 줄과 indicator_weights 와 fetch_usdkrw_volatility 의 is_public 을 되살리면 된다.
+    # "usdkrw_volatility": {"kind": "fixed", "threshold": 0.20, "floor": 0.85},
+    # leverage_inverse_ratio: 최근 20영업일 대표지수 레버리지 ÷ 인버스 거래대금을 앞 1년 중앙값('평소')과 견준 배수
+    # (fetch_leverage_inverse.py). **초고온 진입선은 평소의 1.5배**, 상한은 그 선을 0.75 로 편 값이라 0.5 + 1.0÷0.75.
+    # 평소(1배)를 대입하면 38(상온). 2017~2026 매주 표본 449개: 중앙 1.01 · p75 1.24 · p90 1.49
+    #   → 저온 26% · 상온 42% · 고온 23% · 초고온 10%. 고점 6번 1.98 · 1.55 · 1.23 · 1.49 · 1.97 · 1.68 /
+    #   바닥 8번 0.66 · 0.76 · 0.67 · 1.10 · 1.27 · 1.26 · 1.01 · 0.83 → '고점 > 바닥' 0.96(그대로 쓰면 0.88).
+    "leverage_inverse_ratio": {"kind": "fixed", "threshold": 0.5 + 1.0 / 0.75, "floor": 0.5},
     # put_call_ratio: 풋 거래량 / 콜 거래량. 콜(상승 베팅)이 많을수록 값이 작아지므로
     # direction="low" — 낮을수록 탐욕(과열)이다. ※ direction 은 여기와 fetch 스크립트의
     # INDICATOR_META 양쪽에 있어야 한다(점수 계산은 여기를, 카드의 "이하/이상" 표기는
