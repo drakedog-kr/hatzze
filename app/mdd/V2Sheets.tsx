@@ -381,30 +381,40 @@ export function CasesTable({
 
 /* ── 회복까지 ───────────────────────────────────────────────────── */
 /**
- * '회복까지' — 이 칸의 질문 셋에 쉬운 낱말로 바로 답한다(2026-10-08 Hun "무슨 뜻인지 모르겠다").
- *   ① 얼마나 올라야 하나 — 큰 숫자 '전고점까지 +38.4%'. 제목과 이어 '회복까지 +38.4%'로 읽힌다. '지금 낙폭'(−27.7%)과 다른 숫자다.
- *   ② 과거엔 얼마나 걸렸나 — 이만큼 빠진 적(n번 중 m번 회복) · 저점에서 회복까지(보통).
- *   ③ 이런 꼴은 얼마나 — 이번 하락의 꼴(급락형 · 완만형), 바로 아래 같은 꼴 하락의 회복 기간, 다른 꼴은 견줄 거리로(옛 꼴별 두 줄,
- *      Hun "역사적으로 이런 형태의 하락이 회복까지 얼마나 걸린지 보여 주는 게 좋다").
- *   ④ 지금은 어디쯤 — 저점 이후 지난 기간. ②의 '저점에서 회복까지'와 같은 기준이다.
- * ⛔ 한 줄에 정보 하나 · 지시어('그때')로 다른 자리를 가리키지 않는다 — 막대 · 꼴별 줄 · '그때 하락'을 두었더니
- *    서로를 가리켜 따라가기 어려웠다(같은 날 Hun).
+ * '회복까지' — 큰 숫자 · 막대 그림 하나 · 줄 둘(2026-10-08 Hun "무슨 뜻인지 모르겠다" → "텍스트로만이면 이해가 안 된다, 인포그래픽이 필요").
+ *   ① 큰 숫자 '전고점까지 +38.4%' — 제목과 이어 '회복까지 +38.4%'로 읽힌다. '지금 낙폭'(−27.7%)과 다른 숫자다.
+ *   ② 막대 — 과거 회복에 걸린 기간과 지금(저점 이후 지난 기간)을 한 눈금에 나란히. 이번과 같은 꼴(급락형 · 완만형)은 진한 빨강,
+ *      다른 꼴은 옅은 빨강, 지금은 회색. 꼴별 기록(지금만큼 깊었다 되찾은 하락 셋 이상)이 없으면 지난 회복 하나, 처음이면 그보다 얕았던 하락.
+ *   ③ 줄 — 이만큼 빠진 적(n번 중 m번 회복) · 이번 하락의 꼴.
+ * ⛔ 한 줄에 정보 하나 · 지시어('그때')로 다른 자리를 가리키지 않는다 — 막대 · 꼴별 줄 · '그때 하락'이 서로를 가리켜 따라가기 어려웠다.
  * ⭐ 문턱은 지금 낙폭 그대로(소수 한 자리) — 반올림하면(23.9 → 24) 센 하락과 글자가 조금 어긋난다.
  */
 export function RecoveryModule({ a }: { a: MddAnalysis }) {
   const r = a.recovery!;
+  const ch = a.character;
+  const kindName = { fast: "급락형", slow: "완만형" } as const;
   const depth = `${Math.abs(a.currentDd).toFixed(1)}% 넘게 빠진 적`;
-  // 저점 이후 — '저점에서 회복까지'와 같은 기준(저점에서 되찾기까지, lib/mdd.ts recoveryStats).
+  // 저점 이후 — 막대의 회복 기간과 같은 기준(저점에서 되찾기까지, lib/mdd.ts recoveryStats).
   const sinceLow = Math.round((Date.parse(a.asOf) - Date.parse(a.lowDate)) / 86_400_000);
   // 이만큼 빠진 게 처음이면(진행 중인 하락뿐) 셀 회복이 없다 — '1번 중 0번'으로 적혔다(카카오 5년 실측).
   const firstTime = r.recoveredCount === 0;
   const toPeak = a.price > 0 ? (a.ath / a.price - 1) * 100 : null;
-  // 처음이면 이 기간에 되찾은 (지금보다 얕은) 하락 중 가장 깊은 것 — 과거 회복을 가늠할 유일한 자료다.
-  const shallow = firstTime ? a.topDrawdowns.find((e) => e.recovered) : undefined;
-  // 꼴별 회복 기간 — 지금만큼 깊었다 되찾은 하락이 셋 이상일 때만 있다(lib/mdd.ts drawdownCharacter). 이번 꼴을 먼저, 다른 꼴은 견줄 거리로.
-  const ch = a.character;
-  const kindName = { fast: "급락형", slow: "완만형" } as const;
-  const kinds = ch && (ch.fast || ch.slow) ? ([ch.currentClass, ch.currentClass === "fast" ? "slow" : "fast"] as const) : [];
+  const took = (days: number, count: number) => (count === 1 ? `${fmtDur(days)} 걸림` : `보통 ${fmtDur(days)}`);
+  const bars: RecoveryBar[] = [];
+  if (ch && (ch.fast || ch.slow)) {
+    // 이번 꼴을 먼저, 다른 꼴은 견줄 거리로.
+    for (const key of [ch.currentClass, ch.currentClass === "fast" ? "slow" : "fast"] as const) {
+      const k = ch[key];
+      bars.push({ key, label: kindName[key], days: k?.medianRecovery ?? null, value: k ? took(k.medianRecovery, k.count) : "기록 없음", tone: key === ch.currentClass ? "kind" : "other" });
+    }
+  } else if (!firstTime && r.medianDays !== null) {
+    bars.push({ key: "past", label: r.recoveredCount === 1 ? "지난번" : "지난 회복", days: r.medianDays, value: took(r.medianDays, r.recoveredCount), tone: "kind" });
+  } else {
+    // 처음이면 이 기간에 되찾은 (지금보다 얕은) 하락 중 가장 깊은 것 — 과거 회복을 가늠할 유일한 자료다(2026-10-04 점검, 1년 조회).
+    const e = a.topDrawdowns.find((x) => x.recovered);
+    if (e) bars.push({ key: "shallow", label: `${fmtPct(e.depth)} 하락`, days: e.days - e.troughDays, value: `${fmtDur(e.days - e.troughDays)} 걸림`, tone: "other" });
+  }
+  bars.push({ key: "now", label: "지금", days: sinceLow, value: sinceLow === 0 ? "오늘이 저점" : `${fmtDur(sinceLow)}째`, tone: "now" });
   return (
     <Module title="회복까지" className="v2-md-rec">
       <div className="v2-md-body">
@@ -418,46 +428,45 @@ export function RecoveryModule({ a }: { a: MddAnalysis }) {
             <b>전고점 부근</b>
           )}
         </span>
+        <RecoveryBars bars={bars} />
         <dl className="v2-md-kv">
           <div>
             <dt>{depth}</dt>
             <dd>{firstTime ? "이번이 처음" : `${r.similarCount}번 중 ${r.recoveredCount}번 회복`}</dd>
           </div>
-          {!firstTime && (
-            <div>
-              <dt>저점에서 회복까지</dt>
-              <dd>{r.recoveredCount === 1 ? fmtDur(r.medianDays!) : `보통 ${fmtDur(r.medianDays!)}`}</dd>
-            </div>
-          )}
-          {shallow && (
-            <div>
-              <dt>{fmtPct(shallow.depth)} 빠졌을 때 회복</dt>
-              <dd>{fmtDur(shallow.days - shallow.troughDays)}</dd>
-            </div>
-          )}
-          {/* 이번 하락이 급락형인지 완만형인지 — 고점에서 저점까지 CHARACTER_SPLIT_DAYS 안이면 급락형(사례 표 유형 칸과 같은 셈, 2026-10-08 Hun "있어야 한다"). */}
+          {/* 이번 하락이 급락형인지 완만형인지 — 고점에서 저점까지 CHARACTER_SPLIT_DAYS 안이면 급락형(사례 표 유형 칸과 같은 셈, Hun "있어야 한다"). */}
           {ch && (
             <div>
               <dt>이번 하락</dt>
               <dd>{kindName[ch.currentClass]}</dd>
             </div>
           )}
-          {kinds.map((key) => {
-            const k = ch![key];
-            return (
-              <div key={key}>
-                <dt>{kindName[key]} 회복까지</dt>
-                <dd>{k ? (k.count === 1 ? `${fmtDur(k.medianRecovery)} 걸림` : `보통 ${fmtDur(k.medianRecovery)}`) : "기록 없음"}</dd>
-              </div>
-            );
-          })}
-          <div>
-            <dt>저점 이후</dt>
-            <dd>{sinceLow === 0 ? "오늘이 저점" : `${fmtDur(sinceLow)}째`}</dd>
-          </div>
         </dl>
       </div>
     </Module>
+  );
+}
+
+type RecoveryBar = { key: string; label: string; days: number | null; value: string; tone: "kind" | "other" | "now" };
+
+/**
+ * 회복 막대 — 한 눈금(가장 긴 막대 = 끝) 위에 과거 회복 기간과 지금. 이름 · 막대 · 값 세 칸 격자라 막대 시작선이 같다.
+ * 막대는 그림, 값 글자가 정확한 수다. 기록이 없는 꼴은 빈 길만 남긴다.
+ */
+function RecoveryBars({ bars }: { bars: RecoveryBar[] }) {
+  const end = Math.max(1, ...bars.map((b) => b.days ?? 0));
+  return (
+    <div className="v2-md-recbars">
+      {bars.map((b) => (
+        <div key={b.key} className={`v2-md-recbar is-${b.tone}`}>
+          <span className="v2-md-recbar-k">{b.label}</span>
+          <span className="v2-md-recbar-track">
+            {b.days !== null && b.days > 0 && <i style={{ width: `${Math.max(2, (b.days / end) * 100)}%` }} />}
+          </span>
+          <span className="v2-md-recbar-v">{b.value}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 

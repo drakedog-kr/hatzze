@@ -1220,7 +1220,18 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-case-kind { font-size: 12px; font-weight: 500; color: var(--t-ink2); }
 .v2-yc-bare { display: none; }
 
-/* 이름 · 값 줄 — 회복까지(이만큼 빠진 적 · 그중 회복 · 저점에서 회복까지 …)와 직전 큰 하락(고점 부근 종목의 회복까지 자리)이 함께 쓴다. */
+/* 회복 막대(V2Sheets.tsx RecoveryBars) — 이름 · 막대 · 값 세 칸을 한 격자로(막대 시작선이 같다). 이번과 같은 꼴은 진한 빨강,
+   다른 꼴 · 얕은 하락은 옅은 빨강, 지금(저점 이후)은 회색에 글자는 잉크. 회복이라 빨강 계열(옛 범위 줄과 같은 색). */
+.v2-md-recbars { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: center; column-gap: 10px; row-gap: 12px; margin: 4px 0 14px; }
+.v2-md-recbar { display: contents; }
+.v2-md-recbar-k { font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink2); white-space: nowrap; }
+.v2-md-recbar-track { height: 8px; border-radius: 4px; background: var(--t-bar-off); overflow: hidden; }
+.v2-md-recbar-track > i { display: block; height: 100%; border-radius: 4px; background: color-mix(in srgb, var(--t-up) 38%, transparent); }
+.v2-md-recbar.is-kind .v2-md-recbar-track > i { background: var(--t-up); }
+.v2-md-recbar.is-now .v2-md-recbar-track > i { background: var(--t-ink4); }
+.v2-md-recbar-v { font-size: 12px; font-weight: 600; line-height: 16px; color: var(--t-ink); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2-md-recbar.is-now .v2-md-recbar-k { color: var(--t-ink); }
+/* 이름 · 값 줄 — 회복까지(이만큼 빠진 적 · 이번 하락)와 직전 큰 하락(고점 부근 종목의 회복까지 자리)이 함께 쓴다. */
 .v2-md-kv { flex: none; display: flex; flex-direction: column; margin: 4px 0 0; border-top: 1px solid var(--t-line); }
 .v2-md-kv > div { flex: none; display: flex; align-items: center; justify-content: space-between; min-height: 44px; border-bottom: 1px solid var(--t-line); font-variant-numeric: tabular-nums; }
 .v2-md-kv > div:last-child { border-bottom: 0; }
