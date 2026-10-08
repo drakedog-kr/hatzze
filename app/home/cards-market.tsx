@@ -772,14 +772,16 @@ export function CardCredit({ v }: { v: Pick }) {
 // 레버리지 대 인버스 — 최근 20영업일 대표지수(코스피200·코스닥150) 레버리지 ÷ 인버스 거래대금을 앞 1년 중앙값('평소')과 견준 배수.
 // 두 줄 갈림 막대(2026-10-08 운영자 "차트보다 비율 막대가 직관적") — 줄마다 레버리지 몫 · 인버스 몫. 최근 20일 줄이 평소 줄보다
 // 레버리지 쪽으로 더 차 있으면 쏠린 것이다. 몫 = 비율 ÷ (1 + 비율).
-type LevInvDetails = { ratio?: number; base?: number };
+type LevInvDetails = { ratio?: number; base?: number; lev_20d_jo?: number; inv_20d_jo?: number; lev_base_jo?: number; inv_base_jo?: number };
 
 export function CardLevInv({ v }: { v: Pick }) {
   const dt = v.details as unknown as LevInvDetails | null;
   const share = (r?: number) => (r != null ? (r / (1 + r)) * 100 : null);
+  // 막대에 올리면(폰은 누르면) 그 줄의 20일 거래대금 — 평소 줄은 앞 1년 20일 거래대금의 중앙값.
+  const amt = (l?: number, i?: number) => (l != null && i != null ? `레버리지 ${l.toFixed(1)}조 · 인버스 ${i.toFixed(1)}조` : undefined);
   const rows = [
-    { label: "최근 20일", lev: share(dt?.ratio) },
-    { label: "1년 평소", lev: share(dt?.base) },
+    { label: "최근 20일", lev: share(dt?.ratio), tip: amt(dt?.lev_20d_jo, dt?.inv_20d_jo) },
+    { label: "1년 평소", lev: share(dt?.base), tip: amt(dt?.lev_base_jo, dt?.inv_base_jo) },
   ];
   const INV = "var(--c-blue-3)";
   return (
@@ -798,8 +800,10 @@ export function CardLevInv({ v }: { v: Pick }) {
         {rows.map((r) => (
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ width: 56, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>{r.label}</span>
-            <div style={{ flex: 1, display: "flex", height: 10, borderRadius: R.pill, overflow: "hidden", background: INV }}>
-              <div style={{ width: `${r.lev ?? 0}%`, background: v.color }} />
+            <div className={r.tip ? "hz-tip" : undefined} data-tip={r.tip} style={{ flex: 1, display: "flex", alignItems: "center", height: 18 }}>
+              <div style={{ flex: 1, display: "flex", height: 10, borderRadius: R.pill, overflow: "hidden", background: INV }}>
+                <div style={{ width: `${r.lev ?? 0}%`, background: v.color }} />
+              </div>
             </div>
             <span style={{ width: 34, textAlign: "right", fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.ink }}>
               {r.lev != null ? `${Math.round(r.lev)}%` : "-"}

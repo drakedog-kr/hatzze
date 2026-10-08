@@ -28,5 +28,6 @@ def test_compares_with_usual_ratio():
     last = rows[-1]
     assert last["details"]["ratio"] == 2.0 and last["details"]["base"] == 1.0
     assert last["raw_value"] == 2.0
+    assert (last["details"]["lev_base_jo"], last["details"]["inv_base_jo"]) == (20.0, 20.0)  # 앞 1년 20일 합의 중앙값(조)
     # 평소가 MIN_BASE_DAYS 일 안 찬 앞쪽 날은 값을 안 낸다
     assert rows[0]["date"] == f"d{WINDOW - 1 + MIN_BASE_DAYS:04d}"

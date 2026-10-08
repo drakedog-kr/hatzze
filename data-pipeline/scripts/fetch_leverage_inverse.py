@@ -99,16 +99,24 @@ def build_rows(days: dict[str, tuple[float, float]]) -> list[dict]:
             ratios.append((keys[i], lev / inv, lev, inv))
     rows = []
     for j in range(len(ratios)):
-        prior = [r[1] for r in ratios[max(0, j - BASE_DAYS) : j]]
+        prior = ratios[max(0, j - BASE_DAYS) : j]
         if len(prior) < MIN_BASE_DAYS:
             continue
         d, ratio, lev, inv = ratios[j]
-        base = median(prior)
+        base = median(r[1] for r in prior)
         rows.append(
             {
                 "date": d,
                 "raw_value": round(ratio / base, 3),
-                "details": {"ratio": round(ratio, 3), "base": round(base, 3), "lev_20d_jo": round(lev / 1e12, 1), "inv_20d_jo": round(inv / 1e12, 1)},
+                "details": {
+                    "ratio": round(ratio, 3),
+                    "base": round(base, 3),
+                    "lev_20d_jo": round(lev / 1e12, 1),
+                    "inv_20d_jo": round(inv / 1e12, 1),
+                    # 카드 '1년 평소' 막대의 말풍선 — 앞 1년 20일 거래대금의 중앙값(비율의 중앙값과 꼭 같은 날은 아니다).
+                    "lev_base_jo": round(median(r[2] for r in prior) / 1e12, 1),
+                    "inv_base_jo": round(median(r[3] for r in prior) / 1e12, 1),
+                },
             }
         )
     return rows
