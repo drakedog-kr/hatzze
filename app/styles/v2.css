@@ -1153,8 +1153,11 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-md-range-track { position: relative; height: 4px; margin: 4px 0; border-radius: 2px; background: color-mix(in srgb, var(--t-up) 28%, transparent); }
 .v2-md-range-track > i { position: absolute; top: 50%; width: 12px; height: 12px; margin-left: -6px; transform: translateY(-50%); border-radius: 50%; background: var(--t-up); box-shadow: 0 0 0 2px var(--t-card); }
 .v2-md-range-lab { display: flex; justify-content: space-between; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
-/* 저점 이후 막대(회복이 한 번뿐인 칸) — 범위 줄과 같은 길에 지난 만큼 채운다. */
-.v2-md-since .v2-md-range-track > b { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--t-up); }
+/* 회복 막대(V2Sheets.tsx RecoveryLine) — 회색 길 위에 최단~최장 띠(옅은 빨강) · 보통 점(빨강) · 지금 눈금(잉크 세로선). 왼쪽 글자 '지금'도 잉크. */
+.v2-md-recline .v2-md-range-track { background: var(--t-bar-off); }
+.v2-md-recline .v2-md-range-track > em { position: absolute; top: 0; bottom: 0; border-radius: 2px; background: color-mix(in srgb, var(--t-up) 32%, transparent); }
+.v2-md-recline .v2-md-range-track > b { position: absolute; top: 50%; width: 2px; height: 14px; margin-left: -1px; transform: translateY(-50%); border-radius: 1px; background: var(--t-ink); }
+.v2-md-recline .v2-md-range-lab > :first-child { color: var(--t-ink); }
 
 /* 시장 탓 · 종목 탓(V2Sheets.tsx AttributionModule) — 줄마다 이름 · 막대 · 값, 남는 높이를 나눠 받는다(옆 '해마다'와 키가 같다). */
 /* 줄은 44 고정(옆 사례 표와 같은 줄 꼴) — 남는 높이는 큰 숫자 덩어리가 받는다. 줄이 둘 · 셋뿐인 칸이 높이를 줄 사이 틈으로 채워
