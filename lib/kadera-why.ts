@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from "./supabase-server";
 import { addDaysISO, kaderaBaseDate } from "./telegram-data";
 import { LOAD_FAILED, type MaybeFailed } from "./load-state";
 import { byPeriodEnd, periodFloor, stillAhead, type DatePrecision } from "./event-period";
-import { dropAlreadyHappened, groupEventRows, type GroupedEvent } from "./event-group";
+import { dropAlreadyHappened, dropOutrankedByPast, groupEventRows, pastLookupCodes, type GroupedEvent } from "./event-group";
 import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
 
 /**
@@ -412,7 +412,7 @@ function groupEvents(rows: EventRow[]): Omit<UpcomingEvent, "name" | "market">[]
 /** 이미 지나간 같은 이야기를 볼 날 수 — 앞으로의 한 채널 줄을 이 안의 여러 채널 줄과 견준다(lib/event-group.ts dropAlreadyHappened). */
 const PAST_DAYS = 14;
 
-/** 준 종목들의 지난 PAST_DAYS 일 day 일정 줄. 한 채널 줄이 없으면 묻지 않는다. 못 읽으면 빈 목록(거르지 않는다). */
+/** 준 종목들의 지난 PAST_DAYS 일 day 일정 줄. 물을 종목이 없으면 묻지 않는다. 못 읽으면 빈 목록(거르지 않는다). */
 async function recentPast(codes: string[], from: string): Promise<GroupedEvent[]> {
   if (!codes.length) return [];
   const { data, error } = await getSupabaseAdmin()
@@ -430,10 +430,13 @@ async function recentPast(codes: string[], from: string): Promise<GroupedEvent[]
   return groupEvents((data ?? []) as EventRow[]);
 }
 
-/** 앞으로의 줄에서 이미 지나간 같은 이야기를 뺀다 — 한 채널 줄의 종목만 지난 일정을 묻는다. */
+/**
+ * 앞으로의 줄에서 이미 지나간 같은 이야기를 뺀다 — 한 채널 줄, 그리고 어제 이전의 더 많은 채널 줄에 진 가까운 날 줄
+ * (lib/event-group.ts dropAlreadyHappened · dropOutrankedByPast). 그런 줄이 있는 종목만 지난 일정을 묻는다.
+ */
 async function withoutHappened<T extends Omit<UpcomingEvent, "name" | "market">>(future: T[], from: string): Promise<T[]> {
-  const single = [...new Set(future.filter((e) => e.channels < 2).map((e) => e.code))];
-  return dropAlreadyHappened(future, await recentPast(single, from));
+  const past = await recentPast(pastLookupCodes(future, from), from);
+  return dropAlreadyHappened(dropOutrankedByPast(future, past), past);
 }
 
 async function attachNames<T extends { code: string }>(items: T[]): Promise<(T & { name: string; market: string | null })[]> {

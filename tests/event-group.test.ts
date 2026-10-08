@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { dropAlreadyHappened, eventKind, groupEventRows, periodStart, type EventRowLike } from "../lib/event-group.ts";
+import { dropAlreadyHappened, dropOutrankedByPast, eventKind, groupEventRows, pastLookupCodes, periodStart, type EventRowLike } from "../lib/event-group.ts";
 
 const row = (code: string, channel: string, date: string, precision: EventRowLike["precision"], event: string): EventRowLike => ({
   code,
@@ -165,5 +165,54 @@ describe("dropAlreadyHappened", () => {
     ]);
     const future = [{ code: "000660", event: "자사주 매입 및 소각 완료", channels: 1 }];
     assert.equal(dropAlreadyHappened(future, past).length, 1);
+  });
+});
+
+describe("dropOutrankedByPast · pastLookupCodes", () => {
+  // 2026-10-08 실측: 삼성전자 '3분기 잠정실적 발표'를 34곳이 10/8, 5곳이 10/9 로 적었다(10/8 아침 발표 · 10/9 한글날 휴장).
+  const many = (code: string, n: number, date: string, ev: string) => Array.from({ length: n }, (_, i) => row(code, `c${i}`, date, "day", ev));
+  const samsung = [...many("005930", 34, "2026-10-08", "3분기 잠정실적 발표"), ...many("005930", 5, "2026-10-09", "3분기 잠정실적 발표")];
+
+  it("오늘이 10/9 면 어제(10/8) 34곳 줄에 진 5곳 줄을 뺀다 — 오늘부터만 읽으면 ③이 못 본다", () => {
+    const from = "2026-10-09";
+    const future = groupEventRows(samsung.filter((r) => r.date >= from));
+    assert.equal(future.length, 1); // 고치기 전엔 이 줄이 '다가오는 일정'에 섰다
+    assert.deepEqual(pastLookupCodes(future, from), ["005930"]);
+    const past = groupEventRows(samsung.filter((r) => r.date < from));
+    assert.deepEqual(dropOutrankedByPast(future, past), []);
+  });
+
+  it("오늘이 10/8 이면 두 줄이 다 보여 ③이 접는다(이미 맞던 자리)", () => {
+    const out = groupEventRows(samsung);
+    assert.equal(out.length, 1);
+    assert.equal(out[0].date, "2026-10-08");
+  });
+
+  it("지난 줄이 더 적거나 NEAR_DAYS 밖이면 · 절차가 이어지는 종류면 남긴다", () => {
+    const past = groupEventRows([
+      ...many("005930", 3, "2026-10-07", "3분기 잠정실적 발표"),
+      ...many("000660", 9, "2026-10-01", "잠정실적 발표"),
+      ...many("207940", 9, "2026-10-08", "배당 기준일"),
+    ]);
+    const future = groupEventRows([
+      ...many("005930", 5, "2026-10-09", "3분기 실적 발표"),
+      ...many("000660", 2, "2026-10-09", "실적 발표"),
+      ...many("207940", 2, "2026-10-09", "배당금 지급"),
+    ]);
+    assert.equal(dropOutrankedByPast(future, past).length, 3);
+  });
+
+  it("채널 수가 같으면 ③처럼 먼저 짚인 줄이 이긴다", () => {
+    const at = (r: EventRowLike, postedAt: string) => ({ ...r, postedAt });
+    const past = groupEventRows(many("MU", 2, "2026-10-07", "실적 발표").map((r) => at(r, "2026-10-01T00:00:00Z")));
+    const later = groupEventRows(many("MU", 2, "2026-10-09", "실적 발표").map((r) => at(r, "2026-10-02T00:00:00Z")));
+    const earlier = groupEventRows(many("MU", 2, "2026-10-09", "실적 발표").map((r) => at(r, "2026-09-30T00:00:00Z")));
+    assert.equal(dropOutrankedByPast(later, past).length, 0);
+    assert.equal(dropOutrankedByPast(earlier, past).length, 1);
+  });
+
+  it("오늘에서 먼 여러 채널 줄은 지난 일정을 묻지 않는다", () => {
+    const future = groupEventRows([...many("005930", 8, "2026-10-29", "3Q26 실적 컨퍼런스콜"), ...many("000660", 2, "2026-10-10", "자사주 매입 종료")]);
+    assert.deepEqual(pastLookupCodes(future, "2026-10-09"), []);
   });
 });

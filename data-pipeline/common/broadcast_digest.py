@@ -70,6 +70,7 @@ from zoneinfo import ZoneInfo
 
 from . import broadcast_content as bc
 from . import yahoo_client
+from .event_group import NEAR_DAYS, PAST_DAYS, settle_rows
 from .supabase_client import execute_with_retry, load_keyset
 from .surging import load_stock_daily, top_surging
 from .text_check import problems
@@ -510,27 +511,36 @@ def load_events(db, lo: date, hi: date, market: str) -> list[dict]:
     같은 일정을 채널마다 조금씩 다르게 적어서(공시 알림 채널이 "추가상장·변경상장"을 열 건씩
     올린다) 종목+날짜로 먼저 묶고 가장 많이 적힌 문구를 대표로 삼는다. 둘 이상 채널이
     짚은 일정을 앞세운다.
+
+    ⚠️ [lo, hi] 만 읽으면 같은 이야기를 다른 날에 적은 채널이 안 보인다. 삼성전자 '3분기 잠정실적 발표'를
+       34곳이 10/8, 5곳이 10/9 로 적었는데 10/8 저녁 '내일 일정'에 5곳 줄이 실렸다(10/9 는 한글날 휴장).
+       앞뒤로 넓게 읽어 다른 날에 진 줄과 이미 지난 이야기를 걷는다(common/event_group.py — 카더라 화면과 같은 규칙).
     """
     table, key, names_table, name_col = (
         ("telegram_stock_event", "stock_code", "stocks", "name") if market == "KR"
         else ("telegram_us_stock_event", "ticker", "us_stocks", "name_ko")
     )
-    rows = (
-        db.table(table)
-        .select(f"channel_handle,{key},event_date,event")
-        .eq("date_precision", "day")
-        .gte("event_date", lo.isoformat())
-        .lte("event_date", hi.isoformat())
-        .limit(1000)
-        .execute()
-        .data
-    )
+    rows: list[dict] = []
+    while True:
+        page = (
+            db.table(table)
+            .select(f"id,channel_handle,{key},event_date,event,posted_at")
+            .eq("date_precision", "day")
+            .gte("event_date", (lo - timedelta(days=PAST_DAYS)).isoformat())
+            .lte("event_date", (hi + timedelta(days=NEAR_DAYS)).isoformat())
+            .order("id")
+            .range(len(rows), len(rows) + 999)
+            .execute()
+            .data
+        )
+        rows += page
+        if len(page) < 1000:
+            break
+    rows = settle_rows([r for r in rows if not EVENT_NOISE.search(r["event"] or "")], key, lo, hi)
     if not rows:
         return []
     grouped: dict[tuple[str, str], dict] = {}
     for r in rows:
-        if EVENT_NOISE.search(r["event"] or ""):
-            continue
         g = grouped.setdefault((r["event_date"], r[key]), {"channels": set(), "events": defaultdict(int)})
         g["channels"].add(r["channel_handle"])
         g["events"][" ".join(r["event"].split())] += 1

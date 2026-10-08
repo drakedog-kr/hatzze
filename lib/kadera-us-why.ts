@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from "./supabase-server";
 import { addDaysISO, LLM_TEXT_CARRY_DAYS } from "./telegram-data";
 import { todayKst, type DatePrecision, type UpcomingEvent } from "./kadera-why";
 import { byPeriodEnd, periodFloor, stillAhead } from "./event-period";
-import { dropAlreadyHappened, groupEventRows } from "./event-group";
+import { dropAlreadyHappened, dropOutrankedByPast, groupEventRows, pastLookupCodes } from "./event-group";
 import { LOAD_FAILED, type MaybeFailed } from "./load-state";
 import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
 
@@ -338,14 +338,17 @@ function groupUsEvents(rows: UsEventRow[]): Omit<UpcomingEvent, "name">[] {
 /** 이미 지나간 같은 이야기를 볼 날 수(국내 lib/kadera-why.ts PAST_DAYS 와 같다). */
 const PAST_DAYS = 14;
 
-/** 앞으로의 줄에서 이미 지나간 같은 이야기를 뺀다 — 한 채널 줄의 티커만 지난 PAST_DAYS 일 day 일정을 묻는다(국내 withoutHappened 와 같다). */
+/**
+ * 앞으로의 줄에서 이미 지나간 같은 이야기를 뺀다 — 한 채널 줄, 그리고 어제 이전의 더 많은 채널 줄에 진 가까운 날 줄.
+ * 그런 줄이 있는 티커만 지난 PAST_DAYS 일 day 일정을 묻는다(국내 withoutHappened 와 같다).
+ */
 async function withoutHappened<T extends Omit<UpcomingEvent, "name">>(future: T[], from: string): Promise<T[]> {
-  const single = [...new Set(future.filter((e) => e.channels < 2).map((e) => e.code))];
-  if (!single.length) return future;
+  const codes = pastLookupCodes(future, from);
+  if (!codes.length) return future;
   const { data, error } = await getSupabaseAdmin()
     .from("telegram_us_stock_event")
     .select("channel_handle,ticker,event_date,date_precision,event,posted_at")
-    .in("ticker", single)
+    .in("ticker", codes)
     .eq("date_precision", "day")
     .gte("event_date", addDaysISO(from, -PAST_DAYS))
     .lt("event_date", from)
@@ -354,7 +357,8 @@ async function withoutHappened<T extends Omit<UpcomingEvent, "name">>(future: T[
     console.error("[withoutHappened] 지난 미장 일정을 못 읽었습니다 — 거르지 않습니다", error);
     return future;
   }
-  return dropAlreadyHappened(future, groupUsEvents((data ?? []) as UsEventRow[]));
+  const past = groupUsEvents((data ?? []) as UsEventRow[]);
+  return dropAlreadyHappened(dropOutrankedByPast(future, past), past);
 }
 
 /**
