@@ -101,6 +101,7 @@ from generate_telegram_narratives import (  # noqa: E402
     optimism,
     pick_narrative,
     percent_count,
+    period_mismatch,
     schedule_digest,
     schedule_excerpt,
     schedule_hit,
@@ -892,6 +893,12 @@ def main() -> None:
                            if n > 1 else "퍼센트가 없었습니다. [전체] 낙관도 퍼센트를 **한 번** 적으세요.")
                     text = ask_brief_sentence(
                         system + f"\n\n[다시 쓰기] 방금 쓴 문장에 {fix}",
+                        brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
+                    )
+                if key == "tone" and (pm := period_mismatch(text, brief_digest)):
+                    print(f"[WARNING] 첫째 대목의 기간(최근 {pm[0]}일)이 [전체](최근 {pm[1]}일)와 달라 다시 씁니다: {text[:50]}…")
+                    text = ask_brief_sentence(
+                        system + f"\n\n[다시 쓰기] 방금 쓴 문장의 기간이 '최근 {pm[0]}일'이었습니다. [전체] 줄에 적힌 기간(최근 {pm[1]}일)을 그대로 쓰세요.",
                         brief_digest, length, BRIEF_SENTENCE_CAP[key], key,
                     )
                 if key == "schedule" and not schedule_like(text):
