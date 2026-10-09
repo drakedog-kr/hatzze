@@ -64,8 +64,18 @@ export function HeroStrip({ data, periodLabel }: { data: MddResult; periodLabel:
             </span>
           </div>
           {/* [판단 3 · 2026-10-08 마지막 점검] 조회 기간 가격 선(회색 · 전고점 점선) — 가격 덩어리와 아래 두 줄 사이가 69~113px 비었다.
-              등락색으로 읽히지 않게 회색(flat). 아래 낙폭 추이와 같은 기간이지만 이쪽은 가격, 저쪽은 고점 대비 %다. */}
-          <Spark id="mdd-price-spark" values={a.underwater.map((p) => p.close)} base={a.ath} baseLabel="전고점" w={300} h={48} tone="flat" />
+              등락색으로 읽히지 않게 회색(flat). 아래 낙폭 추이와 같은 기간이지만 이쪽은 가격, 저쪽은 고점 대비 %다.
+              호버하면 그날 날짜 · 종가(2026-10-10 요청) — 점은 아래 낙폭 추이와 같은 솎은 점이다. */}
+          <Spark
+            id="mdd-price-spark"
+            values={a.underwater.map((p) => p.close)}
+            base={a.ath}
+            baseLabel="전고점"
+            w={300}
+            h={48}
+            tone="flat"
+            tips={a.underwater.map((p) => `${fmtDot(p.date)} · ${fmtPrice(p.close, data.market)}`)}
+          />
           <div className="v2-md-rows">
             {drop ? (
               <>

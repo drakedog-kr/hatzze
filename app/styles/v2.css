@@ -1192,6 +1192,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 /* 낙폭 요약 — 시장 브리핑 '오늘의 브리핑'과 같은 줄 꼴(.v2-brief3). 짚는 말은 한 단 진한 잉크로만 가른다 —
    계산 문장이라 한 줄에 두세 군데가 짚혀(−23.2% · 13.7%p 덜) 굵게 두면 줄이 얼룩졌다(2026-10-04). */
 .v2-md-sum dd b { font-weight: 500 !important; color: var(--t-ink); }
+/* 짚은 말은 한 덩어리로 줄을 넘긴다 — '20.0%p'가 줄 끝, '덜'이 다음 줄 첫머리로 갈렸다(삼성전자 1,440, 2026-10-10). 덩어리가 짧아(4~8자) 넘칠 일은 없다. */
+.v2-md-sum dd b { white-space: nowrap; }
 /* 글 시작을 다른 칸 제목 선(14)에 맞춘다 — 브리핑 줄 꼴은 16 이다. */
 .v2-md-sum .v2-brief3-row { padding-left: 14px; padding-right: 14px; }
 
@@ -2190,8 +2192,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-pv-perp .v2-tbody { flex: 1; display: flex; flex-direction: column; }
 .v2-pv-perp .v2-tbody > li { flex: 1 0 auto; display: flex; }
 .v2-pv-perp .v2-tbody > li > .v2-tr { flex: 1; }
+/* 마지막 칸은 76 — 68 이면 머리 '24H 거래대금'(68.02px)이 두 줄로 접혔다(2026-10-10). */
 .v2-pv-th,
-.v2-pv-perp .v2-tr { grid-template-columns: minmax(0, 1fr) 136px 80px 68px; }
+.v2-pv-perp .v2-tr { grid-template-columns: minmax(0, 1fr) 136px 80px 76px; }
 .v2-pv-perp .v2-tr { min-height: 52px; }
 .v2-pv-th {
   display: grid;
@@ -2205,7 +2208,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   font-weight: 500;
   color: var(--t-ink3);
 }
-.v2-pv-th > :nth-child(n + 2) { text-align: right; }
+.v2-pv-th > :nth-child(n + 2) { text-align: right; white-space: nowrap; }
 .v2-pv-name { display: flex; flex-direction: column; min-width: 0; line-height: 18px; }
 .v2-pv-stock { width: fit-content; font-weight: 600; color: var(--t-ink); text-decoration: none; overflow-wrap: anywhere; }
 .v2-pv-stock:hover { text-decoration: underline; text-underline-offset: 2px; }
@@ -2881,15 +2884,22 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 }
 
 /* ── 내부자 종목 · 투자자 상세 아래쪽(2026-10-04) — 옛 시트 일곱 장 → 모듈 ──────────────────────────────
-   차트(판 폭) → [거물 | 애널리스트] → [임원 신고 | 의원 신고]. 투자자는 [보유 종목 | 이번 분기에 한 것 · 전량 정리].
+   차트(판 폭) → [애널리스트 | 거물] → [임원 신고 | 의원 신고](거물이 짧으면 애널리스트 옆에 셋을 쌓는다). 투자자는 [보유 종목 | 이번 분기에 한 것 · 전량 정리].
    줄은 한 줄 · 칸마다 하나(app/insider/V2DetailRows.tsx). 방향은 글자 색(사는 쪽 빨강 · 파는 쪽 파랑). */
 .v2-isd-mod { display: flex; flex-direction: column; }
 /* 줄 목록 — 짝 모듈보다 짧으면 줄이 고르게 늘어난다(카더라 표와 같은 규칙). '더 보기' 줄은 바닥. */
 .v2-isd-list { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 0 14px; list-style: none; }
-/* 줄은 남는 높이를 나눠 받되 한 줄 64 까지 — 줄 셋뿐인 목록이 키 큰 짝에 맞춰 한 줄 207px 까지 늘었다(2026-10-04 점검). 짝은 키가 비슷한 것끼리 고른다(detail.tsx pairUp). */
+/* 줄은 남는 높이를 나눠 받되 한 줄 64 까지 — 줄 셋뿐인 목록이 키 큰 짝에 맞춰 한 줄 207px 까지 늘었다(2026-10-04 점검). 짝 안 펼 줄 수는 detail.tsx layout 이 키에 맞춰 고른다. */
 .v2-isd-list > li { flex: 1 0 auto; display: flex; max-height: 64px; }
 /* 애널리스트 칸의 짝인데 줄이 다 떨어져 10줄을 못 펴는 목록은 80 까지(detail.tsx is-fill) — 64 로는 TSLA 거물 여덟 줄 아래가 117px 비었다(2026-10-08). */
 .v2-tm-band.is-fill .v2-isd-list > li { max-height: 80px; }
+/* 애널리스트 칸 옆에 위아래로 쌓은 목록(detail.tsx layout) — 거물이 한두 줄뿐이면 [애널리스트 | 거물] 짝의 거물 칸 아래가 222px 비었다(2026-10-10). */
+.v2-isd-stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.v2-isd-stack > div { display: flex; flex-direction: column; flex-basis: auto; }
+.v2-isd-stack > div > .v2-mod { flex: 1; }
+/* 옆 칸 목록이 두어 줄뿐인 짝은 줄을 100 까지(detail.tsx layout is-tall) — 의견을 한 줄로 접은 애널리스트 칸(240)에 80 짜리 두 줄(202)이 못 미쳐 38px 비었다(CCL).
+   ⛔ 띠를 3:2 로 나눠 맞췄다가 걷었다 — 짝은 모든 화면이 5:5 다(2026-10-10). */
+.v2-tm-band.is-tall .v2-isd-list > li { max-height: 100px; }
 .v2-isd-list > li + li { border-top: 1px solid var(--t-line); }
 .v2-isd-row {
   flex: 1;
@@ -2940,8 +2950,20 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
 .v2-isd-legend { display: inline-flex; align-items: center; gap: 12px; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-isd-legend > span { display: inline-flex; align-items: center; gap: 5px; }
 .v2-in .hz-mkfilter-set label { font-size: 12px; font-weight: 500; }
-/* 현재가가 목표가 구간 밖이면 막대 바깥에 빈 고리(ConsensusBody outside). */
-.v2-in .hz-range-knob.is-out { background: var(--c-card); box-shadow: inset 0 0 0 2px var(--c-blue); }
+/* 애널리스트 요약의 목표가 막대(ConsensusBody) — 축은 목표가 구간에 현재가까지 넣는다. 굵은 칸이 목표가 구간, 가는 선이 현재가까지 늘린 축,
+   점이 현재가. 현재가가 구간 밖이면 점이 막대 밖에 떠 보였다(CCL · 201종목 중 49, 2026-10-10). '현재가 $X'는 점 바로 위, 최저 · 최고는 굵은 칸 양끝 밑. */
+.v2-cons-nowrow { position: relative; display: block; height: 16px; margin-bottom: -4px; }
+.v2-cons-now { position: absolute; top: 0; white-space: nowrap; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--c-muted); }
+.v2-cons-now b { font-weight: 500; color: var(--c-ink); }
+/* 점 반지름(5)만큼 안으로 — 끝에 선 점이 칸 밖으로 반쯤 나가지 않게. */
+.v2-cons-bar { position: relative; display: block; height: 10px; margin: 0 5px; }
+.v2-cons-bar::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px; border-radius: 1px; background: var(--c-track); }
+/* 단색 — 회색에서 번지는 그라데이션이면 가는 선(같은 회색)과 만나는 최저 목표가 자리가 안 보였다. */
+.v2-cons-seg { position: absolute; top: 2px; height: 6px; border-radius: 999px; background: var(--c-bar); }
+.v2-cons-dot { position: absolute; top: 0; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--c-blue); box-shadow: 0 0 0 2px var(--c-card); }
+.v2-cons-ends { position: relative; display: block; height: 41px; }
+.v2-cons-ends > span { position: absolute; top: 0; display: flex; flex-direction: column; gap: 1px; white-space: nowrap; font-size: 12px; font-weight: 500; line-height: 20px; color: var(--c-muted); }
+.v2-cons-ends b { font-weight: 500; color: var(--c-ink); }
 /* 범례 — 색이 방향이다(매수 빨강 채움 · 매도 파랑 고리, 차트 표식과 같은 뜻 · 2026-10-05). */
 .v2-isd-legend i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--t-down); }
 .v2-isd-legend i.is-fill { border-color: var(--t-up); background: var(--t-up); }
@@ -2974,6 +2996,8 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
 /* 투자자 상세 옆 칸 — 이번 분기에 한 것(줄 넷)이 남는 높이를 받고, 전량 정리는 제 키대로 아래에 선다. */
 .v2-isd-inv .v2-tm-side > .v2-mod { display: flex; flex-direction: column; }
 .v2-isd-inv .v2-isd-facts-mod { flex: 1; }
+/* 보유가 두어 줄뿐이라 64 로는 옆 '분기에 한 것'(229)에 못 미칠 때 100 까지(page.tsx fewHoldings). */
+.v2-isd-inv.is-few .v2-isd-list > li { max-height: 100px; }
 /* 이번 분기에 한 것 — 갈래 이름 아래 그 종목들(티커). */
 .v2-isd-facts dt em { display: block; margin-top: 2px; font-style: normal; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 

@@ -109,66 +109,149 @@ function zeroDays(end: string, days: number) {
 const rowsWeight = (n: number) => Math.min(n, 8) + (n > 8 ? 1 : 0);
 
 /** 짝지을 모듈 하나 — w 는 줄 수로 어림한 키(펴는 줄 8 + '더 보기' 1, 애널리스트 칸은 줄 12쯤). n 은 목록의 전체 줄 수(애널리스트 칸은 없음).
-    render 는 처음 펼 줄 수를 받는다 — 짝이 정해진 뒤에야 몇 줄을 펼지 안다(openFor). */
-type PairMod = { key: string; render: (open?: number) => React.ReactNode; w: number; n?: number };
+    render 는 처음 펼 줄 수를 받는다 — 띠가 정해진 뒤에야 몇 줄을 펼지 안다(layout). acts 는 애널리스트 칸의 '최근 의견' 수 ·
+    stack 은 애널리스트 요약 두 칸을 위아래로 쌓을지. */
+type PairMod = { key: string; render: (open?: number, stack?: boolean) => React.ReactNode; w: number; n?: number; acts?: number };
+
+/** 띠 사이 · 쌓은 모듈 사이 간격(v2.css .v2-tm-band · .v2-isd-stack). */
+const GAP = 12;
+
+/** 애널리스트 칸 꼴 — 의견 줄 수(0 이면 '최근 의견 N건 보기' 한 줄로 접힘) · 요약 두 칸을 위아래로 쌓는가 · 옆 목록 줄을 100 까지 늘이는가. */
+type AnalystShape = { k: number; stack: boolean; tall: boolean };
 
 /**
- * 짝 안에서 목록이 처음 펼 줄 수 — 짝 키에 맞춰 빈 자리 없이(2026-10-08 점검). 줄은 남는 높이를 받아 64 까지 늘어나지만(v2.css .v2-isd-list),
- * 그것만으론 모자라 TSLA · PLTR 거물 칸 바닥이 139 · 167px, 애널리스트 칸 짝인 목록은 '더 보기' 위가 70px 안팎 비었다.
- * - 애널리스트 칸과 짝: 목록을 10줄까지 펴서 실제 줄로 채운다. 애널리스트 칸 키가 폭마다 달라(1,280 671 · 1,440 이상 560 안팎) 12줄이면
- *   넓은 화면에서 목록(610)이 더 길어 애널리스트 칸 바닥이 60px 비었다. 10줄(522)은 1,280 에서 줄을 59 까지 늘려 채우고 넓은 화면에선 안에 든다.
- * - 목록끼리: 펴는 줄이 적은 쪽이 키를 정하고(줄을 64 까지 늘린 키), 긴 쪽은 그 키에 들 만큼만 먼저 편다 — 나머지는 '더 보기'에 그대로 있다.
- * 키 셈은 v2 값이다 — 머리 42 · 줄 44 · 늘린 줄 64 · '더 보기' 줄 40.
+ * 애널리스트 칸의 키. 머리 42 · 요약 · 의견(머리 37 · 줄 56 · '더 보기' 40, 접으면 한 줄 41). 의견이 없으면 요약뿐.
+ * 요약 두 칸은 나란히 서면 172, 위아래로 쌓으면 289 — 1,440(칸 574) · 1,280(칸 496) 같은 값이다('현재가'가 막대 점 위에 서서, 2026-10-10 실측).
+ * ⛔ 1,280 에서 나란히 세우려고 띠를 3:2 로 나눴다가 걷었다 — 짝은 모든 화면이 5:5 다. 칸 기준 폭을 220 으로 낮춰 나란히 세운다(parts.tsx).
  */
-function openFor(g: PairMod[]): Map<string, number> {
-  const out = new Map<string, number>();
-  if (g.length !== 2) return out;
-  const lists = g.filter((m) => m.n != null);
-  if (lists.length === 1) {
-    out.set(lists[0].key, Math.min(lists[0].n!, 10));
-    return out;
-  }
-  if (lists.length !== 2) return out;
-  const vis = (m: PairMod) => Math.min(m.n!, 8);
-  const [short, long] = vis(lists[0]) <= vis(lists[1]) ? [lists[0], lists[1]] : [lists[1], lists[0]];
-  if (vis(short) === vis(long)) return out;
-  const shortMax = 42 + 64 * vis(short) + (short.n! > 8 ? 40 : 0);
-  const k = Math.max(3, Math.floor((shortMax - 42 - 40) / 44));
-  if (k < vis(long)) out.set(long.key, k);
-  return out;
+const analystH = (an: PairMod, s: AnalystShape) => {
+  const sum = s.stack ? 289 : 172;
+  const ops = !an.acts ? 0 : s.k === 0 ? 41 : 37 + 56 * s.k + (an.acts > s.k ? 40 : 0);
+  return 42 + sum + ops;
+};
+
+/** 목록이 o 줄을 펼 때 설 수 있는 키 — 줄은 44 에서 80 까지 늘어난다(애널리스트 칸 띠는 is-fill, is-tall 띠는 100 까지 · v2.css). */
+const listRange = (m: PairMod, o: number, cap = 80): [number, number] => {
+  const more = m.n! > o ? 40 : 0;
+  return [42 + 44 * o + more, 42 + cap * o + more];
+};
+
+/**
+ * 애널리스트 칸 옆 칸에 목록(하나 또는 위아래로 여럿)을 둘 때 — 목록마다 펼 줄 수와 애널리스트 칸 꼴.
+ * 옆 칸이 늘고 줄 수 있는 범위에 애널리스트 칸 키가 들면 빈 곳이 없다. 빈 곳(세 배)이 가장 적은 것 — 애널리스트 칸 키는 1,440 · 1,280 이 같다(analystH).
+ * 기본 꼴(요약 나란히 · 의견 펴기 · 다섯 줄 · 줄 80 까지)에서 벗어나면 벌점을 더한다 — 의견 접기 150 · 요약 쌓기 40 · 줄 100 까지 30 · 다섯 줄 넘는 의견 줄마다 4.
+ * 의견 접기에 벌점이 없으면 몇 px 더 맞추려고 35종목(PLTR · LLY …)이 의견을 접었다 — 애널리스트 칸을 맨 앞에 둔 까닭이 의견이다.
+ * 점수(빈 곳 + 벌점)가 같으면 줄을 더 많이 펴는 것. 목록은 셋(또는 그보다 적으면 전부)부터
+ * 하나면 10 · 여럿이면 8 까지. 의견은 여덟 줄(원천이 주는 최근 여덟 건)까지 편다 — 목록 셋을 쌓으면 셋씩만 펴도 626px 라 다섯 줄(551)로는
+ * 애널리스트 칸 아래가 비었다(HOOD). 거물 넷(PLTR)에 의견 다섯 줄 그대로면 거물 칸 바닥이 223px 비었다(2026-10-10 실측).
+ * - 의견 접기(k 0) — 옆이 두어 줄뿐인 목록 하나면 한 줄을 펴도 130px 남짓 비었다(CCL · NOK · STLA · ALB).
+ * - 요약 쌓기 — 의견이 하나도 없는 애널리스트 칸(194)은 옆에 쌓은 목록(312)보다 짧아 아래가 118px 비었다(WOLF).
+ */
+function fitBeside(an: PairMod, lists: PairMod[], tall = false) {
+  const ks = an.acts ? Array.from({ length: Math.min(an.acts, 8) + 1 }, (_, i) => i) : [0];
+  const choices = lists.map((m) => {
+    const lo = Math.min(m.n!, 3);
+    const hi = Math.min(m.n!, lists.length === 1 ? 10 : 8);
+    return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
+  });
+  let best = { score: Infinity, size: -1, shape: { k: 0, stack: false, tall } as AnalystShape, opens: [] as number[] };
+  const walk = (opens: number[]) => {
+    if (opens.length < lists.length) {
+      for (const o of choices[opens.length]) walk([...opens, o]);
+      return;
+    }
+    let lo = GAP * (lists.length - 1);
+    let hi = lo;
+    lists.forEach((m, i) => {
+      const [a, b] = listRange(m, opens[i], tall ? 100 : 80);
+      lo += a;
+      hi += b;
+    });
+    for (const k of ks)
+      for (const stack of [false, true]) {
+        const shape = { k, stack, tall };
+        const h = analystH(an, shape);
+        const score = 3 * Math.max(0, lo - h, h - hi) + (stack ? 40 : 0) + (k === 0 && an.acts ? 150 : 0) + 4 * Math.max(0, k - 5) + (tall ? 30 : 0);
+        const size = k + opens.reduce((a, b) => a + b, 0);
+        if (score < best.score || (score === best.score && size > best.size)) best = { score, size, shape, opens };
+      }
+  };
+  walk([]);
+  return best;
 }
 
 /**
- * 모듈을 둘씩 짝짓는다 — 키가 비슷한 것끼리. [거물 | 애널리스트] · [임원 | 의원]으로 못박았을 땐 한쪽이 없으면 남은 것이 판 폭을
- * 혼자 차지했고(이름과 금액이 1,000px 떨어짐), 줄이 셋뿐인 목록이 키 큰 짝에 맞춰 늘어 한 줄이 200px 가까이 됐다(2026-10-04 점검).
- * 짝의 순서는 원래 순서(거물 → 애널리스트 → 임원 → 의원)의 앞선 것부터. 홀수면 하나가 판 폭으로 선다.
+ * 목록끼리 짝에서 처음 펼 줄 수 — 펴는 줄이 적은 쪽이 키를 정하고(줄을 64 까지 늘린 키), 긴 쪽은 그 키에 들 만큼만 먼저 편다.
+ * 나머지는 '더 보기'에 그대로 있다(2026-10-08 점검 — TSLA · PLTR 거물 칸 바닥이 139 · 167px 비었다). 키 셈은 v2 값 — 머리 42 · 줄 44 · 늘린 줄 64 · '더 보기' 40.
  */
-function pairUp(ms: PairMod[]): PairMod[][] {
-  if (ms.length <= 2) return ms.length ? [ms] : [];
-  const cost = (a: PairMod, b: PairMod) => Math.abs(Math.log(a.w / b.w));
-  const idx = (m: PairMod) => ms.indexOf(m);
-  const order = (gs: PairMod[][]) => gs.map((g) => [...g].sort((a, b) => idx(a) - idx(b))).sort((a, b) => idx(a[0]) - idx(b[0]));
-  if (ms.length === 3) {
-    let best: PairMod[][] = [];
-    let bc = Infinity;
-    for (let solo = 0; solo < 3; solo++) {
-      const pair = ms.filter((_, i) => i !== solo);
-      const c = cost(pair[0], pair[1]);
-      if (c < bc) {
-        bc = c;
-        best = [pair, [ms[solo]]];
-      }
+function openLists(a: PairMod, b: PairMod, out: Map<string, number>) {
+  const vis = (m: PairMod) => Math.min(m.n!, 8);
+  const [short, long] = vis(a) <= vis(b) ? [a, b] : [b, a];
+  if (vis(short) === vis(long)) return;
+  const shortMax = 42 + 64 * vis(short) + (short.n! > 8 ? 40 : 0);
+  const k = Math.max(3, Math.floor((shortMax - 42 - 40) / 44));
+  if (k < vis(long)) out.set(long.key, k);
+}
+
+/** 목록끼리 짝의 빈 곳 — openLists 대로 편 두 목록이 줄 44~64 로 늘고 줄어도 키가 안 만나는 만큼. */
+function listPairMiss(a: PairMod, b: PairMod): number {
+  const open = new Map<string, number>();
+  openLists(a, b, open);
+  const range = (m: PairMod): [number, number] => {
+    const o = open.get(m.key) ?? Math.min(m.n!, 8);
+    const more = m.n! > o ? 40 : 0;
+    return [42 + 44 * o + more, 42 + 64 * o + more];
+  };
+  const [ra, rb] = [range(a), range(b)];
+  return Math.max(0, Math.max(ra[0], rb[0]) - Math.min(ra[1], rb[1]));
+}
+
+/** 띠 하나 — 칸 하나(판 폭) 또는 둘. 칸에는 모듈 하나, 또는 위아래로 쌓은 목록 여럿(애널리스트 칸 옆). tall 은 목록 줄을 100 까지 늘이는 띠. */
+type Band = { cells: PairMod[][]; tall?: boolean };
+
+/**
+ * 모듈을 띠로 — 읽는 순서가 늘 애널리스트 → 거물 → 임원 → 의원이다(2026-10-10 지적). 키가 비슷한 것끼리 아무렇게나 짝지었을 땐
+ * 종목마다 순서가 달랐다 — [거물 | 임원] 다음 줄에 [애널리스트 | 의원]이 섰다.
+ * - 애널리스트 칸은 왼쪽. 옆 칸에는 거물을 두고 [임원 | 의원]을 다음 줄에 — 거물이 한두 줄뿐이라 옆이 비면(거물 1명 옆 222px, 2026-10-10 실측)
+ *   거물 · 임원 · 의원을 옆 칸에 위아래로 쌓는다. 목록 둘이면 늘 쌓는다 — 남은 하나가 판 폭으로 혼자 서면 이름과 금액이 1,000px 떨어진다(2026-10-04 점검).
+ * - 옆 칸 목록이 짧으면 줄을 100 까지 늘인다(is-tall). 짝은 늘 5:5 다.
+ * - 애널리스트 칸이 없으면 목록끼리 이웃한 것을 둘씩. 셋이면 [앞 둘 | 하나] · [하나 | 뒤 둘] 중 키가 비슷한 짝 쪽으로.
+ */
+function layout(ms: PairMod[]): { bands: Band[]; open: Map<string, number>; stacked: Set<string> } {
+  const open = new Map<string, number>();
+  const stacked = new Set<string>();
+  const an = ms.find((m) => m.acts != null);
+  const lists = ms.filter((m) => m !== an);
+  const pairs = (xs: PairMod[]): Band[] => {
+    if (xs.length === 2) openLists(xs[0], xs[1], open);
+    if (xs.length <= 2) return xs.length ? [{ cells: xs.map((m) => [m]) }] : [];
+    const cost = (a: PairMod, b: PairMod) => Math.abs(Math.log(a.w / b.w));
+    const [a, b, c] = xs;
+    if (xs.length === 3) {
+      if (cost(a, b) <= cost(b, c)) return [...pairs([a, b]), { cells: [[c]] }];
+      return [{ cells: [[a]] }, ...pairs([b, c])];
     }
-    return order(best);
-  }
-  const [a, b, c, d] = ms;
-  const options = [
-    [[a, b], [c, d]],
-    [[a, c], [b, d]],
-    [[a, d], [b, c]],
-  ];
-  const best = options.reduce((x, y) => (cost(y[0][0], y[0][1]) + cost(y[1][0], y[1][1]) < cost(x[0][0], x[0][1]) + cost(x[1][0], x[1][1]) ? y : x));
-  return order(best);
+    return [...pairs(xs.slice(0, 2)), ...pairs(xs.slice(2))];
+  };
+  if (!an) return { bands: pairs(lists), open, stacked };
+  if (!lists.length) return { bands: [{ cells: [[an]] }], open, stacked };
+  // 옆 칸이 짧아 빈 곳이 남으면 목록 줄을 100 까지 늘여 본다 — 의견을 접은 애널리스트 칸(240)에 80 짜리 두 줄(202)이 못 미쳤다(CCL).
+  const beside = (xs: PairMod[]) => {
+    const base = { ...fitBeside(an, xs), xs };
+    if (base.score === 0) return base;
+    const tall = { ...fitBeside(an, xs, true), xs };
+    return tall.score < base.score ? tall : base;
+  };
+  // 옆 칸에 거물 하나만 두는 것과 남은 목록을 다 쌓는 것 — 빈 곳이 적은 쪽. 목록 둘이면 쌓는 것뿐이다.
+  // 거물 하나만 둘 때는 다음 줄 [임원 | 의원] 짝의 빈 곳도 센다 — 한 줄짜리 의원 옆에 셋은 펴는 임원이 서면 124px 비었다(CVS, 2026-10-10).
+  const one = lists.length !== 2 ? beside(lists.slice(0, 1)) : null;
+  if (one && lists.length === 3) one.score += 3 * listPairMiss(lists[1], lists[2]);
+  const all = lists.length > 1 ? beside(lists) : null;
+  const pick = !all || (one && one.score <= all.score) ? one! : all;
+  open.set(an.key, pick.shape.k);
+  if (pick.shape.stack) stacked.add(an.key);
+  pick.xs.forEach((m, i) => open.set(m.key, pick.opens[i]));
+  return { bands: [{ cells: [[an], pick.xs], tall: pick.shape.tall }, ...pairs(lists.slice(pick.xs.length))], open, stacked };
 }
 
 /**
@@ -235,6 +318,8 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
   // 장내 매수도 처분도 아닌 신고(무상 취득 · 옵션 행사 취득 · 전환) — 큰 숫자(임원 신고)와 두 갈래 합을 맞춘다(2026-10-04 점검).
   const execOther = d.insiders.length - execBuys.length - execSells.length;
   // 연도까지('26.1.2 이후') — 연도 없는 '1/2 이후' 아래에 '24.10.23' 줄이 서 모순으로 읽혔다(2026-10-05 점검).
+  // 갈래 수에도 쉼표 — 큰 숫자는 '2,195건'인데 아래 줄이 '처분 1988'이었다(코어위브, 2026-10-10).
+  const num = (n: number) => n.toLocaleString("ko-KR");
   const since = (iso: string | null) => (iso ? `${iso.slice(2, 4)}.${Number(iso.slice(5, 7))}.${Number(iso.slice(8, 10))} 이후` : "");
   const cgTrades = [...cgBuys, ...cgSells].sort((a, b) => (b.transactionDate ?? b.filedDate).localeCompare(a.transactionDate ?? a.filedDate));
 
@@ -269,13 +354,16 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
           </Module>
         )
       : null;
-  const consensusMod = d.consensus ? (
-    <Module title="월가 애널리스트의 시선" meta={fmtDate(d.consensus.asOf)} className="v2-isd-mod v2-isd-consensus">
-      <ConsensusBody c={d.consensus} price={d.price} rate={d.usdKrw}>
-        <AnalystActions rows={d.analystActions} rate={d.usdKrw} />
-      </ConsensusBody>
-    </Module>
-  ) : null;
+  const consensus = d.consensus;
+  const consensusMod = consensus
+    ? (open?: number, stack?: boolean) => (
+        <Module title="월가 애널리스트의 시선" meta={fmtDate(consensus.asOf)} className="v2-isd-mod v2-isd-consensus">
+          <ConsensusBody c={consensus} price={d.price} rate={d.usdKrw} stack={stack}>
+            <AnalystActions rows={d.analystActions} rate={d.usdKrw} initial={open} />
+          </ConsensusBody>
+        </Module>
+      )
+    : null;
   const execMod =
     execTrades.length > 0
       ? (open?: number) => (
@@ -392,13 +480,14 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
             {[
               { label: "월가 거물 보유", n: d.holders.length, unit: `/${d.managerCount}명`, sub: quarterMoves },
               // 기간을 적는다 — 세 축의 기간이 달라(거물 분기 · 의원 표 전체 · 임원 표 전체) 본 화면의 90일 숫자와 어긋나 보였다(2026-10-04 점검).
-              { label: "미 하원의원 신고", n: members, unit: "명", sub: [`매수 ${cgBuys.length} · 매도 ${cgSells.length}건`, since(d.congressSince)].filter(Boolean).join(" · ") },
+              // 기간을 앞에 — 거물 줄('2026 Q2 늘림 2명')과 같은 순서다. 뒤에 붙이면 '· 26.1.2 이후'가 셋째 갈래처럼 읽혔다(2026-10-10).
+              { label: "미 하원의원 신고", n: members, unit: "명", sub: [since(d.congressSince), `매수 ${num(cgBuys.length)} · 매도 ${num(cgSells.length)}건`].filter(Boolean).join(" ") },
               // 셋째 갈래(그 밖)를 넣어 합이 큰 숫자와 맞는다 — 낱말 · 순서는 아래 임원 모듈 머리와 같게(장내 매수 · 처분).
               {
                 label: "임원 신고",
                 n: d.insiders.length,
                 unit: "건",
-                sub: [`장내 매수 ${execBuys.length} · 처분 ${execSells.length}${execOther > 0 ? ` · 그 밖 ${execOther}` : ""}`, since(d.insiderSince)].filter(Boolean).join(" · "),
+                sub: [since(d.insiderSince), `장내 매수 ${num(execBuys.length)} · 처분 ${num(execSells.length)}${execOther > 0 ? ` · 그 밖 ${num(execOther)}` : ""}`].filter(Boolean).join(" "),
               },
             ].map((s) => (
               <div key={s.label}>
@@ -515,31 +604,46 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
         </Module>
       )}
 
-      {/* ── 거물 · 애널리스트 · 임원 · 의원 — 있는 모듈을 키가 비슷한 것끼리 둘씩(pairUp) ───────────────
+      {/* ── 애널리스트 · 거물 · 임원 · 의원 — 있는 모듈을 이 순서대로 띠로(layout) ───────────────
           v2(2026-10-04) — 구간 제목 · 시트 머리 부제를 걷고 모듈 짝으로. 줄은 한 줄 네 칸(V2DetailRows).
           ⭐ 빈 모듈은 그리지 않는다 — 0건은 둘째 줄 '공시에 남은 것'이 이미 말하고, 빈 모듈을 세우면 옆 짝 높이만큼 아래가 빈다
              (에보뮨: 거물 0 → 576px · 의원 0 → 167px, 2026-10-04 실측). 애널리스트 커버리지가 없을 때도 같다. */}
-      {pairUp(
-        (
-          [
-            holdersMod ? { key: "holders", render: holdersMod, w: rowsWeight(holdersN), n: holdersN } : null,
-            consensusMod ? { key: "consensus", render: () => consensusMod, w: 12 } : null,
-            execMod ? { key: "exec", render: execMod, w: rowsWeight(execN), n: execN } : null,
-            cgMod ? { key: "congress", render: cgMod, w: rowsWeight(cgN), n: cgN } : null,
-          ] as (PairMod | null)[]
-        ).filter((m): m is PairMod => m != null),
-      ).map((g) => {
-        const open = openFor(g);
-        // 애널리스트 칸 짝인 목록이 10줄도 못 채우면(줄이 다 떨어짐) 줄을 80 까지 늘린다(v2.css .is-fill) — 64 로는 TSLA 거물 여덟 줄 아래가 117px 비었다.
-        const fill = g.length === 2 && g.some((m) => m.n == null) && g.some((m) => m.n != null && m.n < 10);
-        return (
-          <div key={g.map((m) => m.key).join("-")} className={g.length === 2 ? `v2-tm-band is-pair${fill ? " is-fill" : ""}` : "v2-tm-band is-hot is-solo"}>
-            {g.map((m) => (
-              <Fragment key={m.key}>{m.render(open.get(m.key))}</Fragment>
-            ))}
-          </div>
+      {(() => {
+        const { bands, open, stacked } = layout(
+          (
+            [
+              consensusMod ? { key: "consensus", render: consensusMod, w: 12, acts: d.analystActions.length } : null,
+              holdersMod ? { key: "holders", render: holdersMod, w: rowsWeight(holdersN), n: holdersN } : null,
+              execMod ? { key: "exec", render: execMod, w: rowsWeight(execN), n: execN } : null,
+              cgMod ? { key: "congress", render: cgMod, w: rowsWeight(cgN), n: cgN } : null,
+            ] as (PairMod | null)[]
+          ).filter((m): m is PairMod => m != null),
         );
-      })}
+        return bands.map(({ cells, tall }) => {
+          const mods = cells.flat();
+          // 애널리스트 칸 띠의 목록은 줄을 80 까지 늘린다(v2.css .is-fill) — 64 로는 TSLA 거물 여덟 줄 아래가 117px 비었다.
+          const fill = mods.some((m) => m.acts != null) && mods.some((m) => m.n != null);
+          const cls = cells.length === 2 ? `v2-tm-band is-pair${fill ? " is-fill" : ""}${tall ? " is-tall" : ""}` : "v2-tm-band is-hot is-solo";
+          return (
+            <div key={mods.map((m) => m.key).join("-")} className={cls}>
+              {cells.map((c) =>
+                c.length === 1 ? (
+                  <Fragment key={c[0].key}>{c[0].render(open.get(c[0].key), stacked.has(c[0].key))}</Fragment>
+                ) : (
+                  // 옆 칸에 쌓은 목록 — 남는 키를 펴는 줄 수만큼 나눠 받아 줄마다 고르게 늘어난다(한 줄짜리 거물만 80 에 닿아 비지 않게).
+                  <div key={c.map((m) => m.key).join("-")} className="v2-isd-stack">
+                    {c.map((m) => (
+                      <div key={m.key} style={{ flexGrow: open.get(m.key) ?? 1 }}>
+                        {m.render(open.get(m.key))}
+                      </div>
+                    ))}
+                  </div>
+                ),
+              )}
+            </div>
+          );
+        });
+      })()}
 
       {/* 임원 목록은 산 것과 판 것을 한 목록에(최신 순).
           ⚠️⚠️ 산 것 · 판 것으로 가르면 **어느 쪽도 아닌 신고**가 남는다(옵션 행사 M · 무상 취득 A · 전환 C, 임원 전체의 19%).
