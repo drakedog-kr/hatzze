@@ -509,6 +509,70 @@ def is_clean(text: str, source: str | None = None, *, slips: bool = True) -> boo
     return not problems(text, source, slips=slips)
 
 
+# ── 지시문 누출 ──────────────────────────────────────────────────────────────
+# 모델이 **답 대신 작업 설명을 적은** 자리. 글자·문법이 멀쩡해 [1]~[4] 로는 못 잡는다.
+#
+#   2026-10-08  AST스페이스모바일  'AST스페이스모바일 관련 화제는 … 담담하게 적습니다.'
+#   2026-10-09  마벨(미장 급부상 1위) 'Marvell 관련 화제가 주로 10/7 하루에 몰렸고, 발췌는 … 언급합니다.
+#               이를 22~30자 한 문장으로 담백하게 적습니다.'  (126자, 카드 다섯 줄)
+#
+# 둘 다 Haiku 5.5 로 바꾼(#678) 뒤에 나왔다. 앞은 '이름으로 시작 + ~습니다' 검사(surging pick)로 막았지만 뒤는
+# 영문 이름으로 시작해 비켜갔다 — **꼴이 아니라 낱말로** 잡는다. 프롬프트에만 있고 독자 글엔 나올 일이 없는 말들이다.
+#
+# '발췌'는 모든 생성 프롬프트가 재료를 부르는 이름이다. 화면 문장에 나오면 독자는 무엇의 발췌인지 모른다.
+# 08-01~10-09 저장분(LLM 문장 표 열 개 · 4,078행 · 7,990칸) 실측: 걸린 17칸이 전부 작업 설명이었고 오탐 0
+# ("발췌에서 내용은 확인되지 않습니다" · "발췌에는 … 적혀 있었습니다"). 테마 요약 국장 8 · 미장 7 · 총평 1 · 급부상 1.
+#
+# ⚠️ '적습니다' 하나로는 못 건다 — '물량이 적습니다'(적다)가 있다. 앞에 '~하게 · ~로'가 붙은 꼴만 본다.
+# 텔레그램 발송(broadcast_content · broadcast_digest)은 problems() 를 따로 쓰므로 여기 걸리지 않는다. 호출부가 골라 붙인다.
+LEAK_WORDS = ("발췌",)
+_LEAK_PATTERNS = (
+    (re.compile(r"\d+\s*~\s*\d+\s*자\s*(?:한|로|이내|안팎|내외|분량|짜리)"), "글자 수 지시"),
+    (re.compile(r"한\s*문장으로"), "글자 수 지시"),
+    (re.compile(r"(?:담백|담담|간결|짧)하게\s*(?:적|씁|쓰|정리|요약)"), "작업 설명"),
+    (re.compile(r"(?:하게|으로|로)\s+(?:적(?:겠)?습니다|씁니다|쓰겠습니다|작성(?:하겠습|합)니다|정리(?:하겠습|합)니다|요약(?:하겠습|합)니다)"), "작업 설명"),
+)
+
+
+def prompt_leaks(text: str) -> list[str]:
+    """지시문이 샌 자리 목록. 비어 있으면 통과. 재시도 프롬프트에 그대로 들어가므로 고칠 방향까지 적는다."""
+    if not text:
+        return []
+    found = [f"독자가 모르는 작업 용어 '{w}'(빼고 쓸 것 · 내용이 없는 종목은 적지 말 것)" for w in LEAK_WORDS if w in text]
+    for pat, label in _LEAK_PATTERNS:
+        m = pat.search(text)
+        if m:
+            found.append(f"문장에 {label} 섞임('{m.group().strip()}' · 결과 문장만 쓸 것)")
+    return found
+
+
+_LEAK_SENTENCE_SPLIT = re.compile(r"(?<=[다요]\.)\s+")
+
+
+def drop_leak_sentences(text: str) -> str:
+    """문단은 지키며 지시문이 샌 **문장**만 뺀다(glued_names 를 뺄 때와 같은 방식).
+
+    긴 글(테마 요약 두 문단)은 다시 써도 '발췌' 한 문장이 남는 날이 있다. 그 한 문장 때문에 글 전체를
+    버리면 화면이 빈다 — 문장만 들어낸다. 빼고 남는 게 없으면 빈 문자열이다.
+    """
+    paras = []
+    for para in text.split("\n\n"):
+        sents = _LEAK_SENTENCE_SPLIT.split(para.strip())
+        kept = [s for s in sents if s and not prompt_leaks(s)]
+        if kept:
+            paras.append(" ".join(kept))
+    return "\n\n".join(paras)
+
+
+def leak_free(candidates: list[str]) -> list[str]:
+    """지시문이 새지 않은 후보만. 전부 샜으면 샌 문장만 들어낸 후보로 — 한 문장 때문에 글을 통째로 버리면 칸이 빈다.
+    들어내고도 남으면 빈 목록이다. 호출부는 '못 고름'으로 다룬다(각자 빈칸 처리가 따로 있다)."""
+    ok = [t for t in candidates if t.strip() and not prompt_leaks(t)]
+    if ok:
+        return ok
+    return [t for t in map(drop_leak_sentences, candidates) if t.strip() and not prompt_leaks(t)]
+
+
 # 한글 낱말 + 조사 '와 · 과' 바로 뒤에 라틴 글자가 붙은 자리 — '삼성전자와SK하이닉스를'(2026-10-05 점검, 테마 요약).
 # 모델이 띄어쓰기를 흘린 것이라 다시 묻지 않고 기계로 띄운다. 라틴 글자 **뒤** 조사는 붙여 쓰는 게 맞으니('SK하이닉스와') 건드리지 않는다.
 _GLUED_JOSA_LATIN = re.compile(r"([가-힣](?:와|과))([A-Za-z])")

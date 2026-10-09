@@ -62,7 +62,7 @@ from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE_SHORT  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
 from common.surging import load_stock_daily, top_surging, window_end_for  # noqa: E402
-from common.text_check import is_clean  # noqa: E402
+from common.text_check import is_clean, prompt_leaks  # noqa: E402
 from common.us_surging import load_us_stock_daily, top_us_surging  # noqa: E402
 
 import generate_telegram_narratives as KR  # noqa: E402
@@ -78,6 +78,10 @@ import generate_us_telegram_narratives as US  # noqa: E402
 MODEL = "claude-haiku-5-5"
 CARDS = 10         # 화면 급부상 표 줄 수(국장·미장 둘 다 — lib/kadera-why.ts BOARD_TILES · kadera-us-why.ts US_BOARD_TILES 와 짝). 6 이던 때 7~10행이 비었다
 LEN_MIN, LEN_MAX = 22, 30
+# 이보다 길면 어느 단계에서도 안 고른다. 카드 한 줄이 26자라 40자면 이미 두 줄이다. 08-01~10-09 저장분
+# 606건 가운데 가장 긴 정상 문장이 37자였고, 넘은 것은 지시문이 샌 마벨 126자 하나였다(text_check.prompt_leaks).
+# 못 고르면 None — 화면은 전날 문장이나 흐름 요약으로 물러난다(lib/telegram-data.ts getSurgingOneliners).
+LEN_CEIL = 40
 MAX_RETRIES = 1    # 한 번만 다시 쓴다. 못 맞추면 후보 중 목표에 가장 가까운 걸 쓴다
 
 # ⚠️ 짧게 유지할 것. 이 프롬프트가 호출 비용의 대부분이다(위 머리 주석).
@@ -124,7 +128,11 @@ def ends_as_sentence(text: str) -> bool:
 
 def pick(cands: list[str], digest: str, name: str) -> str | None:
     """후보 가운데 쓸 것 하나. 깨진 글자가 있는 후보는 어느 단계에서도 안 고른다."""
-    clean = [t for t in cands if t.strip() and is_clean(t, digest)] or [t for t in cands if t.strip()]
+    # 지시문이 샌 후보와 LEN_CEIL 을 넘는 후보는 **맨 먼저** 버린다. 2026-10-09 마벨은 다른 후보가 이름으로
+    # 시작한다는 이유로 뒤로 밀리고, 이름 검사를 비켜간 126자 작업 설명이 '이름으로 시작하지 않는 후보'로 뽑혔다.
+    # 순서가 뒤면 아래 선호(이름·명사 끝)가 쓰레기를 고른다.
+    cands = [t for t in cands if t.strip() and not prompt_leaks(t) and len(t) <= LEN_CEIL]
+    clean = [t for t in cands if is_clean(t, digest)] or cands
     # 이름으로 시작해 '~습니다'로 끝나는 후보는 지시문이 샌 것이다 — 'AST스페이스모바일 관련 화제는 … 담담하게 적습니다.'(2026-10-08 마지막 점검).
     # 아예 버린다. 남는 게 없으면 화면이 흐름 요약 · 움직인 이유로 물러난다(app/kadera/page.tsx).
     clean = [t for t in clean if not (starts_with_name(t, name) and ends_as_sentence(t))]
@@ -141,6 +149,19 @@ def pick(cands: list[str], digest: str, name: str) -> str | None:
     return min(named, key=lambda t: abs(len(t) - mid))
 
 
+def answer_line(out: str) -> str:
+    """모델 응답에서 카드에 쓸 한 줄. 지시문이 새지 않은 첫 줄을 쓴다(없으면 첫 줄 — pick 이 버린다).
+
+    예전엔 무조건 첫 줄을 썼다. Haiku 5.5 는 첫 줄에 작업 설명("…이를 22~30자 한 문장으로 담백하게
+    적습니다.")을 적고 다음 줄에 답을 쓰는 날이 있어, 답을 버리고 설명을 카드에 실었다(2026-10-09 마벨).
+    """
+    lines = [ln.strip().strip('"').strip("'").strip() for ln in (out or "").splitlines()]
+    lines = [ln for ln in lines if ln]
+    if not lines:
+        return ""
+    return next((ln for ln in lines if not prompt_leaks(ln)), lines[0])
+
+
 def ask_oneline(client, digest: str, name: str) -> str | None:
     """한 줄을 받아 온다. 길이가 벗어나거나 제 이름으로 시작하면 한 번만 다시 쓰게 한다."""
     def call(text: str) -> str:
@@ -148,13 +169,16 @@ def ask_oneline(client, digest: str, name: str) -> str | None:
             model=MODEL, max_tokens=200, system=ONELINE_SYSTEM,
             messages=[{"role": "user", "content": text}],
         )
-        # 모델이 줄바꿈으로 여러 줄을 주면 첫 줄만 쓴다.
-        out = "".join(b.text for b in r.content if b.type == "text").strip()
-        return out.splitlines()[0].strip().strip('"').strip("'") if out else ""
+        return answer_line("".join(b.text for b in r.content if b.type == "text"))
 
     cands = [call(digest)]
     for _ in range(MAX_RETRIES):
         cur = cands[-1]
+        # 지시문이 샜으면 **방금 쓴 문장을 되먹이지 않고** 처음 그대로 다시 묻는다. 아래 재시도 프롬프트처럼
+        # '[방금 쓴 문장]'을 붙이면 작업 설명을 재료로 다시 쓰게 된다.
+        if prompt_leaks(cur):
+            cands.append(call(digest))
+            continue
         bad_name = starts_with_name(cur, name)
         sentence = ends_as_sentence(cur)
         if LEN_MIN <= len(cur) <= LEN_MAX and is_clean(cur, digest) and not bad_name and not sentence:
@@ -263,7 +287,7 @@ def _generate(db, client, dry_run: bool, table: str, key_col: str, latest: str, 
         try:
             text = ask_oneline(client, digest, name)
             if not text:
-                print(f"  [{name}] 빈 응답만 받아 저장하지 못했습니다.")
+                print(f"  [{name}] 쓸 문장을 못 받아 저장하지 않았습니다(빈 응답 · 지시문 누출 · {LEN_CEIL}자 초과). 화면은 전날 문장으로 물러납니다.")
                 continue
             db.table(table).upsert(
                 {"date": latest, key_col: key, "oneliner": text, "model": MODEL},

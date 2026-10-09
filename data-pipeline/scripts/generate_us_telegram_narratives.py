@@ -63,7 +63,7 @@ from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.js_round import js_fixed1  # noqa: E402
 from common.market_sentiment import MARKET_MIN_MESSAGES, load_market_daily  # noqa: E402
 from common.supabase_client import get_client, load_all, load_window_keyset  # noqa: E402
-from common.text_check import is_clean, problems  # noqa: E402
+from common.text_check import is_clean, leak_free, problems, prompt_leaks  # noqa: E402
 from common.thin_days import usable_days  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from config.us_stock_extraction import is_house  # noqa: E402
@@ -833,7 +833,7 @@ def main() -> None:
         candidates = [first_sentences(brief_body(ask(system, digest, BRIEF_MAX_TOKENS, BRIEF_MODEL), key), sentences)]
         for _ in range(BRIEF_RETRIES):
             cur = candidates[-1]
-            found = problems(cur, digest)
+            found = problems(cur, digest) + prompt_leaks(cur)
             if lo <= len(cur) <= hi and not found and sentence_finished(cur):
                 break
             if not sentence_finished(cur):
@@ -856,6 +856,7 @@ def main() -> None:
         usable = [t for t in candidates if t.strip() and is_clean(t, digest)] or [
             t for t in candidates if t.strip()
         ]
+        usable = leak_free(usable)  # 국내 ask_brief_sentence 와 같은 규칙
         if not usable:
             return ""
         # 끝맺은 후보가 하나라도 있으면 그것들 중에서만 고른다 — 길이가 어긋나도 읽히지만

@@ -61,7 +61,7 @@ from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE_SHORT  # noqa: E402
 from common.stock_framing import EXTRA_BANNED, PRICE_WORDS, has_trade_framing, trend_hits  # noqa: E402
 from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
-from common.text_check import fix_glued_josa_latin, glued_names, is_clean, problems  # noqa: E402
+from common.text_check import fix_glued_josa_latin, glued_names, is_clean, leak_free, problems, prompt_leaks  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from config.stock_extraction import is_house  # noqa: E402
 from config.stock_themes import THEMES  # noqa: E402
@@ -125,11 +125,16 @@ def window_hits(text: str) -> list[str]:
 
 
 def brief_problems(text: str, digest: str) -> list[str]:
-    """종목 요약의 problems() 에 매수·매도 표현·시세 낱말·기간/매체 표현 검사를 더한 것. 비어 있으면 통과."""
+    """종목 요약의 problems() 에 매수·매도 표현·시세 낱말·기간/매체 표현·지시문 누출 검사를 더한 것. 비어 있으면 통과.
+
+    지시문 누출(text_check.prompt_leaks)은 '발췌'가 든 문장이 대부분이다 — "KB금융은 언급이 가장 많았지만 발췌에서 내용은
+    확인되지 않습니다"(2026-10-09 국장 금융). 08-01~10-09 국장 8 · 미장 7건. 오른 이유(riser) · 도는 얘기도 이 함수를 거친다.
+    """
     hits = banned_hits(text) + [w for w in EXTRA_BANNED if w in text]
     price = [w for w in PRICE_WORDS if w in text]
     return (
         problems(text, digest)
+        + prompt_leaks(text)
         + [f"매수·매도 표현({w})" for w in hits]
         + [f"시세 표현({w})" for w in price]
         + [f"기간·매체 표현({w})" for w in window_hits(text)]
@@ -278,6 +283,9 @@ def riser_pick(candidates: list[str], digest: str) -> str | None:
         return None
     candidates = [t for t in candidates if not any(w in t for w in PRICE_WORDS)] or candidates
     candidates = [t for t in candidates if not window_hits(t)] or candidates
+    candidates = leak_free(candidates)
+    if not candidates:
+        return None
     clean = [t for t in candidates if is_clean(t, digest)]
     # 전부 걸렸으면 붙은 이름(text_check.glued_names)이 든 문장만 빼고 쓴다 — 걸린 후보를 그대로 실어 '오삼성전자의 …'가 나갔다(2026-10-04 점검).
     clean = clean or [t for t in (drop_glued_sentences(t, digest) for t in candidates) if t.strip()] or candidates
@@ -389,6 +397,8 @@ def talk_pick(candidates: list[str], digest: str, name: str = "") -> str | None:
     # 매수·매도 표현과 시세 낱말은 어느 단계에서도 안 고른다 — 이 칸은 무엇이 화제였는지만 맡는다. 둘째 실행(2026-10-05)에서
     # 다시 써도 시세로 돌아온 줄이 그대로 실렸다("EU 규제 영향 주가 하락").
     candidates = [t for t in candidates if t.strip() and not has_trade_framing(t) and not any(w in t for w in PRICE_WORDS + TALK_PRICE_WORDS)]
+    # 지시문이 샌 줄도 어느 단계에서도 안 고른다 — "발췌에 이름만 나와 …"는 한 줄 전체가 작업 설명이라 들어낼 문장이 따로 없다.
+    candidates = [t for t in candidates if not prompt_leaks(t)]
     if not candidates:
         return None
     soft = [
@@ -670,7 +680,8 @@ def pick_text(candidates: list[str], digest: str) -> str | None:
     """후보 중 저장할 문장. 종목 요약과 같은 규칙 — 목표 범위 첫 것, 없으면 허용 범위 중 가운데에 가까운 것.
 
     매수·매도 표현이 든 후보는 **어느 단계에서도 안 고른다.** 길이가 어긋난 문장은 읽히지만 권유로 읽히는
-    문장은 실을 수 없다. 전부 걸리면 None — 호출부가 요약 없이 저장하고 화면은 그 사정을 적는다.
+    문장은 실을 수 없다. 지시문이 샌 문장도 같다(text_check.leak_free — 그 문장만 들어낸다). 전부 걸리면 None — 호출부가
+    요약 없이 저장하고 화면은 그 사정을 적는다.
     """
     candidates = [t for t in candidates if not has_trade_framing(t)]
     if not candidates:
@@ -678,6 +689,9 @@ def pick_text(candidates: list[str], digest: str) -> str | None:
     # 시세 낱말·기간/매체 표현이 없는 후보가 하나라도 있으면 그쪽만 본다.
     candidates = [t for t in candidates if not any(w in t for w in PRICE_WORDS)] or candidates
     candidates = [t for t in candidates if not window_hits(t)] or candidates
+    candidates = leak_free(candidates)
+    if not candidates:
+        return None
     clean = [t for t in candidates if is_clean(t, digest)] or candidates
     # 두 문단인 후보가 있으면 그쪽만. 한 문단짜리도 읽히긴 하니 전부 그러면 그대로 간다.
     clean = [t for t in clean if paragraph_count(t) == PARAGRAPHS] or clean
