@@ -801,3 +801,51 @@ def test_bridges_are_not_daegyo(text):
 )
 def test_daegyo_stock_mentions_survive(text):
     assert _daegyo(text) == {"019680"}
+
+
+# ── 2026-10-10: SDN(099220) ← 미국 제재 명단 · 말레이시아 법인 접미사 · 다른 기술 약어 ─────────────
+# 사례는 전 기간 코퍼스의 실제 문장이다. 근거와 전량 수치는 config/stock_extraction.py 의 HOMONYM_CUES["SDN"] 주석.
+
+
+def _sdn(text: str) -> set[str]:
+    match_to_code = {"SDN": "099220", "테크윙": "089030"}
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = set(match_to_code) & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, {k: "dict" for k in match_to_code}, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "미국 재무부 해외자산통제국(OFAC)도 이날 아카네 소장 등 2명을 제재 대상인 특별지정국민(SDN) 명단에추가했다.",
+        "이란 금속 산업과 연계된 다수의 기업을 특별지정제재대상(SDN, Specially Designated Nationals)으로 지정했다.",
+        "선박 22척과 법인 27개, 개인 6명을 제재 명단(SDN)에 올렸다.",
+        "대상 기업들은 OFAC의 Specially Designated Nationals(SDN) 명단에 추가돼 미국 금융시스템 접근이 사실상 차단",
+        "미 우주군의 우주 데이터 네트워크 백본(SDN-B) 사업자로 선정됐다고 발표했다.",
+        "글로벌 소프트웨어 정의 네트워크(SDN)를 활용해 지연 시간을 줄이며 기업들의 AI 추론 수요를 지원",
+        "취득회사 : NEXILIS MANAGEMENT MALAYSIA SDN. BHD.(말레이시아) 주요사업 : 투자업",
+    ],
+)
+def test_sdn_sanctions_list_and_other_acronyms_are_not_the_stock(text):
+    assert "099220" not in _sdn(text)
+
+
+def test_sdn_bhd_mask_keeps_the_real_mention_in_the_same_message():
+    text = "테크윙(089030)은 Micron Memory Malaysia SDN. BHD.와 약 106억6810만원 규모의 반도체 검사장비 공급계약 체결"
+    assert _sdn(text) == {"089030"}
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "(코스닥)SDN - 임원ㆍ주요주주특정증권등소유상황보고서 보고자:박춘용",
+        "기업명: SDN(시가총액: 412억) A099220 보고서명: 기타시장안내(관리종목지정우려종목)",
+        "에스에너지 [+25.5%] 한화솔루션 [+18.0%] OCI홀딩스 [+17.4%] SDN [+12.7%] HD현대에너지솔루션 [ +8.3%]",
+        "태양광: 한화솔루션>HD현대에너지솔루션>신성이엔지>한솔테크닉스>에스에너지>SDN  배터리: 셀 3사",
+        "[실적속보]SDN, 3년 중 최고 매출 달성, 영업이익은 전년동기 대비 -89%",
+        "△제이엠아이  △SDN  △옴니시스템  △이노인스트루먼트",
+        "27. SDN 거래정지(주식병합) 28. 한울앤제주 추가상장(유상증자)",
+    ],
+)
+def test_sdn_stock_mentions_survive(text):
+    assert "099220" in _sdn(text)
