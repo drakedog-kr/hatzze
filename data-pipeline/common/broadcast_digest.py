@@ -49,6 +49,19 @@ LLM 문장은 1판과 같은 그물을 지난다 — 금지어(bc.banned_hits)·
 걸리면 그 갈래만 빠진다. 종목 이름은 자료에 있던 이름으로만 풀리고(name→code), 못 푼
 이름은 조용히 떨어진다 — 모델이 지어낸 종목이 종목 줄에 오르지 않게.
 
+## 휴장일(2026-10-09)
+
+평일이어도 KRX 휴장일(timeutil.KRX_HOLIDAYS)이면 아침 글은 '휴장일 아침 요약'으로 이름을 바꿔
+보내고 저녁 글은 쉰다. 발송 판정이 요일만 봐서 추석(9/24·9/25)·개천절 대체휴일(10/5)에
+"마감 기준" 글이 나갔다. 휴장일의 채널 글은 하루 1,500건 남짓으로 주말과 비슷하다(평일 6~7천).
+
+## 직전 글과 겹치지 않게(2026-10-09)
+
+아침·저녁·수요일 글은 바로 앞에 나간 우리 글 두 편의 갈래(제목·본문)를 [직전 글]로 받고,
+거기 실린 이야기는 그 뒤에 새로 생긴 일만 쓴다. 10/6 저녁의 두 갈래가 다음 날 주중 점검에
+제목까지 그대로 다시 나갔고, 메모리 이야기는 9/30 저녁부터 일곱 편 내리 첫머리였다.
+토·일 글은 한 주를 되짚는 글이라 받지 않는다.
+
 ## 갈래 저장(선택)
 
 아침·저녁 글의 갈래를 `telegram_daily_digest` 에 저장해 두면(migration_070) 수·일 글이
@@ -66,6 +79,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, time as dtime, timedelta
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from . import broadcast_content as bc
@@ -74,7 +88,7 @@ from .event_group import NEAR_DAYS, PAST_DAYS, settle_rows
 from .supabase_client import execute_with_retry, load_keyset
 from .surging import load_stock_daily, top_surging
 from .text_check import problems
-from .timeutil import KST, today_kst
+from .timeutil import KRX_HOLIDAYS, KST, today_kst
 from config.us_stock_extraction import is_house
 
 FORMATS = ("morning2", "evening2", "midweek", "us_weekend", "weekly2")
@@ -95,7 +109,10 @@ NIGHT_TO_HOUR = bc.NIGHT_TO_HOUR       # 7
 DAY_TO_HOUR = 18
 
 # ─── 발췌 ────────────────────────────────────────────────────────────────────
-EXCERPT_CHARS = 220         # 발췌 한 건 상한. 1판(180)보다 길다 — 갈래에 종목·까닭까지 담아야 해서
+# 발췌 한 건 상한. 220 이던 것을 늘렸다(2026-10-09) — 실적·지표·계약 발췌(조회 상위 1,000건 중 173건)의
+# 단위 붙은 숫자가 220자에선 34%만 남고 23건은 하나도 안 남았다. 400자면 55% · 8건. 발췌 길이 중앙값이
+# 116자라 대부분은 그대로고 긴 글만 늘어난다.
+EXCERPT_CHARS = 400
 EXCERPTS_DAY = 70           # 하루짜리 창에서 모델에 주는 발췌 수(1판 14)
 EXCERPTS_MULTI = 100        # 며칠짜리 창
 MULTI_MIN_FORWARDS = 3      # 며칠짜리 창은 서버에서 전달 3회 이상만 받는다(주 4만 건을 다 읽지 않는다)
@@ -243,6 +260,20 @@ def span_label(lo: datetime, hi: datetime, drop_month: int | None = None) -> str
     if drop_month is not None and lo.month == hi.month == drop_month:
         return f"{lo.day}일 {lo.hour}시 ~ {hi.day}일 {hi.hour}시"
     return f"{lo.month}월 {lo.day}일 {lo.hour}시 ~ {hi.month}월 {hi.day}일 {hi.hour}시"
+
+
+def is_krx_holiday(d: date) -> bool:
+    """평일인데 KRX 가 쉬는 날. 주말은 여기서 안 본다(아침·저녁 글은 평일에만 불린다).
+    표에 없는 해는 전부 개장일로 센다(timeutil 주석) — 그때는 예전처럼 보낸다."""
+    return d.isoformat() in KRX_HOLIDAYS
+
+
+def morning_head(R: Render, lo: datetime, hi: datetime) -> list[str]:
+    """아침 글 머리 두 줄. 휴장일엔 '개장 전'이 거짓이라 이름을 바꾼다."""
+    day, span = hi.date(), span_label(lo, hi, drop_month=hi.month)
+    if is_krx_holiday(day):
+        return ["🌅 <b>휴장일 아침 요약</b>", f"{R.date_label(day.isoformat())} · {span}"]
+    return ["🌅 <b>개장 전 요약</b>", f"{R.date_label(day.isoformat())} 개장 전 · {span}"]
 
 
 # ─── 재료: 메시지 ─────────────────────────────────────────────────────────────
@@ -794,6 +825,26 @@ def us_changes(tickers: list[str], period: Period | None) -> dict[str, float]:
 
 # ─── LLM: 갈래 만들기 ─────────────────────────────────────────────────────────
 
+# 1판 규칙의 가운데 덩이(bc._MENTION_SHARE_RULE '이 숫자는 주가가 아닙니다') 자리에 끼우는 2판 절.
+# 그 절은 "여기 나오는 %는 전부 언급 점유율"이라 말하는데 2판 발췌에는 실적·지표 숫자가 그대로 있고
+# [종목별 이유]의 %는 실제 등락률이다. Opus 5.5 로 옮긴 뒤(2026-09-23) 채널 글의 단위 붙은 숫자가
+# 글당 4.9개(Haiku 9/11~9/22, 21편)에서 0.7개(9/23~10/8, 31편)로 줄었다 — "예상을 웃돌았습니다"만
+# 남고 얼마였는지가 빠졌다. 그 절과 형식 절의 "숫자는 문장에 넣지 마세요"를 숫자 전반 금지로 읽은
+# 것으로 본다. 채널 2주치(9/25~10/7, 54,625건)에서는 실적 숫자·증권사 판단이 든 글이 같은 길이의
+# 다른 글보다 1.3~1.8배 많이 전달됐다. 시세 말 금지는 그대로 옮겨 둔다(bc.banned_hits 가 같은 그물).
+# 지어낸 숫자는 _validate_sections 가 문장째 뺀다(drop_unsourced_numbers).
+DIGEST_NUMBER_RULE = """[숫자]
+- **발표된 숫자는 문장에 옮깁니다.** 실적은 매출·영업이익과 시장 예상치, 경제지표는 실제치와
+  예상치, 계약·수주·투자는 금액이나 규모를 발췌에 적힌 대로 씁니다. "예상을 웃돌았습니다"만
+  쓰지 말고 얼마였는지를 함께 적으세요.
+- 발췌에 없는 숫자는 쓰지 않습니다. 단위를 바꾸거나 계산해서 새 숫자를 만들지도 마세요.
+- 주가 등락률은 문장에 쓰지 않습니다. 종목 줄이 따로 찍습니다. 목표주가 금액도 쓰지 않습니다.
+- "강세", "약세", "매수 심리", "매매 신호", "상승세" 같은 시세를 가리키는 말은 쓰지 마세요.
+  "매물 출회", "수급 개선", "반등", "차익실현" 같은 수급 이야기도 특정 종목·테마에 붙여 옮기지 마세요.
+
+"""
+DIGEST_RULES = bc._LLM_RULES_HEAD + DIGEST_NUMBER_RULE + bc._LLM_RULES_TAIL
+
 # 출력 형식. 코드가 이 형식만 읽으므로 모델이 다른 모양으로 쓰면 그 갈래는 버려진다.
 # 근거 줄을 요구하는 이유는 하나다 — 서로 다른 채널 둘 이상이 다룬 이야기만 갈래로
 # 세운다는 규칙을 코드가 검사하려면 어느 발췌에서 왔는지 알아야 한다.
@@ -816,7 +867,7 @@ DIGEST_FORMAT = """\
 - 근거는 되도록 발췌 번호 둘 이상을 적으세요. 하나뿐이면 그 이야기는 갈래가 못 됩니다.
 - 한 채널만 떠든 이야기는 갈래로 세우지 마세요. 여러 발췌에 공통으로 나오는 이야기를 고르세요.
 - 발췌를 베끼지 말고 무슨 일인지를 자기 말로 옮기세요. 링크·홍보 문구·가격 알림은 무시하세요.
-- 등락률·조회 수 같은 숫자는 화면이 따로 찍으니 문장에 넣지 마세요.
+- 실적·지표·계약 숫자는 [숫자] 규칙대로 옮기고, 주가 등락률·조회 수는 넣지 마세요.
 - [종목별 이유] 자료의 종목이 어느 갈래에 속하면 그 이유를 그 갈래의 문장에 녹이세요.
 - 대괄호 라벨([갈래] 같은 것)은 출력하지 마세요."""
 
@@ -831,7 +882,7 @@ TASKS = {
 [이번 글 — 오늘 채널 요약]
 오늘 장중부터 마감 뒤까지 채널이 붙잡은 이야기를 {n} 갈래로 정리합니다. 마감 뒤에 읽는
 글입니다. [종목별 이유] 자료의 종목이 든 갈래는 그 종목이 왜 움직였는지가 문장에 있어야
-합니다. 오늘 처음 나온 이야기와 며칠째 이어지는 이야기를 구별해 적으세요.""",
+합니다.""",
     "midweek": """\
 [이번 글 — 주중 요약]
 이번 주 월요일부터 오늘까지 채널의 이야기가 어떻게 옮겨갔는지를 {n} 갈래로 정리합니다.
@@ -849,6 +900,32 @@ TASKS = {
 이야기가 언제 시작해 어떻게 커지거나 식었는지, 계기가 무엇이었는지를 적으세요. 날짜는
 요일로 부르세요. [지난 요약] 자료가 있으면 그 갈래 이름을 그대로 이어 쓰세요.""",
 }
+
+# [직전 글]이 있을 때 과제 끝에 붙이는 말(머리말 '직전 글과 겹치지 않게').
+# 저녁 과제에 있던 "오늘 처음 나온 이야기와 며칠째 이어지는 이야기를 구별해 적으세요"는 뺐다 —
+# 모델이 그걸 "오늘 새로 나온 이야기입니다", "며칠째 이어지는 이야기입니다" 같은 문장으로 따로
+# 적었고(10/6·10/7 저녁), 이어지는 이야기는 이 말이 대신 다룬다.
+REPEAT_NOTE = """
+
+[직전 글과 겹치지 않게]
+- [직전 글]은 독자가 몇 시간 전에 읽은 우리 글입니다. 거기 실린 이야기를 다시 세우는 건 그 뒤에
+  새 발표·새 숫자·새 반응이 나왔을 때뿐입니다. 그때는 직전 글에 쓴 내용은 빼고 새로 생긴 일만 씁니다.
+- 새로 생긴 일이 없는 이야기는 갈래로 세우지 말고 다른 이야기를 고르세요.
+- 직전 글의 갈래 제목이나 문장을 그대로 쓰지 마세요."""
+
+# 수요일 글은 월~수를 되짚는 글이라 '새로 생긴 일만'은 맞지 않는다. 대신 하루하루의 소식을
+# 다시 옮기지 말고 흐름을 쓰게 한다.
+REPEAT_NOTE_MIDWEEK = """
+
+[직전 글과 겹치지 않게]
+- [직전 글]과 [지난 요약]은 독자가 이미 읽은 이번 주 우리 글입니다. 거기 실린 하루하루의 소식을
+  다시 옮기지 말고, 주초와 지금 사이에 무엇이 커지고 식었는지와 그 계기를 쓰세요.
+- 직전 글의 갈래 제목이나 문장을 그대로 쓰지 마세요."""
+
+HOLIDAY_NOTE = """
+
+[오늘은 국내 증시 휴장일입니다]
+개장 전에 읽는 글이 아닙니다. '개장 전', '오늘 장' 같은 말을 쓰지 마세요."""
 
 
 def _split_blocks(text: str) -> list[str]:
@@ -918,25 +995,99 @@ def _trim_body(body: str) -> str:
     return " ".join(kept[:BODY_MAX_SENTENCES]).strip()
 
 
+_NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
+# 조·억·만은 값으로 맞춘다. 모델이 '238,270억'을 '23조 8,270억원'으로, '10,259억'을 '1조 259억원'으로
+# 읽기 좋게 바꿔 쓴다(10/7 저녁 시험 — 글자 모양으로 맞췄더니 맞는 문장 둘이 빠졌다). 붙어 있는
+# 조→억→만은 한 금액으로 더한다. 값은 만 단위로 센다.
+_KR_AMOUNT = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*(조|억|만)")
+_KR_SCALE = {"조": (0, Decimal(10**8)), "억": (1, Decimal(10**4)), "만": (2, Decimal(1))}
+# 그 밖의 단위는 '숫자+단위' 짝으로 맞춘다 — 숫자만 맞추면 '9%'가 자료의 '9월' 덕에 통과한다.
+# 날짜·시각(년·월·일·시)은 짝으로 안 본다. 자료의 게시 시각이 '10/07 08시' 꼴이라 모델이 쓴
+# '10월 7일'이 짝으로는 안 맞는다. 자료의 '$1.92'는 '1.92달러'와 같은 짝으로 센다.
+_UNIT_AMOUNT = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*(원|달러|위안|엔|유로|%p|%|bp|배)")
+_DOLLAR = re.compile(r"\$\s*(\d[\d,]*(?:\.\d+)?)")
+
+
+def _norm_number(raw: str) -> str:
+    """쉼표를 빼고 정수의 앞자리 0 을 뗀다. '1,200' = '1200', '07' = '7'."""
+    n = raw.replace(",", "")
+    return n if "." in n else (n.lstrip("0") or "0")
+
+
+def _numbers(text: str) -> set[str]:
+    return {_norm_number(m) for m in _NUMBER.findall(text)}
+
+
+def _kr_values(text: str) -> set[Decimal]:
+    out: set[Decimal] = set()
+    cur, end, rank = None, -1, -1
+    for m in _KR_AMOUNT.finditer(text):
+        r, scale = _KR_SCALE[m.group(2)]
+        v = Decimal(m.group(1).replace(",", "")) * scale
+        if cur is not None and not text[end:m.start()].strip() and r > rank:
+            cur += v
+        else:
+            if cur is not None:
+                out.add(cur)
+            cur = v
+        end, rank = m.end(), r
+    if cur is not None:
+        out.add(cur)
+    return out
+
+
+def _unit_pairs(text: str) -> set[tuple[str, str]]:
+    pairs = {(_norm_number(n), u) for n, u in _UNIT_AMOUNT.findall(text)}
+    return pairs | {(_norm_number(n), "달러") for n in _DOLLAR.findall(text)}
+
+
+def _bare_numbers(text: str) -> set[str]:
+    for pat in (_KR_AMOUNT, _UNIT_AMOUNT, _DOLLAR):
+        text = pat.sub(" ", text)
+    return _numbers(text)
+
+
+def drop_unsourced_numbers(body: str, source: str) -> tuple[str, list[str]]:
+    """자료(digest)에 없는 숫자가 든 문장을 뺀다. (남은 본문, 뺀 문장들).
+
+    숫자를 다시 쓰게 하면서(DIGEST_NUMBER_RULE) 붙인 그물이다. 조·억·만 금액은 값으로, 그 밖의
+    단위는 숫자와 단위를 함께, 단위 없는 숫자는 숫자만 맞춘다. 모델이 반올림하거나 더해서 만든
+    숫자도 걸리는데, 그쪽이 틀린 숫자를 구독자 전원에게 보내는 것보다 낫다. 문장째 빼므로 나머지
+    문장은 그대로 읽힌다.
+    """
+    have_kr, have_pairs, have_nums = _kr_values(source), _unit_pairs(source), _numbers(source)
+    kept, dropped = [], []
+    for s in re.split(r"(?<=다\.)\s+", body):
+        if not s:
+            continue
+        unsourced = (_kr_values(s) - have_kr) or (_unit_pairs(s) - have_pairs) or (_bare_numbers(s) - have_nums)
+        (dropped if unsourced else kept).append(s)
+    return " ".join(kept).strip(), dropped
+
+
 # 출력 상한. 첫 비용 측정(2026-09-10)에서 1,400 이 매번 꽉 찼다 — 모델이 갈래마다 문장을 다섯씩 쓰고
 # 마지막 갈래가 잘려 버려졌다. 프롬프트에 길이 규칙을 적고 상한은 여유 있게 둔다(잘리면 갈래 하나를 잃는다).
 SECTION_MAX_TOKENS = 3000   # 2,200 도 저녁 글에서 한 번 꽉 찼다(09-10). 안 쓰면 비용이 없다
 
 
-def compose_sections(client, model: str, fmt: str, digest: str, mat: Material, max_tokens: int = SECTION_MAX_TOKENS) -> list[Section]:
+def compose_sections(
+    client, model: str, fmt: str, digest: str, mat: Material,
+    max_tokens: int = SECTION_MAX_TOKENS, note: str = "",
+) -> list[Section]:
     """갈래 묶음. **실패하면 빈 목록(fail-soft).** 부르는 쪽이 갈래 없이 나머지를 조립한다.
 
-    검사 넷을 갈래마다 건다: 본문이 '다.'로 끝나는 문장으로만(잘림 방지) · 금지어 · 오타 ·
-    근거 발췌의 채널이 둘 이상. 종목 이름은 자료의 이름표로만 푼다.
+    검사 다섯을 갈래마다 건다: 본문이 '다.'로 끝나는 문장으로만(잘림 방지) · 자료에 없는 숫자 ·
+    금지어 · 오타 · 근거 발췌의 채널이 둘 이상. 종목 이름은 자료의 이름표로만 푼다.
+    `note` 는 과제 끝에 붙는 말이다(REPEAT_NOTE · HOLIDAY_NOTE).
     """
     if client is None:
         return []
-    task = TASKS[fmt].format(n=SECTIONS.get(fmt, "세네"))
+    task = TASKS[fmt].format(n=SECTIONS.get(fmt, "세네")) + note
     try:
         resp = client.messages.create(
             model=model,
             max_tokens=max_tokens,
-            system=bc._LLM_RULES + "\n\n" + DIGEST_FORMAT + "\n\n" + task,
+            system=DIGEST_RULES + "\n\n" + DIGEST_FORMAT + "\n\n" + task,
             messages=[{"role": "user", "content": digest}],
         )
         text = "".join(b.text for b in resp.content if b.type == "text").strip()
@@ -964,7 +1115,7 @@ def compose_sections(client, model: str, fmt: str, digest: str, mat: Material, m
             resp = client.messages.create(
                 model=model,
                 max_tokens=max_tokens,
-                system=bc._LLM_RULES + "\n\n" + DIGEST_FORMAT + "\n\n" + task,
+                system=DIGEST_RULES + "\n\n" + DIGEST_FORMAT + "\n\n" + task,
                 messages=[{"role": "user", "content": digest}],
             )
             text2 = "".join(b.text for b in resp.content if b.type == "text").strip()
@@ -978,14 +1129,16 @@ def compose_sections(client, model: str, fmt: str, digest: str, mat: Material, m
 
 
 def _validate_sections(text: str, fmt: str, digest: str, mat: Material, hi_n: int) -> list[Section]:
-    """모델 출력 하나를 갈래 목록으로. 검사 넷(잘림·금지어·오타·근거 채널)을 갈래마다 건다."""
+    """모델 출력 하나를 갈래 목록으로. 검사 다섯(잘림·숫자·금지어·오타·근거 채널)을 갈래마다 건다."""
     by_n = {e.n: e for e in mat.excerpts}
     name_kr, name_us = mat.name_to_kr(), mat.name_to_us()
     out: list[Section] = []
     parsed = _parse_sections(text)
     any_evidence = any(s.evidence for s in parsed)
     for s in parsed:
-        body = _trim_body(s.body)
+        body, dropped = drop_unsourced_numbers(_trim_body(s.body), digest)
+        for d in dropped:
+            print(f"[LLM] 자료에 없는 숫자가 있어 문장을 뺍니다: {d[:60]}")
         if not body:
             print(f"[LLM] 본문이 비어 갈래를 뺍니다: {s.title[:20]}")
             continue
@@ -1106,7 +1259,13 @@ def store_digest(db, day: date, slot: str, sections: list[Section], model: str) 
         print(f"[안내] 갈래를 저장하지 못했습니다({type(e).__name__}). 표(migration_070)가 있는지 보세요.")
 
 
-def stored_digest_lines(db, days: list[date], R: Render) -> list[str]:
+# [지난 요약] 머리. 일요일 글은 한 주를 되짚는 글이라 하루 글과 같은 이름으로 부르게 하고,
+# 수요일 글은 하루 글을 되풀이하지 않게 한다(REPEAT_NOTE_MIDWEEK).
+PAST_HEAD_SAME_NAMES = "[지난 요약] 그날 글이 세운 갈래 제목입니다. 같은 이야기는 같은 이름으로 부르세요."
+PAST_HEAD_ALREADY_READ = "[지난 요약] 이번 주 아침·저녁 글이 세운 갈래 제목입니다. 독자가 이미 읽었습니다."
+
+
+def stored_digest_lines(db, days: list[date], R: Render, head: str = PAST_HEAD_SAME_NAMES) -> list[str]:
     """지난 아침·저녁 글의 갈래 제목(있으면). 수·일 글의 [지난 요약] 재료."""
     try:
         rows = (
@@ -1133,7 +1292,46 @@ def stored_digest_lines(db, days: list[date], R: Render) -> list[str]:
         titles = " / ".join(s.get("title", "") for s in secs if s.get("title"))
         if titles:
             out.append(f"- {R.date_label(r['date'])} {slot}: {titles}")
-    return ["[지난 요약] 그날 글이 세운 갈래 제목입니다. 같은 이야기는 같은 이름으로 부르세요."] + out if out else []
+    return [head] + out if out else []
+
+
+SLOT_LABEL = {
+    "morning": "개장 전 요약", "evening": "저녁 브리핑", "midweek": "주중 점검",
+    "us_weekend": "이번 주 미장 흐름", "weekly": "한 주 정리",
+}
+PREVIOUS_POSTS = 2   # 아침 글엔 전날 저녁·아침(월요일엔 토·일 글), 저녁 글엔 그날 아침(수요일엔 주중 점검까지)
+
+
+def previous_posts(db, before: datetime, n: int = PREVIOUS_POSTS) -> list[dict]:
+    """이 글 바로 앞에 나간 우리 글 n 편(오래된 것부터). 갈래 저장 표(migration_070)의 created_at 순.
+
+    `before` 는 이 글의 창 끝이다 — 같은 날 손으로 다시 돌려도 자기 자신(이미 저장된 오늘 행)을
+    안 읽고, 지난 날짜로 예시를 만들 때도 그날 독자가 본 글까지만 읽는다.
+    """
+    try:
+        rows = (
+            db.table("telegram_daily_digest")
+            .select("date,slot,sections,created_at")
+            .lt("created_at", before.isoformat())
+            .order("created_at", desc=True)
+            .limit(n)
+            .execute()
+            .data
+        )
+    except Exception as e:  # noqa: BLE001 — 표가 없어도 글은 나가야 한다
+        print(f"[안내] 직전 글을 못 읽었습니다({type(e).__name__}). [직전 글] 없이 만듭니다.")
+        return []
+    return list(reversed(rows))
+
+
+def previous_post_lines(rows: list[dict], R: Render) -> list[str]:
+    """[직전 글] 재료. 갈래마다 제목과 본문 — 제목만 주면 같은 이야기의 어디까지 썼는지 모른다."""
+    out = []
+    for r in rows:
+        secs = r["sections"] if isinstance(r["sections"], list) else json.loads(r["sections"])
+        out.append(f"- {R.date_label(r['date'])} {SLOT_LABEL.get(r['slot'], r['slot'])}")
+        out += [f"  · {x.get('title', '')}: {x.get('body', '')}" for x in secs if x.get("body")]
+    return ["[직전 글] 독자가 이미 읽은 우리 채널 글입니다."] + out if out else []
 
 
 # ─── 다섯 빌더 ────────────────────────────────────────────────────────────────
@@ -1147,22 +1345,22 @@ def build_morning2(db, llm, model: str, R: Render, as_of: date, now: datetime, s
     lo, hi = mat.window
     us_d, us_reasons = load_us_reasons(db, hi.date())
     events = load_events(db, hi.date(), hi.date(), "KR")
+    prev = previous_post_lines(previous_posts(db, hi), R)
 
     digest = "\n".join(
         [f"[창] {span_label(lo, hi)} (KST)"]
+        + (prev + [""] if prev else [])
         + excerpt_lines(mat, "밤사이 발췌")
         + [""]
         + (reason_lines("종목별 이유 · 미국 종목", us_reasons, 8, with_change=False) if us_d == hi.date().isoformat() else [])
     )
-    sections = compose_sections(llm, model, "morning2", digest, mat)
+    note = (REPEAT_NOTE if prev else "") + (HOLIDAY_NOTE if is_krx_holiday(hi.date()) else "")
+    sections = compose_sections(llm, model, "morning2", digest, mat, note=note)
     # 국내 등락은 어제 종가라 개장 전 글에선 낡은 값이다. 미국 종목만 간밤 세션(뉴욕 날짜 =
     # 창이 끝난 날의 전날) 등락을 단다.
     chg_kr, chg_us = _changes_for(db, sections, [], now, None, ("session", hi.date() - timedelta(days=1)))
 
-    lines = [
-        "🌅 <b>개장 전 요약</b>",
-        f"{R.date_label(hi.date().isoformat())} 개장 전 · {span_label(lo, hi, drop_month=hi.month)}",
-    ]
+    lines = morning_head(R, lo, hi)
     if len(sections) < MIN_SECTIONS_TO_SEND:
         print(f"[skip] 갈래가 {len(sections)}개뿐이라(최소 {MIN_SECTIONS_TO_SEND}) 아침 글을 만들지 않습니다.")
         return ""
@@ -1174,6 +1372,10 @@ def build_morning2(db, llm, model: str, R: Render, as_of: date, now: datetime, s
 
 
 def build_evening2(db, llm, model: str, R: Render, as_of: date, now: datetime, store: bool) -> str:
+    if is_krx_holiday(as_of):
+        # 마감이 없는 날이다. 온도도 전 거래일 값 그대로라 보내면 '마감 기준'이 거짓이 된다(머리말 '휴장일').
+        print(f"[skip] {as_of} 은 KRX 휴장일이라 저녁 글을 보내지 않습니다.")
+        return ""
     mat = load_material_with_fallback(db, lambda back: day_window(as_of - timedelta(days=back), now), EXCERPTS_DAY)
     if not mat.excerpts:
         print("[skip] 오늘 메시지가 없어 저녁 글을 만들 수 없습니다.")
@@ -1184,14 +1386,16 @@ def build_evening2(db, llm, model: str, R: Render, as_of: date, now: datetime, s
     faces = load_new_faces(db, day + timedelta(days=1))
     events = load_events(db, day + timedelta(days=1), day + timedelta(days=1), "KR")
     scores = load_scores(db, 1)
+    prev = previous_post_lines(previous_posts(db, hi), R)
 
     digest = "\n".join(
         [f"[창] {span_label(lo, hi)} (KST)"]
+        + (prev + [""] if prev else [])
         + excerpt_lines(mat, "오늘 발췌")
         + [""]
         + (reason_lines("종목별 이유 · 오늘 움직인 종목", kr_reasons, 10, with_change=True) if kr_d == day.isoformat() else [])
     )
-    sections = compose_sections(llm, model, "evening2", digest, mat)
+    sections = compose_sections(llm, model, "evening2", digest, mat, note=REPEAT_NOTE if prev else "")
     if len(sections) < MIN_SECTIONS_TO_SEND:
         print(f"[skip] 갈래가 {len(sections)}개뿐이라(최소 {MIN_SECTIONS_TO_SEND}) 저녁 글을 만들지 않습니다.")
         return ""
@@ -1225,17 +1429,21 @@ def build_midweek(db, llm, model: str, R: Render, as_of: date, now: datetime, st
     kr_d, kr_reasons = load_kr_reasons(db, as_of)
     faces = load_week_new_faces(db, monday, as_of)
     events = load_events(db, as_of + timedelta(days=1), monday + timedelta(days=6), "KR")
-    past = stored_digest_lines(db, [monday + timedelta(days=i) for i in range((as_of - monday).days + 1)], R)
+    past = stored_digest_lines(
+        db, [monday + timedelta(days=i) for i in range((as_of - monday).days + 1)], R, head=PAST_HEAD_ALREADY_READ,
+    )
+    prev = previous_post_lines(previous_posts(db, hi), R)
 
     digest = "\n".join(
         [f"[창] {span_label(lo, hi)} (KST) · {R.date_label(monday.isoformat())} 부터 {R.date_label(as_of.isoformat())} 까지"]
         + past
         + [""]
+        + (prev + [""] if prev else [])
         + excerpt_lines(mat, "이번 주 발췌")
         + [""]
         + (reason_lines("종목별 이유 · 최근 움직인 종목", kr_reasons, 8, with_change=True) if kr_reasons else [])
     )
-    sections = compose_sections(llm, model, "midweek", digest, mat)
+    sections = compose_sections(llm, model, "midweek", digest, mat, note=REPEAT_NOTE_MIDWEEK if (prev or past) else "")
     if len(sections) < MIN_SECTIONS_TO_SEND:
         print(f"[skip] 갈래가 {len(sections)}개뿐이라(최소 {MIN_SECTIONS_TO_SEND}) 주중 글을 만들지 않습니다.")
         return ""
