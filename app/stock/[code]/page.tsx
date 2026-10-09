@@ -211,8 +211,17 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   //    짧은 일정은 아래 '같은 테마 종목'과 한 줄 짝(둘 다 키가 낮다)으로 선다.
   const dividendRich = Boolean(dividend && dividend.dps > 0);
   const richEvents = events.length >= 4;
-  const partner = richEvents ? eventsMod : dividendRich ? dividendMod : null;
   const shortEvents = eventsMod && !richEvents ? eventsMod : null;
+  // 배당이 짝이면 짧은 일정은 그 밑에 쌓는다 — 아래 [일정 한 줄 | 같은 테마 종목] 짝은 일정 칸 아래가 81px 비었다(코스메카코리아, 2026-10-10).
+  //   추이 막대는 키를 받아 늘어나니 쌓은 칸 키에 맞춰지고, 같은 테마 종목은 판 폭 네 단으로 선다.
+  const dividendStack =
+    !richEvents && dividendRich && shortEvents ? (
+      <div className="v2-tm-side">
+        {dividendMod}
+        {shortEvents}
+      </div>
+    ) : null;
+  const partner = richEvents ? eventsMod : (dividendStack ?? (dividendRich ? dividendMod : null));
   // 짝이 없으면(일정 짧음 · 배당 없음) 짧은 일정과 같은 테마 종목을 오른쪽에 쌓아 추이의 짝으로 — 추이가 판 폭 1,144×56 띠가 되고
   // 아래 [일정 한 줄 | 종목] 짝은 일정 줄 위아래가 26px 씩 비었다(2026-10-05 점검, HLB).
   const sideStack =
@@ -327,10 +336,12 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
         {partner ?? sideStack}
       </div>
 
-      {/* 넷째 줄부터 — 배당(추이 짝으로 안 쓴 날, 판 폭) · [짧은 일정 | 같은 테마 종목]. 없는 게 정상인 칸은 안 그린다.
+      {/* 넷째 줄부터 — 배당(추이 짝으로 안 쓴 날, 판 폭) · [짧은 일정 | 같은 테마 종목](일정을 배당 밑에 쌓았으면 같은 테마 종목만 판 폭). 없는 게 정상인 칸은 안 그린다.
           배당이 없는 종목은 배당 모듈을 안 그린다 — '최근 12개월 현금배당이 없습니다' 한 줄짜리 판 폭 모듈이 열 종목 중 여덟에 섰다(2026-10-05 점검). */}
-      {partner !== dividendMod && dividendRich && dividendWide}
-      {sideStack ? null : shortEvents && peersMod ? (
+      {partner !== dividendMod && !dividendStack && dividendRich && dividendWide}
+      {sideStack ? null : dividendStack ? (
+        peersMod
+      ) : shortEvents && peersMod ? (
         <div className="v2-tm-band is-pair">
           {shortEvents}
           {peersMod}

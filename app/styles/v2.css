@@ -2987,6 +2987,8 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
 /* 투자자 상세 옆 칸 — 이번 분기에 한 것(줄 넷)이 남는 높이를 받고, 전량 정리는 제 키대로 아래에 선다. */
 .v2-isd-inv .v2-tm-side > .v2-mod { display: flex; flex-direction: column; }
 .v2-isd-inv .v2-isd-facts-mod { flex: 1; }
+/* 보유가 두어 줄뿐이라 64 로는 옆 '분기에 한 것'(229)에 못 미칠 때 100 까지(page.tsx fewHoldings). */
+.v2-isd-inv.is-few .v2-isd-list > li { max-height: 100px; }
 /* 이번 분기에 한 것 — 갈래 이름 아래 그 종목들(티커). */
 .v2-isd-facts dt em { display: block; margin-top: 2px; font-style: normal; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--t-ink3); font-variant-numeric: tabular-nums; }
 

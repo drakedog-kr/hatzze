@@ -125,6 +125,28 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
     { label: "줄임", list: byKind("trim") },
     { label: "전량 정리", list: d.exited.map((e) => e.ticker) },
   ];
+  // 보유 종목이 처음 펼 줄 수 — 옆 칸이 '분기에 한 것' 하나뿐이면(전량 정리 모듈 없음) 그 칸의 제 키에 맞춘다. 늘 열 줄(533)이면
+  // 갈래마다 종목이 한두 개인 옆 칸(229~302)이 그 키로 늘어 줄마다 위아래가 40~50px 비었다(아이칸 · 2026-10-10 점검).
+  // 줄 키 셈은 실측 — 종목 없는 갈래 40, 있으면 34 + 26.5 × 줄(종목 넷까지 + '외 N'), 머리 42 · 위아래 여백 4 · 가는 선 3.
+  // 보유 종목이 이 화면의 본문이라 여섯 줄 밑으로는 안 줄인다. 열 줄과 48px 안쪽으로 차이 나면 열 줄 그대로(줄이 조금 늘 뿐이다).
+  const factsRowH = (len: number) => {
+    const k = Math.min(len, 4) + (len > 4 ? 1 : 0);
+    return k ? 34 + 26.5 * k : 40;
+  };
+  const sideH = d.priorDate && !exitedMod ? 42 + 4 + 3 + moves.reduce((a, s) => a + factsRowH(s.list.length), 0) : null;
+  const holdN = Math.min(d.holdings.length, ROWS_MAX);
+  const holdLo = (o: number) => 42 + 44 * o + (holdN > o ? 40 : 0);
+  let holdOpen = 10;
+  if (sideH != null && holdLo(Math.min(holdN, 10)) - sideH > 48) {
+    holdOpen = 6;
+    for (let o = Math.min(holdN, 10); o > 6; o--)
+      if (holdLo(o) <= sideH) {
+        holdOpen = o;
+        break;
+      }
+  }
+  // 보유가 몇 줄 안 돼 64 까지 늘어도 옆 칸에 못 미치면 100 까지(v2.css .v2-isd-inv.is-few) — 두 줄 보유 옆이 70px 비었다(2026-10-10).
+  const fewHoldings = holdN > 0 && sideH != null && 42 + 64 * holdN < sideH;
   const kaderaCount = d.holdings.filter((h) => h.inKadera).length;
   /**
    * 직전 분기 대비 신고 합계 증감(%). ⚠️ 수익률이 아니다 — 머리말의 AUM 절을 볼 것.
@@ -212,7 +234,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
           ⭐ 보유 종목이 이 화면의 본문이라 넓은 칸을 준다. 옆 칸은 그 표를 읽는 실마리(무엇이 바뀌었나 · 무엇을 다 팔았나).
           ⛔ '상위 종목 몫'(집중도 막대) 모듈은 걷었다 — 다섯 칸이 보유 종목 표 위 다섯 줄과 같은 숫자였고, 집중도 자체는 첫 줄 띠의
              '상위 5종목 %'가 말한다(한 화면에 같은 숫자 세 번). 옛 시트 둘(보유 · 전량 정리)도 모듈로 옮겼다. */}
-      <div className="v2-tm-band is-hot v2-isd-inv">
+      <div className={`v2-tm-band is-hot v2-isd-inv${fewHoldings ? " is-few" : ""}`}>
         <Module
           title="보유 종목"
           meta={`${d.holdings.length > ROWS_MAX ? `상위 ${ROWS_MAX} / ` : ""}${d.holdings.length}종목`}
@@ -221,7 +243,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
           {d.holdings.length === 0 ? (
             <p className="v2-empty">신고된 보유가 없습니다.</p>
           ) : (
-            <DetailList name="investor_holdings" cols="holding" open={10} items={holdingLines(d.holdings.slice(0, ROWS_MAX), d.usdKrw)} />
+            <DetailList name="investor_holdings" cols="holding" open={holdOpen} items={holdingLines(d.holdings.slice(0, ROWS_MAX), d.usdKrw)} />
           )}
         </Module>
         <div className="v2-tm-side">
