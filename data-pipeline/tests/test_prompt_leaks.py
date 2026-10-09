@@ -29,6 +29,8 @@ def test_catches_stored_leaks():
         "KB금융은 언급이 가장 많았지만 발췌에서 내용은 확인되지 않습니다.",
         "이 기간 발췌 가운데 다른 행사나 상장, 편입 일정을 짚은 글은 눈에 띄지 않았습니다.",
         "삼성SDI와 포스코퓨처엠은 발췌에 이름만 나와 어떤 이야기가 돌았는지 확인되지 않습니다.",
+        "두 문단으로 다시 씁니다. 양자컴퓨팅 테마에서는 아이온큐 이야기가 가장 크게 오갔습니다.",  # 10-09 리허설
+        "다시 정리하겠습니다. 반도체 장비 수주 이야기가 이어졌습니다.",
     ):
         assert prompt_leaks(text), text
 
@@ -44,6 +46,8 @@ def test_leaves_ordinary_sentences():
         "대출력 발전엔진과 SMR 주기기 생산시설 투자 소식",
         "감사원의 부당 지시 확인으로 최대주주 승인 취소 논의",
         "애널리스트 자료에서 ESS 관련 기업으로 언급되었습니다.",
+        "실적 발표 뒤 다시 매수세가 몰렸다는 이야기가 돌았습니다.",
+        "공시 문단을 옮긴 글이 다시 올라왔습니다.",
     ):
         assert not prompt_leaks(text), text
 
@@ -57,6 +61,11 @@ def test_drop_leak_sentences_keeps_rest():
         "미래에셋증권을 두고 스페이스X 평가손실 기사가 돌았습니다.\n\n하나금융지주는 대량보유 공시가 화제였습니다."
     )
     assert drop_leak_sentences("발췌에서 확인되지 않습니다.") == ""
+
+
+def test_retry_echo_sentence_is_dropped_from_brief():
+    brief = "두 문단으로 다시 씁니다. 양자컴퓨팅 테마에서는 아이온큐 이야기가 가장 크게 오갔습니다.\n\n디웨이브퀀텀도 함께 거론됐습니다."
+    assert drop_leak_sentences(brief) == "양자컴퓨팅 테마에서는 아이온큐 이야기가 가장 크게 오갔습니다.\n\n디웨이브퀀텀도 함께 거론됐습니다."
 
 
 def test_leak_free():
