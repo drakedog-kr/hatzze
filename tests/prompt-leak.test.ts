@@ -16,6 +16,7 @@ describe("hasPromptLeak", () => {
     assert.ok(hasPromptLeak(MARVELL));
     assert.ok(hasPromptLeak("AST스페이스모바일 관련 화제는 위성 사업 비교에 쏠려 있어 이를 담담하게 적습니다."));
     assert.ok(hasPromptLeak("KB금융은 언급이 가장 많았지만 발췌에서 내용은 확인되지 않습니다."));
+    assert.ok(hasPromptLeak("두 문단으로 다시 씁니다. 양자컴퓨팅 테마에서는 아이온큐 이야기가 가장 크게 오갔습니다."));
   });
 
   it("비슷한 글자가 있어도 작업 설명이 아닌 문장", () => {
