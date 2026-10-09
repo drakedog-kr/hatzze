@@ -137,6 +137,7 @@ source(digest)를 안 넘기면 [3]만 건너뛴다([1]·[2]는 그대로 본다
 from __future__ import annotations
 
 import re
+import threading
 import unicodedata
 
 # 형태소 분석 점수 하한. 이 아래면서 원문에 없는 어절을 의심한다.
@@ -312,6 +313,9 @@ def _control_chars(text: str) -> list[str]:
 
 _kiwi = None
 _kiwi_failed = False
+# LLM 을 동시에 묻는 스크립트(common/llm_parallel)가 스레드 여럿에서 이 검사를 부른다. Kiwi 를 두 번 만들지 않게,
+# 분석도 한 번에 하나씩. 검사 한 번이 몇 ms 라 LLM 답을 기다리는 시간에 비하면 줄을 서도 티가 안 난다.
+_kiwi_lock = threading.RLock()
 
 
 def _get_kiwi():
@@ -324,13 +328,16 @@ def _get_kiwi():
     global _kiwi, _kiwi_failed
     if _kiwi is not None or _kiwi_failed:
         return _kiwi
-    try:
-        from kiwipiepy import Kiwi
+    with _kiwi_lock:
+        if _kiwi is not None or _kiwi_failed:
+            return _kiwi
+        try:
+            from kiwipiepy import Kiwi
 
-        _kiwi = Kiwi()
-    except Exception as e:  # noqa: BLE001 — 설치·로딩 실패 전부를 같게 다룬다
-        _kiwi_failed = True
-        print(f"[검수] Kiwi 를 못 불러와 비문·어절 검사를 건너뜁니다({type(e).__name__}). 문자 검사만 합니다.")
+            _kiwi = Kiwi()
+        except Exception as e:  # noqa: BLE001 — 설치·로딩 실패 전부를 같게 다룬다
+            _kiwi_failed = True
+            print(f"[검수] Kiwi 를 못 불러와 비문·어절 검사를 건너뜁니다({type(e).__name__}). 문자 검사만 합니다.")
     return _kiwi
 
 
@@ -367,7 +374,8 @@ def _ungrammatical(text: str, kiwi) -> list[str]:
     않는 이유는 모듈 주석에 적었다(모음으로 끝나는 체언에서 유령 용언에 가려진다).
     """
     try:
-        toks = kiwi.tokenize(text)
+        with _kiwi_lock:
+            toks = kiwi.tokenize(text)
     except Exception:  # noqa: BLE001 — 분석 실패는 '판단 불가'라 통과시킨다([3] 과 같다)
         return []
     found: list[str] = []
@@ -494,7 +502,8 @@ def problems(text: str, source: str | None = None, *, slips: bool = True) -> lis
         if _in_source(word, source):
             continue  # 원문에서 온 말이면 점수가 낮아도 오타가 아니다
         try:
-            score = kiwi.analyze(word, top_n=1)[0][1]
+            with _kiwi_lock:
+                score = kiwi.analyze(word, top_n=1)[0][1]
         except Exception:  # noqa: BLE001 — 분석 실패는 '판단 불가'라 통과시킨다
             continue
         floor = _word_floor(word)

@@ -14,6 +14,9 @@
 - **출력이 섞이지 않는다.** work 안에서 print 한 줄은 그 항목 몫으로 모았다가 차례가 오면 한꺼번에 찍는다.
 - **한도에 걸린 날은 하나씩 돈다.** 구독이 막혀 API 로 넘어간 호출(SubscriptionClient.calls_fallback)이 이 묶음에서
   FALLBACK_SERIAL 건에 닿으면 남은 항목은 하나씩 돈다. 한도가 찬 날 동시에 몰아 API 청구를 키우지 않게.
+  처음부터 구독 경로가 아닌 클라이언트(토큰 없음 · 연달아 실패해 구독을 끈 상태)도 하나씩 돈다.
+- 문장 검사(common/text_check)는 Kiwi 를 잠금 아래에서 하나씩 쓴다 — 스레드 여럿이 같은 분석기를 부르므로.
+- 호출부가 도중에 빠져나가면 아직 시작 안 한 항목은 묻지 않는다.
 - **끄는 스위치.** 동시 개수는 환경 변수 LLM_WORKERS(기본 DEFAULT_WORKERS). 1 이면 예전처럼 차례대로 돈다.
 - work 가 던진 예외는 그 항목의 결과로 돌려준다. 호출부가 예전처럼 '실패' 줄을 찍고 다음 항목으로 간다.
 """
@@ -73,6 +76,10 @@ def ordered(
     """(항목, 결과 또는 예외)를 items 차례대로 낸다. 앞 항목이 끝나는 대로 하나씩 나오므로 호출부는 받는 대로 저장한다."""
     items = list(items)
     n = workers or workers_from_env()
+    if client is not None and (not hasattr(client, "calls_fallback") or getattr(client, "enabled", True) is False):
+        # 구독 경로가 아닌 클라이언트(토큰이 없어 처음부터 API) · 연달아 실패해 구독을 끈 클라이언트는 하나씩 —
+        # 동시에 몰면 API 청구와 요청 한도(429)만 키운다. 'API 폴백이 FALLBACK_SERIAL 건이면 하나씩'과 같은 취지.
+        n = 1
     if n <= 1 or len(items) <= 1:
         for it in items:
             try:
@@ -109,14 +116,17 @@ def ordered(
 
     real = sys.stdout
     sys.stdout = _ThreadStdout(real)
+    ex = ThreadPoolExecutor(max_workers=n)
     try:
-        with ThreadPoolExecutor(max_workers=n) as ex:
-            futs = [ex.submit(run, it) for it in items]
-            for it, fut in zip(items, futs):
-                res, out = fut.result()
-                if out:
-                    real.write(out)
-                    real.flush()
-                yield it, res
+        futs = [ex.submit(run, it) for it in items]
+        for it, fut in zip(items, futs):
+            res, out = fut.result()
+            if out:
+                real.write(out)
+                real.flush()
+            yield it, res
     finally:
+        # 호출부가 도중에 빠져나가면(break · 예외) 아직 시작 안 한 항목은 묻지 않는다. 돌고 있는 것만 끝까지 기다린다.
+        # `with` 블록으로 두면 블록을 나가며 남은 항목까지 다 기다린 뒤에야 취소가 돈다.
+        ex.shutdown(wait=True, cancel_futures=True)
         sys.stdout = real

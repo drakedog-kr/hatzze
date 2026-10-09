@@ -146,3 +146,72 @@ def test_theme_writers_same_serial_and_parallel(capsys):
 def test_empty_and_single(workers):
     assert list(ordered(lambda x: x, [], workers=workers)) == []
     assert list(ordered(lambda x: x + 1, [1], workers=workers)) == [(1, 2)]
+
+
+def _peak_runner():
+    state = {"running": 0, "peak": 0}
+    lock = threading.Lock()
+
+    def work(i):
+        with lock:
+            state["running"] += 1
+            state["peak"] = max(state["peak"], state["running"])
+        time.sleep(0.01)
+        with lock:
+            state["running"] -= 1
+        return i
+
+    return work, state
+
+
+def test_non_subscription_client_runs_one_at_a_time():
+    class _ApiOnly:  # 토큰이 없어 처음부터 API 로 가는 클라이언트 — calls_fallback 이 없다
+        pass
+
+    work, state = _peak_runner()
+    assert [r for _i, r in ordered(work, range(8), client=_ApiOnly(), workers=6)] == list(range(8))
+    assert state["peak"] == 1
+
+    off = _FakeClient()
+    off.enabled = False  # 연달아 실패해 구독 경로를 끈 상태
+    work, state = _peak_runner()
+    list(ordered(work, range(8), client=off, workers=6))
+    assert state["peak"] == 1
+
+    on = _FakeClient()
+    work, state = _peak_runner()
+    list(ordered(work, range(12), client=on, workers=6))
+    assert state["peak"] > 1
+
+
+def test_early_break_does_not_ask_the_rest():
+    asked = []
+    lock = threading.Lock()
+
+    def work(i):
+        with lock:
+            asked.append(i)
+        time.sleep(0.05)
+        return i
+
+    for _i, _r in ordered(work, range(30), workers=2):
+        break
+    time.sleep(0.2)
+    assert len(asked) <= 4  # 돌고 있던 것만 끝까지 — 남은 26개 이상은 묻지 않는다
+
+
+def test_text_check_same_from_many_threads():
+    pytest.importorskip("kiwipiepy")
+    from common.text_check import problems
+
+    texts = [
+        "광통신 부품 수주 기대감이 높아졌습니다",
+        "이후 낙아들기 시작했습니다",
+        "반도체 장비 공급 계약 소식이 화제였습니다. 관련 공시도 함께 돌았습니다.",
+        "삼성전자 잠정 실적 발표를 두고 이야기가 이어졌습니다",
+        "고대역폭메모리 수요 이야기가 가장 많았습니다",
+    ] * 8
+    src = "광통신 부품 수주 반도체 장비 공급 계약 삼성전자 잠정 실적"
+    serial = [problems(t, src) for t in texts]
+    parallel = [r for _t, r in ordered(lambda t: problems(t, src), texts, workers=8)]
+    assert parallel == serial
