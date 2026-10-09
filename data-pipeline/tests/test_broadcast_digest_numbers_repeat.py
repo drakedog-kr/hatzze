@@ -26,16 +26,24 @@ R = BD.Render(
 
 
 def test_v1_rules_keep_the_mention_share_block():
-    assert BC._LLM_RULES == BC._LLM_RULES_HEAD + BC._MENTION_SHARE_RULE + BC._LLM_RULES_TAIL
+    assert BC._LLM_RULES == BC._LLM_RULES_HEAD + BC._MENTION_SHARE_RULE + BC._LLM_RULES_TAIL + BC._EXPRESSION_RULE
     assert "언급 점유율" in BC._LLM_RULES
 
 
 def test_v2_rules_swap_the_mention_share_block_for_numbers():
     assert "언급 점유율" not in BD.DIGEST_RULES
     assert "[숫자]" in BD.DIGEST_RULES
-    # 머리(말투·절대 금지)와 꼬리(증권사 의견·표현)는 1판과 같다.
+    # 머리(말투·절대 금지)와 꼬리(증권사 의견·형식·문단 길이)는 1판과 같다.
     assert BD.DIGEST_RULES.startswith(BC._LLM_RULES_HEAD)
-    assert BD.DIGEST_RULES.endswith(BC._LLM_RULES_TAIL)
+    assert BC._LLM_RULES_TAIL in BD.DIGEST_RULES
+
+
+def test_v2_rules_swap_the_expression_block_to_drop_who_reported():
+    # 1판은 "언론 보도는 매체를 주어로", 2판은 누가 보도했는지 안 적는다(2026-10-09).
+    assert "매체를 주어로" in BC._LLM_RULES
+    assert "매체를 주어로" not in BD.DIGEST_RULES
+    assert BD.DIGEST_RULES.endswith(BD.DIGEST_EXPRESSION_RULE)
+    assert "누가 보도했는지" in BD.DIGEST_RULES
     assert "숫자는 화면이 따로 찍으니 문장에 넣지 마세요" not in BD.DIGEST_FORMAT
 
 
