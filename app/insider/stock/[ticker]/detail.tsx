@@ -116,21 +116,21 @@ type PairMod = { key: string; render: (open?: number, stack?: boolean) => React.
 /** 띠 사이 · 쌓은 모듈 사이 간격(v2.css .v2-tm-band · .v2-isd-stack). */
 const GAP = 12;
 
-/** 애널리스트 칸 꼴 — 의견 줄 수(0 이면 '최근 의견 N건 보기' 한 줄로 접힘) · 요약 두 칸을 위아래로 쌓는가 · 띠를 3:2 로 나누는가. */
-type AnalystShape = { k: number; stack: boolean; split: boolean };
+/** 애널리스트 칸 꼴 — 의견 줄 수(0 이면 '최근 의견 N건 보기' 한 줄로 접힘) · 요약 두 칸을 위아래로 쌓는가 · 옆 목록 줄을 100 까지 늘이는가. */
+type AnalystShape = { k: number; stack: boolean; tall: boolean };
 
 /**
  * 애널리스트 칸의 키. 머리 42 · 요약 · 의견(머리 37 · 줄 56 · '더 보기' 40, 접으면 한 줄 41). 의견이 없으면 요약뿐.
  * 요약 두 칸은 나란히 152, 위아래로 쌓이면 268 이다(2026-10-10 실측). 칸 폭 564 아래에선 저절로 쌓인다 — 1,440 의 칸(574)은 나란하고
- * 1,280 의 칸(496)은 쌓인다. 띠를 3:2 로 나누면 1,280 에서도 애널리스트 칸이 595 라 나란하다.
+ * 1,280 의 칸(496)은 쌓인다. ⛔ 띠를 3:2 로 나눠 1,280 에서도 나란히 세웠다가 걷었다 — 짝은 모든 화면이 5:5 다(2026-10-10).
  */
 const analystH = (an: PairMod, s: AnalystShape, wide: boolean) => {
-  const sum = s.stack || !(wide || s.split) ? 268 : 152;
+  const sum = s.stack || !wide ? 268 : 152;
   const ops = !an.acts ? 0 : s.k === 0 ? 41 : 37 + 56 * s.k + (an.acts > s.k ? 40 : 0);
   return 42 + sum + ops;
 };
 
-/** 목록이 o 줄을 펼 때 설 수 있는 키 — 줄은 44 에서 80 까지 늘어난다(애널리스트 칸 띠는 is-fill, 3:2 로 나눈 띠는 100 까지 · v2.css). */
+/** 목록이 o 줄을 펼 때 설 수 있는 키 — 줄은 44 에서 80 까지 늘어난다(애널리스트 칸 띠는 is-fill, is-tall 띠는 100 까지 · v2.css). */
 const listRange = (m: PairMod, o: number, cap = 80): [number, number] => {
   const more = m.n! > o ? 40 : 0;
   return [42 + 44 * o + more, 42 + cap * o + more];
@@ -139,8 +139,7 @@ const listRange = (m: PairMod, o: number, cap = 80): [number, number] => {
 /**
  * 애널리스트 칸 옆 칸에 목록(하나 또는 위아래로 여럿)을 둘 때 — 목록마다 펼 줄 수와 애널리스트 칸 꼴.
  * 옆 칸이 늘고 줄 수 있는 범위에 애널리스트 칸 키가 들면 빈 곳이 없다. 1,440 · 1,280 두 폭으로 재서 빈 곳(넓은 폭 두 배)이 가장 적은 것,
- * 기본 꼴(요약 나란히 · 의견 펴기 · 다섯 줄 · 1:1 띠)에서 벗어나면 벌점을 더한다 — 의견 접기 150 · 요약 쌓기 40 · 3:2 띠 30 · 다섯 줄 넘는 의견 줄마다 4.
- * 3:2 띠에 벌점이 없으면 몇 px 때문에 48종목이 3:2 로 섰다 — 종목마다 칸 비율이 갈린다.
+ * 기본 꼴(요약 나란히 · 의견 펴기 · 다섯 줄 · 줄 80 까지)에서 벗어나면 벌점을 더한다 — 의견 접기 150 · 요약 쌓기 40 · 줄 100 까지 30 · 다섯 줄 넘는 의견 줄마다 4.
  * 의견 접기에 벌점이 없으면 몇 px 더 맞추려고 35종목(PLTR · LLY …)이 의견을 접었다 — 애널리스트 칸을 맨 앞에 둔 까닭이 의견이다.
  * 점수(빈 곳 + 벌점)가 같으면 줄을 더 많이 펴는 것. 목록은 셋(또는 그보다 적으면 전부)부터
  * 하나면 10 · 여럿이면 8 까지. 의견은 여덟 줄(원천이 주는 최근 여덟 건)까지 편다 — 목록 셋을 쌓으면 셋씩만 펴도 626px 라 다섯 줄(551)로는
@@ -148,14 +147,14 @@ const listRange = (m: PairMod, o: number, cap = 80): [number, number] => {
  * - 의견 접기(k 0) — 옆이 두어 줄뿐인 목록 하나면 한 줄을 펴도 130px 남짓 비었다(CCL · NOK · STLA · ALB).
  * - 요약 쌓기 — 의견이 하나도 없는 애널리스트 칸(194)은 옆에 쌓은 목록(312)보다 짧아 아래가 118px 비었다(WOLF).
  */
-function fitBeside(an: PairMod, lists: PairMod[], split = false) {
+function fitBeside(an: PairMod, lists: PairMod[], tall = false) {
   const ks = an.acts ? Array.from({ length: Math.min(an.acts, 8) + 1 }, (_, i) => i) : [0];
   const choices = lists.map((m) => {
     const lo = Math.min(m.n!, 3);
     const hi = Math.min(m.n!, lists.length === 1 ? 10 : 8);
     return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
   });
-  let best = { score: Infinity, size: -1, shape: { k: 0, stack: false, split } as AnalystShape, opens: [] as number[] };
+  let best = { score: Infinity, size: -1, shape: { k: 0, stack: false, tall } as AnalystShape, opens: [] as number[] };
   const walk = (opens: number[]) => {
     if (opens.length < lists.length) {
       for (const o of choices[opens.length]) walk([...opens, o]);
@@ -164,15 +163,15 @@ function fitBeside(an: PairMod, lists: PairMod[], split = false) {
     let lo = GAP * (lists.length - 1);
     let hi = lo;
     lists.forEach((m, i) => {
-      const [a, b] = listRange(m, opens[i], split ? 100 : 80);
+      const [a, b] = listRange(m, opens[i], tall ? 100 : 80);
       lo += a;
       hi += b;
     });
     for (const k of ks)
       for (const stack of [false, true]) {
-        const shape = { k, stack, split };
+        const shape = { k, stack, tall };
         const off = (wide: boolean) => Math.max(0, lo - analystH(an, shape, wide), analystH(an, shape, wide) - hi);
-        const score = 2 * off(true) + off(false) + (stack ? 40 : 0) + (k === 0 && an.acts ? 150 : 0) + 4 * Math.max(0, k - 5) + (split ? 30 : 0);
+        const score = 2 * off(true) + off(false) + (stack ? 40 : 0) + (k === 0 && an.acts ? 150 : 0) + 4 * Math.max(0, k - 5) + (tall ? 30 : 0);
         const size = k + opens.reduce((a, b) => a + b, 0);
         if (score < best.score || (score === best.score && size > best.size)) best = { score, size, shape, opens };
       }
@@ -207,15 +206,15 @@ function listPairMiss(a: PairMod, b: PairMod): number {
   return Math.max(0, Math.max(ra[0], rb[0]) - Math.min(ra[1], rb[1]));
 }
 
-/** 띠 하나 — 칸 하나(판 폭) 또는 둘. 칸에는 모듈 하나, 또는 위아래로 쌓은 목록 여럿(애널리스트 칸 옆). split 은 3:2 로 나눈 띠. */
-type Band = { cells: PairMod[][]; split?: boolean };
+/** 띠 하나 — 칸 하나(판 폭) 또는 둘. 칸에는 모듈 하나, 또는 위아래로 쌓은 목록 여럿(애널리스트 칸 옆). tall 은 목록 줄을 100 까지 늘이는 띠. */
+type Band = { cells: PairMod[][]; tall?: boolean };
 
 /**
  * 모듈을 띠로 — 읽는 순서가 늘 애널리스트 → 거물 → 임원 → 의원이다(2026-10-10 지적). 키가 비슷한 것끼리 아무렇게나 짝지었을 땐
  * 종목마다 순서가 달랐다 — [거물 | 임원] 다음 줄에 [애널리스트 | 의원]이 섰다.
  * - 애널리스트 칸은 왼쪽. 옆 칸에는 거물을 두고 [임원 | 의원]을 다음 줄에 — 거물이 한두 줄뿐이라 옆이 비면(거물 1명 옆 222px, 2026-10-10 실측)
  *   거물 · 임원 · 의원을 옆 칸에 위아래로 쌓는다. 목록 둘이면 늘 쌓는다 — 남은 하나가 판 폭으로 혼자 서면 이름과 금액이 1,000px 떨어진다(2026-10-04 점검).
- * - 옆 칸이 짧으면 띠를 3:2 로 나눈다 — 1,280 에서도 요약 두 칸이 나란해 애널리스트 칸이 116px 덜 길다.
+ * - 옆 칸 목록이 짧으면 줄을 100 까지 늘인다(is-tall). 짝은 늘 5:5 다.
  * - 애널리스트 칸이 없으면 목록끼리 이웃한 것을 둘씩. 셋이면 [앞 둘 | 하나] · [하나 | 뒤 둘] 중 키가 비슷한 짝 쪽으로.
  */
 function layout(ms: PairMod[]): { bands: Band[]; open: Map<string, number>; stacked: Set<string> } {
@@ -236,12 +235,12 @@ function layout(ms: PairMod[]): { bands: Band[]; open: Map<string, number>; stac
   };
   if (!an) return { bands: pairs(lists), open, stacked };
   if (!lists.length) return { bands: [{ cells: [[an]] }], open, stacked };
-  // 옆 칸이 짧아 빈 곳이 남으면 띠를 3:2 로 나눠 본다 — 1,280 에서 요약 두 칸이 나란해 애널리스트 칸이 116px 덜 길다(NVS · CEG · NVO 35~86px).
+  // 옆 칸이 짧아 빈 곳이 남으면 목록 줄을 100 까지 늘여 본다 — 의견을 접은 애널리스트 칸(240)에 80 짜리 두 줄(202)이 못 미쳤다(CCL).
   const beside = (xs: PairMod[]) => {
-    const even = { ...fitBeside(an, xs), xs };
-    if (even.score === 0) return even;
-    const split = { ...fitBeside(an, xs, true), xs };
-    return split.score < even.score ? split : even;
+    const base = { ...fitBeside(an, xs), xs };
+    if (base.score === 0) return base;
+    const tall = { ...fitBeside(an, xs, true), xs };
+    return tall.score < base.score ? tall : base;
   };
   // 옆 칸에 거물 하나만 두는 것과 남은 목록을 다 쌓는 것 — 빈 곳이 적은 쪽. 목록 둘이면 쌓는 것뿐이다.
   // 거물 하나만 둘 때는 다음 줄 [임원 | 의원] 짝의 빈 곳도 센다 — 한 줄짜리 의원 옆에 셋은 펴는 임원이 서면 124px 비었다(CVS, 2026-10-10).
@@ -252,7 +251,7 @@ function layout(ms: PairMod[]): { bands: Band[]; open: Map<string, number>; stac
   open.set(an.key, pick.shape.k);
   if (pick.shape.stack) stacked.add(an.key);
   pick.xs.forEach((m, i) => open.set(m.key, pick.opens[i]));
-  return { bands: [{ cells: [[an], pick.xs], split: pick.shape.split }, ...pairs(lists.slice(pick.xs.length))], open, stacked };
+  return { bands: [{ cells: [[an], pick.xs], tall: pick.shape.tall }, ...pairs(lists.slice(pick.xs.length))], open, stacked };
 }
 
 /**
@@ -620,11 +619,11 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
             ] as (PairMod | null)[]
           ).filter((m): m is PairMod => m != null),
         );
-        return bands.map(({ cells, split }) => {
+        return bands.map(({ cells, tall }) => {
           const mods = cells.flat();
           // 애널리스트 칸 띠의 목록은 줄을 80 까지 늘린다(v2.css .is-fill) — 64 로는 TSLA 거물 여덟 줄 아래가 117px 비었다.
           const fill = mods.some((m) => m.acts != null) && mods.some((m) => m.n != null);
-          const cls = cells.length === 2 ? `v2-tm-band is-pair${fill ? " is-fill" : ""}${split ? " is-split" : ""}` : "v2-tm-band is-hot is-solo";
+          const cls = cells.length === 2 ? `v2-tm-band is-pair${fill ? " is-fill" : ""}${tall ? " is-tall" : ""}` : "v2-tm-band is-hot is-solo";
           return (
             <div key={mods.map((m) => m.key).join("-")} className={cls}>
               {cells.map((c) =>

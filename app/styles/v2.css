@@ -2897,12 +2897,9 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-isd-stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .v2-isd-stack > div { display: flex; flex-direction: column; flex-basis: auto; }
 .v2-isd-stack > div > .v2-mod { flex: 1; }
-/* 옆 칸 목록이 짧은 짝 — 3:2 로 나눠 1,280 에서도 애널리스트 요약 두 칸이 나란하게(칸 595, 요약이 접히는 폭 564). 폰은 한 줄기 그대로. */
-@container kd (min-width: 680px) {
-  .v2-tm-band.is-pair.is-split { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
-}
-/* 그 짝의 목록 줄은 100 까지 — 의견을 한 줄로 접은 애널리스트 칸(240)에 80 짜리 두 줄(202)이 못 미쳐 38px 비었다(CCL). */
-.v2-tm-band.is-split .v2-isd-list > li { max-height: 100px; }
+/* 옆 칸 목록이 두어 줄뿐인 짝은 줄을 100 까지(detail.tsx layout is-tall) — 의견을 한 줄로 접은 애널리스트 칸(240)에 80 짜리 두 줄(202)이 못 미쳐 38px 비었다(CCL).
+   ⛔ 띠를 3:2 로 나눠 맞췄다가 걷었다 — 짝은 모든 화면이 5:5 다(2026-10-10). */
+.v2-tm-band.is-tall .v2-isd-list > li { max-height: 100px; }
 .v2-isd-list > li + li { border-top: 1px solid var(--t-line); }
 .v2-isd-row {
   flex: 1;
