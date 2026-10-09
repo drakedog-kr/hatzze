@@ -1358,11 +1358,12 @@ export function ConsensusBody({
     //    다른 목록과 같은 모양이 된다(안 그러면 버튼이 그냥 떠 있는 글자로 보인다).
     <div style={{ display: "flex", flexDirection: "column" }}>
       {/* ⭐ **두 값을 나란히 세운다.** 등급과 목표가는 이 카드가 답하는 질문 둘이라 위아래로
-          쌓으면 카드가 길기만 하고 무엇이 요점인지 안 보인다. 좁아지면 저절로 접힌다. */}
+          쌓으면 카드가 길기만 하고 무엇이 요점인지 안 보인다. 좁아지면 저절로 접힌다.
+          칸 기준 폭 220 — 260 이면 1,280(칸 496)에서 두 칸이 위아래로 접혀 모듈이 116px 길어졌다(2026-10-10). */}
       {/* 좌우 14 — v2 모듈 안쪽 여백(제목 · 다른 모듈 줄과 한 세로줄). 옛 시트의 22 가 남아 8px 더 깊었다(2026-10-04 점검). */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "14px 14px 16px" }}>
         {total > 0 && (
-          <div style={{ flex: stack ? "1 1 100%" : "1 1 260px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
+          <div style={{ flex: stack ? "1 1 100%" : "1 1 220px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
             <span style={{ ...ROW.sub }}>증권가 종합</span>
             <span style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
               <strong style={{ fontSize: "var(--fs-22)", fontWeight: 700, color: C.ink, letterSpacing: "-.02em" }}>
@@ -1395,11 +1396,12 @@ export function ConsensusBody({
         )}
 
         {c.targetAvg != null && (
-          <div style={{ flex: stack ? "1 1 100%" : "1 1 260px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
+          <div className="v2-cons-target" style={{ flex: stack ? "1 1 100%" : "1 1 220px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
             <span style={{ ...ROW.sub }}>
               1년 목표가 평균{c.targetCount != null ? ` · 애널리스트 ${c.targetCount}명` : ""}
             </span>
-            <span style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+            {/* 줄을 넘길 수 있게 — 원화로 보면 값이 길어 좁은 칸(225)에서 옆 칸으로 넘쳤다. */}
+            <span style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: 7 }}>
               <strong style={{ fontFamily: MONO, fontSize: "var(--fs-22)", fontWeight: 700, color: C.ink, letterSpacing: "-.02em" }}>
                 <ExactMoney usd={c.targetAvg} rate={rate} />
               </strong>
@@ -1426,7 +1428,8 @@ export function ConsensusBody({
                 </span>
                 {/* ⚠️ 숫자만 두면 그게 목표가의 양끝인지 축 눈금인지 안 보인다 — 바로 위가
                     막대라 특히 그렇다. 숫자 아래에 무엇인지 적는다. */}
-                <span style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                {/* 칸이 250 보다 좁으면 '현재가'를 둘째 줄로(v2.css .v2-cons-now) — 셋이 한 줄에 서면 '최저 목표가'가 두 줄로 꺾여 석 줄이 됐다. */}
+                <span className="v2-cons-range" style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                   <span style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                     <span style={{ ...ROW.sub, fontFamily: MONO, color: C.ink }}>
                       <ExactMoney usd={c.targetLow} rate={rate} />
@@ -1435,7 +1438,7 @@ export function ConsensusBody({
                   </span>
                   {/* 막대 위 점이 무엇인지 — 바로 위 큰 숫자가 '목표가 평균'이라 점도 평균 자리로 읽혔다(2026-10-04 점검). */}
                   {pos != null && (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, alignSelf: "flex-end", fontSize: "var(--fs-12)", color: C.muted }}>
+                    <span className="v2-cons-now" style={{ display: "inline-flex", alignItems: "center", gap: 5, alignSelf: "flex-end", fontSize: "var(--fs-12)", color: C.muted }}>
                       <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-blue)", flexShrink: 0 }} />
                       {/* 값을 붙인다 — 구간 밖이면 점만으로는 어디인지 안 읽힌다. */}
                       현재가 {price != null && <ExactMoney usd={price} rate={rate} />}
