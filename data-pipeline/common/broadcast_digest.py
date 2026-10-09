@@ -588,18 +588,25 @@ def load_events(db, lo: date, hi: date, market: str) -> list[dict]:
     return out
 
 
-def event_block(R: Render, title: str, events: list[dict], limit: int) -> list[str]:
+def event_block(R: Render, title: str, events: list[dict], limit: int, show_date: bool = True) -> list[str]:
     """📌 일정 블록. 둘 이상 채널이 짚은 것만 싣고, 하나도 없을 때만 한 채널짜리를 둘까지.
 
     한 채널짜리로 칸을 채우면 홈쇼핑 편성·단체행동 같은 줄이 올라온다(첫 시험 실측).
     빈 칸을 채우는 것보다 블록이 짧은 게 낫다.
+
+    `show_date=False` 는 하루치 목록('오늘 일정'·'내일 일정')이다. 블록 이름이 날짜를 말하므로
+    줄마다 같은 날짜를 되풀이하지 않는다(2026-10-09). 그때는 줄 머리의 식별자인 종목 이름을
+    굵게 세운다 — '새로 회자된 종목' 블록과 같은 규칙.
     """
     strong = [e for e in events if e["channels"] >= 2]
     weak = [e for e in events if e["channels"] < 2]
     picked = strong[:limit] if strong else weak[:2]
     if not picked:
         return []
-    lines = [f"<b>{R.date_label(e['date'])[:-3]}</b> {esc(e['name'])} · {esc(e['event'])}" for e in picked]
+    if show_date:
+        lines = [f"<b>{R.date_label(e['date'])[:-3]}</b> {esc(e['name'])} · {esc(e['event'])}" for e in picked]
+    else:
+        lines = [f"<b>{esc(e['name'])}</b> · {esc(e['event'])}" for e in picked]
     return ["", f"📌 <b>{title}</b>", R.quote(*lines)]
 
 
@@ -854,10 +861,11 @@ DIGEST_RULES = bc._LLM_RULES_HEAD + DIGEST_NUMBER_RULE + bc._LLM_RULES_TAIL
 # 같은 재료 Haiku 533). '무슨 이야기가 어떻게 돌았고'도 같은 까닭으로 '무슨 일이 있었고'로.
 DIGEST_FORMAT = """\
 [출력 형식 — 반드시 이 모양으로]
-갈래마다 아래 네 줄 묶음으로 씁니다. 묶음 사이는 빈 줄 하나. 다른 말은 쓰지 마세요.
+갈래마다 아래 묶음으로 씁니다. 묶음 사이는 빈 줄 하나. 다른 말은 쓰지 마세요.
 
 ## 갈래 제목
-문장 세 개(재료가 모자라면 두 개). 무슨 일이 있었고 어떤 종목이 왜 엮였는지.
+본문 문장 세 개(재료가 모자라면 두 개). 무슨 일이 있었고 어떤 종목이 왜 엮였는지.
+소식이 바뀌면 줄을 바꿔 다음 줄에 씁니다. 한 소식에 딸린 문장(추정치와 기대치처럼)은 같은 줄에 둡니다.
 종목: 자료에 적힌 종목 이름을 쉼표로, 그 갈래와 가장 관련 깊은 순으로 넷까지. 없으면 '없음'
 근거: 이 갈래의 바탕이 된 발췌 번호를 쉼표로(둘 이상. 서로 다른 채널이어야 합니다)
 
@@ -980,7 +988,8 @@ def _parse_sections(text: str) -> list[Section]:
         sentence = title.endswith(("다.", "다", "요.")) or len(title) > 44
         if sentence:
             title = title.rstrip(". ")
-        body = " ".join(body_lines).strip()
+        # 줄을 살린다 — 모델이 소식마다 줄을 바꾸고(DIGEST_FORMAT), 그 줄이 채널 글의 문단이 된다.
+        body = "\n".join(body_lines).strip()
         if sentence and not body:
             body, title = title + ".", ""
         names = [] if stocks in ("", "없음") else [s.strip(" .") for s in re.split(r"[,、·]", stocks) if s.strip(" .")]
@@ -990,9 +999,21 @@ def _parse_sections(text: str) -> list[Section]:
 
 
 def _trim_body(body: str) -> str:
-    sentences = [s for s in re.split(r"(?<=다\.)\s+", body) if s]
-    kept = [s for s in sentences if s.rstrip().endswith(("다.", "다!", "다?"))]
-    return " ".join(kept[:BODY_MAX_SENTENCES]).strip()
+    """'다.'로 끝나는 문장만 BODY_MAX_SENTENCES 개까지. 줄(소식 하나 = 문단 하나)은 그대로 둔다.
+
+    예전엔 줄을 한데 이어 붙인 뒤 render 가 120자마다 다시 잘랐다. 문장이 짧으면 짝인 문장
+    ("추정치는 … 기대치는 …")이 서로 다른 문단으로 갈라졌다(2026-10-09 시험).
+    """
+    lines, n = [], 0
+    for line in body.split("\n"):
+        sentences = [s for s in re.split(r"(?<=다\.)\s+", line.strip()) if s]
+        kept = [s for s in sentences if s.rstrip().endswith(("다.", "다!", "다?"))][: BODY_MAX_SENTENCES - n]
+        if kept:
+            lines.append(" ".join(kept))
+            n += len(kept)
+        if n >= BODY_MAX_SENTENCES:
+            break
+    return "\n".join(lines).strip()
 
 
 _NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
@@ -1056,13 +1077,17 @@ def drop_unsourced_numbers(body: str, source: str) -> tuple[str, list[str]]:
     문장은 그대로 읽힌다.
     """
     have_kr, have_pairs, have_nums = _kr_values(source), _unit_pairs(source), _numbers(source)
-    kept, dropped = [], []
-    for s in re.split(r"(?<=다\.)\s+", body):
-        if not s:
-            continue
-        unsourced = (_kr_values(s) - have_kr) or (_unit_pairs(s) - have_pairs) or (_bare_numbers(s) - have_nums)
-        (dropped if unsourced else kept).append(s)
-    return " ".join(kept).strip(), dropped
+    lines, dropped = [], []
+    for line in body.split("\n"):
+        kept = []
+        for s in re.split(r"(?<=다\.)\s+", line.strip()):
+            if not s:
+                continue
+            unsourced = (_kr_values(s) - have_kr) or (_unit_pairs(s) - have_pairs) or (_bare_numbers(s) - have_nums)
+            (dropped if unsourced else kept).append(s)
+        if kept:
+            lines.append(" ".join(kept))
+    return "\n".join(lines).strip(), dropped
 
 
 # 출력 상한. 첫 비용 측정(2026-09-10)에서 1,400 이 매번 꽉 찼다 — 모델이 갈래마다 문장을 다섯씩 쓰고
@@ -1330,7 +1355,7 @@ def previous_post_lines(rows: list[dict], R: Render) -> list[str]:
     for r in rows:
         secs = r["sections"] if isinstance(r["sections"], list) else json.loads(r["sections"])
         out.append(f"- {R.date_label(r['date'])} {SLOT_LABEL.get(r['slot'], r['slot'])}")
-        out += [f"  · {x.get('title', '')}: {x.get('body', '')}" for x in secs if x.get("body")]
+        out += [f"  · {x.get('title', '')}: {' '.join(x['body'].split())}" for x in secs if x.get("body")]
     return ["[직전 글] 독자가 이미 읽은 우리 채널 글입니다."] + out if out else []
 
 
@@ -1365,7 +1390,7 @@ def build_morning2(db, llm, model: str, R: Render, as_of: date, now: datetime, s
         print(f"[skip] 갈래가 {len(sections)}개뿐이라(최소 {MIN_SECTIONS_TO_SEND}) 아침 글을 만들지 않습니다.")
         return ""
     lines += render_sections(R, sections, mat, chg_kr, chg_us)
-    optional = [b for b in [event_block(R, "오늘 일정", events, EVENT_LINES_DAY)] if b]
+    optional = [b for b in [event_block(R, "오늘 일정", events, EVENT_LINES_DAY, show_date=False)] if b]
     if store:
         store_digest(db, hi.date(), "morning", sections, model)
     return _fit(lines, optional, R.cta_link(*CTA["morning2"]))
@@ -1411,7 +1436,7 @@ def build_evening2(db, llm, model: str, R: Render, as_of: date, now: datetime, s
     optional = [
         b for b in [
             new_faces_block(R, "오늘 처음 회자된 종목", faces),
-            event_block(R, "내일 일정", events, EVENT_LINES_DAY),
+            event_block(R, "내일 일정", events, EVENT_LINES_DAY, show_date=False),
         ] if b
     ]
     if store:

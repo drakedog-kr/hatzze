@@ -226,3 +226,68 @@ def test_compose_puts_the_note_and_v2_rules_into_the_system_prompt():
     BD.compose_sections(Client, "m", "evening2", "자료", None, note=BD.REPEAT_NOTE)
     assert got["system"].startswith(BD.DIGEST_RULES)
     assert got["system"].endswith(BD.REPEAT_NOTE)
+
+
+# ── 소식 하나 = 문단 하나 · 하루치 일정은 날짜 없이 ─────────────────────────────
+
+import send_telegram_broadcast as S  # noqa: E402 — 실제 문단 나누기·날짜 표기로 본다
+
+R_REAL = BD.Render(
+    cta_link=S.cta_link, quote=S.quote, paragraphs=S.paragraphs, date_label=S.korean_date_label,
+    js_round=S.js_round, stage_for_score=S.stage_for_score, stage_emoji=S.STAGE_EMOJI,
+)
+
+
+def test_body_keeps_the_lines_the_model_wrote():
+    text = (
+        "## 메모리 가격과 삼성 HBM4E\n"
+        "난야테크가 DRAM 계약 가격을 올린다고 알렸습니다.\n"
+        "메리츠증권은 영업이익을 12조 1000억원으로 추정했습니다. 시장 기대치는 10.9조원입니다.\n"
+        "종목: 없음\n근거: 1"
+    )
+    [s] = BD._parse_sections(text)
+    assert s.body.count("\n") == 1
+    body = BD._trim_body(s.body)
+    assert body.split("\n") == [
+        "난야테크가 DRAM 계약 가격을 올린다고 알렸습니다.",
+        "메리츠증권은 영업이익을 12조 1000억원으로 추정했습니다. 시장 기대치는 10.9조원입니다.",
+    ]
+    # 렌더는 줄마다 문단 하나(빈 줄로 띄움). 짝인 두 문장은 한 문단에 남는다.
+    rendered = BD.render_sections(R_REAL, [BD.Section("t", body, [], [], [])], BD.Material([], {}, {}, (None, None), 0), {}, {})
+    assert rendered[2:] == ["", "난야테크가 DRAM 계약 가격을 올린다고 알렸습니다.",
+                            "", "메리츠증권은 영업이익을 12조 1000억원으로 추정했습니다. 시장 기대치는 10.9조원입니다."]
+
+
+def test_trim_body_caps_sentences_across_lines():
+    body = "하나입니다.\n둘입니다. 셋입니다.\n넷입니다."
+    assert BD._trim_body(body) == "하나입니다.\n둘입니다. 셋입니다."
+
+
+def test_number_net_keeps_lines():
+    body = "영업이익은 12조 1,000억원이었습니다.\n순이익은 9조 원이었습니다. 메모리 이야기가 이어졌습니다."
+    kept, dropped = BD.drop_unsourced_numbers(body, SOURCE)
+    assert kept == "영업이익은 12조 1,000억원이었습니다.\n메모리 이야기가 이어졌습니다."
+    assert dropped == ["순이익은 9조 원이었습니다."]
+
+
+def test_previous_post_lines_flatten_paragraphs():
+    rows = [{"date": "2026-10-07", "slot": "evening", "sections": [{"title": "A", "body": "첫 소식입니다.\n둘째 소식입니다."}]}]
+    assert "  · A: 첫 소식입니다. 둘째 소식입니다." in BD.previous_post_lines(rows, R)
+
+
+EVENTS = [
+    {"date": "2026-10-08", "code": "005930", "name": "삼성전자", "event": "3분기 잠정실적 발표", "channels": 30},
+    {"date": "2026-10-08", "code": "000660", "name": "SK하이닉스", "event": "잠정실적 발표", "channels": 5},
+]
+
+
+def test_day_event_block_drops_the_repeated_date():
+    block = BD.event_block(R_REAL, "내일 일정", EVENTS, 4, show_date=False)
+    assert block[1] == "📌 <b>내일 일정</b>"
+    assert "10월" not in block[2]
+    assert "<b>삼성전자</b> · 3분기 잠정실적 발표" in block[2] and "<b>SK하이닉스</b> · 잠정실적 발표" in block[2]
+
+
+def test_week_event_block_keeps_dates():
+    block = BD.event_block(R_REAL, "다음 주 일정", EVENTS, 8)
+    assert "<b>10월 8일</b> 삼성전자 · 3분기 잠정실적 발표" in block[2]
