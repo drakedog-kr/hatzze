@@ -2950,15 +2950,20 @@ a.v2-isd-row:hover { background: var(--t-tint); margin: 0 -14px; padding: 0 14px
 .v2-isd-legend { display: inline-flex; align-items: center; gap: 12px; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-isd-legend > span { display: inline-flex; align-items: center; gap: 5px; }
 .v2-in .hz-mkfilter-set label { font-size: 12px; font-weight: 500; }
-/* 현재가가 목표가 구간 밖이면 막대 바깥에 빈 고리(ConsensusBody outside). */
-.v2-in .hz-range-knob.is-out { background: var(--c-card); box-shadow: inset 0 0 0 2px var(--c-blue); }
-/* 애널리스트 요약의 목표가 칸 — 칸이 250 보다 좁으면(1,280 의 225) 막대 밑 '현재가'를 둘째 줄로. 최저 · 최고는 막대 양끝 그대로.
-   셋이 한 줄이면 '최저 목표가'가 두 줄로 꺾여 석 줄이 됐다(ALB · NVS · CEG, 2026-10-10). */
-.v2-cons-target { container-type: inline-size; }
-@container (max-width: 250px) {
-  .v2-cons-range { flex-wrap: wrap; row-gap: 4px; }
-  .v2-cons-range > .v2-cons-now { order: 3; flex-basis: 100%; }
-}
+/* 애널리스트 요약의 목표가 막대(ConsensusBody) — 축은 목표가 구간에 현재가까지 넣는다. 굵은 칸이 목표가 구간, 가는 선이 현재가까지 늘린 축,
+   점이 현재가. 현재가가 구간 밖이면 점이 막대 밖에 떠 보였다(CCL · 201종목 중 49, 2026-10-10). '현재가 $X'는 점 바로 위, 최저 · 최고는 굵은 칸 양끝 밑. */
+.v2-cons-nowrow { position: relative; display: block; height: 16px; margin-bottom: -4px; }
+.v2-cons-now { position: absolute; top: 0; white-space: nowrap; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--c-muted); }
+.v2-cons-now b { font-weight: 500; color: var(--c-ink); }
+/* 점 반지름(5)만큼 안으로 — 끝에 선 점이 칸 밖으로 반쯤 나가지 않게. */
+.v2-cons-bar { position: relative; display: block; height: 10px; margin: 0 5px; }
+.v2-cons-bar::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px; border-radius: 1px; background: var(--c-track); }
+/* 단색 — 회색에서 번지는 그라데이션이면 가는 선(같은 회색)과 만나는 최저 목표가 자리가 안 보였다. */
+.v2-cons-seg { position: absolute; top: 2px; height: 6px; border-radius: 999px; background: var(--c-bar); }
+.v2-cons-dot { position: absolute; top: 0; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--c-blue); box-shadow: 0 0 0 2px var(--c-card); }
+.v2-cons-ends { position: relative; display: block; height: 41px; }
+.v2-cons-ends > span { position: absolute; top: 0; display: flex; flex-direction: column; gap: 1px; white-space: nowrap; font-size: 12px; font-weight: 500; line-height: 20px; color: var(--c-muted); }
+.v2-cons-ends b { font-weight: 500; color: var(--c-ink); }
 /* 범례 — 색이 방향이다(매수 빨강 채움 · 매도 파랑 고리, 차트 표식과 같은 뜻 · 2026-10-05). */
 .v2-isd-legend i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--t-down); }
 .v2-isd-legend i.is-fill { border-color: var(--t-up); background: var(--t-up); }

@@ -1348,10 +1348,19 @@ export function ConsensusBody({
   const upside = price && c.targetAvg ? ((c.targetAvg - price) / price) * 100 : null;
   // 현재가가 최저~최고 사이 어디인지. 목표가 구간이 없으면 안 그린다.
   const span = c.targetLow != null && c.targetHigh != null && c.targetHigh > c.targetLow;
-  // 구간 밖이면(현재가 < 최저 목표가 · > 최고 목표가) 막대 끝에 붙이지 않고 바깥에 빈 고리로 — 끝에 붙으면 '최저 목표가' 자리를 가리켰다(EVMN, 2026-10-05 점검).
-  const raw = span && price ? ((price - c.targetLow!) / (c.targetHigh! - c.targetLow!)) * 100 : null;
-  const outside = raw == null ? null : raw < 0 ? "low" : raw > 100 ? "high" : null;
-  const pos = raw == null ? null : Math.min(100, Math.max(0, raw));
+  // 축은 목표가 구간에 현재가까지 넣는다 — 현재가가 구간 밖이면(현재가 < 최저 목표가 · > 최고 목표가) 가는 선이 그쪽으로 이어지고
+  // 점은 그 끝에 선다. 막대 밖에 빈 고리로 찍었을 땐 막대를 넘어 떠 보였다(CCL, 2026-10-10). 끝에 붙이면 '최저 목표가' 자리를 가리켰다(EVMN, 2026-10-05).
+  const axisLo = span ? Math.min(c.targetLow!, price ?? c.targetLow!) : 0;
+  const axisHi = span ? Math.max(c.targetHigh!, price ?? c.targetHigh!) : 1;
+  const ax = (v: number) => ((v - axisLo) / (axisHi - axisLo)) * 100;
+  const lowX = span ? ax(c.targetLow!) : 0;
+  const highX = span ? ax(c.targetHigh!) : 100;
+  const dotX = span && price ? ax(price) : null;
+  // 글자를 그 점 위에 세우되 칸 밖으로 안 나가게 — 왼쪽을 점 자리에 두고 제 폭의 k% 만큼 당긴다(0 이면 왼쪽 맞춤 · 100 이면 오른쪽 맞춤).
+  const pin = (x: number, k = x): React.CSSProperties => ({ left: `${x}%`, transform: `translateX(-${k}%)` });
+  // 현재가가 구간 밖이면 그쪽 끝 표기를 가는 선 쪽으로 더 당긴다 — 굵은 칸이 좁아지면(CLSK 36%) 최저 · 최고 표기가 맞닿았다. 1.6 배면 칸 밖으로도 안 나간다.
+  const lowK = dotX != null && dotX < lowX ? Math.min(100, 1.6 * lowX) : lowX;
+  const highK = dotX != null && dotX > highX ? Math.max(0, 100 - 1.6 * (100 - highX)) : highX;
 
   return (
     // ⚠️ 가로 여백을 여기 두지 말 것. 아래 목록의 '더 보기' 띠가 **카드 폭을 꽉 채워야**
@@ -1396,7 +1405,7 @@ export function ConsensusBody({
         )}
 
         {c.targetAvg != null && (
-          <div className="v2-cons-target" style={{ flex: stack ? "1 1 100%" : "1 1 220px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
+          <div style={{ flex: stack ? "1 1 100%" : "1 1 220px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
             <span style={{ ...ROW.sub }}>
               1년 목표가 평균{c.targetCount != null ? ` · 애널리스트 ${c.targetCount}명` : ""}
             </span>
@@ -1416,39 +1425,35 @@ export function ConsensusBody({
             </span>
             {span ? (
               <>
+                {/* 막대 위 점이 무엇인지 — 바로 위 큰 숫자가 '목표가 평균'이라 점도 평균 자리로 읽혔다(2026-10-04 점검). 값을 붙인다 — 구간 밖이면 점만으로는 어디인지 안 읽힌다.
+                    점 바로 위에 붙인다 — 최저 · 최고 사이 범례로 두면 좁은 칸(1,280 의 225)에서 '최저 목표가'가 꺾여 석 줄이 됐다. */}
+                {dotX != null && (
+                  <span className="v2-cons-nowrow">
+                    <span className="v2-cons-now" style={pin(dotX)}>
+                      현재가 <b><ExactMoney usd={price} rate={rate} /></b>
+                    </span>
+                  </span>
+                )}
                 {/* 채우는 막대가 아니라 **구간 위의 점**이다. 저점부터 채우면 "이만큼 올랐다"로
-                    읽히는데, 이 값은 그게 아니라 예측 범위 안 어디에 지금 값이 있느냐다. */}
-                <span className="hz-range" style={{ position: "relative", height: 10 }}>
-                  {pos != null && (
-                    <span
-                      className={`hz-range-knob${outside ? " is-out" : ""}`}
-                      style={{ left: outside === "low" ? "-8px" : outside === "high" ? "calc(100% + 8px)" : `${pos}%` }}
-                    />
-                  )}
+                    읽히는데, 이 값은 그게 아니라 예측 범위 안 어디에 지금 값이 있느냐다. 굵은 칸이 목표가 구간, 가는 선은 현재가까지 늘린 축. */}
+                <span className="v2-cons-bar">
+                  <span className="v2-cons-seg" style={{ left: `${lowX}%`, right: `${100 - highX}%` }} />
+                  {dotX != null && <span className="v2-cons-dot" style={{ left: `${dotX}%` }} />}
                 </span>
                 {/* ⚠️ 숫자만 두면 그게 목표가의 양끝인지 축 눈금인지 안 보인다 — 바로 위가
-                    막대라 특히 그렇다. 숫자 아래에 무엇인지 적는다. */}
-                {/* 칸이 250 보다 좁으면 '현재가'를 둘째 줄로(v2.css .v2-cons-now) — 셋이 한 줄에 서면 '최저 목표가'가 두 줄로 꺾여 석 줄이 됐다. */}
-                <span className="v2-cons-range" style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                  <span style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    <span style={{ ...ROW.sub, fontFamily: MONO, color: C.ink }}>
+                    막대라 특히 그렇다. 숫자 아래에 무엇인지 적는다. 굵은 칸 양끝을 따라간다. */}
+                <span className="v2-cons-ends">
+                  <span style={pin(lowX, lowK)}>
+                    <b>
                       <ExactMoney usd={c.targetLow} rate={rate} />
-                    </span>
-                    <span style={{ fontSize: "var(--fs-12)", color: C.muted }}>최저 목표가</span>
+                    </b>
+                    최저 목표가
                   </span>
-                  {/* 막대 위 점이 무엇인지 — 바로 위 큰 숫자가 '목표가 평균'이라 점도 평균 자리로 읽혔다(2026-10-04 점검). */}
-                  {pos != null && (
-                    <span className="v2-cons-now" style={{ display: "inline-flex", alignItems: "center", gap: 5, alignSelf: "flex-end", fontSize: "var(--fs-12)", color: C.muted }}>
-                      <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--c-blue)", flexShrink: 0 }} />
-                      {/* 값을 붙인다 — 구간 밖이면 점만으로는 어디인지 안 읽힌다. */}
-                      현재가 {price != null && <ExactMoney usd={price} rate={rate} />}
-                    </span>
-                  )}
-                  <span style={{ display: "flex", flexDirection: "column", gap: 1, alignItems: "flex-end" }}>
-                    <span style={{ ...ROW.sub, fontFamily: MONO, color: C.ink }}>
+                  <span style={{ ...pin(highX, highK), alignItems: "flex-end" }}>
+                    <b>
                       <ExactMoney usd={c.targetHigh} rate={rate} />
-                    </span>
-                    <span style={{ fontSize: "var(--fs-12)", color: C.muted }}>최고 목표가</span>
+                    </b>
+                    최고 목표가
                   </span>
                 </span>
               </>

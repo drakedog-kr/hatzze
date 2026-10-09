@@ -121,11 +121,11 @@ type AnalystShape = { k: number; stack: boolean; tall: boolean };
 
 /**
  * 애널리스트 칸의 키. 머리 42 · 요약 · 의견(머리 37 · 줄 56 · '더 보기' 40, 접으면 한 줄 41). 의견이 없으면 요약뿐.
- * 요약 두 칸은 나란히 서면 1,440(칸 574)에서 152, 1,280(칸 496)에서 181 — 좁은 칸은 막대 밑 '현재가'가 둘째 줄로 내려간다(v2.css .v2-cons-now).
- * 위아래로 쌓으면 268 이다(2026-10-10 실측). ⛔ 1,280 에서 나란히 세우려고 띠를 3:2 로 나눴다가 걷었다 — 짝은 모든 화면이 5:5 다.
+ * 요약 두 칸은 나란히 서면 172, 위아래로 쌓으면 289 — 1,440(칸 574) · 1,280(칸 496) 같은 값이다('현재가'가 막대 점 위에 서서, 2026-10-10 실측).
+ * ⛔ 1,280 에서 나란히 세우려고 띠를 3:2 로 나눴다가 걷었다 — 짝은 모든 화면이 5:5 다. 칸 기준 폭을 220 으로 낮춰 나란히 세운다(parts.tsx).
  */
-const analystH = (an: PairMod, s: AnalystShape, wide: boolean) => {
-  const sum = s.stack ? 268 : wide ? 152 : 181;
+const analystH = (an: PairMod, s: AnalystShape) => {
+  const sum = s.stack ? 289 : 172;
   const ops = !an.acts ? 0 : s.k === 0 ? 41 : 37 + 56 * s.k + (an.acts > s.k ? 40 : 0);
   return 42 + sum + ops;
 };
@@ -138,7 +138,7 @@ const listRange = (m: PairMod, o: number, cap = 80): [number, number] => {
 
 /**
  * 애널리스트 칸 옆 칸에 목록(하나 또는 위아래로 여럿)을 둘 때 — 목록마다 펼 줄 수와 애널리스트 칸 꼴.
- * 옆 칸이 늘고 줄 수 있는 범위에 애널리스트 칸 키가 들면 빈 곳이 없다. 1,440 · 1,280 두 폭으로 재서 빈 곳(넓은 폭 두 배)이 가장 적은 것,
+ * 옆 칸이 늘고 줄 수 있는 범위에 애널리스트 칸 키가 들면 빈 곳이 없다. 빈 곳(세 배)이 가장 적은 것 — 애널리스트 칸 키는 1,440 · 1,280 이 같다(analystH).
  * 기본 꼴(요약 나란히 · 의견 펴기 · 다섯 줄 · 줄 80 까지)에서 벗어나면 벌점을 더한다 — 의견 접기 150 · 요약 쌓기 40 · 줄 100 까지 30 · 다섯 줄 넘는 의견 줄마다 4.
  * 의견 접기에 벌점이 없으면 몇 px 더 맞추려고 35종목(PLTR · LLY …)이 의견을 접었다 — 애널리스트 칸을 맨 앞에 둔 까닭이 의견이다.
  * 점수(빈 곳 + 벌점)가 같으면 줄을 더 많이 펴는 것. 목록은 셋(또는 그보다 적으면 전부)부터
@@ -170,8 +170,8 @@ function fitBeside(an: PairMod, lists: PairMod[], tall = false) {
     for (const k of ks)
       for (const stack of [false, true]) {
         const shape = { k, stack, tall };
-        const off = (wide: boolean) => Math.max(0, lo - analystH(an, shape, wide), analystH(an, shape, wide) - hi);
-        const score = 2 * off(true) + off(false) + (stack ? 40 : 0) + (k === 0 && an.acts ? 150 : 0) + 4 * Math.max(0, k - 5) + (tall ? 30 : 0);
+        const h = analystH(an, shape);
+        const score = 3 * Math.max(0, lo - h, h - hi) + (stack ? 40 : 0) + (k === 0 && an.acts ? 150 : 0) + 4 * Math.max(0, k - 5) + (tall ? 30 : 0);
         const size = k + opens.reduce((a, b) => a + b, 0);
         if (score < best.score || (score === best.score && size > best.size)) best = { score, size, shape, opens };
       }
