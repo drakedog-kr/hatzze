@@ -1232,8 +1232,19 @@ const ACTION_KO: Record<string, { text: string; tone?: Tone }> = {
  * 이 줄에서 가장 읽을 만한 값이 "얼마에서 얼마로"다. 안 바뀐 줄에 이전 값을 지어내지 말 것
  * (원천이 그때는 안 준다).
  */
-export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: number | null }) {
+export function AnalystActions({
+  rows,
+  rate,
+  initial = 5,
+}: {
+  rows: AnalystAction[];
+  rate: number | null;
+  /** 처음 펼 줄 수 — 종목 상세는 옆 칸 목록의 키에 맞춰 줄인다(detail.tsx layout). 0 이면 '최근 의견 N건 보기' 한 줄로 접는다. */
+  initial?: number;
+}) {
   if (!rows.length) return null;
+  // 옆 칸 목록이 두어 줄뿐이면 의견을 한 줄로 접는다 — 한 줄이라도 펴 두면 옆 칸 아래가 130px 남짓 비었다(CCL, 2026-10-10).
+  const folded = initial === 0;
   // 목록이 덮는 기간. 하루치뿐이면 한쪽만 적는다(`8/20~8/20` 은 읽는 사람을 멈칫하게 한다).
   const dates = rows.map((r) => r.date).sort();
   const span =
@@ -1282,16 +1293,18 @@ export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: nu
   });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", borderTop: "1px solid var(--c-sheet-row)", paddingTop: 12 }}>
+    <div style={{ display: "flex", flexDirection: "column", borderTop: "1px solid var(--c-sheet-row)", paddingTop: folded ? 0 : 12 }}>
       {/* ⚠️⚠️ "최근 한 달"이라 못박지 말 것. 원천이 싣는 건 **최근 여덟 건**이지 한 달치가
           아니라, 목록이 덮는 기간이 종목마다 다르다 — 실측 177종목: 중앙값 15일이지만
           엔비디아는 사흘, 가장 긴 곳은 176일이다(커버리지가 뜸한 종목).
           그래서 기간을 **재서 적는다.** 그래야 "64명 중 왜 8명뿐이냐"에도 답이 된다 —
           64명은 등급을 걸어 둔 사람 수, 이 목록은 그 사이에 움직인 사람이다. */}
-      <span style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 14px 4px" }}>
-        <span style={{ ...ROW.sub }}>최근 의견</span>
-        {span && <span style={{ fontSize: "var(--fs-12)", color: C.muted, fontFamily: MONO }}>{span}</span>}
-      </span>
+      {!folded && (
+        <span style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 14px 4px" }}>
+          <span style={{ ...ROW.sub }}>최근 의견</span>
+          {span && <span style={{ fontSize: "var(--fs-12)", color: C.muted, fontFamily: MONO }}>{span}</span>}
+        </span>
+      )}
       {/* ⭐ 다섯 줄로 열고 눌러서 늘린다. 다 펴면 '접기'가 함께 뜬다(ExpandableList 기본).
           ⚠️⚠️ 바닥 띠는 **`hz-sheet-foot-row`** 를 쓴다. 기본 푸터로 뒀더니 카드 한가운데
              떠 있는 옅은 글자가 되어 **버튼으로 안 읽혔다** — 이미 있는데도 "더 보기를
@@ -1299,7 +1312,8 @@ export function AnalystActions({ rows, rate }: { rows: AnalystAction[]; rate: nu
       <ExpandableList
         items={items}
         name="stock_analyst_actions"
-        initial={5}
+        initial={initial}
+        moreLabel={folded ? `최근 의견 ${rows.length}건 보기` : undefined}
         step={10}
         listStyle={{ padding: 0, display: "block" }}
         footerClassName="hz-sheet-foot-row"
@@ -1313,12 +1327,15 @@ export function ConsensusBody({
   price,
   rate,
   children,
+  stack = false,
 }: {
   c: AnalystConsensus;
   price: number | null;
   rate: number | null;
   /** 개별 애널리스트 목록. 위 두 칸 아래에 온다. */
   children?: React.ReactNode;
+  /** 두 칸을 위아래로 — 옆 칸이 길어 나란히 두면 이 칸 아래가 빌 때(종목 상세 layout). 좁은 폭에선 원래 저절로 접힌다. */
+  stack?: boolean;
 }) {
   const counts: Record<string, number> = {
     strongBuy: c.strongBuy ?? 0,
@@ -1345,7 +1362,7 @@ export function ConsensusBody({
       {/* 좌우 14 — v2 모듈 안쪽 여백(제목 · 다른 모듈 줄과 한 세로줄). 옛 시트의 22 가 남아 8px 더 깊었다(2026-10-04 점검). */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "14px 14px 16px" }}>
         {total > 0 && (
-          <div style={{ flex: "1 1 260px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
+          <div style={{ flex: stack ? "1 1 100%" : "1 1 260px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
             <span style={{ ...ROW.sub }}>증권가 종합</span>
             <span style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
               <strong style={{ fontSize: "var(--fs-22)", fontWeight: 700, color: C.ink, letterSpacing: "-.02em" }}>
@@ -1378,7 +1395,7 @@ export function ConsensusBody({
         )}
 
         {c.targetAvg != null && (
-          <div style={{ flex: "1 1 260px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
+          <div style={{ flex: stack ? "1 1 100%" : "1 1 260px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
             <span style={{ ...ROW.sub }}>
               1년 목표가 평균{c.targetCount != null ? ` · 애널리스트 ${c.targetCount}명` : ""}
             </span>

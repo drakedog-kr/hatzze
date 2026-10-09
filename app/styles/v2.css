@@ -2881,15 +2881,25 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 }
 
 /* ── 내부자 종목 · 투자자 상세 아래쪽(2026-10-04) — 옛 시트 일곱 장 → 모듈 ──────────────────────────────
-   차트(판 폭) → [거물 | 애널리스트] → [임원 신고 | 의원 신고]. 투자자는 [보유 종목 | 이번 분기에 한 것 · 전량 정리].
+   차트(판 폭) → [애널리스트 | 거물] → [임원 신고 | 의원 신고](거물이 짧으면 애널리스트 옆에 셋을 쌓는다). 투자자는 [보유 종목 | 이번 분기에 한 것 · 전량 정리].
    줄은 한 줄 · 칸마다 하나(app/insider/V2DetailRows.tsx). 방향은 글자 색(사는 쪽 빨강 · 파는 쪽 파랑). */
 .v2-isd-mod { display: flex; flex-direction: column; }
 /* 줄 목록 — 짝 모듈보다 짧으면 줄이 고르게 늘어난다(카더라 표와 같은 규칙). '더 보기' 줄은 바닥. */
 .v2-isd-list { flex: 1; display: flex; flex-direction: column; margin: 0; padding: 0 14px; list-style: none; }
-/* 줄은 남는 높이를 나눠 받되 한 줄 64 까지 — 줄 셋뿐인 목록이 키 큰 짝에 맞춰 한 줄 207px 까지 늘었다(2026-10-04 점검). 짝은 키가 비슷한 것끼리 고른다(detail.tsx pairUp). */
+/* 줄은 남는 높이를 나눠 받되 한 줄 64 까지 — 줄 셋뿐인 목록이 키 큰 짝에 맞춰 한 줄 207px 까지 늘었다(2026-10-04 점검). 짝 안 펼 줄 수는 detail.tsx layout 이 키에 맞춰 고른다. */
 .v2-isd-list > li { flex: 1 0 auto; display: flex; max-height: 64px; }
 /* 애널리스트 칸의 짝인데 줄이 다 떨어져 10줄을 못 펴는 목록은 80 까지(detail.tsx is-fill) — 64 로는 TSLA 거물 여덟 줄 아래가 117px 비었다(2026-10-08). */
 .v2-tm-band.is-fill .v2-isd-list > li { max-height: 80px; }
+/* 애널리스트 칸 옆에 위아래로 쌓은 목록(detail.tsx layout) — 거물이 한두 줄뿐이면 [애널리스트 | 거물] 짝의 거물 칸 아래가 222px 비었다(2026-10-10). */
+.v2-isd-stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.v2-isd-stack > div { display: flex; flex-direction: column; flex-basis: auto; }
+.v2-isd-stack > div > .v2-mod { flex: 1; }
+/* 옆 칸 목록이 짧은 짝 — 3:2 로 나눠 1,280 에서도 애널리스트 요약 두 칸이 나란하게(칸 595, 요약이 접히는 폭 564). 폰은 한 줄기 그대로. */
+@container kd (min-width: 680px) {
+  .v2-tm-band.is-pair.is-split { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+}
+/* 그 짝의 목록 줄은 100 까지 — 의견을 한 줄로 접은 애널리스트 칸(240)에 80 짜리 두 줄(202)이 못 미쳐 38px 비었다(CCL). */
+.v2-tm-band.is-split .v2-isd-list > li { max-height: 100px; }
 .v2-isd-list > li + li { border-top: 1px solid var(--t-line); }
 .v2-isd-row {
   flex: 1;

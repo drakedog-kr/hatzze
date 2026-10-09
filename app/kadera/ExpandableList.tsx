@@ -20,6 +20,7 @@ export function ExpandableList({
   footerStyle,
   footerClassName,
   name,
+  moreLabel,
 }: {
   items: React.ReactNode[];
   initial?: number;
@@ -38,6 +39,8 @@ export function ExpandableList({
   footerClassName?: string;
   /** GA 이벤트에서 어느 목록인지 구분할 이름. 없으면 펼침을 재지 않는다. */
   name?: string;
+  /** '더 보기 +N' 대신 쓸 글 — 처음에 하나도 안 펴는 목록(애널리스트 '최근 의견 8건 보기')은 무엇을 더 보는지 적어야 한다. */
+  moreLabel?: string;
 }) {
   const [shown, setShown] = useState(initial);
   const canExpand = shown < items.length;
@@ -97,7 +100,7 @@ export function ExpandableList({
                 setShown(next);
               }}
             >
-              더 보기 +{Math.min(step, items.length - shown)}
+              {moreLabel && shown === 0 ? moreLabel : `더 보기 +${Math.min(step, items.length - shown)}`}
             </button>
           )}
           {isExpanded && (
