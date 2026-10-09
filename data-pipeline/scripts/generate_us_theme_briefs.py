@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
+from common.llm_parallel import ordered  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
@@ -258,27 +259,34 @@ def main() -> None:
         print(f"[Supabase] {TABLE} 도는 얘기 {done}/{len(targets)}테마" + (" (저장 안 함)" if no_save else ""))
         return
 
-    saved = 0
-    for theme in targets:
+    def compose(theme: str) -> dict:
+        """테마 한 줄. 국장 짝(generate_theme_briefs.main 의 compose)과 같이 LLM 에 묻는 데까지만 동시에 돈다."""
         b = bundles[theme]
         row = {"date": latest, "theme": theme, "brief": None, "related": [], "excerpts": [], "message_count": 0, "stock_count": 0, "model": None, "riser": None, "talk": {}}
+        if b is not None:
+            text = TB.write_brief(ask_with, US_THEME_SYSTEM, b["digest"], theme)
+            if text is None:
+                print(f"  [{theme}] 쓸 수 있는 문장이 없어(빈 응답이거나 전부 매수·매도 표현) 요약 없이 저장합니다.")
+            row.update(brief=text, related=b["related"], excerpts=b["excerpts"], message_count=b["message_count"], stock_count=b["stock_count"], model=MODEL if text else None)
+        r = riser_of.get(theme)
+        if r is not None:
+            # 화면이 국장과 같은 타입으로 읽는다 — code 에 티커, market 은 늘 "US"(lib/us-theme-page.ts).
+            row["riser"] = {"code": r["code"], "name": r["name"], "market": "US", "recent": r["recent"], "prior": r["prior"], "ratio": r["ratio"],
+                            "reason": TB.write_riser_reason(ask_with, US_RISER_SYSTEM, digest_of.get(r["code"]), r["name"])}
+            print(f"  [{theme} · {r['name']}] {row['riser']['reason'] or '(이유 없음)'}")
+        items = [(t, name_of.get(t, t), blocks[t]) for t in hot_of.get(theme, []) if t in blocks]
+        row["talk"] = TB.write_talk(ask_talk, US_TALK_SYSTEM, theme, items)
+        for t, line in row["talk"].items():
+            print(f"    · {name_of.get(t, t)} ({len(line)}자) {line}")
+        print(f"  [{theme}] 도는 얘기 {len(row['talk'])}/{len(hot_of.get(theme, []))}줄")
+        return row
+
+    saved = 0
+    # 묻는 것만 동시에, 저장 · 결과 줄은 테마 차례대로(common/llm_parallel).
+    for theme, row in ordered(compose, targets, client=client):
         try:
-            if b is not None:
-                text = TB.write_brief(ask_with, US_THEME_SYSTEM, b["digest"], theme)
-                if text is None:
-                    print(f"  [{theme}] 쓸 수 있는 문장이 없어(빈 응답이거나 전부 매수·매도 표현) 요약 없이 저장합니다.")
-                row.update(brief=text, related=b["related"], excerpts=b["excerpts"], message_count=b["message_count"], stock_count=b["stock_count"], model=MODEL if text else None)
-            r = riser_of.get(theme)
-            if r is not None:
-                # 화면이 국장과 같은 타입으로 읽는다 — code 에 티커, market 은 늘 "US"(lib/us-theme-page.ts).
-                row["riser"] = {"code": r["code"], "name": r["name"], "market": "US", "recent": r["recent"], "prior": r["prior"], "ratio": r["ratio"],
-                                "reason": TB.write_riser_reason(ask_with, US_RISER_SYSTEM, digest_of.get(r["code"]), r["name"])}
-                print(f"  [{theme} · {r['name']}] {row['riser']['reason'] or '(이유 없음)'}")
-            items = [(t, name_of.get(t, t), blocks[t]) for t in hot_of.get(theme, []) if t in blocks]
-            row["talk"] = TB.write_talk(ask_talk, US_TALK_SYSTEM, theme, items)
-            for t, line in row["talk"].items():
-                print(f"    · {name_of.get(t, t)} ({len(line)}자) {line}")
-            print(f"  [{theme}] 도는 얘기 {len(row['talk'])}/{len(hot_of.get(theme, []))}줄")
+            if isinstance(row, Exception):
+                raise row
             if not no_save:
                 # updated_at 을 직접 넣는다 — 국장 짝(generate_theme_briefs.py)의 같은 자리 주석.
                 row["updated_at"] = datetime.now(KST).isoformat()

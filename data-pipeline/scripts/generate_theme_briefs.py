@@ -55,6 +55,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
+from common.llm_parallel import ordered  # noqa: E402
 
 from common.broadcast_content import banned_hits  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
@@ -902,31 +903,38 @@ def main() -> None:
         print(f"[Supabase] {TABLE} 도는 얘기 {done}/{len(targets)}테마" + (" (저장 안 함)" if no_save else ""))
         return
 
-    saved = 0
-    for theme in targets:
+    def compose(theme: str) -> dict:
+        """테마 한 줄(요약 · 오른 종목 이유 · 도는 얘기). LLM 에 묻는 데까지만 — 테마끼리 기대는 것이 없어 동시에 돈다."""
         b = bundles[theme]
         row = {"date": latest, "theme": theme, "brief": None, "related": [], "excerpts": [], "message_count": 0, "stock_count": 0, "model": None, "riser": None, "talk": {}}
+        if b is not None:
+            text = write_brief(ask_with, THEME_SYSTEM, b["digest"], theme)
+            row.update(
+                brief=text,
+                related=b["related"],
+                excerpts=b["excerpts"],
+                message_count=b["message_count"],
+                stock_count=b["stock_count"],
+                model=MODEL if text else None,
+            )
+        # 갑자기 많이 언급된 종목은 요약이 없는 테마에도 붙을 수 있다(사전 종목이 태그된 글이 없는데
+        # 언급이 늘 수는 없으니 사실상 같이 가지만, 순서는 서로 묶지 않는다).
+        row["riser"] = riser_reason(theme)
+        if row["riser"]:
+            print(f"  [{theme} · {row['riser']['name']}] {row['riser']['reason'] or '(까닭 없음)'}")
+        items = [(c, name_of.get(c, c), blocks[c]) for c in hot_of.get(theme, []) if c in blocks]
+        row["talk"] = write_talk(ask_talk, TALK_SYSTEM, theme, items)
+        for c, t in row["talk"].items():
+            print(f"    · {name_of.get(c, c)} ({len(t)}자) {t}")
+        print(f"  [{theme}] 도는 얘기 {len(row['talk'])}/{len(hot_of.get(theme, []))}줄")
+        return row
+
+    saved = 0
+    # 묻는 것만 동시에, 저장 · 결과 줄은 테마 차례대로(common/llm_parallel).
+    for theme, row in ordered(compose, targets, client=client):
         try:
-            if b is not None:
-                text = write_brief(ask_with, THEME_SYSTEM, b["digest"], theme)
-                row.update(
-                    brief=text,
-                    related=b["related"],
-                    excerpts=b["excerpts"],
-                    message_count=b["message_count"],
-                    stock_count=b["stock_count"],
-                    model=MODEL if text else None,
-                )
-            # 갑자기 많이 언급된 종목은 요약이 없는 테마에도 붙을 수 있다(사전 종목이 태그된 글이 없는데
-            # 언급이 늘 수는 없으니 사실상 같이 가지만, 순서는 서로 묶지 않는다).
-            row["riser"] = riser_reason(theme)
-            if row["riser"]:
-                print(f"  [{theme} · {row['riser']['name']}] {row['riser']['reason'] or '(까닭 없음)'}")
-            items = [(c, name_of.get(c, c), blocks[c]) for c in hot_of.get(theme, []) if c in blocks]
-            row["talk"] = write_talk(ask_talk, TALK_SYSTEM, theme, items)
-            for c, t in row["talk"].items():
-                print(f"    · {name_of.get(c, c)} ({len(t)}자) {t}")
-            print(f"  [{theme}] 도는 얘기 {len(row['talk'])}/{len(hot_of.get(theme, []))}줄")
+            if isinstance(row, Exception):
+                raise row
             if not no_save:
                 # ⚠️ updated_at 을 직접 넣는다. 열의 default now() 는 **처음 넣을 때만** 돈다 — upsert 가 같은 (날짜, 테마)를
                 #    다시 쓰면 글은 바뀌어도 시각은 첫 실행에 머물러, 표가 언제 마지막으로 쓰였는지를 거짓으로 말한다

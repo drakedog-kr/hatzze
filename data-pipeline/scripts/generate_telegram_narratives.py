@@ -70,6 +70,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
+from common.llm_parallel import ordered  # noqa: E402
 
 from common.broadcast_content import weekly_top_stocks  # noqa: E402
 from common.channel_breadth import channel_breadth_map  # noqa: E402
@@ -2371,30 +2372,36 @@ def main() -> None:
         print("[안내] --stocks-only — 총평은 건드리지 않습니다." if stocks_only else "[안내] 총평을 만들 집계가 없어 건너뜁니다.")
 
     # ── 종목 흐름 요약 ──────────────────────────────────────────────────────
-    saved = 0
-    for code, name, digest in stock_digests:
-        try:
-            # 목표 범위에 들 때까지 다시 쓰게 하되, 시도한 문장을 전부 후보로 모아 둔다.
-            candidates = [ask(STOCK_SYSTEM, digest)]
-            for attempt in range(MAX_RETRIES):
-                cur = candidates[-1]
-                # 길이가 맞아도 글자가 깨졌거나 매수·매도·시세·추이 표현이 있으면 다시 쓴다.
-                found = narrative_problems(cur, digest)
-                if LEN_MIN <= len(cur) <= LEN_MAX and not found:
-                    break
-                if found:
-                    print(f"  [{name}] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
-                    fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 그 대목을 빼고 {LEN_MIN}~{LEN_MAX}자로 다시 써 주세요.\n\n{digest}"
-                else:
-                    need = "늘려" if len(cur) < LEN_MIN else "줄여"
-                    fix = (
-                        f"방금 쓴 문장은 {len(cur)}자입니다. 뜻은 유지하면서 {need} "
-                        f"{LEN_MIN}~{LEN_MAX}자로 다시 써 주세요.\n\n"
-                        f"{digest}\n\n[방금 쓴 문장]\n{cur}"
-                    )
-                candidates.append(ask(STOCK_SYSTEM, fix))
+    def compose_narrative(item: tuple[str, str, str]) -> str | None:
+        """한 종목의 흐름 요약. 묻고 · 다시 쓰게 하고 · 고르는 데까지만 — 종목끼리 기대는 것이 없어 동시에 돈다."""
+        _code, name, digest = item
+        # 목표 범위에 들 때까지 다시 쓰게 하되, 시도한 문장을 전부 후보로 모아 둔다.
+        candidates = [ask(STOCK_SYSTEM, digest)]
+        for attempt in range(MAX_RETRIES):
+            cur = candidates[-1]
+            # 길이가 맞아도 글자가 깨졌거나 매수·매도·시세·추이 표현이 있으면 다시 쓴다.
+            found = narrative_problems(cur, digest)
+            if LEN_MIN <= len(cur) <= LEN_MAX and not found:
+                break
+            if found:
+                print(f"  [{name}] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
+                fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 그 대목을 빼고 {LEN_MIN}~{LEN_MAX}자로 다시 써 주세요.\n\n{digest}"
+            else:
+                need = "늘려" if len(cur) < LEN_MIN else "줄여"
+                fix = (
+                    f"방금 쓴 문장은 {len(cur)}자입니다. 뜻은 유지하면서 {need} "
+                    f"{LEN_MIN}~{LEN_MAX}자로 다시 써 주세요.\n\n"
+                    f"{digest}\n\n[방금 쓴 문장]\n{cur}"
+                )
+            candidates.append(ask(STOCK_SYSTEM, fix))
+        return pick_narrative(candidates, digest, name)
 
-            text = pick_narrative(candidates, digest, name)
+    saved = 0
+    # 묻는 것만 동시에, 저장 · 결과 줄은 종목 차례대로(common/llm_parallel).
+    for (code, name, digest), text in ordered(compose_narrative, stock_digests, client=client):
+        try:
+            if isinstance(text, Exception):
+                raise text
             if text is None:
                 # 빈 응답뿐이었거나 매수·매도 표현을 빼고 남은 문장이 없다. 아래 커버리지 검사에서 걸린다.
                 print(f"  [{name}] 저장할 문장이 없어 건너뜁니다.")
