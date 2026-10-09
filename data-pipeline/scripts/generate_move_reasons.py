@@ -56,7 +56,7 @@ from common.supabase_client import (  # noqa: E402
     load_keyset,
     load_window_keyset,
 )
-from common.text_check import problems  # noqa: E402
+from common.text_check import problems, prompt_leaks  # noqa: E402
 from common.timeutil import KST, today_kst  # noqa: E402
 from config.us_stock_extraction import RESEARCH_HOUSES, is_house  # noqa: E402
 
@@ -304,7 +304,7 @@ def clean_reason(text: str, name: str, digest: str) -> tuple[str | None, str]:
         t = t[len(name):].lstrip(" ,·:은는이가의") or t
     if len(t) > REASON_LEN[1] + 15 or len(t) < 4:
         return None, f"길이 {len(t)}자"
-    bad = problems(t, digest)
+    bad = problems(t, digest) + prompt_leaks(t)
     if bad:
         return None, "검수: " + " · ".join(bad)
     return t, ""

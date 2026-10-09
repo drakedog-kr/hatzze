@@ -88,7 +88,7 @@ from common.supabase_client import (  # noqa: E402
 )
 from common.surging import load_stock_daily, top_surging  # noqa: E402
 from common.stock_framing import drop_trade_sentences, price_hits, trade_hits, trend_hits  # noqa: E402
-from common.text_check import is_clean, problems  # noqa: E402
+from common.text_check import is_clean, leak_free, problems, prompt_leaks  # noqa: E402
 from common.timeutil import KST, md_with_weekday  # noqa: E402
 from config.stock_extraction import is_house  # noqa: E402
 from common.supabase_client import load_all  # noqa: E402
@@ -538,9 +538,11 @@ STOCK_SYSTEM = COMMON + f"""
 
 
 def narrative_problems(text: str, digest: str) -> list[str]:
-    """종목 흐름 요약의 problems() 에 매수·매도 표현·시세 낱말·언급 추이 검사를 더한 것(common/stock_framing.py). 비어 있으면 통과."""
+    """종목 흐름 요약의 problems() 에 매수·매도 표현·시세 낱말·언급 추이 검사를 더한 것(common/stock_framing.py). 비어 있으면 통과.
+    지시문 누출(text_check.prompt_leaks)도 여기서 건다 — 국장·미장 흐름 요약이 같이 쓴다."""
     return (
         problems(text, digest)
+        + prompt_leaks(text)
         + [f"매수·매도 표현({w})" for w in trade_hits(text)]
         + [f"시세 표현({w})" for w in price_hits(text)]
         + [f"추이 표현({w})" for w in trend_hits(text)]
@@ -561,6 +563,11 @@ def pick_narrative(candidates: list[str], digest: str, name: str) -> str | None:
         safe = [c for c in (drop_trade_sentences(t) for t in pool) if c]
         print(f"  [{name}] 후보 {len(pool)}개가 모두 매수·매도 표현을 품어 그 문장을 뺐습니다(남은 후보 {len(safe)}개).")
     if not safe:
+        return None
+    # 지시문이 샌 문장도 어느 단계에서도 안 고른다(text_check.leak_free — 그 문장만 들어낸다). 안 남으면 None.
+    safe = leak_free(safe)
+    if not safe:
+        print(f"  [{name}] 후보가 모두 지시문 누출이라 저장하지 않습니다.")
         return None
     safe = [t for t in safe if not price_hits(t)] or safe
     safe = [t for t in safe if not trend_hits(t)] or safe
@@ -2227,8 +2234,8 @@ def main() -> None:
         candidates = [first_sentences(brief_body(ask(system, digest, BRIEF_MAX_TOKENS, BRIEF_MODEL), key), sentences)]
         for _ in range(BRIEF_RETRIES):
             cur = candidates[-1]
-            # 길이가 맞아도 글자가 깨졌거나 오타가 있으면 다시 쓴다(common/text_check.py).
-            found = problems(cur, digest)
+            # 길이가 맞아도 글자가 깨졌거나 오타가 있거나 지시문이 샜으면 다시 쓴다(common/text_check.py).
+            found = problems(cur, digest) + prompt_leaks(cur)
             if lo <= len(cur) <= hi and not found and sentence_finished(cur):
                 break
             if not sentence_finished(cur):
@@ -2252,6 +2259,8 @@ def main() -> None:
         usable = [t for t in candidates if t.strip() and is_clean(t, digest)] or [
             t for t in candidates if t.strip()
         ]
+        # 지시문이 샌 문장은 길이가 맞아도 안 쓴다 — "이 기간 발췌 가운데 …"(2026-10-09 넷째 대목). 그 문장만 들어낸다.
+        usable = leak_free(usable)
         if not usable:
             return ""
         # 끝맺은 후보가 하나라도 있으면 그것들 중에서만 고른다 — 길이가 어긋나도 읽히지만

@@ -12,6 +12,7 @@ import { dropOverlaps } from "@/lib/keyword-overlap";
 import { usableDays, weekAgoDates } from "@/lib/theme-flow";
 import { pickThemeRows } from "@/lib/theme-rows";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
+import { usableOneliner } from "@/lib/prompt-leak";
 import { trendingTodayStartISO } from "@/lib/trending-window";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 
@@ -2357,7 +2358,10 @@ export async function getSurgingOneliners(): Promise<MaybeFailed<Record<string, 
     console.error("[getSurgingOneliners] 급부상 한 줄 요약을 못 읽었습니다", error);
     return LOAD_FAILED;
   }
-  return Object.fromEntries((data ?? []).map((r) => [r.stock_code as string, r.oneliner as string]));
+  // 지시문이 샌 줄은 버린다 — 같은 종목의 전날 문장이 이기거나, 없으면 카드가 흐름 요약으로 물러난다(lib/prompt-leak.ts).
+  return Object.fromEntries(
+    (data ?? []).filter((r) => usableOneliner(r.oneliner as string)).map((r) => [r.stock_code as string, r.oneliner as string]),
+  );
 }
 
 export async function getStockNarratives(): Promise<MaybeFailed<Record<string, string>>> {

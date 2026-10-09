@@ -21,6 +21,7 @@
 import { cache } from "react";
 
 import { getSupabaseAdmin } from "@/lib/supabase-server";
+import { usableOneliner } from "@/lib/prompt-leak";
 import { sentimentTone } from "@/lib/format";
 import { pickThemeRows } from "@/lib/theme-rows";
 import {
@@ -227,7 +228,10 @@ export async function getUsSurgingOneliners(): Promise<Record<string, string>> {
     console.error("[getUsSurgingOneliners] 급부상 한 줄 요약을 못 읽었습니다", error);
     return {};
   }
-  return Object.fromEntries((data ?? []).map((r) => [r.ticker as string, r.oneliner as string]));
+  // 지시문이 샌 줄은 버린다(국장 getSurgingOneliners 와 같은 규칙 · lib/prompt-leak.ts).
+  return Object.fromEntries(
+    (data ?? []).filter((r) => usableOneliner(r.oneliner as string)).map((r) => [r.ticker as string, r.oneliner as string]),
+  );
 }
 
 export async function getUsSurgingStocks(
