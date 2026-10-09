@@ -349,3 +349,29 @@ def test_past_summary_reads_only_rows_written_before_the_post():
     db = _DB([])
     BD.stored_digest_lines(db, [date(2026, 10, 7)], R)
     assert not any(name == "lt" for name, _ in db.log)
+
+
+# ── 일정 셋 고르기 ──────────────────────────────────────────────────────────
+
+
+def _ev(d, name, ch, event="일정"):
+    return {"date": d, "code": name, "name": name, "event": event, "channels": ch}
+
+
+def test_pick_events_keeps_the_most_mentioned_and_shows_them_by_date():
+    # load_events 처럼 날짜순으로 준다. 10/4 일요일 글의 모양 — 날짜순으로 셋을 자르면 삼성전자(34곳)가 빠진다.
+    week = [
+        _ev("2026-10-05", "NC", 3), _ev("2026-10-06", "LG전자", 5), _ev("2026-10-06", "삼성바이오로직스", 2),
+        _ev("2026-10-07", "알테오젠", 3), _ev("2026-10-07", "펩트론", 3), _ev("2026-10-08", "삼성전자", 34),
+    ]
+    picked = BD.pick_events(week, 3)
+    assert [e["name"] for e in picked] == ["NC", "LG전자", "삼성전자"]   # 동률 셋(3곳) 가운데 날짜가 빠른 NC
+
+
+def test_pick_events_falls_back_to_two_single_channel_lines():
+    assert [e["name"] for e in BD.pick_events([_ev("2026-10-05", "A", 1), _ev("2026-10-06", "B", 1), _ev("2026-10-07", "C", 1)], 3)] == ["A", "B"]
+
+
+def test_redisclosure_deadlines_are_noise_for_the_channel_post():
+    assert BD.EVENT_NOISE.search("자사주 美 증시 상장 추진 보도 관련 재공시 기한")
+    assert not BD.EVENT_NOISE.search("보호예수 해제")

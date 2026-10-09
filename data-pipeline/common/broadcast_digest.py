@@ -135,7 +135,7 @@ RETRIES_WHEN_SHORT = 1
 MIN_SECTIONS_TO_SEND = 2
 STOCKS_PER_SECTION = 4      # 종목 줄에 싣는 종목 수 상한(2026-09-10 결정). 넘치면 앞에서부터 넷
 EVENT_LINES_DAY = 3         # 오늘·내일 일정 줄 수(2026-10-09 4 → 3, 갈래와 같이 '최대 3개')
-EVENT_LINES_WEEK = 8        # 다음 주 일정 줄 수
+EVENT_LINES_WEEK = 3        # 다음 주 일정 줄 수(2026-10-09 8 → 3 · 많이 짚은 순으로 고른다 — pick_events)
 NEW_FACES = 3               # 처음 회자된 종목 수
 MESSAGE_SOFT_LIMIT = 3900   # 텔레그램 상한 4096 — 넘치면 뒤쪽 블록부터 뺀다
 
@@ -539,7 +539,9 @@ def reason_lines(label: str, rows: list[dict], limit: int, with_change: bool) ->
 
 # 공시 알림 채널이 기계적으로 올리는 줄. 달력엔 남겨도 채널 글에는 안 싣는다 — 한 날짜를
 # "추가상장(CB전환)" 여섯 줄이 차지했다(첫 시험 실측). 보호예수 해제·상장폐지는 뜻이 있어 둔다.
-EVENT_NOISE = re.compile(r"추가상장|변경상장|주식매수선택권|전환청구|신주인수권|자기주식매매|CB ?전환|BW ?행사")
+# '재공시'(보도에 대해 회사가 다시 공시해야 하는 마감)도 뺀다(2026-10-09). 일정이 다 두 채널짜리인 주엔
+# 세 줄 중 둘이 '재공시 기한'이었다(9/20 일요일 글). 이 거름은 채널 글에만 쓰인다 — 사이트 달력엔 남는다.
+EVENT_NOISE = re.compile(r"추가상장|변경상장|주식매수선택권|전환청구|신주인수권|자기주식매매|CB ?전환|BW ?행사|재공시")
 
 
 def load_events(db, lo: date, hi: date, market: str) -> list[dict]:
@@ -595,9 +597,19 @@ def load_events(db, lo: date, hi: date, market: str) -> list[dict]:
 
 
 def pick_events(events: list[dict], limit: int) -> list[dict]:
-    """둘 이상 채널이 짚은 일정을 limit 개까지. 하나도 없을 때만 한 채널짜리를 둘까지(event_block 주석)."""
+    """둘 이상 채널이 짚은 일정에서 **많이 짚은 순으로** limit 개, 보여 줄 땐 날짜순.
+    하나도 없을 때만 한 채널짜리를 둘까지(event_block 주석).
+
+    예전엔 날짜순으로 줄을 세워 앞에서 잘랐다. 여덟 줄일 땐 괜찮았지만 셋으로 줄이니(2026-10-09) 주 앞쪽
+    일정만 남았다 — 10/4 일요일 글이라면 34곳이 짚은 삼성전자 잠정실적(목)이 빠지고 2곳짜리 신주 배정
+    기준일(화)이 남는다. 채널 수가 같으면 날짜가 빠른 쪽을 남긴다(load_events 가 날짜순으로 주고 정렬이
+    안정적이라 그대로 지켜진다).
+    """
     strong = [e for e in events if e["channels"] >= 2]
-    return strong[:limit] if strong else [e for e in events if e["channels"] < 2][:2]
+    if not strong:
+        return [e for e in events if e["channels"] < 2][:2]
+    top = sorted(strong, key=lambda e: -e["channels"])[:limit]
+    return sorted(top, key=lambda e: (e["date"], -e["channels"], e["name"]))
 
 
 def event_lines(R: Render, events: list[dict], limit: int) -> list[str]:
