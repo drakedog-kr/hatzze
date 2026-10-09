@@ -76,6 +76,9 @@ env:
   PYTHONUNBUFFERED: "1"
   # LLM 을 동시에 묻는 개수(data-pipeline/common/llm_parallel.py). 1 이면 예전처럼 하나씩 묻는다.
   LLM_WORKERS: "6"
+  # 큰 카더라 표는 바뀐 행만 쓴다(common/supabase_client.replace_rows). 비우면 요일로 정한다(일요일 오전만 전부 다시 씀).
+  # 끄려면 "full", 몇 행을 쓸지 세기만 하려면 "check"(아무것도 안 쓴다 — 파이프라인에선 쓰지 말 것).
+  REPLACE_ROWS_MODE: ""
   FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
   # NAVER API HUB 키 하나로 뉴스·검색어트렌드를 모두 호출한다.
   NAVER_HUB_KEY_ID: ${{ secrets.NAVER_HUB_KEY_ID }}
