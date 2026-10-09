@@ -380,3 +380,53 @@ def test_pick_events_falls_back_to_two_single_channel_lines():
 def test_redisclosure_deadlines_are_noise_for_the_channel_post():
     assert BD.EVENT_NOISE.search("자사주 美 증시 상장 추진 보도 관련 재공시 기한")
     assert not BD.EVENT_NOISE.search("보호예수 해제")
+
+
+# ── 종목 줄 ─────────────────────────────────────────────────────────────────
+
+
+def _sec(order):
+    s = BD.Section("t", "본문입니다.", [k for m, k in order if m == "KR"], [k for m, k in order if m == "US"], [])
+    s.order = order
+    return s
+
+
+NAMES_KR = {"005930": "삼성전자", "000660": "SK하이닉스", "009150": "삼성전기", "007660": "이수페타시스"}
+NAMES_US = {"MU": "마이크론", "NVDA": "엔비디아"}
+
+
+def test_stock_line_puts_moves_first_so_bare_names_do_not_borrow_a_number():
+    s = _sec([("KR", "005930"), ("KR", "000660"), ("US", "MU")])
+    assert BD.stock_line(s, NAMES_KR, NAMES_US, {}, {"MU": 4.1}) == "마이크론 +4.1% · 삼성전자 · SK하이닉스"
+
+
+def test_stock_line_keeps_the_first_three_the_model_listed():
+    s = _sec([("KR", "009150"), ("US", "NVDA"), ("KR", "007660"), ("KR", "000660")])
+    line = BD.stock_line(s, NAMES_KR, NAMES_US, {"009150": 4.9, "007660": 1.9, "000660": -1.1}, {"NVDA": 3.9})
+    assert line == "삼성전기 +4.9% · 엔비디아 +3.9% · 이수페타시스 +1.9%"   # 넷째(SK하이닉스)는 빠진다
+
+
+def test_stock_line_without_order_falls_back_to_kr_then_us():
+    s = BD.Section("t", "본문입니다.", ["005930"], ["MU"], [])
+    assert BD.stock_line(s, NAMES_KR, NAMES_US, {"005930": -1.3}, {"MU": 4.1}) == "삼성전자 -1.3% · 마이크론 +4.1%"
+
+
+def test_validate_records_the_order_the_model_wrote():
+    mat = BD.Material(
+        excerpts=[BD.Excerpt(n=1, channel="a", message_id=1, text="x", views=1, forwards=0,
+                             posted_at=datetime(2026, 10, 8, 7, tzinfo=BD.KST), channels={"a", "b"},
+                             kr=["005930"], us=["MU"])],
+        kr_names={"005930": "삼성전자"}, us_names={"MU": "마이크론"}, window=(None, None), total=1,
+    )
+    text = "## 메모리\n메모리 이야기가 컸습니다.\n종목: 마이크론, 삼성전자\n근거: 1"
+    [s] = BD._validate_sections(text, "evening2", SOURCE, mat, 3)
+    assert s.order == [("US", "MU"), ("KR", "005930")]
+
+
+def test_trailing_digits_after_man_count_as_one_value():
+    # 재료 '486,532대'를 모델이 '48만 6,532대'로 풀어 썼다(2026-10-10 시험 · 테슬라 인도량). 같은 값이면 지나간다.
+    src = "테슬라 3분기 인도량 486,532대 (예상 463,761대)"
+    body = "테슬라의 3분기 인도량은 48만 6,532대로 예상치 46만 3,761대를 넘었습니다."
+    assert BD.drop_unsourced_numbers(body, src) == (body, [])
+    # 반올림한 값은 새 숫자다.
+    assert BD.drop_unsourced_numbers("인도량은 48만 7,000대였습니다.", src)[1] == ["인도량은 48만 7,000대였습니다."]

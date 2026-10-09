@@ -133,7 +133,7 @@ RETRIES_WHEN_SHORT = 1
 # 형식을 통째로 어긴 날은 제목 없는 문단 하나만 남는다(파서 시험에서 그 모습을 봤다).
 # 다시 부르는 건 위 RETRIES_WHEN_SHORT 가 이미 한 번 한다 — 그러고도 모자라면 그날은 거른다.
 MIN_SECTIONS_TO_SEND = 2
-STOCKS_PER_SECTION = 4      # 종목 줄에 싣는 종목 수 상한(2026-09-10 결정). 넘치면 앞에서부터 넷
+STOCKS_PER_SECTION = 3      # 종목 줄에 싣는 종목 수 상한(2026-09-10 넷 → 2026-10-09 셋). 모델이 적은 순서로 앞에서부터
 EVENT_LINES_DAY = 3         # 오늘·내일 일정 줄 수(2026-10-09 4 → 3, 갈래와 같이 '최대 3개')
 EVENT_LINES_WEEK = 3        # 다음 주 일정 줄 수(2026-10-09 8 → 3 · 많이 짚은 순으로 고른다 — pick_events)
 NEW_FACES = 3               # 처음 회자된 종목 수
@@ -211,6 +211,8 @@ class Section:
     us: list[str]
     evidence: list[int]
     sentence_title: bool = False   # 제목 자리에 문장을 썼다(명사구가 아니다). 다시 만들 조건에 쓴다
+    # 모델이 '종목:' 줄에 적은 순서(관련 깊은 순) — ("KR", 코드) · ("US", 티커). 종목 줄이 이 순서로 셋을 고른다.
+    order: list[tuple[str, str]] = field(default_factory=list)
 
 
 def esc(s: str) -> str:
@@ -920,6 +922,7 @@ DIGEST_RULES = bc._LLM_RULES_HEAD + DIGEST_NUMBER_RULE + bc._LLM_RULES_TAIL + DI
 # '문장 세 개'는 Opus 5.5 로 옮기며 '두세 개'에서 올렸다(2026-09-23). 전언으로 감싸는 말을
 # 걷어 내자 문장이 짧아지고 갈래마다 두 문장에 그쳐 글이 11% 짧아졌다(개장 전 475 → 532자,
 # 같은 재료 Haiku 533). '무슨 이야기가 어떻게 돌았고'도 같은 까닭으로 '무슨 일이 있었고'로.
+# '문장마다 새 사실'은 같은 날 더했다 — 최종본 여섯 편 52문장 중 10문장이 예고·종목 되풀이·관심 이동만 말했다.
 # 갈래를 셋으로 줄인 날(2026-10-09) 저녁 글이 오히려 5% 길어졌다 — 모델이 '글 전체 700자'를 갈래 셋으로
 # 채우려고 한 갈래에 이야기를 셋씩 몰아넣었다. 그래서 '한 갈래 한 이야기'와 갈래당 150자 · 전체 500자로 낮췄다.
 DIGEST_FORMAT = """\
@@ -929,11 +932,15 @@ DIGEST_FORMAT = """\
 ## 갈래 제목
 본문 문장 세 개(재료가 모자라면 두 개). 무슨 일이 있었고 어떤 종목이 왜 엮였는지.
 소식이 바뀌면 줄을 바꿔 다음 줄에 씁니다. 한 소식에 딸린 문장(추정치와 기대치처럼)은 같은 줄에 둡니다.
-종목: 자료에 적힌 종목 이름을 쉼표로, 그 갈래와 가장 관련 깊은 순으로 넷까지. 없으면 '없음'
+종목: 자료에 적힌 종목 이름을 쉼표로, 그 갈래와 가장 관련 깊은 순으로 셋까지. 없으면 '없음'
 근거: 이 갈래의 바탕이 된 발췌 번호를 쉼표로(둘 이상. 서로 다른 채널이어야 합니다)
 
 - 갈래는 그날 가장 크게 다뤄진 이야기부터 씁니다. 정해진 수를 넘는 갈래는 코드가 뒤에서부터 버립니다.
 - **한 갈래에는 한 이야기만 씁니다.** 갈래 수가 모자란다고 다른 이야기를 끼워 넣지 말고, 못 담은 이야기는 버립니다.
+- **문장마다 새 사실이 하나씩 있어야 합니다.** 이런 문장은 쓰지 마세요.
+  다음 문장을 예고만 하는 말: "오늘은 ○○ 잠정실적이 나왔습니다."
+  종목 줄에 실릴 종목을 문장으로 다시 늘어놓는 말: "○○와 △△도 이 우려에 함께 엮였습니다."
+  계기 없이 관심이 옮겨갔다는 말: "오늘은 실적 발표로 화제가 옮겨갔습니다."
 - **본문은 갈래마다 두세 문장, 150자 안팎. 글 전체 본문은 500자 안에.** 넘치면 코드가 잘라 버리므로 길게 써도 실리지 않습니다.
 - 제목은 **명사구** 20자 안팎(예: "반도체 장비 수주 확대"). 문장이 아니므로 마침표를 찍지 마세요.
   종목 이름이 들어가도 됩니다. 번호를 매기지 마세요.
@@ -1106,22 +1113,37 @@ def _numbers(text: str) -> set[str]:
     return {_norm_number(m) for m in _NUMBER.findall(text)}
 
 
-def _kr_values(text: str) -> set[Decimal]:
-    out: set[Decimal] = set()
-    cur, end, rank = None, -1, -1
+# 조·억·만 금액 뒤에 바로 붙는 끝자리 숫자('48만 6,532대'의 6,532). 뒤에 또 조·억·만이 오면 다음 덩이다.
+_KR_TRAIL = re.compile(r"[ \t]*(\d[\d,]*)(?![\d.,]|\s*(?:조|억|만))")
+_KR_ABS = {"조": Decimal(10**12), "억": Decimal(10**8), "만": Decimal(10**4)}
+
+
+def _kr_runs(text: str) -> list[tuple[Decimal, int, int]]:
+    """조·억·만 금액 덩이마다 (값, 시작, 끝). 붙어 있는 조→억→만과 끝자리 숫자를 한 값으로 더한다.
+
+    끝자리를 따로 보면 '48만 6,532대'(재료엔 '486,532대')가 '48만'과 '6,532'로 갈려 맞는 문장이 빠졌다
+    (2026-10-10 시험 · 테슬라 인도량).
+    """
+    runs: list[list] = []
     for m in _KR_AMOUNT.finditer(text):
-        r, scale = _KR_SCALE[m.group(2)]
-        v = Decimal(m.group(1).replace(",", "")) * scale
-        if cur is not None and not text[end:m.start()].strip() and r > rank:
-            cur += v
+        rank, _ = _KR_SCALE[m.group(2)]
+        v = Decimal(m.group(1).replace(",", "")) * _KR_ABS[m.group(2)]
+        if runs and not text[runs[-1][2]:m.start()].strip() and rank > runs[-1][3]:
+            runs[-1][0] += v
+            runs[-1][2], runs[-1][3] = m.end(), rank
         else:
-            if cur is not None:
-                out.add(cur)
-            cur = v
-        end, rank = m.end(), r
-    if cur is not None:
-        out.add(cur)
+            runs.append([v, m.start(), m.end(), rank])
+    out = []
+    for v, start, end, _ in runs:
+        t = _KR_TRAIL.match(text, end)
+        if t:
+            v, end = v + Decimal(t.group(1).replace(",", "")), t.end()
+        out.append((v, start, end))
     return out
+
+
+def _kr_values(text: str) -> set[Decimal]:
+    return {v for v, _, _ in _kr_runs(text)}
 
 
 def _unit_pairs(text: str) -> set[tuple[str, str]]:
@@ -1130,7 +1152,9 @@ def _unit_pairs(text: str) -> set[tuple[str, str]]:
 
 
 def _bare_numbers(text: str) -> set[str]:
-    for pat in (_KR_AMOUNT, _UNIT_AMOUNT, _DOLLAR):
+    for _, start, end in reversed(_kr_runs(text)):
+        text = text[:start] + " " + text[end:]
+    for pat in (_UNIT_AMOUNT, _DOLLAR):
         text = pat.sub(" ", text)
     return _numbers(text)
 
@@ -1143,7 +1167,10 @@ def drop_unsourced_numbers(body: str, source: str) -> tuple[str, list[str]]:
     숫자도 걸리는데, 그쪽이 틀린 숫자를 구독자 전원에게 보내는 것보다 낫다. 문장째 빼므로 나머지
     문장은 그대로 읽힌다.
     """
-    have_kr, have_pairs, have_nums = _kr_values(source), _unit_pairs(source), _numbers(source)
+    have_nums = _numbers(source)
+    # 금액은 값으로 — 재료가 조·억으로 적었든('1조 259억') 숫자로만 적었든('486,532') 같은 값이면 맞다.
+    have_kr = _kr_values(source) | {Decimal(n) for n in have_nums}
+    have_pairs = _unit_pairs(source)
     lines, dropped = [], []
     for line in body.split("\n"):
         kept = []
@@ -1278,20 +1305,24 @@ def _validate_sections(text: str, fmt: str, digest: str, mat: Material, hi_n: in
         if found:
             print(f"[LLM] 문제가 있어 갈래를 뺍니다({' · '.join(found)}): {s.title}")
             continue
-        kr, us = [], []
+        kr, us, order = [], [], []
         for name in s.kr:
             key = re.sub(r"\(.*?\)", "", name).strip()
             if key in name_kr:
                 kr.append(name_kr[key])
+                order.append(("KR", name_kr[key]))
             elif key in name_us:
                 us.append(name_us[key])
+                order.append(("US", name_us[key]))
             else:
                 m = re.search(r"\(([A-Z.\-]{1,6})\)", name)
                 if m and m.group(1) in name_us:
                     us.append(name_us[m.group(1)])
+                    order.append(("US", name_us[m.group(1)]))
                 else:
                     print(f"[안내] 자료에 없는 종목 이름이라 뺍니다: {name}")
         s.kr, s.us, s.body = list(dict.fromkeys(kr)), list(dict.fromkeys(us)), tidy_amounts(body)
+        s.order = list(dict.fromkeys(order))
         s.title = tidy_amounts(s.title)
         # 채널 수 검사. 근거로 적힌 발췌(복붙 묶음의 채널 포함)에, 이 갈래의 종목을 다룬 발췌의
         # 채널을 더한다 — 모델이 번호를 하나만 적어도 그 종목을 여러 채널이 말했으면 통과한다.
@@ -1323,19 +1354,20 @@ def stock_link(code: str, market: str, label: str) -> str:
 
 
 def stock_line(s: Section, kr_names: dict, us_names: dict, chg_kr: dict, chg_us: dict) -> str:
-    """종목 줄. 국내 먼저, 그다음 미국. 합쳐서 STOCKS_PER_SECTION 개까지."""
-    parts = []
-    for c in s.kr:
-        label = kr_names.get(c, c)
-        if c in chg_kr:
-            label += f" {chg_kr[c]:+.1f}%"
-        parts.append(stock_link(c, "KR", label))
-    for t in s.us:
-        label = us_names.get(t, t)
-        if t in chg_us:
-            label += f" {chg_us[t]:+.1f}%"
-        parts.append(esc(label))
-    return " · ".join(parts[:STOCKS_PER_SECTION])
+    """종목 줄. 모델이 적은 순서(관련 깊은 순)로 STOCKS_PER_SECTION 개를 고르고, **등락이 있는 종목을 앞에** 둔다.
+
+    등락 없는 이름이 앞에 서면 "삼성전자 · SK하이닉스 · 마이크론 +4.1%"가 셋 다 4.1%로 읽힌다(2026-10-09).
+    개장 전 글의 국내 종목은 어제 종가라 등락을 안 단다(build_morning2) — 그래서 이름만 남는다.
+    순서를 안 적은 갈래(옛 저장분)는 국내 먼저, 그다음 미국으로 고른다.
+    """
+    order = s.order or [("KR", c) for c in s.kr] + [("US", t) for t in s.us]
+    with_chg, bare = [], []
+    for market, key in order[:STOCKS_PER_SECTION]:
+        names, chg = (kr_names, chg_kr) if market == "KR" else (us_names, chg_us)
+        label = names.get(key, key) + (f" {chg[key]:+.1f}%" if key in chg else "")
+        part = stock_link(key, "KR", label) if market == "KR" else esc(label)
+        (with_chg if key in chg else bare).append(part)
+    return " · ".join(with_chg + bare)
 
 
 def render_sections(R: Render, sections: list[Section], mat: Material, chg_kr: dict, chg_us: dict) -> list[str]:
