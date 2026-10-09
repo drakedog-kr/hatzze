@@ -1,3 +1,5 @@
+import json
+import os
 import time
 from datetime import datetime, timezone
 
@@ -5,6 +7,7 @@ import httpx  # supabase(postgrest)가 쓰는 HTTP 클라이언트. 전송 예�
 from supabase import Client, create_client
 
 from .config import SUPABASE_SECRET_KEY, SUPABASE_URL
+from .timeutil import KST
 
 PAGE_SIZE = 1000  # PostgREST 기본 상한
 
@@ -79,10 +82,136 @@ def replace_rows(
     ⚠️ on_conflict 는 표의 유일 제약과 **열이 똑같아야** 한다(PostgREST 42P10). 행에는 표의 열을 빠짐없이 싣는다 —
        payload 에 없는 열은 upsert 가 옛 값을 그대로 둔다(insert 였다면 기본값이 됐다).
     ⚠️ rows 가 비면 아무것도 안 한다. 빈 결과로 갈아 끼우면 표가 통째로 빈다 — 앞 단계가 죽었을 때가 대부분이다.
+
+    ## 큰 표는 바뀐 행만 쓴다(2026-10-09 · _replace_diff)
+
+    위 방식은 매 실행 **모든 행**에 새 시각을 찍어 다시 쓴다. 7월부터 쌓인 기록이라 실행 한 번에 약 73만 행
+    (태그 29만 · 화제어 19만 · 미국 태그 11만 …)인데, 메시지는 최근 7일만 다시 받으므로 표마다 최근 9일 행(9~11%)
+    말고는 값이 그대로다. 행 수가 DIFF_MIN_ROWS 이상인 표는 지금 표를 읽어 **새 행 · 바뀐 행만 upsert 하고
+    없어진 행만 지운다.** 계산은 여전히 전체를 다시 하므로 사전 · 규칙을 바꾸면 지난 기록에도 그대로 반영된다.
+    - 다 쓴 뒤 표를 다시 읽어 계산 결과와 한 행도 다르지 않은지 확인한다. 다르면 그 자리에서 예전 방식으로 다시 쓴다.
+    - 일요일 아침 실행(FULL_WEEKDAY)은 예전 방식으로 전부 다시 쓴다. 위 확인까지 빠져나간 어긋남도 길어야 일주일이다.
+    - REPLACE_ROWS_MODE=full 이면 늘 예전 방식(끄는 스위치) · check 면 몇 행을 쓸지 세기만 하고 아무것도 안 쓴다.
+    - 바뀌었나는 **값을 뭉개지 않고** 본다(JSON 왕복한 그대로 같은가). 틀려도 '다르다' 쪽으로만 틀린다 — 더 쓸 뿐
+      옛 값이 남지는 않는다. 그래서 표마다 찍는 '바뀜' 수가 매번 전체에 가까우면 비교가 헛도는 것이다.
     """
     if not rows:
         print(f"[안내] {table} — 이번 결과가 비어 표를 그대로 둡니다")
         return
+    mode = replace_mode()
+    if mode != "full" and len(rows) >= DIFF_MIN_ROWS:
+        try:
+            if _replace_diff(db, table, rows, on_conflict, stamp_col, where, check_only=(mode == "check")):
+                return
+        except Exception as exc:  # noqa: BLE001 — 아래 예전 방식으로 갈아 끼운다
+            print(f"[경고] {table} 바뀐 행만 쓰기가 실패해 예전 방식으로 전부 다시 씁니다 — {type(exc).__name__}: {exc}", flush=True)
+    elif mode == "check":
+        print(f"[확인 모드] {table} {len(rows):,}행 — 작은 표라 예전 방식 대상(쓰지 않음)", flush=True)
+        return
+    _replace_full(db, table, rows, on_conflict, stamp_col, where)
+
+
+# 바뀐 행만 쓰는 표의 문턱. 이보다 작은 표(순위 · 종목별 톤 · 테마/센티먼트 일별 2천 행대)는 예전 방식 그대로 —
+# 줄일 몫이 작고, 그런 표엔 id 열이 없는 것도 있다(telegram_issue_keyword · telegram_us_stock_tone).
+DIFF_MIN_ROWS = 5000
+# 이 요일 오전 실행은 전부 다시 쓴다(0=월 … 6=일). 주말 아침이 가장 한가하다. 토요일이 아니라 일요일인 것은
+# 바뀐 행만 쓰기를 처음 넣은 날(2026-10-09 금) 다음 실행이 토 아침이라, 첫 실행부터 새 경로를 타게 하려고.
+FULL_WEEKDAY = 6
+
+
+def replace_mode(now: datetime | None = None) -> str:
+    """'full'(예전 방식) · 'diff'(바뀐 행만) · 'check'(세기만). 환경 변수가 있으면 그걸 따른다."""
+    forced = (os.environ.get("REPLACE_ROWS_MODE") or "").strip().lower()
+    if forced in ("full", "diff", "check"):
+        return forced
+    now = (now or datetime.now(KST)).astimezone(KST)
+    return "full" if now.weekday() == FULL_WEEKDAY and now.hour < 12 else "diff"
+
+
+def _canon(v):
+    """비교용 값. DB 가 돌려준 것과 같은 모양으로 — 보낼 때와 같은 JSON 왕복을 한 번 거친다. 값은 뭉개지 않는다."""
+    return json.loads(json.dumps(v, ensure_ascii=False, default=str))
+
+
+def _diff_columns(rows: list[dict], stamp_col: str) -> list[str]:
+    return sorted({k for r in rows for k in r} - {stamp_col})
+
+
+def _same_as_table(db, table: str, rows: list[dict], keys: list[str], cols: list[str], where: dict | None) -> tuple[bool, str]:
+    """표(where 범위)가 rows 와 행 수 · 값이 똑같은가. 다르면 첫 차이를 사람이 읽는 말로."""
+    after = _load_scope(db, table, cols, where)
+    if len(after) != len(rows):
+        return False, f"행 수 {len(after):,} ≠ 계산 {len(rows):,}"
+    have = {tuple(_canon(a[k]) for k in keys): a for a in after}
+    for r in rows:
+        k = tuple(_canon(r[c]) for c in keys)
+        a = have.get(k)
+        if a is None:
+            return False, f"키 {k} 가 표에 없음"
+        bad = next((c for c in cols if _canon(r.get(c)) != a.get(c)), None)
+        if bad:
+            return False, f"키 {k} 의 {bad}: 표 {a.get(bad)!r} ≠ 계산 {_canon(r.get(bad))!r}"
+    return True, ""
+
+
+def _load_scope(db, table: str, cols: list[str], where: dict | None) -> list[dict]:
+    narrow = None
+    if where:
+        def narrow(q):
+            for col, value in where.items():
+                q = q.eq(col, value)
+            return q
+    return load_keyset(db, table, ",".join(["id", *cols]), "id", narrow=narrow)
+
+
+def _replace_diff(db, table: str, rows: list[dict], on_conflict: str, stamp_col: str, where: dict | None, *, check_only: bool) -> bool:
+    """새 행 · 바뀐 행만 upsert, 없어진 행만 지우고, 다시 읽어 확인한다. 확인이 어긋나면 False(호출부가 예전 방식으로)."""
+    t0 = time.time()
+    keys = [k.strip() for k in on_conflict.split(",")]
+    cols = _diff_columns(rows, stamp_col)
+    existing = _load_scope(db, table, cols, where)
+    by_key = {tuple(_canon(e[k]) for k in keys): e for e in existing}
+    new_keys: set[tuple] = set()
+    changed: list[dict] = []
+    for r in rows:
+        k = tuple(_canon(r[c]) for c in keys)
+        new_keys.add(k)
+        e = by_key.get(k)
+        if e is None or any(_canon(r.get(c)) != e.get(c) for c in cols):
+            changed.append(r)
+    stale_ids = [e["id"] for k, e in by_key.items() if k not in new_keys]
+    added = sum(1 for r in changed if tuple(_canon(r[c]) for c in keys) not in by_key)
+    t_read = time.time() - t0
+    summary = (
+        f"{table} 계산 {len(rows):,}행 · 새 {added:,} · 바뀜 {len(changed) - added:,} · 지움 {len(stale_ids):,} · "
+        f"그대로 {len(rows) - len(changed):,}"
+    )
+    if check_only:
+        print(f"[확인 모드] {summary} (읽기 {t_read:.0f}초 · 쓰지 않음)", flush=True)
+        return True
+
+    t1 = time.time()
+    stamp = datetime.now(timezone.utc).isoformat()
+    for i in range(0, len(changed), 500):
+        batch = [{**r, stamp_col: stamp} for r in changed[i : i + 500]]
+        execute_with_retry(db.table(table).upsert(batch, on_conflict=on_conflict))
+    for i in range(0, len(stale_ids), 200):
+        execute_with_retry(db.table(table).delete().in_("id", stale_ids[i : i + 200]))
+    t_write = time.time() - t1
+
+    t2 = time.time()
+    ok, why = _same_as_table(db, table, rows, keys, cols, where)
+    t_check = time.time() - t2
+    if not ok:
+        print(f"[경고] {table} 바뀐 행만 쓴 뒤 표가 계산과 다릅니다({why}) — 예전 방식으로 전부 다시 씁니다.", flush=True)
+        return False
+    print(f"[갈아 끼우기] {summary} · 확인 같음 (읽기 {t_read:.0f}초 · 쓰기 {t_write:.0f}초 · 확인 {t_check:.0f}초)", flush=True)
+    return True
+
+
+def _replace_full(db, table: str, rows: list[dict], on_conflict: str, stamp_col: str, where: dict | None) -> None:
+    """예전 방식 — 모든 행을 이번 시각으로 upsert 하고, 그보다 옛 행을 지운다(replace_rows 주석 1) · 2))."""
+    t0 = time.time()
     stamp = datetime.now(timezone.utc).isoformat()
     # 한 요청이 크면 statement timeout 에 걸린다. 다른 쓰기와 같은 500행 단위.
     for i in range(0, len(rows), 500):
@@ -92,6 +221,7 @@ def replace_rows(
     for col, value in (where or {}).items():
         q = q.eq(col, value)
     execute_with_retry(q)
+    print(f"[갈아 끼우기] {table} {len(rows):,}행 전부 다시 씀 ({time.time() - t0:.0f}초)", flush=True)
 
 
 def get_client() -> Client:
