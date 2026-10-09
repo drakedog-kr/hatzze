@@ -1192,6 +1192,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 /* 낙폭 요약 — 시장 브리핑 '오늘의 브리핑'과 같은 줄 꼴(.v2-brief3). 짚는 말은 한 단 진한 잉크로만 가른다 —
    계산 문장이라 한 줄에 두세 군데가 짚혀(−23.2% · 13.7%p 덜) 굵게 두면 줄이 얼룩졌다(2026-10-04). */
 .v2-md-sum dd b { font-weight: 500 !important; color: var(--t-ink); }
+/* 짚은 말은 한 덩어리로 줄을 넘긴다 — '20.0%p'가 줄 끝, '덜'이 다음 줄 첫머리로 갈렸다(삼성전자 1,440, 2026-10-10). 덩어리가 짧아(4~8자) 넘칠 일은 없다. */
+.v2-md-sum dd b { white-space: nowrap; }
 /* 글 시작을 다른 칸 제목 선(14)에 맞춘다 — 브리핑 줄 꼴은 16 이다. */
 .v2-md-sum .v2-brief3-row { padding-left: 14px; padding-right: 14px; }
 
