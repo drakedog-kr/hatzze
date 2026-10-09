@@ -2192,8 +2192,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-pv-perp .v2-tbody { flex: 1; display: flex; flex-direction: column; }
 .v2-pv-perp .v2-tbody > li { flex: 1 0 auto; display: flex; }
 .v2-pv-perp .v2-tbody > li > .v2-tr { flex: 1; }
+/* 마지막 칸은 76 — 68 이면 머리 '24H 거래대금'(68.02px)이 두 줄로 접혔다(2026-10-10). */
 .v2-pv-th,
-.v2-pv-perp .v2-tr { grid-template-columns: minmax(0, 1fr) 136px 80px 68px; }
+.v2-pv-perp .v2-tr { grid-template-columns: minmax(0, 1fr) 136px 80px 76px; }
 .v2-pv-perp .v2-tr { min-height: 52px; }
 .v2-pv-th {
   display: grid;
@@ -2207,7 +2208,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   font-weight: 500;
   color: var(--t-ink3);
 }
-.v2-pv-th > :nth-child(n + 2) { text-align: right; }
+.v2-pv-th > :nth-child(n + 2) { text-align: right; white-space: nowrap; }
 .v2-pv-name { display: flex; flex-direction: column; min-width: 0; line-height: 18px; }
 .v2-pv-stock { width: fit-content; font-weight: 600; color: var(--t-ink); text-decoration: none; overflow-wrap: anywhere; }
 .v2-pv-stock:hover { text-decoration: underline; text-underline-offset: 2px; }
