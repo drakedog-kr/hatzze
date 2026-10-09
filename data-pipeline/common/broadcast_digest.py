@@ -444,6 +444,9 @@ def load_material_with_fallback(db, window_of: Callable[[int], tuple[datetime, d
     return mat
 
 
+WEEKDAYS = "월화수목금토일"
+
+
 def excerpt_lines(mat: Material, label: str, excerpts: list[Excerpt] | None = None) -> list[str]:
     """모델에 주는 발췌 목록. 번호·채널·종목 태그를 한 줄 머리에 둔다.
 
@@ -453,7 +456,9 @@ def excerpt_lines(mat: Material, label: str, excerpts: list[Excerpt] | None = No
     out = [f"[{label}] 널리 퍼진 순입니다. 번호는 근거 표기에 쓰세요."]
     for e in (excerpts if excerpts is not None else mat.excerpts):
         tags = [mat.kr_names.get(c, c) for c in e.kr] + [f"{mat.us_names.get(t, t)}({t})" for t in e.us]
-        head = f"({e.n}) {e.posted_at:%m/%d %H시} @{e.channel}"
+        # 요일을 붙여 준다 — 날짜만 주면 모델이 요일을 스스로 셈하다 틀린다(10/7 주중 점검이 목요일 실적
+        # 발표를 '수요일'로 적었다. 2026-10-09 시험).
+        head = f"({e.n}) {e.posted_at:%m/%d}({WEEKDAYS[e.posted_at.weekday()]}) {e.posted_at:%H}시 @{e.channel}"
         if len(e.channels) > 1:
             head += f" · 같은 글 {len(e.channels)}개 채널"
         if tags:
@@ -588,6 +593,26 @@ def load_events(db, lo: date, hi: date, market: str) -> list[dict]:
     return out
 
 
+def pick_events(events: list[dict], limit: int) -> list[dict]:
+    """둘 이상 채널이 짚은 일정을 limit 개까지. 하나도 없을 때만 한 채널짜리를 둘까지(event_block 주석)."""
+    strong = [e for e in events if e["channels"] >= 2]
+    return strong[:limit] if strong else [e for e in events if e["channels"] < 2][:2]
+
+
+def event_lines(R: Render, events: list[dict], limit: int) -> list[str]:
+    """[일정] 재료. 글 아래 📌 블록에 실릴 것과 같은 줄을 날짜·요일과 함께 모델에게도 준다.
+
+    발췌에는 "주 후반 예정된 삼성전자 3분기 잠정실적"처럼 날짜 없이 적힌 일정이 많다. 그걸 읽은 모델이
+    요일을 짐작해 '수요일 실적 발표'라고 썼다(실제 10/8 목요일 · 2026-10-09 시험). 일정 표는 날짜를 안다.
+    """
+    picked = pick_events(events, limit)
+    if not picked:
+        return []
+    return ["[일정] 채널이 짚은 앞날 일정입니다. 날짜·요일은 여기 적힌 대로 쓰세요."] + [
+        f"- {R.date_label(e['date'])} {e['name']} · {e['event']}" for e in picked
+    ]
+
+
 def event_block(R: Render, title: str, events: list[dict], limit: int, show_date: bool = True) -> list[str]:
     """📌 일정 블록. 둘 이상 채널이 짚은 것만 싣고, 하나도 없을 때만 한 채널짜리를 둘까지.
 
@@ -598,9 +623,7 @@ def event_block(R: Render, title: str, events: list[dict], limit: int, show_date
     줄마다 같은 날짜를 되풀이하지 않는다(2026-10-09). 그때는 줄 머리의 식별자인 종목 이름을
     굵게 세운다 — '새로 회자된 종목' 블록과 같은 규칙.
     """
-    strong = [e for e in events if e["channels"] >= 2]
-    weak = [e for e in events if e["channels"] < 2]
-    picked = strong[:limit] if strong else weak[:2]
+    picked = pick_events(events, limit)
     if not picked:
         return []
     if show_date:
@@ -897,6 +920,8 @@ DIGEST_FORMAT = """\
 - 한 채널만 떠든 이야기는 갈래로 세우지 마세요. 여러 발췌에 공통으로 나오는 이야기를 고르세요.
 - 발췌를 베끼지 말고 무슨 일인지를 자기 말로 옮기세요. 링크·홍보 문구·가격 알림은 무시하세요.
 - 실적·지표·계약 숫자는 [숫자] 규칙대로 옮기고, 주가 등락률·조회 수는 넣지 마세요.
+- 요일·날짜는 발췌 머리와 [일정]에 적힌 것만 씁니다. 자료에 날짜가 없는 일은 요일을 짐작해 적지 말고
+  '이번 주 후반'처럼 씁니다.
 - [종목별 이유] 자료의 종목이 어느 갈래에 속하면 그 이유를 그 갈래의 문장에 녹이세요.
 - 대괄호 라벨([갈래] 같은 것)은 출력하지 마세요."""
 
@@ -1111,6 +1136,34 @@ def drop_unsourced_numbers(body: str, source: str) -> tuple[str, list[str]]:
     return "\n".join(lines).strip(), dropped
 
 
+# 붙어 있는 조·억·만 금액 한 덩이('23조8270억', '1조 259억').
+_AMOUNT_RUN = re.compile(r"\d[\d,]*(?:\.\d+)?\s*(?:조|억|만)(?:\s*\d[\d,]*(?:\.\d+)?\s*(?:억|만))*")
+
+
+def _with_commas(raw: str) -> str:
+    whole, _, frac = raw.replace(",", "").partition(".")
+    return f"{int(whole):,}" + (f".{frac}" if frac else "")
+
+
+def tidy_amounts(text: str) -> str:
+    """금액 표기를 한 모양으로 — '23조8270억원'·'238,270억원' → '23조 8,270억원', '7818억원' → '7,818억원'.
+
+    모델이 같은 글 안에서도 '23조 8,270억원' · '23조8270억원' · '238,270억원'(공시 원문 그대로)을 섞어
+    썼다(2026-10-09 시험). 값은 그대로 두고 조·억·만으로 다시 나눠 쓴다. 소수가 붙은 금액('106.1조')은
+    쉼표만 찍는다 — 나누면 '106조 1,000억'처럼 원문에 없던 모양이 된다. '원'의 띄어쓰기는 건드리지 않는다.
+    """
+    def fix(m: re.Match) -> str:
+        parts = re.findall(r"(\d[\d,]*(?:\.\d+)?)\s*(조|억|만)", m.group())
+        if any("." in n for n, _ in parts):
+            return " ".join(f"{_with_commas(n)}{u}" for n, u in parts)
+        total = sum(int(n.replace(",", "")) * int(_KR_SCALE[u][1]) for n, u in parts)   # 만 단위
+        jo, rest = divmod(total, 10**8)
+        eok, man = divmod(rest, 10**4)
+        out = [f"{v:,}{u}" for v, u in ((jo, "조"), (eok, "억"), (man, "만")) if v]
+        return " ".join(out) if out else m.group()
+    return _AMOUNT_RUN.sub(fix, text)
+
+
 # 출력 상한. 첫 비용 측정(2026-09-10)에서 1,400 이 매번 꽉 찼다 — 모델이 갈래마다 문장을 다섯씩 쓰고
 # 마지막 갈래가 잘려 버려졌다. 프롬프트에 길이 규칙을 적고 상한은 여유 있게 둔다(잘리면 갈래 하나를 잃는다).
 SECTION_MAX_TOKENS = 3000   # 2,200 도 저녁 글에서 한 번 꽉 찼다(09-10). 안 쓰면 비용이 없다
@@ -1211,7 +1264,8 @@ def _validate_sections(text: str, fmt: str, digest: str, mat: Material, hi_n: in
                     us.append(name_us[m.group(1)])
                 else:
                     print(f"[안내] 자료에 없는 종목 이름이라 뺍니다: {name}")
-        s.kr, s.us, s.body = list(dict.fromkeys(kr)), list(dict.fromkeys(us)), body
+        s.kr, s.us, s.body = list(dict.fromkeys(kr)), list(dict.fromkeys(us)), tidy_amounts(body)
+        s.title = tidy_amounts(s.title)
         # 채널 수 검사. 근거로 적힌 발췌(복붙 묶음의 채널 포함)에, 이 갈래의 종목을 다룬 발췌의
         # 채널을 더한다 — 모델이 번호를 하나만 적어도 그 종목을 여러 채널이 말했으면 통과한다.
         # 종목이 없는 갈래(매크로)는 근거 번호로만 판정한다.
@@ -1311,10 +1365,16 @@ PAST_HEAD_SAME_NAMES = "[지난 요약] 그날 글이 세운 갈래 제목입니
 PAST_HEAD_ALREADY_READ = "[지난 요약] 이번 주 아침·저녁 글이 세운 갈래 제목입니다. 독자가 이미 읽었습니다."
 
 
-def stored_digest_lines(db, days: list[date], R: Render, head: str = PAST_HEAD_SAME_NAMES) -> list[str]:
-    """지난 아침·저녁 글의 갈래 제목(있으면). 수·일 글의 [지난 요약] 재료."""
+def stored_digest_lines(
+    db, days: list[date], R: Render, head: str = PAST_HEAD_SAME_NAMES, before: datetime | None = None,
+) -> list[str]:
+    """지난 아침·저녁 글의 갈래 제목(있으면). 수·일 글의 [지난 요약] 재료.
+
+    `before` 를 주면 그보다 먼저 쓰인 행만 읽는다. 날짜로만 고르면 수요일 글을 저녁에 다시 돌리거나
+    지난 날짜로 만들 때 그날 저녁 글(아직 안 나간 글)까지 '독자가 읽은 글'로 들어간다(2026-10-09 시험).
+    """
     try:
-        rows = (
+        q = (
             db.table("telegram_daily_digest")
             .select("date,slot,sections")
             .in_("date", [d.isoformat() for d in days])
@@ -1322,10 +1382,10 @@ def stored_digest_lines(db, days: list[date], R: Render, head: str = PAST_HEAD_S
             #    슬롯을 안 가르면 수요일 글이 쓴 행이 그다음 일요일 재료에 섞여 같은 날이 두 번
             #    들어가고 라벨도 '저녁'으로 잘못 붙는다.
             .in_("slot", ["morning", "evening"])
-            .order("date")
-            .execute()
-            .data
         )
+        if before is not None:
+            q = q.lt("created_at", before.isoformat())
+        rows = q.order("date").execute().data
     except Exception as e:  # noqa: BLE001 — 표가 없어도 글은 나가야 한다(머리말)
         # ⚠️ 조용히 넘기지 않는다. 이 자리가 비면 수·일 글이 '지난 요약' 없이 만들어지는데,
         #    글은 멀쩡해 보여서 표가 없다는 걸 알 길이 없다.
@@ -1399,6 +1459,7 @@ def build_morning2(db, llm, model: str, R: Render, as_of: date, now: datetime, s
         + excerpt_lines(mat, "밤사이 발췌")
         + [""]
         + (reason_lines("종목별 이유 · 미국 종목", us_reasons, 8, with_change=False) if us_d == hi.date().isoformat() else [])
+        + [""] + event_lines(R, events, EVENT_LINES_DAY)
     )
     note = (REPEAT_NOTE if prev else "") + (HOLIDAY_NOTE if is_krx_holiday(hi.date()) else "")
     sections = compose_sections(llm, model, "morning2", digest, mat, note=note)
@@ -1440,6 +1501,7 @@ def build_evening2(db, llm, model: str, R: Render, as_of: date, now: datetime, s
         + excerpt_lines(mat, "오늘 발췌")
         + [""]
         + (reason_lines("종목별 이유 · 오늘 움직인 종목", kr_reasons, 10, with_change=True) if kr_d == day.isoformat() else [])
+        + [""] + event_lines(R, events, EVENT_LINES_DAY)
     )
     sections = compose_sections(llm, model, "evening2", digest, mat, note=REPEAT_NOTE if prev else "")
     if len(sections) < MIN_SECTIONS_TO_SEND:
@@ -1476,7 +1538,8 @@ def build_midweek(db, llm, model: str, R: Render, as_of: date, now: datetime, st
     faces = load_week_new_faces(db, monday, as_of)
     events = load_events(db, as_of + timedelta(days=1), monday + timedelta(days=6), "KR")
     past = stored_digest_lines(
-        db, [monday + timedelta(days=i) for i in range((as_of - monday).days + 1)], R, head=PAST_HEAD_ALREADY_READ,
+        db, [monday + timedelta(days=i) for i in range((as_of - monday).days + 1)], R,
+        head=PAST_HEAD_ALREADY_READ, before=hi,
     )
     prev = previous_post_lines(previous_posts(db, hi), R)
 
@@ -1488,6 +1551,7 @@ def build_midweek(db, llm, model: str, R: Render, as_of: date, now: datetime, st
         + excerpt_lines(mat, "이번 주 발췌")
         + [""]
         + (reason_lines("종목별 이유 · 최근 움직인 종목", kr_reasons, 8, with_change=True) if kr_reasons else [])
+        + [""] + event_lines(R, events, EVENT_LINES_DAY)
     )
     sections = compose_sections(llm, model, "midweek", digest, mat, note=REPEAT_NOTE_MIDWEEK if (prev or past) else "")
     if len(sections) < MIN_SECTIONS_TO_SEND:
@@ -1536,7 +1600,8 @@ def build_us_weekend(db, llm, model: str, R: Render, as_of: date, now: datetime,
         night.total + week.total,
     )
     us_d, us_reasons = load_us_reasons(db, sat)
-    us_fresh = us_d == sat.isoformat()   # 토요일 행 = 금요일 세션. 저녁에만 만들면 없을 수 있다(머리말)
+    us_fresh = us_d == sat.isoformat()
+    events = load_events(db, sat + timedelta(days=2), sat + timedelta(days=8), "US")   # 토요일 행 = 금요일 세션. 저녁에만 만들면 없을 수 있다(머리말)
     digest = "\n".join(
         [f"[창] {span_label(*mat.window)} (KST) · 이번 주 미국장"]
         + excerpt_lines(mat, "금요일 밤 발췌", night.excerpts)
@@ -1544,12 +1609,12 @@ def build_us_weekend(db, llm, model: str, R: Render, as_of: date, now: datetime,
         + excerpt_lines(mat, "이번 주 미국 종목 발췌", week.excerpts)
         + [""]
         + (reason_lines("종목별 이유 · 미국 종목", us_reasons, 8, with_change=False) if us_fresh else [])
+        + [""] + event_lines(R, events, EVENT_LINES_WEEK)
     )
     sections = compose_sections(llm, model, "us_week", digest, mat)
     if len(sections) < MIN_SECTIONS_TO_SEND:
         print(f"[skip] 갈래가 {len(sections)}개뿐이라(최소 {MIN_SECTIONS_TO_SEND}) 미장 글을 만들지 않습니다.")
         return ""
-    events = load_events(db, sat + timedelta(days=2), sat + timedelta(days=8), "US")
     # 한 주 구간 등락(지난 금요일 종가 대비 이번 금요일 종가). 미국은 뉴욕 날짜로 월~금.
     chg_kr, chg_us = _changes_for(db, sections, [], now, ("range", monday, fri), ("range", monday, fri))
 
@@ -1576,7 +1641,7 @@ def build_weekly2(db, llm, model: str, R: Render, as_of: date, now: datetime, st
     faces = load_week_new_faces(db, monday, friday)
     events = load_events(db, sat + timedelta(days=2), sat + timedelta(days=8), "KR")
     scores = [r for r in load_scores(db, 7, until=friday) if r["date"] >= monday.isoformat()]
-    past = stored_digest_lines(db, [monday + timedelta(days=i) for i in range(5)], R)
+    past = stored_digest_lines(db, [monday + timedelta(days=i) for i in range(5)], R, before=at(sat, NIGHT_TO_HOUR))
 
     digest = "\n".join(
         [f"[창] {span_label(*mat.window)} (KST) · {R.date_label(monday.isoformat())} 부터 {R.date_label(friday.isoformat())} 까지"]
@@ -1585,6 +1650,7 @@ def build_weekly2(db, llm, model: str, R: Render, as_of: date, now: datetime, st
         + excerpt_lines(mat, "이번 주 발췌")
         + [""]
         + (reason_lines("종목별 이유 · 이번 주 움직인 종목", kr_reasons, 8, with_change=True) if kr_reasons else [])
+        + [""] + event_lines(R, events, EVENT_LINES_WEEK)
     )
     sections = compose_sections(llm, model, "weekly2", digest, mat)
     if len(sections) < MIN_SECTIONS_TO_SEND:

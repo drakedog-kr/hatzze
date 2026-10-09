@@ -105,7 +105,7 @@ def test_validate_drops_the_sentence_but_keeps_the_section():
     text = "## 삼성전자 실적\n삼성전자 영업이익은 12조 1000억 원이었습니다. 순이익은 9조 원이었습니다.\n종목: 없음\n근거: 1"
     out = BD._validate_sections(text, "evening2", SOURCE, mat, 4)
     assert len(out) == 1
-    assert out[0].body == "삼성전자 영업이익은 12조 1000억 원이었습니다."
+    assert out[0].body == "삼성전자 영업이익은 12조 1,000억 원이었습니다."   # 금액 모양도 맞춘다(tidy_amounts)
 
 
 # ── 휴장일 ───────────────────────────────────────────────────────────────────
@@ -299,3 +299,53 @@ def test_day_event_block_drops_the_repeated_date():
 def test_week_event_block_keeps_dates():
     block = BD.event_block(R_REAL, "다음 주 일정", EVENTS, 8)
     assert "<b>10월 8일</b> 삼성전자 · 3분기 잠정실적 발표" in block[2]
+
+
+# ── 금액 모양 · 요일 ─────────────────────────────────────────────────────────
+
+
+def test_tidy_amounts_spaces_and_commas():
+    assert BD.tidy_amounts("매출은 23조8270억원, 영업이익은 7818억원입니다.") == "매출은 23조 8,270억원, 영업이익은 7,818억원입니다."
+    assert BD.tidy_amounts("예상치 1조259억원 · 106.1조원 · 10만 원대") == "예상치 1조 259억원 · 106.1조원 · 10만 원대"
+    # 이미 맞는 모양은 그대로다.
+    assert BD.tidy_amounts("23조 8,270억원") == "23조 8,270억원"
+    # 공시 원문 그대로 옮긴 큰 금액은 조·억으로 풀어 쓴다(10/7 주중 점검 시험). 소수가 붙은 금액은 나누지 않는다.
+    assert BD.tidy_amounts("매출은 238,270억원, 예상치는 10,259억원") == "매출은 23조 8,270억원, 예상치는 1조 259억원"
+    assert BD.tidy_amounts("106.1조원 · 5.46조원") == "106.1조원 · 5.46조원"
+
+
+def test_validate_tidies_amounts():
+    mat = BD.Material(
+        excerpts=[BD.Excerpt(n=1, channel="a", message_id=1, text="x", views=1, forwards=0,
+                             posted_at=datetime(2026, 10, 8, 7, tzinfo=BD.KST), channels={"a", "b"})],
+        kr_names={}, us_names={}, window=(None, None), total=1,
+    )
+    text = "## 실적\n영업이익은 12조1000억원이었습니다.\n종목: 없음\n근거: 1"
+    [s] = BD._validate_sections(text, "evening2", SOURCE, mat, 4)
+    assert s.body == "영업이익은 12조 1,000억원이었습니다."
+
+
+def test_excerpt_head_carries_the_weekday():
+    mat = BD.Material(
+        excerpts=[BD.Excerpt(n=1, channel="ch", message_id=1, text="본문", views=1, forwards=0,
+                             posted_at=datetime(2026, 10, 6, 22, tzinfo=BD.KST))],
+        kr_names={}, us_names={}, window=(None, None), total=1,
+    )
+    assert BD.excerpt_lines(mat, "발췌")[1].startswith("(1) 10/06(화) 22시 @ch")
+
+
+def test_event_lines_give_the_model_dates_with_weekdays():
+    lines = BD.event_lines(R_REAL, EVENTS, 4)
+    assert lines[0].startswith("[일정]")
+    assert "- 10월 8일(목) 삼성전자 · 3분기 잠정실적 발표" in lines
+    assert BD.event_lines(R_REAL, [], 4) == []
+
+
+def test_past_summary_reads_only_rows_written_before_the_post():
+    db = _DB([])
+    before = datetime(2026, 10, 7, 14, tzinfo=BD.KST)
+    BD.stored_digest_lines(db, [date(2026, 10, 7)], R, before=before)
+    assert ("lt", ("created_at", before.isoformat())) in db.log
+    db = _DB([])
+    BD.stored_digest_lines(db, [date(2026, 10, 7)], R)
+    assert not any(name == "lt" for name, _ in db.log)
