@@ -119,11 +119,10 @@ def test_holiday_table():
 
 def test_morning_head_renames_on_holiday():
     lo, hi = BD.night_window(date(2026, 10, 9))
-    head = BD.morning_head(R, lo, hi)
-    assert head[0] == "🌅 <b>휴장일 아침 요약</b>"
-    assert "개장 전" not in head[1]
+    assert BD.morning_head(R, lo, hi) == ["🌅 <b>휴장일 아침 요약</b>", "10월 9일"]
+    # 시간 범위('7일 18시 ~ 8일 7시')는 싣지 않는다(2026-10-09).
     lo, hi = BD.night_window(date(2026, 10, 8))
-    assert BD.morning_head(R, lo, hi) == ["🌅 <b>개장 전 요약</b>", "10월 8일 개장 전 · 7일 18시 ~ 8일 7시"]
+    assert BD.morning_head(R, lo, hi) == ["🌅 <b>개장 전 요약</b>", "10월 8일 개장 전"]
 
 
 def test_evening_skips_on_holiday_without_touching_db():
@@ -305,13 +304,19 @@ def test_week_event_block_keeps_dates():
 
 
 def test_tidy_amounts_spaces_and_commas():
-    assert BD.tidy_amounts("매출은 23조8270억원, 영업이익은 7818억원입니다.") == "매출은 23조 8,270억원, 영업이익은 7,818억원입니다."
-    assert BD.tidy_amounts("예상치 1조259억원 · 106.1조원 · 10만 원대") == "예상치 1조 259억원 · 106.1조원 · 10만 원대"
+    assert BD.tidy_amounts("매출은 23조8270억원, 영업이익은 7818억원입니다.") == "매출은 23조 8,270억 원, 영업이익은 7,818억 원입니다."
+    assert BD.tidy_amounts("예상치 1조259억원 · 106.1조원 · 10만 원대") == "예상치 1조 259억 원 · 106.1조 원 · 10만 원대"
     # 이미 맞는 모양은 그대로다.
-    assert BD.tidy_amounts("23조 8,270억원") == "23조 8,270억원"
+    assert BD.tidy_amounts("23조 8,270억 원") == "23조 8,270억 원"
     # 공시 원문 그대로 옮긴 큰 금액은 조·억으로 풀어 쓴다(10/7 주중 점검 시험). 소수가 붙은 금액은 나누지 않는다.
-    assert BD.tidy_amounts("매출은 238,270억원, 예상치는 10,259억원") == "매출은 23조 8,270억원, 예상치는 1조 259억원"
-    assert BD.tidy_amounts("106.1조원 · 5.46조원") == "106.1조원 · 5.46조원"
+    assert BD.tidy_amounts("매출은 238,270억원, 예상치는 10,259억원") == "매출은 23조 8,270억 원, 예상치는 1조 259억 원"
+    assert BD.tidy_amounts("106.1조원 · 5.46조원") == "106.1조 원 · 5.46조 원"
+
+
+def test_currency_after_korean_units_is_spaced_but_digits_keep_won_attached():
+    assert BD.tidy_amounts("15조원어치 · 3억 8,000만달러") == "15조 원어치 · 3억 8,000만 달러"
+    # 아라비아 숫자 바로 뒤 '원'은 붙여 쓰기가 허용돼 그대로 둔다. '엔비디아'의 '엔'은 화폐가 아니다.
+    assert BD.tidy_amounts("5,000원 · 2조엔비디아") == "5,000원 · 2조엔비디아"
 
 
 def test_validate_tidies_amounts():
@@ -322,7 +327,7 @@ def test_validate_tidies_amounts():
     )
     text = "## 실적\n영업이익은 12조1000억원이었습니다.\n종목: 없음\n근거: 1"
     [s] = BD._validate_sections(text, "evening2", SOURCE, mat, 4)
-    assert s.body == "영업이익은 12조 1,000억원이었습니다."
+    assert s.body == "영업이익은 12조 1,000억 원이었습니다."
 
 
 def test_excerpt_head_carries_the_weekday():

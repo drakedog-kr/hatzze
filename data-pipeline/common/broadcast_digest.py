@@ -270,11 +270,15 @@ def is_krx_holiday(d: date) -> bool:
 
 
 def morning_head(R: Render, lo: datetime, hi: datetime) -> list[str]:
-    """아침 글 머리 두 줄. 휴장일엔 '개장 전'이 거짓이라 이름을 바꾼다."""
-    day, span = hi.date(), span_label(lo, hi, drop_month=hi.month)
-    if is_krx_holiday(day):
-        return ["🌅 <b>휴장일 아침 요약</b>", f"{R.date_label(day.isoformat())} · {span}"]
-    return ["🌅 <b>개장 전 요약</b>", f"{R.date_label(day.isoformat())} 개장 전 · {span}"]
+    """아침 글 머리 두 줄. 휴장일엔 '개장 전'이 거짓이라 이름을 바꾼다.
+
+    '7일 18시 ~ 8일 7시' 같은 시간 범위는 뺐다(2026-10-09 — 쓸데없는 글자는 줄인다). 어느 밤인지는
+    날짜가 말한다 — 자료가 없어 하루 물러난 날(load_material_with_fallback)도 날짜가 그 밤의 날짜로 찍힌다.
+    """
+    label = R.date_label(hi.date().isoformat())
+    if is_krx_holiday(hi.date()):
+        return ["🌅 <b>휴장일 아침 요약</b>", label]
+    return ["🌅 <b>개장 전 요약</b>", f"{label} 개장 전"]
 
 
 # ─── 재료: 메시지 ─────────────────────────────────────────────────────────────
@@ -1153,8 +1157,11 @@ def drop_unsourced_numbers(body: str, source: str) -> tuple[str, list[str]]:
     return "\n".join(lines).strip(), dropped
 
 
-# 붙어 있는 조·억·만 금액 한 덩이('23조8270억', '1조 259억').
-_AMOUNT_RUN = re.compile(r"\d[\d,]*(?:\.\d+)?\s*(?:조|억|만)(?:\s*\d[\d,]*(?:\.\d+)?\s*(?:억|만))*")
+# 붙어 있는 조·억·만 금액 한 덩이('23조8270억', '1조 259억')와 그 뒤의 화폐 단위('원'·'달러' …).
+# '엔'은 넣지 않는다 — '엔비디아'·'엔진'이 금액 뒤에 붙어 나올 수 있다.
+_AMOUNT_RUN = re.compile(
+    r"\d[\d,]*(?:\.\d+)?\s*(?:조|억|만)(?:\s*\d[\d,]*(?:\.\d+)?\s*(?:억|만))*(?:\s*(원|달러|위안|유로))?"
+)
 
 
 def _with_commas(raw: str) -> str:
@@ -1163,21 +1170,24 @@ def _with_commas(raw: str) -> str:
 
 
 def tidy_amounts(text: str) -> str:
-    """금액 표기를 한 모양으로 — '23조8270억원'·'238,270억원' → '23조 8,270억원', '7818억원' → '7,818억원'.
+    """금액 표기를 한 모양으로 — '23조8270억원'·'238,270억원' → '23조 8,270억 원', '7818억원' → '7,818억 원'.
 
-    모델이 같은 글 안에서도 '23조 8,270억원' · '23조8270억원' · '238,270억원'(공시 원문 그대로)을 섞어
-    썼다(2026-10-09 시험). 값은 그대로 두고 조·억·만으로 다시 나눠 쓴다. 소수가 붙은 금액('106.1조')은
-    쉼표만 찍는다 — 나누면 '106조 1,000억'처럼 원문에 없던 모양이 된다. '원'의 띄어쓰기는 건드리지 않는다.
+    모델이 같은 글 안에서도 '23조 8,270억원' · '23조8270억원' · '238,270억원'(공시 원문 그대로) · '7,818억 원'을
+    섞어 썼다(2026-10-09 시험). 값은 그대로 두고 조·억·만으로 다시 나눠 쓴다. 소수가 붙은 금액('106.1조')은
+    쉼표만 찍는다 — 나누면 '106조 1,000억'처럼 원문에 없던 모양이 된다.
+    화폐 단위는 띄어 쓴다(한글 맞춤법 제43항 원칙 · 2026-10-09 결정): '7,818억 원' · '15조 원어치'.
+    아라비아 숫자 바로 뒤('5,000원')는 붙여 쓰기가 허용되고 흔히 그렇게 써서 건드리지 않는다.
     """
     def fix(m: re.Match) -> str:
+        unit = f" {m.group(1)}" if m.group(1) else ""
         parts = re.findall(r"(\d[\d,]*(?:\.\d+)?)\s*(조|억|만)", m.group())
         if any("." in n for n, _ in parts):
-            return " ".join(f"{_with_commas(n)}{u}" for n, u in parts)
+            return " ".join(f"{_with_commas(n)}{u}" for n, u in parts) + unit
         total = sum(int(n.replace(",", "")) * int(_KR_SCALE[u][1]) for n, u in parts)   # 만 단위
         jo, rest = divmod(total, 10**8)
         eok, man = divmod(rest, 10**4)
         out = [f"{v:,}{u}" for v, u in ((jo, "조"), (eok, "억"), (man, "만")) if v]
-        return " ".join(out) if out else m.group()
+        return " ".join(out) + unit if out else m.group()
     return _AMOUNT_RUN.sub(fix, text)
 
 
