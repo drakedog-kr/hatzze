@@ -59,6 +59,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
+from common.llm_parallel import ordered  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE_SHORT  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
 from common.surging import load_stock_daily, top_surging, window_end_for  # noqa: E402
@@ -283,9 +284,11 @@ def _generate(db, client, dry_run: bool, table: str, key_col: str, latest: str, 
         print(f"[dry-run] {table} — LLM 호출·저장 없이 종료합니다({len(digests)}종목).")
         return 0
     saved = 0
-    for key, name, digest in digests:
+    # 묻는 것만 동시에, 저장 · 결과 줄은 종목 차례대로(common/llm_parallel).
+    for (key, name, _digest), text in ordered(lambda d: ask_oneline(client, d[2], d[1]), digests, client=client):
         try:
-            text = ask_oneline(client, digest, name)
+            if isinstance(text, Exception):
+                raise text
             if not text:
                 print(f"  [{name}] 쓸 문장을 못 받아 저장하지 않았습니다(빈 응답 · 지시문 누출 · {LEN_CEIL}자 초과). 화면은 전날 문장으로 물러납니다.")
                 continue

@@ -51,6 +51,7 @@ loadUsStockDaily(windowBefore)로 읽어 기준일 앞 사흘을 세기 때문�
 from __future__ import annotations
 
 import sys
+import threading
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -58,6 +59,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
+from common.llm_parallel import ordered  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.js_round import js_fixed1  # noqa: E402
@@ -812,10 +814,12 @@ def main() -> None:
 
     client = get_llm_client(ANTHROPIC_API_KEY)
     calls = 0
+    calls_lock = threading.Lock()  # 종목 흐름 요약을 동시에 묻는다(common/llm_parallel)
 
     def ask(system: str, digest: str, max_tokens: int = 400, model: str = MODEL) -> str:
         nonlocal calls
-        calls += 1
+        with calls_lock:
+            calls += 1
         resp = client.messages.create(
             model=model,
             max_tokens=max_tokens,
@@ -935,29 +939,35 @@ def main() -> None:
         print("[안내] --stocks-only — 총평은 건드리지 않습니다." if stocks_only else "[안내] 총평을 만들 집계가 없어 건너뜁니다.")
 
     # ── 종목 흐름 요약 ──────────────────────────────────────────────────────
-    saved = 0
-    for ticker, name, digest in stock_digests:
-        try:
-            candidates = [ask(STOCK_SYSTEM, digest)]
-            for _ in range(MAX_RETRIES):
-                cur = candidates[-1]
-                found = narrative_problems(cur, digest)
-                if LEN_MIN <= len(cur) <= LEN_MAX and not found:
-                    break
-                if found:
-                    print(f"  [{name}] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
-                    fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 그 대목을 빼고 {LEN_MIN}~{LEN_MAX}자로 다시 써 주세요.\n\n{digest}"
-                else:
-                    need = "늘려" if len(cur) < LEN_MIN else "줄여"
-                    fix = (
-                        f"방금 쓴 문장은 {len(cur)}자입니다. 뜻은 유지하면서 {need} "
-                        f"{LEN_MIN}~{LEN_MAX}자로 다시 써 주세요.\n\n"
-                        f"{digest}\n\n[방금 쓴 문장]\n{cur}"
-                    )
-                candidates.append(ask(STOCK_SYSTEM, fix))
+    def compose_narrative(item: tuple[str, str, str]) -> str | None:
+        """한 종목의 흐름 요약 — 국내 compose_narrative 와 같다. 묻는 데까지만 동시에 돈다."""
+        _ticker, name, digest = item
+        candidates = [ask(STOCK_SYSTEM, digest)]
+        for _ in range(MAX_RETRIES):
+            cur = candidates[-1]
+            found = narrative_problems(cur, digest)
+            if LEN_MIN <= len(cur) <= LEN_MAX and not found:
+                break
+            if found:
+                print(f"  [{name}] 문장을 버리고 다시 씁니다({' · '.join(found)}): {cur[:40]}…")
+                fix = f"방금 쓴 문장에 문제가 있습니다({' · '.join(found)}). 그 대목을 빼고 {LEN_MIN}~{LEN_MAX}자로 다시 써 주세요.\n\n{digest}"
+            else:
+                need = "늘려" if len(cur) < LEN_MIN else "줄여"
+                fix = (
+                    f"방금 쓴 문장은 {len(cur)}자입니다. 뜻은 유지하면서 {need} "
+                    f"{LEN_MIN}~{LEN_MAX}자로 다시 써 주세요.\n\n"
+                    f"{digest}\n\n[방금 쓴 문장]\n{cur}"
+                )
+            candidates.append(ask(STOCK_SYSTEM, fix))
+        # 고르는 규칙은 국내와 같다(generate_telegram_narratives.pick_narrative).
+        return pick_narrative(candidates, digest, name)
 
-            # 고르는 규칙은 국내와 같다(generate_telegram_narratives.pick_narrative).
-            text = pick_narrative(candidates, digest, name)
+    saved = 0
+    # 묻는 것만 동시에, 저장 · 결과 줄은 종목 차례대로(common/llm_parallel).
+    for (ticker, name, digest), text in ordered(compose_narrative, stock_digests, client=client):
+        try:
+            if isinstance(text, Exception):
+                raise text
             if text is None:
                 print(f"  [{name}] 저장할 문장이 없어 건너뜁니다.")
                 continue
