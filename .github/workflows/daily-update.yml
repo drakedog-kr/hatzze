@@ -864,8 +864,11 @@ jobs:
       # 입력은 telegram_stock_daily(그날) + 메시지 본문이라 stock_daily 뒤면 어디든 된다.
       # ⚠️ 슬롯을 꼭 넘길 것. 한때 스크립트가 그날 글 수(1,500건)로 아침을 짐작했는데, 주말·연휴
       #    저녁도 그 아래라 2026-09-24~26 추석에 미장 판이 안 생겼다(스크립트 머리 주석).
-      # ⚠️ 추출이 실패한 시장은 빼고 돈다(국장 '종목 추출' 주석 ②). **저녁만이다** — 아침은 어느 판도
-      #    안 만들고 KRX 확정값만 채우는데(태그를 안 읽는다), --us-only 를 주면 그 채우기까지 빠진다.
+      # ⚠️ 추출이 실패한 시장은 빼고 돈다(국장 '종목 추출' 주석 ②). **저녁만이다** — 아침은 그날 판을
+      #    안 만들고 KRX 확정값만 채우는데, --us-only 를 주면 그 채우기까지 빠진다.
+      # ⭐ 빈 날 다시 잡기(2026-10-11, 스크립트 머리 주석) — 아침 · 저녁 모두 앞 7일에 행이 없는 날을 다시 만든다.
+      #    그날 저녁이 못 만든 날(10-08 추출 사고)이 영영 비던 것을 다음 실행이 메운다. 이번 실행에서 일별 집계가
+      #    실패한 시장은 --skip-catchup 으로 뺀다 — 낡은 집계로 지난 날을 만들면 행이 서서 다시 안 고쳐진다.
       - name: (텔레그램) 등락 종목 까닭 생성
         id: telegram_move_reasons
         continue-on-error: true
@@ -877,13 +880,18 @@ jobs:
           SLOT: ${{ github.event.inputs.slot }}
           KR_TAGS: ${{ steps.telegram_extract.outcome }}
           US_TAGS: ${{ steps.telegram_us_extract.outcome }}
+          KR_DAILY: ${{ steps.telegram_stock_daily.outcome }}
+          US_DAILY: ${{ steps.telegram_us_daily.outcome }}
         run: |
           only=""
           if [ "$SLOT" != morning ]; then
             [ "$KR_TAGS" = success ] || only="--us-only"
             [ "$US_TAGS" = success ] || only="--kr-only"
           fi
-          python data-pipeline/scripts/generate_move_reasons.py --slot "$SLOT" $only
+          skip=""
+          [ "$KR_DAILY" = success ] || skip="$skip --skip-catchup kr"
+          [ "$US_DAILY" = success ] || skip="$skip --skip-catchup us"
+          python data-pipeline/scripts/generate_move_reasons.py --slot "$SLOT" $only $skip
 
       # 국장 LLM 문장. 국장 센티먼트·테마·트렌딩이 전부 끝난 뒤여야 digest 가 찬다.
       # ⭐ 미장 총평보다 앞이다(2026-09-28, 위 트렌딩 머리 주석). 예전엔 미장 동시 언급·트렌딩·테마·
