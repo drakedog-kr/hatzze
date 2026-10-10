@@ -219,7 +219,8 @@ async function themeMembers(theme: string): Promise<MemberRow[] | null> {
  * (generate_move_reasons.fill_krx) 오늘 줄은 하루 동안 등락률이 비어 있었다. 데일리 노트가 오늘 글에만 야후를
  * 보는 규칙(lib/daily-note.ts getNoteStocks)을 그대로 따른다:
  *   - 오늘(KST)이고 change_rate 가 비어 있는 줄만. 어제 줄은 안 본다 — 야후의 등락률은 늘 '지금 세션'이라
- *     이튿날 장이 열리면 어제 줄에 오늘 값이 앉는다. 어제 줄은 KRX 가 낮에 채울 때까지 '종가 전'으로 둔다.
+ *     이튿날 장이 열리면 어제 줄에 오늘 값이 앉는다. 어제 줄은 이튿날 08:00 KRX 공표 뒤 배당 잡이 종가 이력으로
+ *     채운다(generate_move_reasons.py --fill-only) — 그 전(자정~08시)만 '종가 전'이다. 예전엔 저녁 19시께에야 채워졌다.
  *   - 못 구하면 null 그대로(화면이 '종가 전'을 적는다). 캐시는 데일리 노트와 같은 600초.
  * 오늘 까닭은 하루 몇 줄이라(테마 하나 5줄 안팎) 요청 수가 작다.
  */
