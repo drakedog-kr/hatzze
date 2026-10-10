@@ -6,7 +6,7 @@
   미국 시세    핀허브 `quote`
   환율         ECB 참조환율(common/fx.py) · 안 오면 FRED
   ⚠️ 시세(국내·미국)·환율을 못 받은 날은 표에 있던 바로 전 값을 물려받는다(common/carry_quote.py) — None 으로 쓰면
-     어제 값까지 지워진다.
+     어제 값까지 지워진다. 국내는 그날 시세 목록으로 상장폐지를 못 거르므로 어제 표에 종가가 있던 ETF 만 싣는다.
 
 '1년에 얼마'는 미국·국내 다 같다 — **지난 365일 안에 지급된 건의 합.** 지급 달은 그 건들의 달이라 달력에 든다.
 
@@ -315,7 +315,7 @@ def main() -> None:
 
     latest = krx_latest()
     if latest is None:
-        print("[ETF] KRX 시세를 못 받았습니다 — 국내 ETF 는 표에 있던 바로 전 종가를 물려받습니다")
+        print("[ETF] KRX 시세를 못 받았습니다 — 국내 ETF 는 표에 있던 바로 전 종가를 물려받고, 그 종가가 없던 것은 뺍니다")
     kr_hist = seibro_history(today)
     # 이번에 받은 과표가 먼저고, 못 받은 지급 건은 저장된 값으로 채운다(stored_taxable 주석). 읽기만 하므로 --dry-run 에서도 부른다.
     db = get_client()
@@ -335,9 +335,14 @@ def main() -> None:
             if not paid:
                 continue  # 지난 1년 지급이 없으면 지금은 분배가 없는 상품이다
             px = latest[1].get(code) if latest else None
-            if latest and px is None:
+            # 시세 목록에 없으면 상장폐지·코드 변경 — 화면에 못 세운다. KRX 를 못 받은 날은 목록 대신 어제 표에 종가가
+            # 있던 코드만 세운다(아래 carry_close 가 물려줄 수 있는 것). 10-10 에 KRX 403 이 나자 이 거름이 꺼져 평소
+            # 빠지던 상장폐지·만기 ETF 26개가 종가 없이 실려 검색에 떴다. 어제 표마저 못 읽은 날은 국내가 0개라
+            # 정리 문턱(MIN_ROWS_TO_PRUNE)에 걸려 어제 행이 그대로 남는다.
+            listed = px is not None if latest else bool((last.get(code) or {}).get("close"))
+            if not listed:
                 no_price += 1
-                continue  # 시세 목록에 없으면 상장폐지·코드 변경 — 화면에 못 세운다
+                continue
             close = float(px["TDD_CLSPRC"]) if px and px.get("TDD_CLSPRC") else None
             ttm = round(sum(p["amount"] for p in paid), 2)
             kr_count += 1
@@ -360,7 +365,7 @@ def main() -> None:
         issuers = sorted({r["issuer"] for r in kr_hist})
         with_tx = [r for r in rows if r["market"] == "KR" and r["taxable_dps"] is not None]
         partial = [r for r in with_tx if r["taxable_dps"] < r["ttm_dps"] * 0.99]
-        print(f"[ETF] SEIBro 분배 내역 {len(kr_hist)}건 · {len(by_code)}종목 중 지난 1년 지급 있음 {kr_count} · 운용사 {len(issuers)}곳" + (f" · 시세 없어 뺀 것 {no_price}" if no_price else ""))
+        print(f"[ETF] SEIBro 분배 내역 {len(kr_hist)}건 · {len(by_code)}종목 중 지난 1년 지급 있음 {kr_count} · 운용사 {len(issuers)}곳" + (f" · {'시세' if latest else '어제 종가'} 없어 뺀 것 {no_price}" if no_price else ""))
         print(f"[ETF] 과표 붙은 국내 ETF {len(with_tx)} · 그중 일부만 과세 {len(partial)}")
         for r in sorted(partial, key=lambda r: r["taxable_dps"] / r["ttm_dps"])[:6]:
             print(f"  {r['name_ko']:34s} 분배금 {r['ttm_dps']:>8,.0f} 과표 {r['taxable_dps']:>8,.0f} ({r['taxable_dps'] / r['ttm_dps'] * 100:.0f}%)")
