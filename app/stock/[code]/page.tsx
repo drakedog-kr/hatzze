@@ -4,14 +4,14 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 
 import { withSubjectParticle } from "@/lib/format";
-import { STOCK_STAT_DAYS, STOCK_TREND_DAYS, fmtKoDate, getStockPage, stockHref, stockMddHref, themePeerStocks, type StockTrendPoint } from "@/lib/stock-page";
+import { STOCK_STAT_DAYS, STOCK_TREND_DAYS, fmtKoDate, getStockPage, stockHref, stockMddHref, themePeerStocks, type StockPricePoint, type StockTrendPoint } from "@/lib/stock-page";
 
 import { getStockDividend } from "@/lib/dividend";
 import { eventDateLabel, getStockEvents, getStockMoveReason, todayKst } from "@/lib/kadera-why";
 import { DIVIDEND_PUBLIC } from "../../screen-flags";
 import { DividendCard } from "./DividendCard";
 import { PageJsonLd } from "../../JsonLd";
-import { CoverLinkCell, CoverMeta, Module, dayPill } from "../../kadera/V2Modules";
+import { CoverLinkCell, CoverMeta, MentionTrend, Module, dayPill, type TrendPrice } from "../../kadera/V2Modules";
 import { StockLogo } from "../../StockLogo";
 import { KADERA_CARD } from "../../og-copy";
 import { pageMetadata } from "../../seo";
@@ -87,41 +87,17 @@ export async function generateMetadata({ params }: { params: Promise<{ code: str
   return d.indexable ? meta : { ...meta, robots: { index: false, follow: true } };
 }
 
-/**
- * 언급 추이 막대. **SVG 도 라이브러리도 안 쓴다** — 막대 90개는 div 로 충분하고, 서버 컴포넌트로 남길 수 있어
- * 클라이언트 번들이 안 는다. 꼴은 테마 한 장의 '30일 점유율 추이'와 같다(.v2-tm-trend) — 최근 사흘만 진한 파랑.
- *
- * ⚠️ 빈 날을 0 으로 메워 받는다. 안 메우면 언급 없는 날을 건너뛰어 막대 간격이 날짜와 어긋나고, 추이가 실제보다 촘촘해 보인다.
- */
-function Trend({ points }: { points: StockTrendPoint[] }) {
-  // 바닥 10 — 그 종목의 최댓값으로만 나누면 30일에 한 번 1회 언급도 꽉 찬 막대라 삼성전자 314회와 같은 키였다(2026-10-04 점검).
-  const max = Math.max(10, ...points.map((p) => p.mentions));
-  const recentFrom = points.length >= 3 ? points[points.length - 3].date : "";
-  return (
-    <div className="v2-tm-trend" role="img" aria-label={`최근 ${points.length}일 언급 막대`}>
-      {points.map((p, i) => {
-        const at = i / Math.max(1, points.length - 1);
-        const edge = at > 0.72 ? " hz-tip-end" : at < 0.28 ? " hz-tip-start" : "";
-        return (
-          <span key={p.date} className={`hz-tip hz-vline${edge}`} data-tip={`${fmtKoDate(p.date)} · 언급 ${p.mentions}회 · 채널 ${p.channels}곳`}>
-            <i
-              className={!p.mentions ? "is-none" : p.date >= recentFrom ? "is-recent" : undefined}
-              // 0 인 날은 2px 바닥선(내부자 · 테마 추이와 같은 꼴, 2026-10-05).
-              style={{ height: p.mentions ? `${Math.max(3, (p.mentions / max) * 100)}%` : "2px" }}
-            />
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 /** "10월 3일(토)" — 날짜만 있는 값이라 UTC 자정으로 읽어 요일을 뽑는다. */
 const koDay = (iso: string) => `${fmtKoDate(iso)}(${WEEKDAY[new Date(`${iso}T00:00:00Z`).getUTCDay()]})`;
 const md = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
 const signPct = (v: number) => `${v > 0 ? "+" : v < 0 ? "-" : ""}${Math.abs(v).toFixed(2)}%`;
 const tone = (v: number | null | undefined) => (v == null || v === 0 ? "" : v > 0 ? " is-up" : " is-down");
+/** 관심 추이 막대 위 종가 선 — 날짜 → 높이 · 말풍선 둘째 줄('종가 276,000원 +0.87%'). 등락은 첫 줄 띠(종가 칸)와 같은 꼴. */
+const pricesByDate = (rows: StockPricePoint[]) =>
+  new Map<string, TrendPrice>(
+    rows.map((p) => [p.date, { close: p.close, tip: `종가 ${p.close.toLocaleString("ko-KR")}원${p.changeRate != null ? ` ${signPct(p.changeRate)}` : ""}` }]),
+  );
 
 export default async function StockPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
@@ -314,11 +290,19 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
             </p>
           ) : (
             <div className="v2-tm-trendbody">
-              {/* 위 숫자 넷은 아래 막대와 **같은 기간**(최근 30일)이다 — 90일 숫자를 두었더니 머리 '9월 4일 ~ 10월 3일' 아래에 '가장 많던 날 · 7월 21일'이
+              {/* 위 숫자 셋은 아래 막대와 **같은 기간**(최근 30일)이다 — 90일 숫자를 두었더니 머리 '9월 4일 ~ 10월 3일' 아래에 '가장 많던 날 · 7월 21일'이
                   서서 기간이 어긋나 보였다(2026-10-04 점검). 90일 값은 검색 설명(generateMetadata)에만 쓴다.
-                  하루 최다 채널 — 채널 합집합은 하루 단위로만 정확하다(lib/stock-page.ts 머리말 ②). 라벨이 '하루'라고 말해야 한다. */}
+                  채널 수는 화면에 두지 않는다(TrendFigs 주석). */}
               <TrendFigs points={d.trend} />
-              <Trend points={d.trend} />
+              {/* 막대 키의 바닥 10 — 그 종목의 최댓값으로만 나누면 30일에 한 번 1회 언급도 꽉 찬 막대라 삼성전자 314회와 같은 키였다(2026-10-04 점검). */}
+              <MentionTrend
+                id={`px-${d.code}`}
+                points={d.trend}
+                floor={10}
+                day={fmtKoDate}
+                prices={pricesByDate(d.prices)}
+                priceLabel={(v) => `${v.toLocaleString("ko-KR")}원`}
+              />
               <div className="v2-tm-legend">
                 {/* 날짜로 적는다 — 이 화면 · 카더라의 사흘은 기준일 앞 사흘이고, 테마 한 장은 기준일을 넣은 사흘이라(2026-09-29 결정)
                     같은 '최근 3일'에 숫자가 달랐다(612회 · 318회, 2026-10-04 점검). */}
@@ -356,13 +340,15 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   );
 }
 
-/** 커뮤니티 관심 추이 위 숫자 넷 — 막대(최근 30일)와 같은 기간으로 센다. 가장 많던 날 · 하루 최다 채널은 0 이면 안 세운다. */
+/**
+ * 커뮤니티 관심 추이 위 숫자 셋 — 막대(최근 30일)와 같은 기간으로 센다. 가장 많던 날은 0 이면 안 세운다.
+ * 채널 수(몇 곳에서 언급됐나)는 두지 않는다 — 넷째 칸 '하루 최다 채널'을 걷었고(2026-10-10), 막대 말풍선에서도 뺐다(2026-10-11 지시).
+ */
 function TrendFigs({ points }: { points: StockTrendPoint[] }) {
   const total = points.reduce((s, p) => s + p.mentions, 0);
   const active = points.filter((p) => p.mentions > 0).length;
   const peak = points.reduce<StockTrendPoint | null>((b, p) => (p.mentions > 0 && (!b || p.mentions > b.mentions) ? p : b), null);
-  const peakCh = points.reduce<StockTrendPoint | null>((b, p) => (p.channels > 0 && (!b || p.channels > b.channels) ? p : b), null);
-  // 언급된 날이 하루뿐이면 '가장 많던 날' · '하루 최다 채널'은 앞 두 칸과 같은 하루를 되풀이한다 — 세우지 않는다.
+  // 언급된 날이 하루뿐이면 '가장 많던 날'은 앞 두 칸과 같은 하루를 되풀이한다 — 세우지 않는다.
   const single = active <= 1;
   return (
     <div className="v2-tm-figs">
@@ -379,12 +365,6 @@ function TrendFigs({ points }: { points: StockTrendPoint[] }) {
         <span>
           <b>{peak.mentions.toLocaleString("ko-KR")}회</b>
           <em>가장 많던 날 · {fmtKoDate(peak.date)}</em>
-        </span>
-      )}
-      {peakCh && !single && (
-        <span>
-          <b>{peakCh.channels}곳</b>
-          <em>하루 최다 채널 · {fmtKoDate(peakCh.date)}</em>
         </span>
       )}
     </div>

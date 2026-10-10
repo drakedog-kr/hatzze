@@ -1948,6 +1948,66 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-trend i.is-none { background: var(--t-ink4); opacity: 0.45; }
 /* 아직 안 끝난 날(오늘) — 옅게. 반나절치라 다른 날과 견줄 막대가 아니다(내부자 종목 상세 mentionPartial). */
 .v2-tm-trend i.is-part { opacity: 0.4; }
+/* 종목 상세 관심 추이(V2Modules MentionTrend) — 위 칸은 종가 줄(맥락), 아래 칸은 언급 막대(주인공).
+   자리는 변수 셋이 정한다 — 위 칸 머리 여백(최고 글자 자리) · 막대 높이 · 위 칸 아래 몫(막대 + 최저 글자 자리).
+   색은 파랑 한 가족 — 막대는 옅은 파랑 · 최근 사흘 진한 파랑(이 화면의 강조), 종가 선은 카드 색에 섞은 옅은 파랑(--px-line)이다.
+   ⛔ 그려 보고 걷은 것(2026-10-10 · 10-11):
+      · 선을 막대 위에 겹친 판 — 검은 선 + 막대를 끊는 흰 테두리가 "투박하다", 회색 막대 위 한 판 겹침도 "너무 겹쳐 보기 안 좋다"
+      · 무채색 선(기본값 차트 같다) · 등락 색(빨강 · 파랑이 막대와 갈린다, "색은 통일") · 곡선 보간(봉우리가 물렁하다)
+      · 진한 파랑 2px 선 + 회색 막대 — "시세 라인만 너무 튄다". 선은 맥락이라 막대보다 한 단 낮아야 한다 */
+.v2-tm-trend.has-px {
+  --px-top: 18px;
+  --px-bars: 52%;
+  --px-bottom: calc(var(--px-bars) + 20px);
+  --px-c: var(--t-down);
+  /* 70% — 카드 바탕 대비 라이트 3.06 · 다크 3.43(그래프 선 기준 3). 55% 는 다크에서 2.59 로 어두운 카드에 묻혔다(2026-10-11). */
+  --px-line: color-mix(in srgb, var(--t-down) 70%, var(--t-card));
+  --px-bar: color-mix(in srgb, var(--t-down) 22%, transparent);
+  --px-bar-recent: var(--t-down);
+  position: relative;
+}
+/* 막대는 칸 폭의 60% 로 가늘게 · 위만 둥글게 · 바닥에 기준선 한 줄. 손닿는 자리(칸)는 그대로 넓다. */
+.v2-tm-trend.has-px > span { justify-content: center; }
+.v2-tm-trend.has-px i { width: 60%; min-width: 2px; border-radius: 2px 2px 0 0; background: var(--px-bar); }
+.v2-tm-trend.has-px i.is-recent { background: var(--px-bar-recent); }
+.v2-tm-trend.has-px i.is-none { background: var(--t-ink4); }
+.v2-tm-trend.has-px::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--t-line); pointer-events: none; }
+/* 범례 견본도 막대와 같은 두 단 — 변수는 막대 칸(.has-px)에만 있어 값을 그대로 적는다. */
+.v2-tm-trendbody:has(> .v2-tm-trend.has-px) .v2-tm-legend i { background: color-mix(in srgb, var(--t-down) 22%, transparent); }
+.v2-tm-trendbody:has(> .v2-tm-trend.has-px) .v2-tm-legend i.is-recent { background: var(--t-down); }
+.v2-tm-pxpane {
+  position: absolute; left: 0; right: 0; top: var(--px-top); bottom: var(--px-bottom);
+  color: var(--px-line); pointer-events: none;
+}
+.v2-tm-pxpane svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.v2-tm-px-line { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+/* 최고 · 최저 — 점 위 · 아래에 값 글자. 양 끝 근처는 안쪽으로 연다(is-start · is-end).
+   막대 위에 걸칠 수 있어 카드 색 글자 테두리를 두른다(카더라 여론 선 축 글자 .v2-spark-blabel 과 같은 값). */
+.v2-tm-pxlab {
+  position: absolute; font-size: var(--fs-11); font-weight: 500; line-height: 14px; color: var(--t-ink3);
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 2px var(--t-card), 0 0 2px var(--t-card), 0 0 3px var(--t-card);
+}
+.v2-tm-pxlab.is-hi { transform: translate(-50%, calc(-100% - 5px)); }
+.v2-tm-pxlab.is-lo { transform: translate(-50%, 5px); }
+.v2-tm-pxlab.is-hi.is-start { transform: translate(-6px, calc(-100% - 5px)); }
+.v2-tm-pxlab.is-lo.is-start { transform: translate(-6px, 5px); }
+.v2-tm-pxlab.is-hi.is-end { transform: translate(calc(-100% + 6px), calc(-100% - 5px)); }
+.v2-tm-pxlab.is-lo.is-end { transform: translate(calc(-100% + 6px), 5px); }
+/* 끝점 — 가장 최근 종가. 카드 색 고리 + 퍼져 나가며 사라지는 후광 — 카더라 여론 선 끝점(.v2-spark-dot)과 같은 v2-halo 다. 선과 같은 옅은 파랑. */
+.v2-tm-pxend {
+  position: absolute; width: 6px; height: 6px; border-radius: 999px;
+  background: currentColor; box-shadow: 0 0 0 2px var(--t-card); transform: translate(-50%, -50%);
+}
+.v2-tm-pxend::after {
+  content: ""; position: absolute; inset: -5px; border-radius: 50%;
+  background: currentColor; opacity: 0.18; animation: v2-halo 2.4s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .v2-tm-pxend::after { animation: none; }
+}
+/* 호버 점은 선 위에 — 위 칸(.v2-tm-pxpane)이 칸들보다 뒤에 오므로 순서로는 선이 점을 덮는다. 점은 진한 파랑(가리킨 날을 짚는다). */
+.v2-tm-trend .v2-tm-pxdot { z-index: 1; background: var(--px-c); }
 /* 일정을 판 폭으로 쌓을 때(.v2-tm-stack · 1,000 미만 옆 칸) — 두 단을 세로 먼저 채운다(--ev-rows, ThemeDetailView). 줄 키는 제 글만큼.
    폰(679 이하)은 한 단. */
 .v2-tm-stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
@@ -2668,6 +2728,8 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 .v2-nowrap { white-space: nowrap; }
 /* 짝 없는 판 폭 추이 — 막대 칸이 1,144×56 띠였다(2026-10-05 점검). */
 .v2-sk .v2-tm-band.is-solo .v2-tm-trend { min-height: 112px; }
+/* 종가 선이 있으면 두 칸이라 더 높게 — 112 · 폰 80 이면 위 칸이 20px 남짓으로 납작했다. 판 폭(위 줄) · 폰(.v2-tm-trendmod 규칙)보다 이긴다. */
+.v2-kd .v2-tm-trendmod .v2-tm-trend.has-px { min-height: 168px; }
 /* 판 폭으로 선 짧은 일정 — 글 칸을 내용 폭으로('채널 1곳'이 글 끝에서 881px 떨어져 섰다). */
 .v2-sk > .v2-tm-events .v2-events { grid-template-columns: max-content minmax(0, max-content) max-content; }
 /* 같은 테마 종목 — 이름 · 종가 · 등락 줄 격자. 판 폭이면 넷, 짝 · 쌓기 안과 폰은 둘. */
@@ -2719,6 +2781,10 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 }
 /* 추이 · 배당 숫자 칸 — 넷이면 폰 폭(351)을 넘었다. 접어 두 줄로. */
 .v2-sk .v2-tm-figs { flex-wrap: wrap; row-gap: 8px; }
+/* 320 폭 폰(컨테이너 296) — 관심 추이 숫자 셋이 18px 간격으로 266px 에 딱 걸려 셋째만 아랫줄로 꺾이고 오른쪽이 비었다(2026-10-11). */
+@container kd (max-width: 319px) {
+  .v2-sk .v2-tm-figs { column-gap: 14px; }
+}
 @container kd (max-width: 679px) {
   /* 88 · 한 줄 — 76 이면 '10/1 +10.90%'가 날짜 · 등락 두 줄로 갈렸다(2026-10-05 점검). */
   /* 날짜는 문장 위 작은 줄로 — 88px 날짜 칸 옆 문장이 236px 로 좁아 네 줄씩 접혔다(2026-10-05 모바일 점검). */

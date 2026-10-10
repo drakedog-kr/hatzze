@@ -134,6 +134,12 @@
 :root:not([data-cur]) [data-cur-default="usd"] .hz-krw { display: none; }
 :root:not([data-cur]) [data-cur-default="usd"] .hz-usd { display: revert; }
 
+/* 말풍선도 통화를 따른다 — 속성 글이라 둘 다 그려 둘 수 없어, 통화별 글을 data-tip-usd · data-tip-krw 에 싣고 고른 통화의 것을
+   띄운다(종목 상세 관심 추이 막대, V2Modules MentionTrend). 고른 적이 없으면 data-tip(화면 기본 통화의 글) 그대로다.
+   ⚠️ 특이도로 .hz-tip:hover::after(0,2,1) · 앵커 블록을 이긴다(여기 0,5,1). 여는 세 상태(호버 · 탭 · 키보드 포커스)를 다 건다. */
+:root[data-cur="usd"] .hz-tip[data-tip-usd]:is(:hover, .hz-tip-open, :focus-visible)::after { content: attr(data-tip-usd); }
+:root[data-cur="krw"] .hz-tip[data-tip-krw]:is(:hover, .hz-tip-open, :focus-visible)::after { content: attr(data-tip-krw); }
+
 /* 스위치 자체 — 두 칸짜리 알약. 테마 단추와 높이(38)를 맞춘다. */
 .hz-cur-switch {
   display: inline-flex;

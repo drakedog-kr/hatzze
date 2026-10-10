@@ -9,7 +9,7 @@ import { groupInsiderLines } from "@/lib/insider-person";
 import { PRICE_RANGES, type PriceRangeKey, stockDetailHref } from "@/lib/insider-range";
 import { assertLoaded } from "@/lib/load-state";
 
-import { CoverMeta, Module } from "../../../kadera/V2Modules";
+import { CoverMeta, MentionTrend, Module, type TrendPrice } from "../../../kadera/V2Modules";
 import { CurrencyToggle } from "../../../AppShell";
 import { ChartZoom } from "../../ChartZoom";
 import { StockLogo } from "../../../StockLogo";
@@ -255,35 +255,26 @@ function layout(ms: PairMod[]): { bands: Band[]; open: Map<string, number>; stac
 }
 
 /**
- * 언급 추이 막대. **SVG 도 라이브러리도 안 쓴다** — 40개짜리 막대는 div 로 충분하고,
- * 서버 컴포넌트로 남길 수 있어 클라이언트 번들이 안 는다.
+ * 관심 추이 막대 위 종가 선 — 날짜 → 높이 · 말풍선 둘째 줄('종가 $182.50 +1.25%' · 원화를 고르면 '종가 254,317원 +1.25%').
  *
- * ⚠️ 빈 날을 0 으로 메워 받는다(`fillDays`). 안 메우면 주말을 건너뛰어 막대 간격이
- *    날짜와 어긋나고, 추이가 실제보다 촘촘해 보인다.
+ * 아래 '주가와 매매 시점' 차트가 쓰는 일봉(d.bars)을 그대로 쓴다 — 새 요청이 없다. 그 봉은 차트 기간(가장 짧은 게 3개월)만큼
+ * 있어서 관심 추이 40일을 늘 덮고, 첫날의 등락도 바로 앞 봉으로 잰다. 날짜는 둘 다 그날의 날짜 글자로 잇는다 — 봉은 미국 장 날짜,
+ * 막대는 한국 날짜라 '10/7' 칸에는 한국 10/7 밤에 열린 미국 10/7 장의 종가가 선다.
+ * 통화는 이용자가 고른 하나만 — 둘 다 적던 것을 걷었다(2026-10-11 지시). 고른 적이 없으면 이 화면 기본인 달러(tip),
+ * 고르면 CSS 가 data-tip-usd · data-tip-krw 중 그 통화의 글을 띄운다(MentionTrend · mobile.css). 환율을 못 받은 날은 달러만.
  */
-function Trend({ points, partial = false }: { points: { date: string; mentions: number; channels: number }[]; partial?: boolean }) {
-  const max = Math.max(1, ...points.map((p) => p.mentions));
-  // v2 — 종목 페이지 · 테마 한 장의 추이와 같은 꼴(.v2-tm-trend). 최근 사흘만 진한 파랑.
-  const recentFrom = points.length >= 3 ? points[points.length - 3].date : "";
-  return (
-    <div className="v2-tm-trend" role="img" aria-label={`최근 ${points.length}일 언급 막대`}>
-      {points.map((p, i) => {
-        const at = i / Math.max(1, points.length - 1);
-        const edge = at > 0.72 ? " hz-tip-end" : at < 0.28 ? " hz-tip-start" : "";
-        // 마지막 칸이 오늘(아직 안 끝난 날)이면 옅게 · 말풍선에 '집계 중'(mentionTrend partial).
-        const part = partial && i === points.length - 1;
-        return (
-          <span key={p.date} className={`hz-tip hz-vline${edge}`} data-tip={`${fmtDate(p.date)} · 언급 ${p.mentions}회 · 채널 ${p.channels}곳${part ? " · 집계 중" : ""}`}>
-            <i
-              className={[!p.mentions ? "is-none" : p.date >= recentFrom ? "is-recent" : "", part ? "is-part" : ""].filter(Boolean).join(" ") || undefined}
-              // 0 인 날은 2px 바닥선 — 1px 막대 40개는 빈 칸이나 깨진 그림으로 보였다(언급 0 종목, 2026-10-05 점검).
-              style={{ height: p.mentions ? `${Math.max(3, (p.mentions / max) * 100)}%` : "2px" }}
-            />
-          </span>
-        );
-      })}
-    </div>
-  );
+function pricesByDate(bars: { date: string; close: number }[], days: { date: string }[], rate: number | null) {
+  const want = new Set(days.map((p) => p.date));
+  const out = new Map<string, TrendPrice>();
+  bars.forEach((b, i) => {
+    if (!want.has(b.date)) return;
+    const prev = bars[i - 1]?.close;
+    const pct = prev ? ((b.close - prev) / prev) * 100 : null;
+    const chg = pct == null ? "" : ` ${pct > 0 ? "+" : pct < 0 ? "-" : ""}${Math.abs(pct).toFixed(2)}%`;
+    const usd = `종가 $${b.close.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${chg}`;
+    out.set(b.date, { close: b.close, tip: usd, byCur: rate ? { usd, krw: `종가 ${Math.round(b.close * rate).toLocaleString("ko-KR")}원${chg}` } : undefined });
+  });
+  return out;
 }
 
 /**
@@ -302,6 +293,18 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
   const members = congressMembers(d.congress);
   const peak = Math.max(0, ...d.trend.map((p) => p.mentions));
   const trendPoints = d.trend.length ? d.trend : d.mentionAsOf ? zeroDays(d.mentionAsOf, MENTION_TREND_DAYS) : [];
+  const trendPrices = pricesByDate(d.bars, trendPoints, d.usdKrw);
+  // 최고 · 최저 글자 — 고른 통화 하나만 보이게 두 벌(.hz-usd · .hz-krw, mobile.css 통화 스위치). 환율이 없으면 달러만.
+  const pxLabel = (v: number) => {
+    const usd = `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (!d.usdKrw) return usd;
+    return (
+      <>
+        <span className="hz-usd">{usd}</span>
+        <span className="hz-krw">{Math.round(v * d.usdKrw).toLocaleString("ko-KR")}원</span>
+      </>
+    );
+  };
 
   // ⚠️⚠️ 둘로 가르면 **어느 쪽도 아닌 신고**가 남는다 — 임원은 옵션 행사(M)·무상 취득(A)·
   //      전환(C), 의원은 교환(E). 실측으로 임원 전체의 19% 다. 조용히 빠뜨리면 카드 두
@@ -515,7 +518,7 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
                   <em>최근 {trendPoints.length}일 언급</em>
                 </span>
               </div>
-              <Trend points={trendPoints} />
+              <MentionTrend id={`px-${d.ticker}`} points={trendPoints} floor={1} day={fmtDate} prices={trendPrices} priceLabel={pxLabel} />
             </div>
           ) : (
             <div className="v2-tm-trendbody">
@@ -525,15 +528,11 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
                   <em>{fmtDate(d.mentionDate)} 하루 언급</em>
                 </span>
                 <span>
-                  <b>{d.channelsToday}곳</b>
-                  <em>그날 채널</em>
-                </span>
-                <span>
                   <b>{peak}회</b>
                   <em>최근 {d.trend.length}일 최다</em>
                 </span>
               </div>
-              <Trend points={d.trend} partial={d.mentionPartial} />
+              <MentionTrend id={`px-${d.ticker}`} points={d.trend} floor={1} day={fmtDate} partial={d.mentionPartial} prices={trendPrices} priceLabel={pxLabel} />
             </div>
           )}
         </Module>
