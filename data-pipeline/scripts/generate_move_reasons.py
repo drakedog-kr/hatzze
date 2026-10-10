@@ -14,7 +14,17 @@ KRX 오픈API 는 그날 시세를 **다음 날 낮**에 준다(5회 실측: 18:
 그날 언급 폭(channel_count). 표기는 장중 값일 수 있어 **화면에 등락률로 내지 않고**
 후보 고르기·줄 세우기에만 쓴다. 화면의 등락률은 lib/kadera-why.ts 가 따로 구한다.
 
-다음 날 KRX 가 그날 시세를 주면 `fill_krx()` 가 change_rate 를 채운다(보관용).
+다음 날 KRX 가 그날 시세를 주면 `fill_krx()` 가 change_rate · close_price 를 채운다. 테마 화면 '등락의 이유'가
+이 값을 그대로 쓴다(lib/theme-page.ts — 오늘 줄만 야후로 채운다).
+
+## 등락률은 이튿날 아침 08시 뒤에 채운다
+
+KRX 는 그날 종가를 다음 날 08:00 에 올린다. 그런데 채우기가 이 스크립트(까닭 스텝) 안에만 있어서 아침 실행
+(07시 전 · 공표 전)은 늘 0행이었고, 저녁 실행이 19시께 채웠다 — 전날 줄이 **하루 내내 '종가 전'** 이었다
+(2026-09-28 ~ 10-07 실측: 채운 시각 전부 이튿날 19:05~20:22 KST). 그래서 배당 잡이 08:00 뒤 종가 이력
+(stock_price_daily)을 받은 직후 `--fill-only` 로 채운다(daily-update.yml). 값은 날짜별 이력에서 찾고,
+없을 때만 stocks 의 최신 하루치를 본다 — stocks 는 하루치뿐이라, 다시 잡은 날처럼 늦게 만든 줄은 그 날짜가
+지나가면 영영 못 채웠다.
 
 ## 창은 '그날' 하루다
 
@@ -42,6 +52,7 @@ KRX 오픈API 는 그날 시세를 **다음 날 낮**에 준다(5회 실측: 18:
     python scripts/generate_move_reasons.py --kr-only          # 한쪽만(--us-only)
     python scripts/generate_move_reasons.py --slot morning     # 그날 까닭은 안 만들고 KRX 확정값 · 빈 날만
     python scripts/generate_move_reasons.py --skip-catchup kr  # 그 시장은 빈 날 다시 잡기를 안 한다(집계가 실패한 실행)
+    python scripts/generate_move_reasons.py --fill-only        # 까닭은 안 건드리고 국장 등락률만 채운다(LLM 안 씀)
 """
 
 from __future__ import annotations
@@ -439,28 +450,57 @@ def ask(client, batch: list[tuple[str, str, str]], retries: int = REASON_RETRIES
     return out
 
 
+def krx_quote(r: dict, hist: dict[tuple[str, str], dict], latest: dict[str, dict]) -> tuple | None:
+    """까닭 줄 하나의 KRX 확정 (등락률, 종가). 날짜별 이력(stock_price_daily)이 먼저고, 없으면 stocks 의 최신
+    하루치가 **그 날짜일 때만**. 둘 다 없으면 None — 아직 공표 전이다(파일 머리 '등락률은 이튿날 아침')."""
+    h = hist.get((r["stock_code"], r["date"]))
+    if h and h.get("change_rate") is not None:
+        return h["change_rate"], h.get("close")
+    s = latest.get(r["stock_code"])
+    if s and s.get("price_date") == r["date"] and s.get("change_rate") is not None:
+        return s["change_rate"], s.get("close_price")
+    return None
+
+
 def fill_krx(db, dry_run: bool) -> int:
-    """KRX 가 그날 시세를 준 뒤(stocks.price_date == date) change_rate 를 채운다."""
+    """KRX 가 그날 시세를 준 뒤 비어 있는 change_rate · close_price 를 채운다(krx_quote)."""
     since = (today_kst() - timedelta(days=KRX_FILL_DAYS)).isoformat()
     rows = (
         db.table(TABLE).select("id,date,stock_code")
         .is_("change_rate", "null").gte("date", since).range(0, 999).execute().data
     ) or []
     if not rows:
+        print("[KRX] 확정 등락률 채움 0행 (대상 0행)")
         return 0
+    # 날짜마다 그날 줄의 종목만 묻는다 — 하루 40종목 상한이라 한 번에 40행이다(PostgREST 1000행 캡 안쪽).
+    hist: dict[tuple[str, str], dict] = {}
+    by_date: dict[str, set[str]] = defaultdict(set)
+    for r in rows:
+        by_date[r["date"]].add(r["stock_code"])
+    for d, day_codes in by_date.items():
+        try:
+            page = (
+                db.table("stock_price_daily").select("code,date,close,change_rate")
+                .eq("date", d).in_("code", sorted(day_codes)).execute().data
+            ) or []
+        except Exception as exc:  # noqa: BLE001
+            # 이력을 못 읽어도 예전 길(stocks 최신 하루치)은 남는다.
+            print(f"[KRX] {d} 종가 이력 조회 실패 — stocks 만 봅니다: {type(exc).__name__}: {exc}")
+            continue
+        hist.update({(p["code"], p["date"]): p for p in page})
     codes = sorted({r["stock_code"] for r in rows})
-    info: dict[str, dict] = {}
+    latest: dict[str, dict] = {}
     for i in range(0, len(codes), 200):
         page = db.table("stocks").select("code,close_price,change_rate,price_date").in_("code", codes[i : i + 200]).execute().data or []
-        info.update({s["code"]: s for s in page})
+        latest.update({s["code"]: s for s in page})
     filled = 0
     for r in rows:
-        s = info.get(r["stock_code"])
-        if not s or s.get("price_date") != r["date"] or s.get("change_rate") is None:
+        q = krx_quote(r, hist, latest)
+        if q is None:
             continue
         if not dry_run:
             db.table(TABLE).update({
-                "change_rate": s["change_rate"], "close_price": s.get("close_price"),
+                "change_rate": q[0], "close_price": q[1],
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }).eq("id", r["id"]).execute()
         filled += 1
@@ -743,6 +783,11 @@ def main() -> None:
     # 실패한 시장은 워크플로가 --skip-catchup 으로 뺀다 — 낡은 집계로 지난 날을 만들면 그 판이 굳는다.
     catch_up = "--date" not in args
     skip_catchup = {args[i + 1] for i, a in enumerate(args[:-1]) if a == "--skip-catchup"}
+
+    # 배당 잡이 08:00 뒤 종가 이력을 받은 직후 부른다(파일 머리 '등락률은 이튿날 아침'). LLM 자격이 필요 없다.
+    if "--fill-only" in args:
+        fill_krx(get_client(), dry_run)
+        return
 
     if not HAS_LLM_CREDENTIAL and not dry_run:
         print("[skip] LLM 자격(구독 토큰·API 키)이 없어 까닭 생성을 건너뜁니다.")

@@ -2033,6 +2033,30 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_krx_price_history.py
 
+      # 등락 이유(테마 화면 '등락의 이유')의 국장 등락률 · 종가 — 위에서 막 받은 어제 종가로 채운다. 까닭 스텝(update 잡) 안의
+      # 채우기는 아침엔 08:00 공표 전이라 늘 0행이었고 저녁 19시께에야 채워져, 전날 줄이 하루 내내 '종가 전'이었다
+      # (generate_move_reasons.py 머리 '등락률은 이튿날 아침'). LLM 을 안 쓰고 몇 초다.
+      # 저녁엔 새로 공표된 날이 없어 0행이다 — 그때는 화면을 안 비운다.
+      - name: 등락 이유 등락률 채우기 (어제 종가)
+        id: move_reason_rates
+        if: ${{ !cancelled() && steps.krx_price_history.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python data-pipeline/scripts/generate_move_reasons.py --fill-only | tee /tmp/move_reason_rates.log
+          n=$(sed -n 's/^\[KRX\] 확정 등락률 채움 \([0-9]*\)행.*/\1/p' /tmp/move_reason_rates.log | tail -1)
+          echo "filled=${n:-0}" >> "$GITHUB_OUTPUT"
+
+      # 채운 줄이 있으면 그 줄을 읽는 테마 상세만 바로 비운다 — 안 비우면 finalize 의 전체 비우기(update 잡 끝, 아침 09시대)까지
+      # 옛 사본('종가 전')이 나간다. 종목 화면은 아래 '배당 화면만 먼저 비우고 데우기'가 같이 비운다.
+      # ⚠️ 대괄호는 셸 글롭이라 따옴표를 벗기지 말 것.
+      - name: 테마 상세만 먼저 비우기 (등락 이유 등락률)
+        if: ${{ !cancelled() && steps.move_reason_rates.outputs.filled != '' && steps.move_reason_rates.outputs.filled != '0' }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh '/theme/[theme]'
+
       # ⚠️ 날짜별 증분이 아니라 **매일 스냅숏 전량**(15페이지·7만 행)이다. 금융위 API 는
       #    기준일 다음 영업일 13시 뒤에 갱신되므로 아침 실행은 이틀 전 스냅숏, 저녁 실행이
       #    어제 것을 받는다. 둘 다 돌려도 같은 행을 다시 쓸 뿐이다.
