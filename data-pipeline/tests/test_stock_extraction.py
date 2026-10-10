@@ -930,3 +930,46 @@ def test_week4_phantoms_are_not_stocks(text):
 )
 def test_week4_real_mentions_survive(text, code):
     assert code in _week4(text)
+
+
+# ── 2026-10-10: 예스24(053280) ← 책 출간 홍보의 서점 구매 링크 · 공연장 ─────────────────────────────
+# 사례는 전 기간 코퍼스의 실제 문장이다. 근거와 전량 수치는 config/stock_extraction.py 의 HOMONYM_CUES["예스24"] 주석.
+
+
+def _yes24(text: str) -> set[str]:
+    match_to_code = {"예스24": "053280", "카카오": "035720"}
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = set(match_to_code) & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, {k: "dict" for k in match_to_code}, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "📚책 구매와 주변에 포워딩해 주시는 것 모두 저에게 정말 큰 힘이 됩니다! 감사합니다\n\n교보문고\n"
+        "https://product.kyobobook.co.kr/detail/S000221518506\n\n예스24\nhttps://m.yes24.com/goods/detail/197293320\n\n"
+        "알라딘\nhttps://www.aladin.co.kr/m/mproduct.aspx",
+        "🛒 [구매링크]\n교보문고 https://siglab.short.gy/kyobo\n예스24 https://siglab.short.gy/yes24\n"
+        "알라딘 https://siglab.short.gy/aladin\n\n- SignalLab Research",
+        "교보문고 : https://gdrb.kr/k000pa\n예스24 : https://gdrb.kr/y000pd\n알라딘 : https://gdrb.kr/a000pb",
+        "아래 링크 공유드립니다.\n\n예스24: https://m.yes24.com/goods/detail/193052366\n\n"
+        "알라딘: https://www.aladin.co.kr/m/mproduct.aspx?ItemId=397175707",
+        "⬇️ 교보문고 ⬇️\nhttps://vo.la/gLuKdAK\n\n예스24, 알라딘, 쿠팡, 카카오 선물하기 등에서도 찾아보실 수 있습니다.",
+        "네오위즈는 오는 10월 10일 오후 7시 서울 광진구 예스24 라이브홀에서 ‘MIRACLE 10.10’ 공연을 개최한다고 21일 밝혔다.",
+    ],
+)
+def test_yes24_bookstore_links_and_venue_are_not_the_stock(text):
+    assert "053280" not in _yes24(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "(코스닥)예스24 - 반기보고서 (2026.06)\nhttp://dart.fss.or.kr/api/link.jsp?rcpNo=20260814002825",
+        "(코스닥)예스24 - 단기차입금증가결정\nhttp://dart.fss.or.kr/api/link.jsp?rcpNo=20260929900899",
+        "[실적속보]예스24, 3년 중 최저 매출 기록, 영업이익은 적자지속 (연결)\n\nhttp://spot.rassiro.com/rd/20260814/1007673",
+        "기업명: 예스24(시가총액: 815억) A053280\n보고서명: 반기보고서 (2026.06)",
+    ],
+)
+def test_yes24_stock_mentions_survive(text):
+    assert "053280" in _yes24(text)
