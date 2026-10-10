@@ -146,7 +146,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   const hasTalk = Boolean(d.narrative || why);
 
   /* ── v2(2026-10-03) — 테마 한 장과 같은 부품 ──────────────────────────
-     뒤로 가기 줄 → 첫 줄 띠(종목 · 종가 · 테마 · MDD · 집계 기준) → 요즘 도는 얘기(판 폭) → [일별 언급 추이 | 다가오는 일정 또는 배당]
+     뒤로 가기 줄 → 첫 줄 띠(종목 · 종가 · 테마 · MDD · 집계 기준) → 요즘 도는 얘기(판 폭) → [커뮤니티 관심 추이 | 다가오는 일정 또는 배당]
      → 배당(판 폭, 위에서 안 쓴 날) → 같은 테마 종목(판 폭). 옛 히어로 판 · 시트 부제 · 아이콘 타일 · 바닥 '다음에 볼 곳' · 각주는 걷었다 —
      다음에 볼 곳(테마 · MDD)은 첫 줄 띠의 링크 칸이, 국장 카더라는 뒤로 가기 줄이 맡는다. 집계 기준은 띠의 업데이트 자리로.
      ⭐ 짝은 **안쪽이 늘어나는 모듈끼리만** 짓는다 — 추이(막대) · 일정(줄) · 배당(달 막대)은 키를 받아 늘어나도 빈 곳이 없지만,
@@ -295,10 +295,10 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
         </Module>
       )}
 
-      {/* 셋째 줄 — 일별 언급 추이 | 일정(없으면 배당). 짝이 없으면 추이가 판 폭. */}
+      {/* 셋째 줄 — 커뮤니티 관심 추이 | 일정(없으면 배당). 짝이 없으면 추이가 판 폭. */}
       <div className={`v2-tm-band is-brief${partner || sideStack ? "" : " is-solo"}`}>
         <Module
-          title="일별 언급 추이"
+          title="커뮤니티 관심 추이"
           meta={d.trend.length ? `${md(d.trend[0].date)}~${md(d.trend[d.trend.length - 1].date)}` : undefined}
           className="v2-tm-trendmod"
           // 날마다의 값은 막대 말풍선에만 있다 — 폰은 눌러야 열린다. 테마 화면 30일 점유율 추이와 같은 가르침(id 'trend-bar').
@@ -356,7 +356,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   );
 }
 
-/** 일별 언급 추이 위 숫자 넷 — 막대(최근 30일)와 같은 기간으로 센다. 가장 많던 날 · 하루 최다 채널은 0 이면 안 세운다. */
+/** 커뮤니티 관심 추이 위 숫자 넷 — 막대(최근 30일)와 같은 기간으로 센다. 가장 많던 날 · 하루 최다 채널은 0 이면 안 세운다. */
 function TrendFigs({ points }: { points: StockTrendPoint[] }) {
   const total = points.reduce((s, p) => s + p.mentions, 0);
   const active = points.filter((p) => p.mentions > 0).length;
