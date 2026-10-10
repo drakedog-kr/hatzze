@@ -151,6 +151,143 @@ export function Spark({
   );
 }
 
+/** 관심 추이 막대 한 칸 — 그날 언급 수. */
+export type TrendBar = { date: string; mentions: number };
+/**
+ * 그날 종가 — 선의 높이(close)와 말풍선 둘째 줄(tip). 글자는 화면이 짓는다(원 · 달러가 다르다).
+ * byCur 를 주면 통화 스위치를 따른다 — 말풍선은 속성 글이라 금액 칸(.hz-krw · .hz-usd)처럼 둘 다 그려 둘 수 없어, 통화별 글을
+ * data-tip-usd · data-tip-krw 에 싣고 CSS 가 고른 통화의 것을 띄운다(mobile.css 통화 스위치). tip 은 화면 기본 통화의 글이다.
+ */
+export type TrendPrice = { close: number; tip: string; byCur?: { usd: string; krw: string } };
+
+/**
+ * 커뮤니티 관심 추이 — 위 칸은 그날 종가 줄(맥락), 아래 칸은 일별 언급 막대(주인공). 국장 종목 상세 · 미장 종목 상세가 같이 쓴다
+ * (2026-10-10). 칸에 마우스를 올리면 세로선이 두 칸을 함께 지나고 선 위에 점이 서며, 말풍선 한 장에 날짜 · 언급(첫 줄)과
+ * 종가 · 등락(둘째 줄)이 같이 뜬다. 채널 수는 화면에 두지 않는다 — 숫자 줄 · 말풍선 둘 다 걷었다(2026-10-10 · 10-11 지시).
+ *
+ * ⭐ 모듈 이름이 '관심 추이'라 막대가 주인공이다 — 종가 선은 가늘고 옅게, 위 칸은 막대보다 낮게 둔다. 그려 보고 걷은 꼴
+ *    (겹침 · 무채색 · 등락 색 · 곡선 · 진한 선)과 그 이유는 v2.css 머리말에 모았다.
+ * ⭐ 선이 무엇인지는 범례 대신 **최고 · 최저 값 글자**가 말한다 — 값에 '원' · '$' 가 붙어 있으면 종가 선으로 읽힌다.
+ *
+ * 막대 · 손닿는 칸은 div, 선은 SVG 한 장 — 서버 컴포넌트로 남아 클라이언트 번들이 안 는다. 칸은 틈 없이 n 등분이라
+ * (v2.css .v2-tm-trend gap 0 · 틈은 칸 안쪽 여백) 칸 가운데가 정확히 (i + 0.5) / n 이다 — 선의 꼭짓점 · 세로선 · 점이 그 자리에 선다.
+ * 늘이는 그림이라(preserveAspectRatio none) 점 · 글자는 SVG 밖 span 이 그린다(안에서 그리면 찌그러진다, Spark 와 같은 까닭).
+ * 위 칸의 자리(머리 여백 · 아래 몫)와 막대 높이는 v2.css 의 --px-* 변수가 정한다 — 칸 안 호버 점도 같은 변수로 자리를 잰다.
+ *
+ * ⚠️ 빈 날을 0 으로 메워 받는다. 안 메우면 언급 없는 날을 건너뛰어 막대 간격이 날짜와 어긋나고, 추이가 실제보다 촘촘해 보인다.
+ * ⚠️ 종가가 없는 날(주말 · 휴장 · 아직 공표 전)은 선이 그 칸을 건너 앞뒤 거래일을 잇는다. 선은 거래일이 둘 이상일 때만 긋고,
+ *    그 밖엔 예전처럼 막대만 판 높이로 선다.
+ */
+export function MentionTrend({
+  id,
+  points,
+  floor,
+  day,
+  partial = false,
+  prices,
+  priceLabel,
+}: {
+  /** 면 그라데이션 id — 문서 전역이라 화면마다 다르게(종목 코드). */
+  id: string;
+  points: TrendBar[];
+  /** 막대 키의 바닥. 국장 10 — 그 종목 최댓값으로만 나누면 30일에 한 번 1회 언급도 꽉 찬 막대였다(2026-10-04 점검). */
+  floor: number;
+  /** 말풍선의 날짜 글자. */
+  day: (iso: string) => string;
+  /** 마지막 칸이 오늘(아직 안 끝난 날)이면 옅게 · 말풍선에 '집계 중'(미장 mentionTrend partial). */
+  partial?: boolean;
+  /** 날짜 → 그날 종가. */
+  prices?: Map<string, TrendPrice>;
+  /** 최고 · 최저 글자의 값 꼴 — '280,500원' · '$239.24'. 통화 스위치를 따르려면 .hz-usd · .hz-krw 두 벌을 돌려준다(미장). */
+  priceLabel?: (v: number) => React.ReactNode;
+}) {
+  const n = points.length;
+  const max = Math.max(floor, ...points.map((p) => p.mentions));
+  // 최근 사흘만 진한 파랑.
+  const recentFrom = n >= 3 ? points[n - 3].date : "";
+
+  const priced = prices ? points.flatMap((p, i) => (prices.has(p.date) ? [{ i, close: prices.get(p.date)!.close }] : [])) : [];
+  const hasLine = priced.length >= 2;
+  const lo = Math.min(...priced.map((p) => p.close));
+  const hi = Math.max(...priced.map((p) => p.close));
+  // 위 칸 안에서 위로부터 몇 % 인가(0 = 위 칸 꼭대기 · 100 = 바닥). 한 달 내내 같은 값이면 가운데.
+  const y = (v: number) => (hi > lo ? ((hi - v) / (hi - lo)) * 100 : 50);
+  const xPct = (i: number) => ((i + 0.5) / n) * 100;
+  // 직선으로 잇는다 — 곡선(단조 보간)도 그려 봤는데 극값마다 봉우리가 평평해져 물렁해 보였다(2026-10-10).
+  const line = hasLine ? priced.map((p, k) => `${k ? "L" : "M"}${p.i + 0.5},${y(p.close).toFixed(2)}`).join(" ") : "";
+  const first = priced[0];
+  const last = priced[priced.length - 1];
+  const hiAt = priced.find((p) => p.close === hi);
+  const loAt = priced.find((p) => p.close === lo);
+  // 글자가 판 밖으로 나가지 않게 — 양 끝 근처는 점 쪽에 붙여 안쪽으로 연다.
+  const edge = (i: number) => (xPct(i) < 14 ? " is-start" : xPct(i) > 86 ? " is-end" : "");
+
+  return (
+    <div className={`v2-tm-trend${hasLine ? " has-px" : ""}`} role="img" aria-label={`최근 ${n}일 언급 막대${hasLine ? "와 종가 선" : ""}`}>
+      {points.map((p, i) => {
+        const at = i / Math.max(1, n - 1);
+        const tipEdge = at > 0.72 ? " hz-tip-end" : at < 0.28 ? " hz-tip-start" : "";
+        const part = partial && i === n - 1;
+        const px = prices?.get(p.date);
+        const head = `${day(p.date)} · 언급 ${p.mentions}회${part ? " · 집계 중" : ""}`;
+        const tip = px ? `${head}\n${px.tip}` : head;
+        const ratio = p.mentions / max;
+        return (
+          <span
+            key={p.date}
+            className={`hz-tip hz-vline${px ? " hz-tip-wide hz-tip-lines" : ""}${tipEdge}`}
+            data-tip={tip}
+            data-tip-usd={px?.byCur ? `${head}\n${px.byCur.usd}` : undefined}
+            data-tip-krw={px?.byCur ? `${head}\n${px.byCur.krw}` : undefined}
+          >
+            <i
+              className={[!p.mentions ? "is-none" : p.date >= recentFrom ? "is-recent" : "", part ? "is-part" : ""].filter(Boolean).join(" ") || undefined}
+              // 0 인 날은 2px 바닥선 — 1px 막대 여럿은 빈 칸이나 깨진 그림으로 보였다(언급 0 종목, 2026-10-05 점검).
+              // 선이 있으면 막대는 아래 칸(--px-bars 높이까지)에만 선다.
+              style={{
+                height: !p.mentions ? "2px" : hasLine ? `calc(var(--px-bars) * ${Math.max(0.03, ratio).toFixed(4)})` : `${Math.max(3, ratio * 100)}%`,
+              }}
+            />
+            {/* 호버 점 — 칸 높이 기준이라 위 칸의 자리(머리 여백 --px-top 과 아래 몫 --px-bottom 을 뺀 높이)로 옮겨 잰다. */}
+            {hasLine && px && (
+              <span
+                className="hz-vdot v2-tm-pxdot"
+                style={{ top: `calc(var(--px-top) + (100% - var(--px-top) - var(--px-bottom)) * ${(y(px.close) / 100).toFixed(4)})` }}
+              />
+            )}
+          </span>
+        );
+      })}
+      {hasLine && (
+        <div className="v2-tm-pxpane" aria-hidden="true">
+          <svg viewBox={`0 0 ${n} 100`} preserveAspectRatio="none">
+            <defs>
+              <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="currentColor" stopOpacity="0.06" />
+                <stop offset="1" stopColor="currentColor" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d={`${line} L${last.i + 0.5},100 L${first.i + 0.5},100 Z`} fill={`url(#${id})`} />
+            <path d={line} className="v2-tm-px-line" vectorEffect="non-scaling-stroke" />
+          </svg>
+          {priceLabel && hiAt && loAt && hi > lo && (
+            <>
+              <span className={`v2-tm-pxlab is-hi${edge(hiAt.i)}`} style={{ left: `${xPct(hiAt.i)}%`, top: `${y(hi)}%` }}>
+                최고 {priceLabel(hi)}
+              </span>
+              <span className={`v2-tm-pxlab is-lo${edge(loAt.i)}`} style={{ left: `${xPct(loAt.i)}%`, top: `${y(lo)}%` }}>
+                최저 {priceLabel(lo)}
+              </span>
+            </>
+          )}
+          {/* 선 끝점 — 가장 최근 종가가 어느 날인지(KRX 는 하루 늦게 공표해 막대보다 먼저 끝나기도 한다). */}
+          <span className="v2-tm-pxend" style={{ left: `${xPct(last.i)}%`, top: `${y(last.close)}%` }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * 여론 낙관도 — 값 · 꼬리표 · 30일 선(50 이 점선) · 30일 최고/최저. 2차의 큰 카드를 모듈 안으로 옮긴 것이다(2026-10-02 요청:
  * "낙관도나 그런 거는 토스 지적 전 버전처럼"). 그사이 시험한 50 위아래 막대 · 갈림 막대는 걷었다.

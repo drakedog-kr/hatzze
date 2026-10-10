@@ -197,7 +197,6 @@ export type StockDetail = {
   trend: MentionPoint[];
   /** 오늘(가장 최근 날) 언급. 없으면 0 이다. */
   mentionsToday: number;
-  channelsToday: number;
   /** 추이의 끝점 = 언급 표 전체의 가장 최근 날(이 종목의 마지막 언급일이 아니다). */
   mentionDate: string | null;
   holders: StockHolder[];
@@ -670,7 +669,6 @@ const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<
     usdKrw: fx?.now ?? null,
     trend,
     mentionsToday: today?.mentions ?? 0,
-    channelsToday: today?.channels ?? 0,
     mentionDate,
     mentionPartial,
     mentionAsOf,

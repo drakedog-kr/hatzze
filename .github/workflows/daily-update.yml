@@ -2013,6 +2013,18 @@ jobs:
             echo "이미 08:00 KST 를 지났습니다 (현재 $(TZ=Asia/Seoul date '+%H:%M') KST) — 대기 없음"
           fi
 
+      # 국장 일별 종가 이력(stock_price_daily) — 종목 상세 '커뮤니티 관심 추이'의 시세 선 재료다. 최근 45일 중 빠진 날만
+      # 받는다. 평소엔 새로 공표된 하루(호출 둘)와 휴장일 헛물음 몇 번이라 몇 초, 첫 실행만 한 달치(국내 실측 81초).
+      # ⭐ 이 잡에 둔 까닭 둘. ① 위 08:00 대기 뒤라 아침 실행이 어제 종가를 받는다 — krx_master 는 08:00 전에 돌아
+      #    하루 늦은 값만 있다(fetch_krx_stocks 머리말). ② 다른 잡을 안 막는다. 이 잡 끝의 '배당 화면만 먼저 비우고
+      #    데우기'가 /stock/[code] 를 같이 비우므로 선도 그때 바로 늘어난다.
+      # ⚠️ 스크립트가 시간 상한(240초)과 첫 KRX 실패에서 멈춘다 — 러너가 KRX 에 막힌 날 뒤 스텝을 붙들지 않는다.
+      - name: Fetch KRX 일별 종가 이력 (종목 상세)
+        id: krx_price_history
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_krx_price_history.py
+
       # ⚠️ 날짜별 증분이 아니라 **매일 스냅숏 전량**(15페이지·7만 행)이다. 금융위 API 는
       #    기준일 다음 영업일 13시 뒤에 갱신되므로 아침 실행은 이틀 전 스냅숏, 저녁 실행이
       #    어제 것을 받는다. 둘 다 돌려도 같은 행을 다시 쓸 뿐이다.
@@ -2094,6 +2106,7 @@ jobs:
       # ── 배당주 수집 전용 알림 ────────────────────────────────────────────
       # /dividend 는 죽어도 카드가 그대로 뜨고 히어로 툴팁의 '기준' 날짜만 안 움직인다 —
       # 서학개미·내부자와 같은 조용한 낡음이다. 그래서 여기서 알려야 한다.
+      # 종목 상세의 시세 선(fetch_krx_price_history)도 같은 꼴이라 여기 함께 센다 — 선이 어제에서 멈출 뿐 화면은 멀쩡하다.
       #
       # ⚠️ 하루 실패는 다음 실행이 만회한다(전량을 다시 받는다). 며칠 연속 열리면 원천이
       #    바뀐 것이니 스크립트 머리말부터 볼 것 — 주소가 `/service/` 없이 `_V2` 다.
@@ -2103,8 +2116,8 @@ jobs:
         id: dividend_health
         if: always()
         run: |
-          names=("fetch_kr_dividends.py" "fetch_kr_dividend_notices.py" "calculate_kr_dividend_stats.py" "fetch_kr_high_dividend.py" "fetch_kr_dividend_payout.py" "fetch_us_dividends.py" "fetch_etf_dividends.py" "fetch_seohak_etf.py")
-          outcomes=("${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_notices.outcome }}" "${{ steps.kr_dividend_stats.outcome }}" "${{ steps.kr_high_dividend.outcome }}" "${{ steps.kr_dividend_payout.outcome }}" "${{ steps.us_dividends.outcome }}" "${{ steps.etf_dividends.outcome }}" "${{ steps.etf_flows.outcome }}")
+          names=("fetch_krx_price_history.py" "fetch_kr_dividends.py" "fetch_kr_dividend_notices.py" "calculate_kr_dividend_stats.py" "fetch_kr_high_dividend.py" "fetch_kr_dividend_payout.py" "fetch_us_dividends.py" "fetch_etf_dividends.py" "fetch_seohak_etf.py")
+          outcomes=("${{ steps.krx_price_history.outcome }}" "${{ steps.kr_dividends.outcome }}" "${{ steps.kr_dividend_notices.outcome }}" "${{ steps.kr_dividend_stats.outcome }}" "${{ steps.kr_high_dividend.outcome }}" "${{ steps.kr_dividend_payout.outcome }}" "${{ steps.us_dividends.outcome }}" "${{ steps.etf_dividends.outcome }}" "${{ steps.etf_flows.outcome }}")
 
           {
             echo "## 배당주"
@@ -2133,7 +2146,7 @@ jobs:
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           failed="${DIVIDEND_FAILED_SCRIPTS:-요약 탭에서 확인}"
           title="⚠️ 배당주 수집 중단"
-          note=$(printf '배당주 수집이 실패했습니다. /dividend 와 종목 페이지 배당 카드는 그대로 뜨고 값만 조용히 낡습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n하루 실패는 다음 실행이 만회합니다. 며칠 연속 열리면 원천이 바뀐 것이니 `fetch_kr_dividends.py` · `calculate_kr_dividend_stats.py` · `fetch_us_dividends.py` 머리말부터 보세요.' \
+          note=$(printf '배당주 수집이 실패했습니다. /dividend 와 종목 페이지(배당 카드 · 관심 추이 시세 선)는 그대로 뜨고 값만 조용히 낡습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n하루 실패는 다음 실행이 만회합니다. 며칠 연속 열리면 원천이 바뀐 것이니 `fetch_kr_dividends.py` · `calculate_kr_dividend_stats.py` · `fetch_us_dividends.py` 머리말부터 보세요.' \
             "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then

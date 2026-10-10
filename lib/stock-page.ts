@@ -26,7 +26,8 @@ import { THEMES } from "./stock-themes";
  *
  *   ① **야후를 부르지 않는다.** `getStockReport` 는 시세를 야후에서 받는데(stockQuote),
  *      크롤러가 훑으면 종목마다 바깥 요청이 하나씩 붙는다. 여기서는 `stocks` 표에
- *      KRX 로 받아 둔 종가를 쓴다(마이그레이션 015).
+ *      KRX 로 받아 둔 종가를 쓴다(마이그레이션 015). 관심 추이의 종가 선도 같은 원천을
+ *      날짜별로 쌓은 `stock_price_daily` 에서 읽는다(마이그레이션 093).
  *   ② **관심의 폭(서로 다른 채널 수)을 즉석에서 세지 않는다.** `recentChannelCount` 는
  *      저장값(telegram_stock_breadth)이 있는 종목만 싸고, 그 표는 상위 몇 종목만
  *      담는다. 나머지 450여 종목은 telegram_message_stocks 조인으로 떨어지는데 그게
@@ -77,6 +78,14 @@ export type StockTrendPoint = {
   channels: number;
 };
 
+/** 그날 KRX 종가 — 관심 추이 막대 위에 겹치는 시세 선. */
+export type StockPricePoint = {
+  date: string;
+  close: number;
+  /** KRX 전일대비 등락률(%). */
+  changeRate: number | null;
+};
+
 export type StockPageData = {
   code: string;
   name: string;
@@ -87,6 +96,11 @@ export type StockPageData = {
   priceDate: string | null;
   /** 막대용. 언급이 없는 날도 0으로 채워 STOCK_TREND_DAYS 칸이 늘 찬다. */
   trend: StockTrendPoint[];
+  /**
+   * trend 기간의 KRX 종가(stock_price_daily, 마이그레이션 093). 거래일만 있다 — 주말 · 휴장일 ·
+   * 아직 공표 전인 날(KRX 는 그날 종가를 다음 날 08:00 에 올린다)은 없다. 날짜 순.
+   */
+  prices: StockPricePoint[];
   /** 최근 STOCK_STAT_DAYS 일 언급 합. */
   totalMentions: number;
   /** 그중 언급이 있던 날 수. 사이트맵 자격과 같은 잣대다. */
@@ -162,7 +176,7 @@ export const getStockPage = cache(async (code: string): Promise<StockPageData | 
   // 일별 집계 행. Supabase 가 select 문자열로 타입을 못 좁히므로 여기서 한 번만 적는다.
   type DailyRow = { date: string; mention_count: number | null; channel_count: number | null };
 
-  const [dailyRes, narrative] = await Promise.all([
+  const [dailyRes, narrative, priceRes] = await Promise.all([
     db
       .from("telegram_stock_daily")
       .select("date,mention_count,channel_count")
@@ -186,7 +200,18 @@ export const getStockPage = cache(async (code: string): Promise<StockPageData | 
         .maybeSingle();
       return (data?.narrative as string | undefined) ?? null;
     })().catch(() => null),
+    // 막대와 같은 기간의 종가. 종목 하나에 30행 안팎이라 기본키(code, date)로 바로 집힌다.
+    db
+      .from("stock_price_daily")
+      .select("date,close,change_rate")
+      .eq("code", code)
+      .gte("date", trendDays[0])
+      .lte("date", last)
+      .order("date"),
   ]);
+  // 시세 선은 곁다리라 못 읽어도 막대는 그대로 그린다(loadFailed 에 안 섞는다 — 그건 언급 집계의 실패다).
+  // 5xx · 끊김은 supabase-server 가 따로 적어 사본에 안 담긴다(lib/load-state.ts).
+  if (priceRes.error) console.error(`[getStockPage] ${code} 종가 이력을 못 읽었습니다`, priceRes.error);
   // ⚠️ 90일치라도 종목 하나는 90행을 못 넘는다(날짜당 한 행). 1,000행 캡과 무관하다.
   if (dailyRes.error) console.error(`[getStockPage] ${code} 언급 집계를 못 읽었습니다`, dailyRes.error);
 
@@ -224,6 +249,12 @@ export const getStockPage = cache(async (code: string): Promise<StockPageData | 
     0,
   );
 
+  const prices: StockPricePoint[] = ((priceRes.data ?? []) as { date: string; close: number; change_rate: number | null }[]).map((r) => ({
+    date: r.date,
+    close: r.close,
+    changeRate: r.change_rate == null ? null : Number(r.change_rate),
+  }));
+
   const name = stock.name as string;
   return {
     code,
@@ -233,6 +264,7 @@ export const getStockPage = cache(async (code: string): Promise<StockPageData | 
     changeRate: (stock.change_rate as number | null) ?? null,
     priceDate: (stock.price_date as string | null) ?? null,
     trend,
+    prices,
     totalMentions,
     activeDays,
     peak,
