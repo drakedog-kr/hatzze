@@ -1,4 +1,4 @@
-"""테마 상세 '말 많은 종목' 줄 — 화면(lib/theme-page.ts buildHotStocks · getThemePage)과 같은 규칙의 파이썬 짝.
+"""테마 상세 '언급 상위 종목' 줄 — 화면(lib/theme-page.ts buildHotStocks · getThemePage)과 같은 규칙의 파이썬 짝.
 
 테마 요약 스크립트가 이 줄마다 '요즘 도는 얘기' 한 줄을 써 telegram_theme_brief.talk 에 넣는다(마이그레이션 092).
 화면은 그 행을 읽어 종목 코드로 붙이기만 하므로 **줄을 고르는 규칙이 두 벌**이다 — 어긋나면 그 줄만 빈다. 그래서

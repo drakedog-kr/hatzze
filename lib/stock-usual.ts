@@ -80,9 +80,21 @@ export function usualDeltaShort(mentions: number, usual: number): string {
 }
 
 /** 평소와 견준 언급 변화 한 마디 — "평소 대비 +60%" · "평소의 3배" · "새로 등장". 표 태그와 지도 툴팁이 같이 쓴다.
- *  끝의 '언급'은 뗐다 — 열 줄 태그가 모두 '…언급'으로 끝났고, 표 머리('말 많은 종목 · 언급')가 이미 말한다(2026-10-05 점검). */
+ *  끝의 '언급'은 뗐다 — 열 줄 태그가 모두 '…언급'으로 끝났고, 표 머리('언급 상위 종목')가 이미 말한다(2026-10-05 점검). */
 export function usualDeltaText(mentions: number, usual: number): string {
   const short = usualDeltaShort(mentions, usual);
   if (short === "새로 등장" || short === "평소만큼") return short;
   return short.endsWith("%") ? `평소 대비 ${short}` : `평소의 ${short}`;
+}
+
+/** 태그에 마우스를 올리면 뜨는 문장 — "평소보다 60% 더 많이 언급되었습니다". 숫자는 태그(usualDeltaShort)와 같은 값이다. */
+export function usualDeltaTip(mentions: number, usual: number): string {
+  const short = usualDeltaShort(mentions, usual);
+  if (short === "새로 등장") return "평소엔 언급되지 않던 종목입니다";
+  if (short === "평소만큼") return "평소만큼 언급되었습니다";
+  if (short.endsWith("%")) {
+    const pct = short.slice(1);
+    return short.startsWith("+") ? `평소보다 ${pct} 더 많이 언급되었습니다` : `평소보다 ${pct} 적게 언급되었습니다`;
+  }
+  return `평소의 ${short} 언급되었습니다`;
 }

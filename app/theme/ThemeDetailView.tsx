@@ -2,13 +2,13 @@ import Link from "next/link";
 
 import { eventDateLabel, todayKst, type UpcomingEvent } from "@/lib/kadera-why";
 import { fmtKoDate } from "@/lib/stock-page";
+import { stockTone, usualDeltaText, usualDeltaTip } from "@/lib/stock-usual";
 import { KADERA_WINDOW_DAYS, addDaysISO } from "@/lib/telegram-data";
 import { THEME_TREND_DAYS, type ThemePageData, type ThemeReasonRow, type ThemeTrendPoint } from "@/lib/theme-page";
 
 import { StockLogo } from "../StockLogo";
 import { CoverMeta, Module, dayPill } from "../kadera/V2Modules";
 import type { ThemeMarket } from "./market";
-import { stockTone, usualDeltaText } from "./Treemap";
 import { ShareBar } from "./ShareBar";
 import { BackTrail } from "@/components/back-trail";
 
@@ -22,21 +22,21 @@ import { BackTrail } from "@/components/back-trail";
  *
  * ## v2(2026-10-03) — 카더라 · MDD · 배당에 쓴 규칙으로
  * 뒤로 가기 줄 → 첫 줄 띠(테마 종목 · 최근 3일 점유율 · 시세 반응 · 기준일) → [요즘 도는 얘기 | 30일 점유율 추이]
- * → [말 많은 종목(줄마다 요즘 도는 얘기) | 다가오는 일정 · 함께 거론되는 테마] → 등락의 이유(최근 7일).
+ * → [언급 상위 종목(줄마다 요즘 도는 얘기) | 다가오는 일정 · 함께 거론되는 테마] → 등락의 이유(최근 7일).
  * - 걷은 것: 회색 타일 히어로, 큰 구간 제목 셋(01 · 02 · 03), 시트 머리 아이콘 타일 · 설명 문장, 등락의 이유 '이전 7일' 단추(쪽 넘김),
  *   '채널에서 오간 글' 카드 여섯 장 + 더 보기 — 카더라 v2 에서 화제 글을 걷은 것과 같은 까닭(눌린 비율 2~5%).
  * - 주인공은 1~5 · 6~10 두 단이었는데 한 단 열 줄로(비교 목록은 한 단 세로 목록이 낫다 — MDD 업종 칸 때 정한 것).
  * - 일정은 5주 달력을 걷고 카더라 v2 일정 꼴(날짜 알약 + 일정)로 — 날짜가 짚인 것 뒤에 달 · 분기만 짚인 것을 같은 줄 꼴로 잇는다.
  *
  * ## ⭐ 서버가 그린다
- * 종목 화면과 같은 이유다 — 크롤러가 테마 이름·말 많은 종목·이유를 첫 HTML 에서 읽어야 이 화면이 검색에 잡힌다.
+ * 종목 화면과 같은 이유다 — 크롤러가 테마 이름·언급 상위 종목·이유를 첫 HTML 에서 읽어야 이 화면이 검색에 잡힌다.
  * (주를 넘기던 ReasonWeeks 를 걷어 이제 클라이언트 부품은 로고뿐이다.)
  *
  * ## 제목은 셸이 그린다
  * 테마는 사전이 정적이라 셸의 DEEP_PAGES 가 이름을 안다(AppShell). v2 에선 화면에서만 걷고 h1 은 남는다.
  */
 
-/** '말 많은 종목' 줄 수. */
+/** '언급 상위 종목' 줄 수. */
 const HOT_ROWS = 10;
 /** 일정 — 날짜가 짚인 것은 앞으로 5주(카더라와 같다), 달 · 분기만 짚인 것은 가까운 것 몇 줄. */
 const CALENDAR_DAYS = 35;
@@ -232,7 +232,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
         <div className="v2-cover-cell">
           {/* 칸 이름엔 점유율의 기간만, 변화(+%p)가 견준 기간은 그 값 바로 앞에 — 칸 이름에 '최근 3일 점유율 · 1~2주 전 대비'로 나란히
               두었더니 두 기간이 한 덩어리로 읽혔다(2026-10-05 운영자 판단, 카더라 · 테마 판세와 같은 정리). '평소'라 부르지 않는 건
-              말 많은 종목 태그(앞 27일)와 두 뜻이 돼서다(2026-10-04 점검). */}
+              언급 상위 종목 태그(앞 27일)와 두 뜻이 돼서다(2026-10-04 점검). */}
           <span className="v2-cover-k">최근 {KADERA_WINDOW_DAYS}일 점유율</span>
           <span className="v2-cover-v">
             {d.loadFailed || d.recentShare == null ? (
@@ -336,12 +336,13 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
 
       {/* 셋째 줄 — [이 테마의 주인공 | 다가오는 일정 · 함께 거론되는 테마]. 주인공 열 줄이 키를 정하고 오른쪽 일정 줄이 그 높이를 나눠 받는다. */}
       <div className={`v2-tm-band is-hot${solo ? " is-solo" : ""}`}>
-        {/* 이름은 목록 화면과 같은 '말 많은 종목'(2026-10-04 점검). 요즘 도는 얘기 칸이 AI 글이라 고지는 머리에. */}
+        {/* 이름은 목록 화면 표 머리와 같은 '언급 상위 종목'(2026-10-11 운영자 결정, 전엔 '말 많은 종목'). 제목이 '언급'을 말하니
+            곁 글자엔 날짜와 '평소 대비'만. 요즘 도는 얘기 칸이 AI 글이라 고지는 머리에. */}
         {/* 사흘을 날짜로 — 이 화면의 사흘은 기준일을 넣고(2026-09-29 결정), 종목 화면 · 카더라는 기준일 앞 사흘이라 같은 '최근 3일'에
             숫자가 달랐다(삼성전자 318회 · 612회, 2026-10-04 점검). */}
         <Module
-          title="말 많은 종목"
-          meta={`${d.recentDays.length ? `${mdShort(d.recentDays[0])}~${mdShort(d.recentDays[d.recentDays.length - 1])}` : `최근 ${KADERA_WINDOW_DAYS}일`} 언급 · 평소 대비`}
+          title="언급 상위 종목"
+          meta={`${d.recentDays.length ? `${mdShort(d.recentDays[0])}~${mdShort(d.recentDays[d.recentDays.length - 1])}` : `최근 ${KADERA_WINDOW_DAYS}일`} · 평소 대비`}
           className="v2-tm-hot"
           ai={anyTalk}
         >
@@ -373,8 +374,10 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
                         <span className="v2-td-stock">
                           <StockLogo code={s.code} name={s.name} market={s.market} size={22} />
                           <span className="v2-td-name">{s.name}</span>
-                          {/* 평소와 견준 언급 변화 — 색은 지도 칸과 같은 단계(stockTone). */}
-                          <span className={`hz-theme-tag ${stockTone(s.mentions, s.usualMentions)}`}>{usualDeltaText(s.mentions, s.usualMentions)}</span>
+                          {/* 평소와 견준 언급 변화 — 색은 지도 칸과 같은 단계(stockTone). 마우스를 올리면 같은 값을 문장으로. */}
+                          <span className={`hz-theme-tag hz-tip ${stockTone(s.mentions, s.usualMentions)}`} data-tip={usualDeltaTip(s.mentions, s.usualMentions)}>
+                            {usualDeltaText(s.mentions, s.usualMentions)}
+                          </span>
                         </span>
                         {/* 요즘 도는 얘기 한 줄(파이프라인이 줄마다 쓴다 · lib/theme-page.ts talkOf). 예전 이 칸은 '채널이 말한 이유'(등락 까닭)라
                             움직이지 않은 종목은 비어 열 줄 중 대여섯이 빈칸이었고, 같은 문장이 아래 '등락의 이유'에 또 섰다(2026-10-05 운영자 결정).

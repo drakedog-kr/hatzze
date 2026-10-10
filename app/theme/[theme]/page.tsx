@@ -37,8 +37,8 @@ export async function generateMetadata({ params }: { params: Promise<{ theme: st
   const meta = await pageMetadata({
     title: `${theme} 테마 상세 정보 | hatzze`,
     description: `${withSubjectParticle(theme)} 주식 텔레그램에서 요즘 어떻게 회자되는지 봅니다.${
-      hot.length ? ` 최근 3일 말 많은 종목은 ${hot.join("·")}입니다.` : ""
-    } 말 많은 종목과 그 이유, 앞으로의 일정을 테마 단위로 읽습니다.`,
+      hot.length ? ` 최근 3일 언급 상위 종목은 ${hot.join("·")}입니다.` : ""
+    } 언급 상위 종목과 그 이유, 앞으로의 일정을 테마 단위로 읽습니다.`,
     path: themeHref(theme),
     ownImage: themeCard(theme, "kr", themeHref(theme)).alt,
   });

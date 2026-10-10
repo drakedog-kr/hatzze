@@ -180,6 +180,9 @@
 .hz-theme-tag.is-down-1 { background: color-mix(in srgb, var(--c-blue-2) 24%, var(--c-card)); color: var(--c-ink); }
 .hz-theme-tag.is-down-2 { background: color-mix(in srgb, var(--c-blue-2) 45%, var(--c-card)); color: var(--c-ink); }
 .hz-theme-tag.is-down-3 { background: color-mix(in srgb, var(--c-blue-2) 58%, var(--c-card)); color: var(--c-ink); }
+/* 테마 화면 '언급 상위 종목'의 태그엔 문장 툴팁(data-tip)이 달린다. .hz-tip 이 커서를 화살표로 못박아(sheets.css) 줄 링크 위에서
+   태그만 손 모양이 풀렸다 — 줄의 커서를 그대로 받는다. */
+.hz-theme-tag.hz-tip { cursor: inherit; }
 /* 테마 목록(/theme)의 흐름 표: # · 테마(+대표 종목) · 점유율(숫자+막대) · 열흘 흐름(띠+한 줄 글).
    열은 넷뿐이다. 처음엔 다섯(라벨 칸이 따로)이었고 줄 높이 8px 에 띠마다 순위 숫자까지 있어
    "복잡하고 안 깔끔하고 좁다"는 지적을 받았다(2026-09-19). 띠에서 숫자를 빼고 라벨을 띠 아래로

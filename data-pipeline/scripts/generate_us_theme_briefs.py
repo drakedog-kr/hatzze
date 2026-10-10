@@ -12,7 +12,7 @@
               본문을 뒤에 붙일 일이 없다(미국 언급 메시지는 창에 천여 건이라 본문째 받아도 가볍다).
   사전        config/us_stock_themes.py — 키가 티커라 이름 대조가 없다.
   급부상      common/us_theme_risers.py 가 고르고, digest 는 build_stock_digests(tickers=…)로 만든다.
-  도는 얘기   테마 상세 '말 많은 종목' 줄마다 한 줄(talk jsonb · 마이그레이션 092). 줄은 common/theme_hot.py 가 화면과 같은
+  도는 얘기   테마 상세 '언급 상위 종목' 줄마다 한 줄(talk jsonb · 마이그레이션 092). 줄은 common/theme_hot.py 가 화면과 같은
               규칙으로 고르고, 쓰는 일(TALK_SYSTEM · write_talk)은 국장 짝 그대로다.
 
 실행:
@@ -21,7 +21,7 @@
     python scripts/generate_us_theme_briefs.py                         # 생성 + 저장(전 테마)
     python scripts/generate_us_theme_briefs.py --theme AI반도체,메모리    # 몇 개만
     python scripts/generate_us_theme_briefs.py --theme 메모리 --no-save  # 문장만 보고 저장 안 함
-    python scripts/generate_us_theme_briefs.py --talk-only               # 말 많은 종목의 도는 얘기만(그날 행의 talk 열)
+    python scripts/generate_us_theme_briefs.py --talk-only               # 언급 상위 종목의 도는 얘기만(그날 행의 talk 열)
 """
 
 from __future__ import annotations
@@ -177,7 +177,7 @@ def main() -> None:
         for t in tickers:
             themes_of[t].append(theme)
 
-    # 도는 얘기의 줄과 창 — 화면 '말 많은 종목'과 같은 규칙(common/theme_hot.py). 얇은 날(기준일 아침)을 빼면 창이 하루 앞에서
+    # 도는 얘기의 줄과 창 — 화면 '언급 상위 종목'과 같은 규칙(common/theme_hot.py). 얇은 날(기준일 아침)을 빼면 창이 하루 앞에서
     # 시작할 수 있어 메시지를 그만큼 앞에서부터 받고, 요약 · 급부상 재료는 예전 창(since ~ end)으로 다시 자른다.
     talk_days, hot_of = theme_hot(db, latest, US_THEMES, "telegram_us_stock_daily", "telegram_us_theme_daily", "ticker", TB.TALK_ROWS)
     print(f"[도는 얘기] 최근 {', '.join(talk_days)} · {sum(len(v) for v in hot_of.values())}종목")
