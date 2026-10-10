@@ -296,7 +296,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
           title={`${THEME_TREND_DAYS}일 점유율 추이`}
           meta={trendFrom && trendTo ? `${mdShort(trendFrom)}~${mdShort(trendTo)}` : undefined}
           className="v2-tm-trendmod"
-          // 날마다의 값은 막대 말풍선에만 있다 — 폰은 눌러야 열린다(종목 화면 일별 언급 추이와 같은 id).
+          // 날마다의 값은 막대 말풍선에만 있다 — 폰은 눌러야 열린다(종목 화면 커뮤니티 관심 추이와 같은 id).
           hint={!d.loadFailed && d.trend.length ? { id: "trend-bar", anchor: ".v2-tm-trend", at: "inside", text: "막대를 누르면 그날 값이 나옵니다" } : undefined}
         >
           {d.loadFailed ? (
