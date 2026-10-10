@@ -20,7 +20,19 @@ KRX 오픈API 는 그날 시세를 **다음 날 낮**에 준다(5회 실측: 18:
 
 종목 요약(3일)·급부상 한 줄(3일)과 다르다. "왜 올랐나"는 그날의 질문이라 어제 말을
 섞으면 답이 어긋난다. 저녁 18:00 실행 시점에 그날 메시지의 8할이 들어와 있다.
-아침 실행(`--slot morning`)은 그날 메시지가 몇백 건뿐이라 **만들지 않는다**. KRX 채우기만 한다.
+아침 실행(`--slot morning`)은 그날 메시지가 몇백 건뿐이라 **그날 것은 만들지 않는다**. KRX 채우기와
+아래 '빈 날 다시 잡기'만 한다.
+
+## 빈 날 다시 잡기
+
+까닭은 그날 저녁 실행 한 번에만 만든다. 그 실행이 못 만들면 그 날짜는 **영영 빈다** — 2026-10-08(목)
+저녁에 종목 추출이 DB 연결 끊김으로 죽어 그날 집계가 아침분(3채널 이상 6종목)뿐이었고, 아래 휴장 판정이
+그걸 '장이 안 열린 날'로 읽어 국장 까닭을 건너뛰었다. 다음 실행부터 집계는 전량 재계산으로 돌아왔지만
+(3채널 이상 332종목) 까닭은 아무도 다시 만들지 않아 테마 화면 '등락의 이유'에서 그날이 통째로 빠졌다.
+
+그래서 **매 실행(아침 포함)이 앞 CATCHUP_DAYS 일 가운데 행이 하나도 없는 날을 다시 만든다.** 국장은
+주말·휴장일을 빼고(common/timeutil.KRX_HOLIDAYS), 미장은 날마다 행이 서므로(주말에도 16~34행) 전부 본다.
+지난 날의 집계는 그 뒤 실행이 전량 재계산으로 채워 둔 것이라 그날 저녁보다 오히려 온전하다.
 
 실행:
     cd data-pipeline && source .venv/bin/activate
@@ -28,7 +40,8 @@ KRX 오픈API 는 그날 시세를 **다음 날 낮**에 준다(5회 실측: 18:
     python scripts/generate_move_reasons.py                    # 생성 + 저장
     python scripts/generate_move_reasons.py --date 2026-09-04  # 지난 날을 다시
     python scripts/generate_move_reasons.py --kr-only          # 한쪽만(--us-only)
-    python scripts/generate_move_reasons.py --slot morning     # 까닭은 안 만들고 KRX 확정값만 채운다
+    python scripts/generate_move_reasons.py --slot morning     # 그날 까닭은 안 만들고 KRX 확정값 · 빈 날만
+    python scripts/generate_move_reasons.py --skip-catchup kr  # 그 시장은 빈 날 다시 잡기를 안 한다(집계가 실패한 실행)
 """
 
 from __future__ import annotations
@@ -57,7 +70,7 @@ from common.supabase_client import (  # noqa: E402
     load_window_keyset,
 )
 from common.text_check import problems, prompt_leaks  # noqa: E402
-from common.timeutil import KST, today_kst  # noqa: E402
+from common.timeutil import KRX_HOLIDAY_YEARS, KRX_HOLIDAYS, KST, today_kst  # noqa: E402
 from config.us_stock_extraction import RESEARCH_HOUSES, is_house  # noqa: E402
 
 import generate_telegram_narratives as KR  # noqa: E402
@@ -91,6 +104,12 @@ TABLE = "telegram_stock_move_reason"
 #
 # 요일로 막지 않고 **채널 글의 등락 표기 수**로 가른다. 공휴일까지 한 번에 걸리고, 실측이
 # 깨끗하게 갈린다(2026-09 국장): 금 72 · 월 98 · 화 68 · **토 1**.
+#
+# ⚠️⚠️ **표기 수는 휴장과 '자료가 덜 찬 날'을 못 가른다**(2026-10-08). 그날 저녁 종목 추출이 죽어 집계가
+#    아침분뿐이었는데 표기 0 을 휴장으로 읽고 넘어갔다. 그래서 휴장일 표(common/timeutil.KRX_HOLIDAYS)가
+#    있는 해는 **표가 휴장을 정하고**, 개장일인데 표기가 문턱 아래면 '자료가 덜 찼다'로 적고 경고를 남긴다
+#    (만들지 않는 건 같다 — 반쪽 재료로 만든 판은 다시 안 고쳐진다). 그 날짜는 다음 실행의 '빈 날 다시
+#    잡기'가 온전한 집계로 만든다. 표가 없는 해(KRX_HOLIDAY_YEARS 밖)만 예전처럼 표기 수가 휴장을 정한다.
 #
 # ⛔ 미장에는 걸지 않는다(`min_quoted` 를 0 으로 둔다). 국내 채널은 미국 종목 옆에 등락률을
 #    잘 안 적어서 **평일에도 2** 다 — 같은 문턱을 걸면 미장이 매일 사라진다. 그리고 미장 화면은
@@ -166,6 +185,7 @@ BATCH = 5             # 호출당 종목 수. 시스템 프롬프트 한 번에 
 REASON_LEN = (12, 45)
 TEXT_CHUNK = 50       # `.in_()` 목록 길이(generate_telegram_narratives.TEXT_CHUNK 과 같은 이유)
 KRX_FILL_DAYS = 7     # 며칠 전 행까지 KRX 확정값을 채워 보나
+CATCHUP_DAYS = 7      # 빈 날 다시 잡기 — 오늘 앞 며칠(달력)까지 행이 없는 날을 찾나. 한 주면 주말 · 연휴 하루를 덮는다
 
 # ── 프롬프트 ──────────────────────────────────────────────────────────────────
 #
@@ -448,6 +468,34 @@ def fill_krx(db, dry_run: bool) -> int:
     return filled
 
 
+def krx_session(d: date) -> bool | None:
+    """국장이 열린 날인가. 주말·휴장일 표의 날은 False, 표가 있는 해의 나머지 평일은 True.
+    표가 없는 해의 평일은 None(모른다) — 그때는 run_market 이 채널 글의 등락 표기 수로 가른다."""
+    if d.weekday() >= 5 or d.isoformat() in KRX_HOLIDAYS:
+        return False
+    return True if d.year in KRX_HOLIDAY_YEARS else None
+
+
+def catch_up_days(have: set[str], today: date, krx_calendar: bool) -> list[str]:
+    """오늘 앞 CATCHUP_DAYS 일 가운데 까닭 행이 하나도 없는 날(오래된 날부터). 오늘은 안 본다 — 그날
+    것은 저녁 실행의 몫이고, 아침엔 글이 몇백 건뿐이다(파일 머리 '빈 날 다시 잡기').
+    국장(krx_calendar)은 장이 안 열린 날을 뺀다. 표가 없는 해의 평일은 넣는다 — run_market 이 표기 수로 거른다."""
+    days = [today - timedelta(days=n) for n in range(CATCHUP_DAYS, 0, -1)]
+    if krx_calendar:
+        days = [d for d in days if krx_session(d) is not False]
+    return [d.isoformat() for d in days if d.isoformat() not in have]
+
+
+def missing_days(db, cfg: dict, today: date) -> list[str]:
+    """catch_up_days 의 DB 쪽 — 앞 CATCHUP_DAYS 일에 행이 있는 날짜를 읽는다(하루 40행 상한이라 한 주 280행)."""
+    first = (today - timedelta(days=CATCHUP_DAYS)).isoformat()
+    rows = (
+        db.table(cfg["table"]).select("date")
+        .gte("date", first).lt("date", today.isoformat()).range(0, 999).execute().data
+    ) or []
+    return catch_up_days({r["date"] for r in rows}, today, bool(cfg.get("krx_calendar")))
+
+
 # ── 시장별 설정 ───────────────────────────────────────────────────────────────
 #
 # 국장·미장이 **같은 코퍼스를 다른 사전으로 읽은 것**이라 로직이 한 벌이면 된다. 갈리는 건
@@ -468,6 +516,8 @@ MARKETS = {
         "fill_krx": True,
         "min_quoted": KR_MIN_QUOTED,
         "weekdays_only": True,
+        # 휴장은 휴장일 표가 정한다(KR_MIN_QUOTED 위 주석 '자료가 덜 찬 날').
+        "krx_calendar": True,
     },
     "us": {
         "label": "미장",
@@ -489,6 +539,10 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
     if cfg.get("weekdays_only") and date.fromisoformat(day).weekday() >= 5:
         print(f"[{tag} {day}] 주말이라 만들지 않습니다 — 화면은 직전 거래일 자료를 그대로 씁니다.")
         return 0
+    session = krx_session(date.fromisoformat(day)) if cfg.get("krx_calendar") else None
+    if session is False:
+        print(f"[{tag} {day}] 휴장일이라 만들지 않습니다 — 화면은 직전 거래일 자료를 그대로 씁니다.")
+        return 0
 
     # 1) 그날 집계(종목별 언급 폭). 앞 스텝(calculate_(us_)stock_daily)이 만든다.
     daily = load_keyset(
@@ -499,7 +553,7 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
     cands0 = [c for c, r in counts.items() if (r.get("channel_count") or 0) >= MIN_CHANNELS]
     print(f"[{tag} {day}] 집계 종목 {len(counts)} · {MIN_CHANNELS}채널 이상 {len(cands0)}")
     if not cands0:
-        print(f"[{tag}] 후보 종목이 없습니다.")
+        print(f"{'::warning::' if session else ''}[{tag} {day}] 후보 종목이 없습니다." + (" 개장일이라 다음 실행이 빈 날로 다시 잡습니다." if session else ""))
         return 0
 
     # 2) 그날 메시지(본문 없이). 두 시장이 같은 코퍼스라 이 조회는 한 번이면 되지만, 시장마다
@@ -551,6 +605,15 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
     ][:HEAVY_N]
     min_quoted = cfg.get("min_quoted", 0)
     if len(moved) < min_quoted:
+        if session:
+            # 개장일인데 표기가 없다 — 휴장이 아니라 그날 집계가 덜 찬 것이다(2026-10-08). 반쪽 재료로 만들면
+            # 행이 서서 빈 날 다시 잡기가 그날을 안 본다. 만들지 않고 Actions 경고로 남긴다.
+            print(
+                f"::warning::[{tag} {day}] 개장일인데 등락 표기 후보가 {len(moved)}개뿐입니다(문턱 {min_quoted} · "
+                f"{MIN_CHANNELS}채널 이상 {len(cands0)}종목). 그날 집계가 덜 찬 것으로 보고 만들지 않습니다 — "
+                "다음 실행이 빈 날로 다시 잡습니다."
+            )
+            return 0
         print(
             f"[{tag} {day}] 등락 표기 후보 {len(moved)}개뿐입니다(문턱 {min_quoted}). "
             "장이 열리지 않은 날로 보고 만들지 않습니다 — 화면은 직전 거래일 자료를 그대로 씁니다."
@@ -669,20 +732,34 @@ def main() -> None:
     args = sys.argv[1:]
     dry_run = "--dry-run" in args
     kr_only, us_only = "--kr-only" in args, "--us-only" in args
-    day = today_kst().isoformat()
+    today = today_kst()
+    day = today.isoformat()
     if "--date" in args:
         day = args[args.index("--date") + 1]
     # 슬롯 규칙은 파일 머리 KR_MIN_QUOTED 위 주석. 아침만 안 만든다 — 빈 값(손으로 돌림)은 만든다.
     slot = args[args.index("--slot") + 1] if "--slot" in args else ""
     make = slot != "morning"
+    # 빈 날 다시 잡기(파일 머리). 날짜를 짚어 다시 만들 때(--date)는 그날만 본다. 이번 실행에서 집계가
+    # 실패한 시장은 워크플로가 --skip-catchup 으로 뺀다 — 낡은 집계로 지난 날을 만들면 그 판이 굳는다.
+    catch_up = "--date" not in args
+    skip_catchup = {args[i + 1] for i, a in enumerate(args[:-1]) if a == "--skip-catchup"}
 
     if not HAS_LLM_CREDENTIAL and not dry_run:
         print("[skip] LLM 자격(구독 토큰·API 키)이 없어 까닭 생성을 건너뜁니다.")
         return
     db = get_client()
-    client = None if dry_run or not make else get_llm_client(ANTHROPIC_API_KEY)
+    # 클라이언트는 쓸 때 만든다 — 아침 실행은 빈 날이 있을 때만 부른다.
+    llm: list = []
+
+    def client():
+        if dry_run:
+            return None
+        if not llm:
+            llm.append(get_llm_client(ANTHROPIC_API_KEY))
+        return llm[0]
+
     if not make:
-        print("[skip] 아침 실행이라 까닭을 만들지 않습니다 — KRX 확정값만 채웁니다.")
+        print("[skip] 아침 실행이라 그날 까닭은 만들지 않습니다 — KRX 확정값과 빈 날만 봅니다.")
 
     total = 0
     for market, cfg in MARKETS.items():
@@ -690,10 +767,22 @@ def main() -> None:
             continue
         if make:
             try:
-                total += run_market(db, client, cfg, day, dry_run)
+                total += run_market(db, client(), cfg, day, dry_run)
             except Exception as exc:  # noqa: BLE001
                 # 한쪽이 죽어도 다른 쪽은 나가야 한다(미장 표가 아직 없는 환경 포함).
                 print(f"[{cfg['label']}] 실패: {type(exc).__name__}: {exc}")
+        if catch_up and market not in skip_catchup:
+            try:
+                gaps = missing_days(db, cfg, today)
+            except Exception as exc:  # noqa: BLE001
+                gaps = []
+                print(f"[{cfg['label']} 빈 날] 조회 실패: {type(exc).__name__}: {exc}")
+            for gap in gaps:
+                print(f"[{cfg['label']} {gap}] 까닭 행이 하나도 없는 날이라 다시 만듭니다(빈 날 다시 잡기).")
+                try:
+                    total += run_market(db, client(), cfg, gap, dry_run)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"[{cfg['label']} {gap}] 실패: {type(exc).__name__}: {exc}")
         if cfg["fill_krx"]:
             try:
                 fill_krx(db, dry_run)
