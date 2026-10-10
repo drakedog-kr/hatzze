@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { daysEndingAt } from "../lib/theme-window.ts";
-import { expectedUsualMentions, stockTone, toneForRatio, usualDeltaShort, usualDeltaText } from "../lib/stock-usual.ts";
+import { expectedUsualMentions, stockTone, toneForRatio, usualDeltaShort, usualDeltaText, usualDeltaTip } from "../lib/stock-usual.ts";
 
 const isWeekend = (iso: string) => [0, 6].includes(new Date(`${iso}T00:00:00Z`).getUTCDay());
 
@@ -65,6 +65,15 @@ describe("평소 대비 문구", () => {
     assert.equal(usualDeltaShort(58, 100), "-42%");
     assert.equal(usualDeltaText(5, 0), "새로 등장");
     assert.equal(usualDeltaShort(10, 10), "평소만큼");
+  });
+
+  it("툴팁 문장은 태그와 같은 숫자를 말로 푼다", () => {
+    assert.equal(usualDeltaTip(16, 10), "평소보다 60% 더 많이 언급되었습니다");
+    assert.equal(usualDeltaTip(58, 100), "평소보다 42% 적게 언급되었습니다");
+    assert.equal(usualDeltaTip(12, 3), "평소의 4배 언급되었습니다");
+    assert.equal(usualDeltaTip(10, 0.111), "평소의 10배 넘게 언급되었습니다");
+    assert.equal(usualDeltaTip(5, 0), "평소엔 언급되지 않던 종목입니다");
+    assert.equal(usualDeltaTip(10, 10), "평소만큼 언급되었습니다");
   });
 
   it("급부상 태그 색은 배수 그대로다", () => {

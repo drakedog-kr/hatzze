@@ -1834,7 +1834,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm .hz-tm-tile.is-tall .hz-tm-name { font-size: 11px; font-weight: 600; }
 .v2-tm .hz-tm-val { font-size: 11px; font-weight: 500; }
 .v2-tm .hz-tm-delta { font-size: 11px; font-weight: 500; }
-/* 큰 칸의 곁줄 — 그 테마의 말 많은 종목(Treemap.tsx sub). 두 줄까지. */
+/* 큰 칸의 곁줄 — 그 테마의 언급 상위 종목(Treemap.tsx sub). 두 줄까지. */
 .hz-tm-sub {
   margin-top: 6px;
   font-size: 11px;
@@ -1870,7 +1870,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-hot .v2-tbody > li { flex: 1 0 auto; display: flex; }
 .v2-tm-hot .v2-tbody > li > .v2-tr { flex: 1; }
 
-/* 테마 흐름 — 순위 · 테마와 말 많은 종목 · 요즘 도는 얘기(남는 폭) · 점유율(5일 전 대비) · 열흘. 줄 꼴은 신호 표(.v2-tr)와 같다.
+/* 테마 흐름 — 순위 · 테마와 언급 상위 종목 · 요즘 도는 얘기(남는 폭) · 점유율(5일 전 대비) · 열흘. 줄 꼴은 신호 표(.v2-tr)와 같다.
    ⭐ 이름 → 문장 → 숫자 차례다(2026-10-04) — 오른쪽 정렬 숫자 칸이 왼쪽 정렬 문장 앞에 붙으면 둘이 한 덩어리로 읽혔다. 숫자는 줄 오른쪽 끝에 모은다.
    머리 줄 정렬은 신호 표 공통 규칙(셋째 = 문장 왼쪽 · 넷째부터 숫자 오른쪽)을 그대로 쓴다. */
 /* 앞 두 칸 합(20 + 336 = 356)을 아래 급부상 표(96 + 260)와 맞춰 두 표의 문장 칸이 같은 세로선에서 시작한다(2026-10-04 점검). */

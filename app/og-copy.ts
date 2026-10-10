@@ -141,7 +141,7 @@ export const THEME_CARD: OgCopy = {
   lines: [
     "반도체·로봇·원전 같은 테마마다",
     "채널에서 무슨 얘기가 도는지,",
-    "말 많은 종목과 그 이유를 봅니다.",
+    "언급 상위 종목과 그 이유를 봅니다.",
   ],
   foot: "hatzze.fun/theme",
   alt: "국장 테마 판세 · 반도체·로봇·원전 같은 테마마다 채널에서 무슨 얘기가 도는지 봅니다",
@@ -152,7 +152,7 @@ export const US_THEME_CARD: OgCopy = {
   lines: [
     "AI반도체·빅테크·원자력 같은 테마마다",
     "채널에서 무슨 얘기가 도는지,",
-    "말 많은 미국 종목과 그 이유를 봅니다.",
+    "언급 상위 미국 종목과 그 이유를 봅니다.",
   ],
   foot: "hatzze.fun/theme/us",
   alt: "미장 테마 판세 · AI반도체·빅테크·원자력 같은 테마마다 채널에서 무슨 얘기가 도는지 봅니다",
@@ -169,9 +169,9 @@ export function themeCard(theme: string, market: "kr" | "us", path: string): OgC
   const head = market === "us" ? `미장 ${theme}` : theme;
   return {
     title: theme,
-    lines: [`${head} 테마를 두고`, "채널에서 요즘 무슨 얘기가 도는지,", "말 많은 종목과 그 이유를 봅니다."],
+    lines: [`${head} 테마를 두고`, "채널에서 요즘 무슨 얘기가 도는지,", "언급 상위 종목과 그 이유를 봅니다."],
     foot: `hatzze.fun${path}`,
-    alt: `${head} 테마 · 채널에서 요즘 무슨 얘기가 도는지, 말 많은 종목과 그 이유를 봅니다`,
+    alt: `${head} 테마 · 채널에서 요즘 무슨 얘기가 도는지, 언급 상위 종목과 그 이유를 봅니다`,
   };
 }
 

@@ -15,7 +15,7 @@
 두 벌이 어긋나면 까닭 없는 줄이 나갔다. 처음엔 급부상 한 줄 요약(22~30자, telegram_surging_oneliner)을
 같이 썼는데, 이 화면은 까닭 칸이 넓어 한 줄짜리가 아까웠다(2026-09-21 "이유를 더 자세히").
 
-셋째 몫: 테마 상세 **'말 많은 종목' 표의 '요즘 도는 얘기'** 칸. 줄마다(테마당 최대 TALK_ROWS 종목) 14~26자 명사형 한 줄을
+셋째 몫: 테마 상세 **'언급 상위 종목' 표의 '요즘 도는 얘기'** 칸. 줄마다(테마당 최대 TALK_ROWS 종목) 14~26자 명사형 한 줄을
 **테마 하나에 한 번의 호출로** 쓰고 그 테마의 요약 행(talk jsonb · 마이그레이션 092)에 {종목코드: 문장} 으로 넣는다.
 줄은 화면과 같은 규칙으로 고른다(common/theme_hot.py). 예전 이 칸은 '채널이 말한 이유'(등락 까닭)라 움직이지 않은
 종목은 비어 열 줄 중 대여섯이 빈칸이었고(2026-10-05 국장 · 미장 147줄 중 61줄만 찼다), 같은 문장이 아래 '등락의 이유'에
@@ -23,7 +23,7 @@
 
 ## 창은 화면과 같다
 
-기준일을 **포함한** 사흘(brief_window). 화면의 '최근 사흘 점유율'과 '말 많은 종목'이 같은 사흘을
+기준일을 **포함한** 사흘(brief_window). 화면의 '최근 사흘 점유율'과 '언급 상위 종목'이 같은 사흘을
 세므로(lib/theme-window.ts) 문장이 다른 기간을 말하면 안 된다. 둘째 몫(갑자기 언급된 종목)도 같은 사흘이다 —
 theme_risers 가 기준일을 넣은 사흘로 고르고(2026-09-30 부터 · 예전엔 기준일을 빼 하루 어긋났다), 까닭 digest 도
 build_stock_digests(end=기준일)로 같은 사흘을 본다.
@@ -39,7 +39,7 @@ build_stock_digests(end=기준일)로 같은 사흘을 본다.
     python scripts/generate_theme_briefs.py                       # 생성 + 저장(전 테마)
     python scripts/generate_theme_briefs.py --theme 반도체,로봇     # 몇 개만
     python scripts/generate_theme_briefs.py --theme 로봇 --no-save  # 문장만 보고 저장 안 함
-    python scripts/generate_theme_briefs.py --talk-only             # 말 많은 종목의 도는 얘기만(그날 행의 talk 열)
+    python scripts/generate_theme_briefs.py --talk-only             # 언급 상위 종목의 도는 얘기만(그날 행의 talk 열)
 """
 
 from __future__ import annotations
@@ -80,7 +80,7 @@ def brief_window(latest: str) -> tuple[str, str]:
     """테마 요약이 읽는 구간(KST 날짜, 양끝 포함) — **기준일을 포함한** WINDOW_DAYS 일.
 
     화면(lib/theme-window.ts themeDetailWindow)의 '최근 사흘'과 같다. 히어로의 점유율·순위가 테마 로테이션
-    (기준일을 넣은 사흘)에서 오고 막대·말 많은 종목도 그 사흘을 센다 — 오늘 뜬 테마가 오늘 보여야 해서다
+    (기준일을 넣은 사흘)에서 오고 막대·언급 상위 종목도 그 사흘을 센다 — 오늘 뜬 테마가 오늘 보여야 해서다
     (2026-09-29). 예전엔 종목 요약처럼 기준일 전날에서 끝나는 사흘에 오늘 글을 더해 읽어, 화면 창 밖인
     나흘 전 글이 문장에 섞일 수 있었다. 미장(generate_us_theme_briefs → US.window_dates)과 같은 규칙이다.
     """
@@ -303,7 +303,7 @@ def riser_pick(candidates: list[str], digest: str) -> str | None:
     return None
 
 
-# ── 셋째 몫: 말 많은 종목마다 '요즘 도는 얘기' 한 줄 ──
+# ── 셋째 몫: 언급 상위 종목마다 '요즘 도는 얘기' 한 줄 ──
 # 줄 수 — 화면이 열 줄(app/theme/ThemeDetailView.tsx HOT_ROWS)을 세우는데 둘을 더 쓴다. 고르는 규칙이 TS · 파이썬 두 벌이라
 # (common/theme_hot.py) 경계에서 한두 종목이 갈려도 그 줄이 비지 않게.
 TALK_ROWS = 12
@@ -790,7 +790,7 @@ def main() -> None:
     # 덮게 넉넉히 잡는다 — 아래 갑자기 언급 digest(build_stock_digests)가 이 목록에서 자기 창을 스스로 거른다.
     since, _until = brief_window(latest)
     stock_since = (date.fromisoformat(latest) - timedelta(days=1 + KR.WINDOW_OFFSET)).isoformat()
-    # 셋째 몫(도는 얘기)의 줄과 창 — 화면 '말 많은 종목'과 같은 규칙(common/theme_hot.py). 그 창은 얇은 날(기준일 아침)을 빼
+    # 셋째 몫(도는 얘기)의 줄과 창 — 화면 '언급 상위 종목'과 같은 규칙(common/theme_hot.py). 그 창은 얇은 날(기준일 아침)을 빼
     # 하루 앞에서 시작할 수 있어 메시지를 그만큼 앞에서부터 받는다.
     name_of, code_of, themes_of = code_maps(db)
     members = {t: [code_of[n] for n in names if n in code_of] for t, names in THEMES.items()}

@@ -1,4 +1,4 @@
-"""테마 상세 '말 많은 종목'의 요즘 도는 얘기 — 줄 고르기(common/theme_hot.py)와 한 줄 쓰기(generate_theme_briefs write_talk).
+"""테마 상세 '언급 상위 종목'의 요즘 도는 얘기 — 줄 고르기(common/theme_hot.py)와 한 줄 쓰기(generate_theme_briefs write_talk).
 
 줄 고르기는 화면(lib/theme-page.ts buildHotStocks)과 같은 차례여야 한다 — 어긋나면 그 줄이 빈다.
 """

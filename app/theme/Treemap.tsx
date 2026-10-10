@@ -64,7 +64,7 @@ export type TreemapTile = {
   /** 툴팁·aria-label. */
   tip: string;
   valueText: string;
-  /** 큰 칸(lg)에만 서는 곁줄 — 테마 칸이면 그 테마의 말 많은 종목. 가장 큰 칸이 판 절반을 빈 색 면으로 쓰던 것을 채운다(v2, 2026-10-03). */
+  /** 큰 칸(lg)에만 서는 곁줄 — 테마 칸이면 그 테마의 언급 상위 종목. 가장 큰 칸이 판 절반을 빈 색 면으로 쓰던 것을 채운다(v2, 2026-10-03). */
   sub?: string;
 };
 
@@ -194,7 +194,7 @@ export function Treemap({
           order={hint.order}
           text={hint.text(byKey.get(biggest.key)!.label)}
           target=".hz-tm-tile"
-          // 곁줄('말 많은 종목')이 있으면 그 아래로 — 56 이면 쪽지가 곁줄을 통째로 덮었다(2026-10-08 마지막 점검).
+          // 곁줄('언급 상위 종목')이 있으면 그 아래로 — 56 이면 쪽지가 곁줄을 통째로 덮었다(2026-10-08 마지막 점검).
           style={{ left: `calc(${biggest.x}% + 10px)`, top: `calc(${(biggest.y / H) * 100}% + ${byKey.get(biggest.key)!.sub ? 80 : 56}px)` }}
         />
       )}

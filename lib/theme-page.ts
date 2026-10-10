@@ -35,7 +35,7 @@ import { changeRateOf, fetchYahooQuote } from "./yahoo-quote";
  * ## 무엇으로 만드나 — 전부 이미 있는 표다
  *
  *   telegram_theme_daily        일별 점유율·순위(30일 추이)
- *   telegram_stock_daily        테마 종목의 최근 사흘 언급(말 많은 종목)
+ *   telegram_stock_daily        테마 종목의 최근 사흘 언급(언급 상위 종목)
  *   telegram_stock_move_reason  종목이 움직인 날의 한 줄 까닭(까닭 이력)
  *   telegram_stock_event        앞날의 일정
  *   telegram_theme_brief        요즘 무슨 얘기(LLM 두세 문장)·함께 언급된 테마·발췌 — 마이그레이션 080
@@ -179,7 +179,7 @@ export type ThemePageData = {
   /** 오늘 이후 일정 전부(정밀도 무관, 가까운 날부터). 화면이 날짜 있는 것은 달력에, 달·분기만 짚인 것은 그 아래에 가른다. */
   events: UpcomingEvent[];
   brief: ThemeBrief | null;
-  /** 집계(추이·말 많은 종목)를 못 읽었나. 실패를 '언급 없음'으로 위장하지 않으려는 표시. */
+  /** 집계(추이·언급 상위 종목)를 못 읽었나. 실패를 '언급 없음'으로 위장하지 않으려는 표시. */
   loadFailed: boolean;
 };
 
@@ -268,7 +268,7 @@ export type BriefRow = {
   related: ThemeRelated[] | null;
   excerpts: BriefExcerptRow[] | null;
   message_count: number | null;
-  /** 말 많은 종목마다 요즘 도는 얘기 {종목코드: 한 줄}(마이그레이션 092). 그 전 행은 null. */
+  /** 언급 상위 종목마다 요즘 도는 얘기 {종목코드: 한 줄}(마이그레이션 092). 그 전 행은 null. */
   talk?: Record<string, unknown> | null;
 };
 
@@ -342,7 +342,7 @@ export function buildHotStocks(
     agg.set(r.code, a);
   }
   return [...agg.entries()]
-    // 앞 사흘에만 언급되고 최근 사흘엔 없는 종목은 '말 많은 종목'이 아니다.
+    // 앞 사흘에만 언급되고 최근 사흘엔 없는 종목은 '언급 상위 종목'이 아니다.
     .filter(([code, a]) => byCode.has(code) && a.m > 0)
     .sort((x, y) => y[1].m - x[1].m || y[1].w - x[1].w || x[0].localeCompare(y[0]))
     .map(([code, a]) => {
@@ -409,7 +409,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
   const byCode = new Map<string, ThemeMember>(members.map((m) => [m.code, { code: m.code, name: m.name, market: m.market }]));
   const quotes = themeQuotes(members);
 
-  // 기준일을 넣은 30일 — 히어로의 점유율·순위(테마 로테이션)가 기준일을 넣은 사흘이라 막대·말 많은 종목도 그 사흘을 센다.
+  // 기준일을 넣은 30일 — 히어로의 점유율·순위(테마 로테이션)가 기준일을 넣은 사흘이라 막대·언급 상위 종목도 그 사흘을 센다.
   // 종목의 '평소' = 최근 사흘을 뺀 나머지 27일. 종목 집계는 이 30일을 다 받는다(테마 55종목 × 30일 ≤ 1,650행, 페이징).
   const { trendDays, recentDays: windowDays } = themeDetailWindow(baseDate, THEME_TREND_DAYS, KADERA_WINDOW_DAYS);
   const first = trendDays[0];
@@ -502,7 +502,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
     };
   });
 
-  // ── 말 많은 종목 ── 최근 사흘 언급 합 순. 머리가 "많이 언급된 순서"라고 말하니 잣대도 언급 수다
+  // ── 언급 상위 종목 ── 최근 사흘 언급 합 순. 머리가 "많이 언급된 순서"라고 말하니 잣대도 언급 수다
   // (테마 로테이션 팝오버는 주목도순인데, 그쪽은 "점유율을 만든 종목"이라 잣대가 다르다). 동률은 주목도.
   // '최근 사흘'도 얇은 날을 뺀 끝에서 고른다 — 히어로 점유율(테마 로테이션 · lib/theme-flow.ts usableDays)과 같은 사흘이어야
   // 한 칸 안의 숫자가 같은 날을 말한다. 평소도 얇은 날은 뺀다.
