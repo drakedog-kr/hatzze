@@ -115,14 +115,18 @@ def parse_dividends(page: str) -> list[dict]:
 
 
 def parse_stats(page: str) -> dict:
-    """표 위의 요약 칸 — {payout_pct, growth_years, frequency}. 없는 칸은 None.
+    """표 위의 요약 칸 — {payout_pct, growth_years, frequency, inception}. 없는 칸은 None.
 
     "Payout Ratio 63.71%" 는 지난 12개월 배당 ÷ 주당순이익, "Growth Years 64" 는 배당을 해마다 늘려 온 햇수
     (코카콜라 64). SEC 로 센 연속 배당 연수는 공시가 2007년쯤부터라 19~20에서 막히는데 이건 안 막힌다.
+    inception 은 ETF 의 상장일(ISO) — 화면 글자가 아니라 페이지에 실린 데이터(`inception:"2026-06-23"`)에서 읽는다.
+    주식 페이지엔 없다(None). 상장 1년 미만 ETF 의 어림이 쓴다(common/young_etf.py).
     """
+    m = re.search(r'inception:"(\d{4}-\d{2}-\d{2})"', page)
+    inception = m.group(1) if m else None
     text = re.sub(r"<[^>]+>", " ", page)
     text = re.sub(r"\s+", " ", html.unescape(text))
-    out: dict = {"payout_pct": None, "growth_years": None, "frequency": None}
+    out: dict = {"payout_pct": None, "growth_years": None, "frequency": None, "inception": inception}
     m = re.search(r"Payout Ratio ([\d.]+)%", text)
     if m:
         out["payout_pct"] = float(m.group(1))

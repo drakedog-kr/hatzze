@@ -23,7 +23,8 @@ SEIBro `ETF > 권리행사정보 > 분배금지급현황`(BIP_CNTS06030V)이 운
 
 ## '1년에 얼마' 규칙 — 미국·국내 같다
 
-지난 365일 안에 **지급된** 건의 합. 추정이 없다. 지급이 끊긴 지 1년이 넘으면 표에서 빠진다.
+지난 365일 안에 **지급된** 건의 합. 지급이 끊긴 지 1년이 넘으면 표에서 빠진다.
+상장 1년이 안 된 ETF 만 남은 차례를 채워 1년치로 어림한다 — 그래서 미국은 `cadence` 가 셈에 쓰인다(common/young_etf.py).
 """
 
 US_ETFS: list[dict] = [
@@ -168,7 +169,7 @@ US_ETFS: list[dict] = [
     {"code": "WDTE", "name_ko": "WDTE", "name_en": "Defiance S&P 500 Weekly Distribution ETF", "cadence": "주", "source": "https://www.defianceetfs.com/jepy/"},
     {"code": "IWMY", "name_ko": "IWMY", "name_en": "Defiance R2000 Weekly Distribution ETF", "cadence": "주", "source": "https://www.defianceetfs.com/iwmy/"},
     # 2026-10-11 요청. 스테이트스트리트 나스닥100 — QQQM 과 같은 지수, 지수 ETF 라 묶음엔 안 서고 검색으로만. 2026-06-23 상장이라
-    # stockanalysis 지급 건이 하나뿐이다(2026-09-23 0.02723). '1년에 얼마'는 지급된 건의 합이니 분기 네 번이 다 찰 때(2027-06)까지
-    # 수익률이 낮게 선다 — 10-11 기준 0.11%, 같은 지수 QQQM 0.43%. Finnhub 시세 확인(10-09 25.45).
+    # stockanalysis 지급 건이 하나뿐이다(2026-09-23 0.02723). 지급된 건의 합이면 0.11%(같은 지수 QQQM 0.43%)라 상장 1년이 찰
+    # 때(2027-06)까지는 남은 세 분기를 채워 어림한다(common/young_etf.py). Finnhub 시세 확인(10-09 25.45).
     {"code": "QNDX", "name_ko": "QNDX", "name_en": "State Street SPDR Portfolio Nasdaq 100 ETF", "cadence": "분기", "source": "https://www.ssga.com/us/en/intermediary/etfs/state-street-spdr-portfolio-nasdaq-100-etf-qndx"},
 ]

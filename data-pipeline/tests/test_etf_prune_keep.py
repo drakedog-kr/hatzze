@@ -65,19 +65,19 @@ def _run(monkeypatch, pages, stored):
         page = pages.get(code, PAID)
         if page is PageChanged:
             raise PageChanged("배당 표를 못 찾았다")
-        return page
+        return page, {}
 
     db = _DB(stored)
     codes = sorted({*pages, *(f"E{i:02d}" for i in range(12))})
     monkeypatch.setattr(sys, "argv", ["fetch_etf_dividends.py"])
     monkeypatch.setattr(etf, "today_kst", lambda: TODAY)
-    monkeypatch.setattr(etf, "krx_latest", lambda: None)
+    monkeypatch.setattr(etf, "krx_latest", lambda start=None: None)
     monkeypatch.setattr(etf, "seibro_history", lambda today: None)
     monkeypatch.setattr(etf, "get_client", lambda: db)
     monkeypatch.setattr(etf, "usdkrw", lambda: None)
     monkeypatch.setattr(etf, "FINNHUB_API_KEY", None)
     monkeypatch.setattr(etf, "US_ETFS", [_etf(c) for c in codes])
-    monkeypatch.setattr(etf, "dividend_history", history)
+    monkeypatch.setattr(etf, "dividend_page", history)
     etf.main()
     return db
 

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getDevOverrides } from "@/lib/dev-overrides";
 import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase-server";
 import { fetchAllRows } from "@/lib/telegram-data";
 import type { IconName } from "@/lib/icon-names";
@@ -39,7 +40,8 @@ export type DividendStock = {
   yieldPct: number | null;
   /** 특별·청산배당이 섞였다는 표시(12개월 합이 그 전 회계연도의 두 배 초과). 국내만. */
   unusual: boolean;
-  /** 마지막 분기 × 4 추정값(미국). */
+  /** 어림값이다. 미국 주식은 마지막 분기 × 4 등(ttm_method), ETF 는 상장 1년 미만이라 남은 차례를 채운 1년치(etf_dividend.estimated).
+      ETF 의 남은 차례는 payments 에 지급 건으로 들어 있다 — 달력·다가오는 일정이 1년치 합과 맞게. */
   estimated: boolean;
   payMonths: number[];
   payments: Payment[];
@@ -271,17 +273,19 @@ function toUsStock(r: UsRow): DividendStock {
 /* ── ETF (etf_dividend, 마이그레이션 074·076) ─────────────────────────────
    미국은 stockanalysis, 국내는 예탁결제원 SEIBro 분배금지급현황(전 운용사, 2026-09-16까지는 미래에셋 TIGER 사이트만) —
    둘 다 지난 1년 지급 건이라 달력에 든다(data-pipeline/scripts/fetch_etf_dividends.py). `as_of` 는 그 내역을 받은 날. 화면이 그 날짜를 적는다. */
-type EtfRow = {
+export type EtfRow = {
   code: string;
   market: string;
   currency: string;
   name_ko: string;
   name_en: string | null;
   cadence: string | null;
+  /** 지난 1년 지급 합. estimated 면 상장 1년 미만이라 남은 차례를 채운 1년치다(data-pipeline/common/young_etf.py). */
   ttm_dps: number;
   estimated: boolean;
-  /** 지난 1년에 지급된 건. 국내(SEIBro)는 record 가 있고 미국(stockanalysis)은 없다. */
-  payments: { record?: string; pay: string; amount: number }[];
+  /** 지난 1년에 지급된 건. 국내(SEIBro)는 record 가 있고 미국(stockanalysis)은 없다.
+      est 는 상장 1년 미만 ETF 의 남은 차례를 주기대로 붙인 어림 — 받은 건과 합하면 ttm_dps 다. */
+  payments: { record?: string; pay: string; amount: number; est?: boolean }[];
   pay_months: number[];
   as_of: string;
   close: number | null;
@@ -310,7 +314,7 @@ export function toEtfStock(r: EtfRow): DividendStock {
     priceDate: r.price_date,
     marketCap: null,
     dps: Number(r.ttm_dps ?? 0),
-    count: Array.isArray(r.payments) ? r.payments.length : 0,
+    count: Array.isArray(r.payments) ? r.payments.filter((p) => !p.est).length : 0,
     yieldPct: n(r.ttm_yield_pct),
     unusual: false,
     estimated: Boolean(r.estimated),
@@ -338,9 +342,13 @@ type ReportFailure = (label: string, e: unknown) => void;
 
 async function loadEtf(report: ReportFailure): Promise<{ stocks: DividendStock[]; fx: UsdKrw | null }> {
   // 국내 953 + 미국 33(2026-09-16)이라 한 번에 물으면 1,000행 캡에 걸린다 — 쪽으로 받는다.
-  const rows = await fetchAllRows<EtfRow>("code", () => getSupabaseServer().from("etf_dividend").select("*"), {
+  const fetched = await fetchAllRows<EtfRow>("code", () => getSupabaseServer().from("etf_dividend").select("*"), {
     onError: (e) => report("ETF 분배 기록", e),
   });
+  // 로컬 dev 에서만 — 수집기 --dump 의 행을 같은 코드의 DB 행 대신 얹어, 표에 쓰기 전에 화면을 본다(lib/dev-overrides.ts).
+  const dev = getDevOverrides().etfRows ?? [];
+  const devCodes = new Set(dev.map((r) => r.code));
+  const rows = dev.length ? [...fetched.filter((r) => !devCodes.has(r.code)), ...dev] : fetched;
   return { stocks: rows.map(toEtfStock), fx: latestFx(rows) };
 }
 
@@ -645,7 +653,11 @@ function coverMonths(kr: DividendStock[], us: DividendStock[], monthlyEtfs: Divi
   return picked;
 }
 
-export function pickBaskets(kr: DividendStock[], us: DividendStock[], etfs: DividendStock[], haveHighDiv: boolean): Basket[] {
+export function pickBaskets(kr: DividendStock[], us: DividendStock[], allEtfs: DividendStock[], haveHighDiv: boolean): Basket[] {
+  // 상장 1년 미만이라 1년치를 어림한 ETF 는 바스켓에 안 세운다 — 커버드콜·연금 바스켓이 수익률 순이라, 석 달치로 채운 값이
+  // 1년 기록이 있는 ETF 를 밀어낸다(10-11 실측 국내 커버드콜 신규 여럿이 20%대). 검색·'더 보기'로는 담긴다.
+  // 규칙 알약에는 안 적는다 — 카드 한 줄에 셋까지라(아래 rules 주석) 넷째가 들어가면 두 줄이 된다.
+  const etfs = allEtfs.filter((s) => !s.estimated);
   const pool = kr.filter(eligible);
   const isPref = (s: DividendStock) => s.shareKind != null && s.shareKind !== "보통주";
   const isReit = (s: DividendStock) => s.isReit || KR_INFRA.has(s.code);

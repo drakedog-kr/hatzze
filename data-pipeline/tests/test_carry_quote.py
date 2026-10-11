@@ -75,14 +75,14 @@ def test_etf_run_carries_quote_and_fx_when_sources_fail(monkeypatch):
     stored = {"SCHD": {"code": "SCHD", "close": 25.0, "price_date": "2026-09-29", "usdkrw": 1401.5, "usdkrw_date": "2026-09-29"}}
     monkeypatch.setattr(sys, "argv", ["fetch_etf_dividends.py"])
     monkeypatch.setattr(etf, "today_kst", lambda: TODAY)
-    monkeypatch.setattr(etf, "krx_latest", lambda: None)
+    monkeypatch.setattr(etf, "krx_latest", lambda start=None: None)
     monkeypatch.setattr(etf, "seibro_history", lambda today: None)
     monkeypatch.setattr(etf, "get_client", lambda: db)
     monkeypatch.setattr(etf, "load_last_quotes", lambda _db, _t, _k: stored)
     monkeypatch.setattr(etf, "usdkrw", lambda: None)
     monkeypatch.setattr(etf, "FINNHUB_API_KEY", None)
     monkeypatch.setattr(etf, "US_ETFS", [{"code": "SCHD", "name_ko": "SCHD", "name_en": "SCHD", "cadence": "분기", "source": "x"}])
-    monkeypatch.setattr(etf, "dividend_history", lambda code, kind: paid)
+    monkeypatch.setattr(etf, "dividend_page", lambda code, kind: (paid, {}))
     etf.main()
     (row,) = db.upserted
     assert (row["close"], row["price_date"], row["ttm_yield_pct"]) == (25.0, "2026-09-29", 2.0)
