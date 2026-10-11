@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { IndicatorDetails, IndicatorWithLatestValue } from "@/lib/data";
+import type { EtfRow } from "@/lib/dividend";
 
 // 로컬 개발용 오버레이. 지표 설명(description_beginner)이나 서브값(details)을
 // 운영 Supabase에 쓰기 전에, 로컬 dev 서버에서만 새 값을 얹어 미리 보기 위한
@@ -54,6 +55,11 @@ export type DevOverrides = {
    * 꼴은 IndicatorWithLatestValue 에서 id 를 뺀 것이다 — `fetch_investor_deposit.py --preview` 가 한 항목을 이 꼴로 뽑는다.
    */
   indicators?: Omit<IndicatorWithLatestValue, "id">[];
+  /**
+   * 배당으로 살기(/dividend)의 ETF 행(etf_dividend 와 같은 꼴). 같은 코드의 DB 행 대신 이것을 쓴다. 분배 셈을 고친 뒤
+   * **표에 쓰기 전에** 로컬에서 화면을 보는 용도다 — `fetch_etf_dividends.py --dry-run --dump rows.json` 이 이 꼴로 뽑는다.
+   */
+  etfRows?: EtfRow[];
 };
 
 const EMPTY: DevOverrides = {};

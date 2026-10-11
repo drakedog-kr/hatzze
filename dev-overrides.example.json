@@ -18,5 +18,7 @@
     }
   ],
   "_indicators": "DB 에 아직 없는 새 지표를 로컬 카드로 볼 때 씁니다. 키 이름에서 밑줄을 떼고 indicators 로 두세요. 한 항목은 수집 스크립트의 --preview 가 뽑습니다(예: python data-pipeline/scripts/fetch_investor_deposit.py --preview /tmp/deposit.json). 같은 slug 가 DB 에 생기면 DB 쪽을 씁니다.",
-  "_indicators_value": []
+  "_indicators_value": [],
+  "_etfRows": "배당으로 살기(/dividend)의 ETF 행을 표에 쓰기 전에 로컬에서 볼 때 씁니다. 키 이름에서 밑줄을 떼고 etfRows 로 두세요. 행은 python data-pipeline/scripts/fetch_etf_dividends.py --dry-run --dump /tmp/etf.json 이 뽑고, 보고 싶은 행만 골라 넣으면 같은 코드의 DB 행 대신 그 행을 씁니다.",
+  "_etfRows_value": []
 }

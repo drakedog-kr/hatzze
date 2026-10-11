@@ -62,7 +62,7 @@ def _run(monkeypatch, latest, codes, last, stored):
     db = _DB(stored)
     monkeypatch.setattr(sys, "argv", ["fetch_etf_dividends.py"])
     monkeypatch.setattr(etf, "today_kst", lambda: TODAY)
-    monkeypatch.setattr(etf, "krx_latest", lambda: latest)
+    monkeypatch.setattr(etf, "krx_latest", lambda start=None: None if start else latest)
     monkeypatch.setattr(etf, "seibro_history", lambda today: [_paid(c) for c in codes])
     monkeypatch.setattr(etf, "get_client", lambda: db)
     monkeypatch.setattr(etf, "load_last_quotes", lambda db, table, key: last)

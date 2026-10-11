@@ -9,6 +9,8 @@
      어제 값까지 지워진다. 국내는 그날 시세 목록으로 상장폐지를 못 거르므로 어제 표에 종가가 있던 ETF 만 싣는다.
 
 '1년에 얼마'는 미국·국내 다 같다 — **지난 365일 안에 지급된 건의 합.** 지급 달은 그 건들의 달이라 달력에 든다.
+상장 1년이 안 된 ETF 만 남은 차례를 채워 1년치로 어림한다(`estimated`, 남은 차례는 payments 에 `est` 로) — 판정과 셈은
+common/young_etf.py. 국내 판정에 1년 전 거래일의 KRX ETF 목록을 한 번 더 받는다(못 받은 날은 어제 표의 `estimated` 를 잇는다).
 
 ## 국내 과표 — 운용사 공시(지금은 TIGER 만)
 
@@ -62,9 +64,10 @@ from common.carry_quote import carry_close, fx_or_last, load_last_quotes  # noqa
 from common.config import FINNHUB_API_KEY  # noqa: E402
 from common.fx import usdkrw  # noqa: E402
 from common.krx_client import krx_get  # noqa: E402
-from common.stockanalysis import PageChanged, dividend_history, trailing  # noqa: E402
+from common.stockanalysis import PageChanged, dividend_page, trailing  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
+from common.young_etf import CADENCE, MIN_LISTED_YEAR_AGO, PER_YEAR, YEAR_DAYS, estimate, listed_within_year, per_year_from_gaps  # noqa: E402
 from config.etf_dividends import US_ETFS  # noqa: E402
 
 TABLE = "etf_dividend"
@@ -100,9 +103,9 @@ MAX_LOOKBACK_DAYS = 10
 MIN_ROWS_TO_PRUNE = 600
 
 
-def krx_latest() -> tuple[str, dict[str, dict]] | None:
-    """최신 가용 거래일의 ETF 전 종목. (거래일, 코드→행)."""
-    day = today_kst()
+def krx_latest(start: date | None = None) -> tuple[str, dict[str, dict]] | None:
+    """start(기본 오늘) 이전 가장 가까운 거래일의 ETF 전 종목. (거래일, 코드→행)."""
+    day = start or today_kst()
     for _ in range(MAX_LOOKBACK_DAYS):
         bas_dd = day.strftime("%Y%m%d")
         res = krx_get(KRX_URL, bas_dd)
@@ -295,6 +298,31 @@ def stored_taxable(db) -> dict[tuple[str, str], float]:
     return out
 
 
+def stored_estimated(db) -> set[str]:
+    """어제 표에서 1년치로 어림했던 국내 ETF 코드. 1년 전 KRX 목록을 못 받은 날 그 판정을 잇는다. 못 읽으면 빈 set."""
+    try:
+        rows = db.table(TABLE).select("code").eq("market", "KR").eq("estimated", True).execute().data
+    except Exception as exc:  # noqa: BLE001
+        print(f"[ETF] 어제 어림한 국내 ETF 를 못 읽었습니다 — 오늘은 국내를 어림하지 않습니다: {exc}")
+        return set()
+    return {r["code"] for r in rows}
+
+
+def kr_young(today: date, db) -> tuple[set[str] | None, set[str]]:
+    """(1년 전 거래일에 상장돼 있던 국내 ETF 코드, 어제 어림한 코드). 앞의 것이 None 이면 목록을 못 받은 날이다.
+
+    상장일은 KRX ETF 시세에 없다. 그래서 1년 전 거래일의 전 종목 목록을 받아, 지금 있는데 그때 없던 코드를 1년 안에 상장한
+    ETF 로 본다(common/young_etf.py 머리말). 목록이 반쯤 온 날(MIN_LISTED_YEAR_AGO 미만)도 못 받은 날로 친다.
+    """
+    old = krx_latest(today - timedelta(days=YEAR_DAYS))
+    listed = set(old[1]) if old and len(old[1]) >= MIN_LISTED_YEAR_AGO else None
+    if listed is None:
+        print("[ETF] 1년 전 KRX ETF 목록을 못 받았습니다 — 어제 어림한 국내 ETF 만 어림합니다")
+        return None, stored_estimated(db)
+    print(f"[ETF] 1년 전 KRX ETF 목록 {old[0]} · {len(listed)}종목")
+    return listed, set()
+
+
 def cadence_of(n: int) -> str | None:
     """지난 1년 지급 건수 → 주기. 열한 번도 월(빠진 달 하나는 상장 첫해거나 지급일이 밀린 것)."""
     if n >= 11:
@@ -329,6 +357,7 @@ def main() -> None:
         by_code: dict[str, list[dict]] = {}
         for r in kr_hist:
             by_code.setdefault(r["code"], []).append(r)
+        listed_year_ago, kept_estimated = kr_young(today, db)
         no_price = 0
         for code, recs in by_code.items():
             paid, nxt = trailing(recs, today)
@@ -344,17 +373,26 @@ def main() -> None:
                 no_price += 1
                 continue
             close = float(px["TDD_CLSPRC"]) if px and px.get("TDD_CLSPRC") else None
-            ttm = round(sum(p["amount"] for p in paid), 2)
+            paid_sum = sum(p["amount"] for p in paid)
+            # 상장 1년 미만이면 남은 차례를 채워 1년치로(common/young_etf.py). 1년 전 목록을 못 받은 날은 어제 판정을 잇는다.
+            young = code not in listed_year_ago if listed_year_ago is not None else code in kept_estimated
+            per_year = per_year_from_gaps([p["pay"] for p in paid]) if young else None
+            est = estimate([(p["pay"], p["amount"]) for p in paid], per_year, today) if young else None
+            ttm = round(est[0] if est else paid_sum, 2)
             kr_count += 1
             # 과표는 지급 건마다. 하나라도 있으면 없는 건은 분배금 전액으로 쳐서 합을 낸다(그 달 페이지를 못 받은 것).
+            # 어림한 ETF 는 받은 건의 과세 비율을 1년치에 그대로 옮긴다.
             tx = [taxable.get((code, p["record"])) for p in paid]
             has_tx = any(t is not None for t in tx)
+            paid_tx = sum(min(p["amount"], t) if t is not None else p["amount"] for p, t in zip(paid, tx))
             rows.append({
                 "code": code, "market": "KR", "currency": "KRW",
                 "name_ko": max(recs, key=lambda p: p["record"])["name"], "name_en": None,  # 이름이 바뀐 ETF 는 최근 건의 이름
-                "cadence": cadence_of(len(paid)), "ttm_dps": ttm, "estimated": False,
-                "payments": [{"record": p["record"], "pay": p["pay"], "amount": p["amount"], **({"taxable": t} if t is not None else {})} for p, t in zip(paid, tx)],
-                "taxable_dps": round(sum(min(p["amount"], t) if t is not None else p["amount"] for p, t in zip(paid, tx)), 2) if has_tx else None,
+                # 지급 건수로 세는 주기는 신규에서 틀린다(석 달 된 월분배가 '분기') — 어림한 것은 지급 간격으로 센 주기.
+                "cadence": CADENCE[per_year] if est and per_year else cadence_of(len(paid)), "ttm_dps": ttm, "estimated": bool(est),
+                "payments": [{"record": p["record"], "pay": p["pay"], "amount": p["amount"], **({"taxable": t} if t is not None else {})} for p, t in zip(paid, tx)]
+                + [{"pay": d, "amount": a, "est": True} for d, a in (est[1] if est else [])],
+                "taxable_dps": round(paid_tx * ttm / paid_sum if est and paid_sum else paid_tx, 2) if has_tx else None,
                 "pay_months": sorted({int(p["pay"][5:7]) for p in paid}),
                 "next_pay_date": nxt["pay"] if nxt else None, "next_pay_amount": nxt["amount"] if nxt else None,
                 "as_of": today.isoformat(), "source": SEIBRO_SRC,
@@ -369,6 +407,11 @@ def main() -> None:
         print(f"[ETF] 과표 붙은 국내 ETF {len(with_tx)} · 그중 일부만 과세 {len(partial)}")
         for r in sorted(partial, key=lambda r: r["taxable_dps"] / r["ttm_dps"])[:6]:
             print(f"  {r['name_ko']:34s} 분배금 {r['ttm_dps']:>8,.0f} 과표 {r['taxable_dps']:>8,.0f} ({r['taxable_dps'] / r['ttm_dps'] * 100:.0f}%)")
+        young_rows = [r for r in rows if r["market"] == "KR" and r["estimated"]]
+        print(f"[ETF] 상장 1년 미만이라 1년치로 어림한 국내 ETF {len(young_rows)}")
+        for r in young_rows[:6]:
+            got = sum(p["amount"] for p in r["payments"] if not p.get("est"))
+            print(f"  {r['name_ko']:34s} {r['cadence']} {sum(1 for p in r['payments'] if not p.get('est'))}건 {got:>8,.0f} → 1년 {r['ttm_dps']:>8,.0f}")
 
     fx, fx_carried = fx_or_last(usdkrw(), last)
     if fx_carried:
@@ -381,8 +424,10 @@ def main() -> None:
         # 지급 건은 stockanalysis 가 먼저다. 못 받으면 설정의 `pays`(있을 때)로.
         pays: list[tuple[str, float]] = []
         as_of = today.isoformat()
+        inception = None
         try:
-            hist = dividend_history(e["code"], "etf")
+            hist, stats = dividend_page(e["code"], "etf")
+            inception = stats.get("inception")
         except PageChanged:
             hist = None
             sa_fail += 1
@@ -397,13 +442,15 @@ def main() -> None:
         if not pays:
             print(f"  ⚠️ {e['code']}: 지급 건을 못 받았고 설정에도 없어 건너뜁니다")
             continue
-        ttm = round(sum(a for _, a in pays), 4)
+        # 상장 1년 미만이면 남은 차례를 채워 1년치로 — 주기는 설정의 cadence(common/young_etf.py).
+        est = estimate(pays, PER_YEAR.get(e["cadence"]), today) if listed_within_year(inception, today) else None
+        ttm = round(est[0] if est else sum(a for _, a in pays), 4)
         q = quote(e["code"], key) if key else None
         rows.append({
             "code": e["code"], "market": "US", "currency": "USD",
             "name_ko": e["name_ko"], "name_en": e.get("name_en"),
-            "cadence": e["cadence"], "ttm_dps": ttm, "estimated": False,
-            "payments": [{"pay": d, "amount": a} for d, a in pays],
+            "cadence": e["cadence"], "ttm_dps": ttm, "estimated": bool(est),
+            "payments": [{"pay": d, "amount": a} for d, a in pays] + [{"pay": d, "amount": a, "est": True} for d, a in (est[1] if est else [])],
             "taxable_dps": None,
             "pay_months": sorted({int(d[5:7]) for d, _ in pays}),
             "next_pay_date": nxt["pay"] if nxt else None, "next_pay_amount": float(nxt["amount"]) if nxt else None,
@@ -423,7 +470,7 @@ def main() -> None:
           + (f" · 환율 {fx[0]:,.2f}({fx[1]})" if fx else " · 환율 없음"))
     for r in [x for x in rows if x["currency"] == "USD"] + [x for x in rows if x["currency"] == "KRW"][:8]:
         unit = "$" if r["currency"] == "USD" else "원"
-        print(f"  {r['name_ko']:28s} 1년 {r['ttm_dps']:>9,.4f}{unit} · {r['cadence'] or '?'} {r['pay_months']} · 시세 {r['close']} · 수익률 {r['ttm_yield_pct']}%")
+        print(f"  {r['name_ko']:28s} 1년 {r['ttm_dps']:>9,.4f}{unit} · {r['cadence'] or '?'} {r['pay_months']} · 시세 {r['close']} · 수익률 {r['ttm_yield_pct']}%{' · 어림' if r['estimated'] else ''}")
     if "--dump" in sys.argv[1:]:
         # 화면 쪽 검증용 — 이 행들을 그대로 lib/dividend.ts 의 EtfRow 로 읽어 바스켓을 미리 볼 수 있다.
         out = Path(sys.argv[sys.argv.index("--dump") + 1])
