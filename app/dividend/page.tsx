@@ -105,7 +105,7 @@ const CHIP_MIN_YIELD_US = 1.5;
 const CHIP_MIN_CAP = 3_000e8;
 /** 미국 ETF 는 자료가 없어 손으로 적은 순서. 서학개미가 배당·월분배로 가장 많이 드는 것부터. 칩은 앞에서 자른다. */
 const US_ETF_ORDER = ["SCHD", "JEPI", "JEPQ", "QYLD", "MSTY", "TSLY", "VYM", "DIVO"];
-/* '더 보기' 묶음의 미국 ETF — config/etf_dividends.py 의 100개를 성격으로 가른 것. 순서가 곧 서는 순서다.
+/* '더 보기' 묶음의 미국 ETF — config/etf_dividends.py 의 101개를 성격으로 가른 것. 순서가 곧 서는 순서다.
    커버드콜은 월분배(JP모건·글로벌X·NEOS·골드만·REX) 다음에 주분배(라운드힐 0DTE)·일드맥스. 지수 ETF(VOO·IVV·QQQ·QQQM…)는
    묶음에 안 세운다 — 배당 화면의 줄이 아니라 검색으로만. */
 const US_ETF_COVERED = ["JEPI", "JEPQ", "QYLD", "XYLD", "RYLD", "DIVO", "QDVO", "IDVO", "QQQI", "SPYI", "IWMI", "GPIX", "GPIQ", "FEPI", "AIPI", "XPAY", "XDTE", "QDTE", "RDTE", "SDTY", "QDTY", "RDTY", "MAGY", "YBTC", "YETH", "BTCI", "ISPY", "IQQQ", "SPYT", "QQQT", "QQQY", "WDTE", "IWMY", "MSTY", "TSLY", "NVDY", "CONY", "PLTY", "CHPY", "LFGY", "GPTY", "BIGY", "FIAT", "AMZY", "APLY", "GOOY", "MSFO", "NFLY", "YMAX", "YMAG", "ULTY"];

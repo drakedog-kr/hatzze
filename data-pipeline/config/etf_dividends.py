@@ -9,7 +9,7 @@ JEPI 2026-09-03 0.37142). 티커와 이름만 적으면 된다. `pays` 를 적�
 
 목록은 서학개미가 배당·월분배로 드는 것 위주다 — SCHD 계열, JP모건·글로벌X·NEOS·골드만 커버드콜, 뱅가드·
 아이셰어즈 배당, 리츠·우선주·채권(월배당이라 파이어족이 든다 — 하이일드·투자등급·국채·채권 커버드콜까지), 라운드힐 0DTE·일드맥스(단일 종목·묶음 옵션, 분배금이
-달마다 크게 흔들려 화면이 30% 넘는 분배율에 '초고배당' 표시를 단다), 지수(VOO·IVV·QQQ·QQQM·SPY·VTI).
+달마다 크게 흔들려 화면이 30% 넘는 분배율에 '초고배당' 표시를 단다), 지수(VOO·IVV·QQQ·QQQM·QNDX·SPY·VTI).
 
 ## 국내 ETF — 전 운용사 자동(예탁결제원 SEIBro 분배금지급현황)
 
@@ -167,4 +167,8 @@ US_ETFS: list[dict] = [
     {"code": "QQQY", "name_ko": "QQQY", "name_en": "Defiance Nasdaq 100 Weekly Distribution ETF", "cadence": "주", "source": "https://www.defianceetfs.com/qqqy/"},
     {"code": "WDTE", "name_ko": "WDTE", "name_en": "Defiance S&P 500 Weekly Distribution ETF", "cadence": "주", "source": "https://www.defianceetfs.com/jepy/"},
     {"code": "IWMY", "name_ko": "IWMY", "name_en": "Defiance R2000 Weekly Distribution ETF", "cadence": "주", "source": "https://www.defianceetfs.com/iwmy/"},
+    # 2026-10-11 요청. 스테이트스트리트 나스닥100 — QQQM 과 같은 지수, 지수 ETF 라 묶음엔 안 서고 검색으로만. 2026-06-23 상장이라
+    # stockanalysis 지급 건이 하나뿐이다(2026-09-23 0.02723). '1년에 얼마'는 지급된 건의 합이니 분기 네 번이 다 찰 때(2027-06)까지
+    # 수익률이 낮게 선다 — 10-11 기준 0.11%, 같은 지수 QQQM 0.43%. Finnhub 시세 확인(10-09 25.45).
+    {"code": "QNDX", "name_ko": "QNDX", "name_en": "State Street SPDR Portfolio Nasdaq 100 ETF", "cadence": "분기", "source": "https://www.ssga.com/us/en/intermediary/etfs/state-street-spdr-portfolio-nasdaq-100-etf-qndx"},
 ]
