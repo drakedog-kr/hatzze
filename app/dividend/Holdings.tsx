@@ -291,7 +291,7 @@ function HoldingRow({
   // 첫 배당 — 끝난 회계연도에 배당이 없었는데 지난 1년에 있다. 국내만: 미국 연속 연수는 늘린 햇수를 물려받는다.
   else if (s.currency === "KRW" && s.kind === "stock" && s.dps > 0 && s.streak === 0) facts.push({ text: "작년 무배당", title: "지난해 배당 없었음", warn: true });
   // 어림값 — 미국 주식은 연간 공시가 없어 마지막 배당으로, ETF 는 상장 1년이 안 돼 남은 차례를 채워서(etf_dividend.estimated).
-  if (s.estimated) facts.push({ text: "추정", title: s.kind === "etf" ? "상장 1년이 안 돼 어림" : "마지막 배당으로 어림", warn: true });
+  if (s.estimated) facts.push({ text: "추정", title: s.kind === "etf" ? "상장 1년이 안 돼 연환산" : "마지막 배당으로 어림", warn: true });
   // 일드맥스(TSLY·MSTY)류. 지난 1년 분배가 가격의 3할을 넘으면 원금을 돌려주는 상품이라 봐야 한다.
   if ((s.yieldPct ?? 0) > HOT_YIELD_PCT) facts.push({ text: "초고배당", title: "원금 반환 섞인 분배", warn: true });
   if (s.close == null) facts.push({ text: "종가 없음", title: "투자금 · 수익률 못 냄", warn: true });
