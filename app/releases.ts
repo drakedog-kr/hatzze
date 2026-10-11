@@ -31,6 +31,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 목록에 종목이 느는 것이라 Patch. 날짜는 머지하는 날로 고친다.
+    version: "2.9.4",
+    date: "2026-10-11",
+    changes: ["배당으로 살기에 미국 ETF QNDX가 더 담깁니다."],
+  },
+  {
     // 등락 이유의 국장 등락률을 이튿날 아침 KRX 공표 뒤 바로 채운다 — 쓰는 법은 그대로라 Patch. 날짜는 머지하는 날로 고친다.
     version: "2.9.3",
     date: "2026-10-11",
