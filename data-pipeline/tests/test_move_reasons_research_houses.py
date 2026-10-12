@@ -3,8 +3,8 @@ import generate_telegram_narratives as KR
 from generate_move_reasons import RESEARCH_HOUSES, quoted_move, quoted_moves
 
 
-def test_houses_are_the_five_research_banks():
-    assert RESEARCH_HOUSES == {"JPM", "GS", "MS", "BAC", "C"}
+def test_houses_are_the_research_banks():
+    assert RESEARCH_HOUSES == {"JPM", "GS", "MS", "BAC", "C", "WFC"}
 
 
 def test_quote_after_name_is_the_bank_itself():

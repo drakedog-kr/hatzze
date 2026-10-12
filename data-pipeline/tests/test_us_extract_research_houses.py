@@ -14,7 +14,7 @@ def tagger():
 
 
 def test_houses_are_in_the_dictionary():
-    assert RESEARCH_HOUSES == {"JPM", "GS", "MS", "BAC", "C"}
+    assert RESEARCH_HOUSES == {"JPM", "GS", "MS", "BAC", "C", "WFC"}
     assert sanity_check() == []
 
 
@@ -29,6 +29,9 @@ def test_houses_are_in_the_dictionary():
     "- 주관사 : 모건스탠리,골드만삭스\n- 시장구분 : 나스닥",
     "골드만삭스는 30조원 규모의 현금배당을 주당 4604원으로 환산했다",
     "(모건스탠리, Overweight, 목표주가 $250)",
+    # 웰스파고(2026-10-12, 이슈 #712) — 30일 195건 중 대부분이 이 꼴이었다
+    "• 메타 플랫폼스 (META) — 웰스파고가 ‘Overweight’를 유지하면서 목표주가를 640달러에서 796달러로 상향",
+    "넷플릭스(-4.67%)는 웰스파고가 컨텐츠 투자에 대한 재조정 등에서 어려운 국면이라고 평가",
 ])
 def test_bank_as_speaker_or_role_is_not_a_mention(tagger, text):
     assert not set(tagger(text)) & RESEARCH_HOUSES
@@ -39,6 +42,7 @@ def test_bank_as_speaker_or_role_is_not_a_mention(tagger, text):
     ("골드만삭스 9% 급등하며 금융주 강세 주도", "GS"),
     ("제목 : 뱅크오브아메리카 주가 급락 과도 - MS", "BAC"),
     ("• 골드만삭스 (GS) — ETF 운용사 NEOS 를 인수하기로 합의", "GS"),
+    ("JP모건(-3.42%), 웰스파고(-3.92%), BOA(-3.04%) 등 금융주 전반이 하락했습니다", "WFC"),
 ])
 def test_bank_treated_as_stock_is_a_mention(tagger, text, ticker):
     assert ticker in tagger(text)

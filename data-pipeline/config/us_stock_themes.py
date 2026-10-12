@@ -75,7 +75,7 @@ US_THEMES: dict[str, list[str]] = {
         "LLY", "MRNA", "NVO", "MRK", "PFE", "ABBV", "AZN", "NVS",
         "JNJ", "UNH", "ISRG", "MDGL", "CVS", "CAH", "AMGN", "MDT", "EVMN",
     ],
-    "금융": ["GS", "JPM", "MS", "BAC", "BRK", "BX", "SCHW", "MA", "AXP", "PYPL", "SOFI", "UPST", "C"],
+    "금융": ["GS", "JPM", "MS", "BAC", "BRK", "BX", "SCHW", "MA", "AXP", "PYPL", "SOFI", "UPST", "C", "WFC"],
     # 코인 시세와 함께 움직이는 묶음. 금융과 갈라 둔 이유는 그날 오가는 얘기가
     # 실적이 아니라 코인 시세라, 섞으면 금융 테마의 순위가 코인 때문에 흔들린다.
     "가상자산": ["COIN", "MSTR", "CRCL", "GLXY", "CLSK", "RIOT", "CIFR", "HOOD"],
