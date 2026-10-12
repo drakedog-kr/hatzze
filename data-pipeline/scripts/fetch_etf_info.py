@@ -18,6 +18,16 @@
 KRX 일별매매정보는 단축코드만 준다. 국내 ETF ISIN 은 'KR7' + 단축코드 + '00' + 체크숫자이고, 체크숫자는 ISO 6166(글자를
 36진 숫자로 펴서 룬 알고리즘)이다 — KR7069500007 · KR7360750004 · KR70094M0005 로 맞췄다.
 
+## 세이브로에 없는 ETF
+
+KRX 에 상장했어도 세이브로 'ETF종합정보'가 빈 응답(앞 칸 없음)을 주는 ETF 가 있다 — 2026-10-13 첫 정기 실행에서
+0182R0(1Q K반도체TOP2+ · 4월 상장)과 0246X0(SOL 글로벌DRAM반도체플러스 · 10-07 상장)이 그랬다. ISIN 은 KRX 종목 찾기의
+full_code 와 같다(KR70182R0003 · KR70246X0009). 받을 것이 그 둘뿐이라 2/2 로 실패 비율 문턱을 넘어 죽었고(이슈 #723),
+둘이 저쪽에 오를 때까지 매 실행 알림이 설 판이었다. 그래서 실패가 나오면 늘 있는 KODEX 200(CANARY)을 한 번 더 받아 본다 —
+읽히면 실패는 저쪽에 그 종목이 없는 것이라 경고만 찍고 지나가고, 안 읽히면 저쪽 화면이 바뀐 것이라 죽는다. 비율 문턱은
+FAIL_MIN 개 이상 실패했을 때만 본다(끊김이 몰린 날). 못 받은 ETF 는 표에 없어 화면이 이름 규칙으로 유형을 정하고
+총보수 · 운용사 · 상장일을 '없음'으로 둔다. 다음 실행이 다시 걸어 본다.
+
 ## 며칠마다 다시 받나
 
 총보수 · 설정일은 거의 안 바뀐다. 매 실행 표에 없거나 REFRESH_DAYS 넘게 묵은 것만, 한 번에 MAX_CALLS 까지 받는다.
@@ -59,8 +69,11 @@ PAUSE_SEC = 0.3
 REFRESH_DAYS = 7
 MAX_CALLS = 400
 CHUNK = 500
-# 이만큼 넘게 실패하면 저쪽 화면이 바뀐 것이다 — 조용히 넘어가지 말고 죽는다.
+# 이만큼 넘게 실패하면 저쪽 화면이 바뀐 것이다 — 조용히 넘어가지 말고 죽는다. 실패가 FAIL_MIN 보다 적으면 비율을 안 본다(머리말 '세이브로에 없는 ETF').
 FAIL_RATIO_LIMIT = 0.2
+FAIL_MIN = 10
+# 늘 있는 ETF(KODEX 200) — 실패가 나오면 이것도 받아 본다. 이게 읽히면 실패는 저쪽에 그 종목이 없는 것이다.
+CANARY = "069500"
 
 
 def isin_check_digit(body: str) -> str:
@@ -165,22 +178,29 @@ def main() -> None:
     print(f"[세이브로] {day} 상장 {len(codes)}종목 · 표에 {len(have)}종목 · 받을 것 {len(todo)}종목")
 
     rows: list[dict] = []
-    failed = 0
+    missed: list[str] = []
     for i, code in enumerate(todo, 1):
         info = fetch_info(to_isin(code))
         row = to_row(code, info) if info is not None else None
         if row is None:
-            failed += 1
+            missed.append(code)
         else:
             rows.append(row)
             if args.dry_run and len(rows) <= 5:
                 print(f"[dry-run] {row['code']} {row['name']} · 보수 {row['fee_pct']}% · {row['manager']} · {row['category']}")
         if i % 100 == 0:
-            print(f"[세이브로] {i}/{len(todo)} · 실패 {failed}")
+            print(f"[세이브로] {i}/{len(todo)} · 실패 {len(missed)}")
         time.sleep(PAUSE_SEC)
 
-    if todo and failed / len(todo) > FAIL_RATIO_LIMIT:
-        raise RuntimeError(f"세이브로 ETF종합정보 실패 {failed}/{len(todo)} — 화면 구조가 바뀌었는지 볼 것")
+    failed = len(missed)
+    if failed:
+        print(f"[경고] 세이브로에서 못 받은 {failed}종목: {' · '.join(missed[:20])}{' …' if failed > 20 else ''}")
+        probe = fetch_info(to_isin(CANARY))
+        if probe is None or to_row(CANARY, probe) is None:
+            raise RuntimeError(f"세이브로 ETF종합정보 실패 {failed}/{len(todo)} · KODEX 200 도 못 읽었다 — 화면 구조가 바뀌었는지 볼 것")
+        print("[세이브로] KODEX 200 은 읽힌다 — 못 받은 종목은 저쪽에 없는 것으로 보고 넘어갑니다")
+    if failed >= FAIL_MIN and failed / len(todo) > FAIL_RATIO_LIMIT:
+        raise RuntimeError(f"세이브로 ETF종합정보 실패 {failed}/{len(todo)} — 끊김이 몰렸거나 화면 구조가 바뀌었는지 볼 것")
     if args.dry_run:
         print(f"[dry-run] 받은 {len(rows)} · 실패 {failed} · DB 에 안 썼습니다")
         return
