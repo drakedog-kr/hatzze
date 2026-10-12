@@ -3,15 +3,17 @@ import Link from "next/link";
 import type { DividendStock } from "@/lib/dividend";
 
 import { showsSepTax } from "../../dividend/calc";
-import { DIVIDEND_PAGE } from "../../dividend/copy";
+import { DIVIDEND_ADD_LABEL, DIVIDEND_PAGE } from "../../dividend/copy";
 import { Module } from "../../kadera/V2Modules";
+import { Icon } from "../../ui";
 
 /**
  * 종목 페이지의 배당 모듈 — "이 종목을 1주 들면 1년에 얼마 받나, 어느 달에 받나". 서버가 그린다(크롤러가 읽게).
  *
  * 값은 배당으로 살기(/dividend)와 같은 표(kr_dividend_stock)에서 온다: 최근 12개월 실제 지급 합, 전일 종가로 나눈
  * 배당수익률, 지급 달. 여기서는 셈을 안 하고 보여만 준다 — 주수를 넣어 셈하는 건 /dividend 의 일이라 머리 띠 오른쪽 링크가
- * 그리로 잇는다(`?add=코드` 로 열면 그 종목이 담긴 채 열린다).
+ * 그리로 잇는다(`?add=코드` 로 열면 그 종목이 담긴 채 열린다). 링크 말은 '내 배당 포폴에 추가하기'(2026-10-12 · 한때 '배당으로 살기에서
+ * 셈하기' — 무엇을 하는 단추인지 말이 바로 안 했다). ETF 상세 분배금 카드 · 미장 종목 상세 커뮤니티 관심 추이 카드 머리도 같은 말이다.
  *
  * ⚠️ 아래 곁말(배당성향 · 5년 증가율 · 분리과세)의 뜻은 /dividend 의 줄과 같다. 같은 자료에 같은 말.
  * v2(2026-10-03) — 시트 머리(아이콘 · 부제)를 모듈 머리 띠로, 통계 칸 · 꼬리표 알약을 글자 줄로 바꿨다.
@@ -48,8 +50,9 @@ export function DividendCard({ s, wide = false }: { s: DividendStock; wide?: boo
       meta="최근 12개월 · 원"
       aside={
         s.dps > 0 ? (
-          <Link href={href} className="v2-more" data-ga="cta_click" data-ga-cta="to_dividend_calc" data-ga-surface="stock_page">
-            {DIVIDEND_PAGE.label}에서 셈하기
+          <Link href={href} className="v2-add-btn" data-ga="cta_click" data-ga-cta="to_dividend_calc" data-ga-surface="stock_page">
+            <Icon name="add_circle" />
+            {DIVIDEND_ADD_LABEL}
           </Link>
         ) : undefined
       }
@@ -81,7 +84,7 @@ export function DividendCard({ s, wide = false }: { s: DividendStock; wide?: boo
                     <span className="v2-sk-mbar">
                       <i className={v > 0 ? undefined : "is-none"} style={{ height: v > 0 ? `${Math.max(8, (v / max) * 100)}%` : 3 }} />
                     </span>
-                    <em>{m}월</em>
+                    <em>{m}<span className="v2-sk-mu">월</span></em>
                     {/* 그달 받은 돈 — 누르지 않아도 보이게(1주 기준 · 원은 머리 근거가 말한다). */}
                     {v > 0 && <b>{Math.round(v).toLocaleString("ko-KR")}</b>}
                   </span>

@@ -1,5 +1,5 @@
 /**
- * /kadera·/mdd·/insider·/dividend·/daily·/preview·/changelog·/theme 공유 카드에 들어가는 글.
+ * /kadera·/mdd·/insider·/dividend·/etf·/daily·/preview·/changelog·/theme 공유 카드에 들어가는 글.
  *
  * 왜 카드 파일 안이 아니라 여기냐면, 같은 글을 두 곳이 봐야 하기 때문이다 —
  * 카드를 그리는 opengraph-image.tsx 와, og:image:alt 를 채우는 app/seo.ts.
@@ -92,6 +92,17 @@ export const DIVIDEND_CARD: OgCopy = {
   ],
   foot: "hatzze.fun/dividend",
   alt: "배당으로 살기 · 가진 종목과 주수를 넣으면 1년에 배당을 얼마 받는지 바로 셉니다",
+};
+
+/**
+ * ETF 자금 흐름 카드. 화면 설명(app/etf/copy.ts description)의 축 — ETF 하나하나 · 유입과 유출 · 설정·환매. 그림은 히어로의
+ * 날별 순유입처럼 0 선 위아래로 선 막대다(app/etf/opengraph-image.tsx). ⛔ 금액 · ETF 이름을 적지 않는다(카드는 한 번 굳는다).
+ */
+export const ETF_CARD: OgCopy = {
+  title: "ETF 자금 흐름",
+  lines: ["국내 상장 ETF 하나하나에", "자금이 얼마나 유입되고", "빠져나갔는지 봅니다."],
+  foot: "hatzze.fun/etf",
+  alt: "ETF 자금 흐름 · 국내 상장 ETF 하나하나에 자금이 얼마나 유입되고 빠져나갔는지 봅니다",
 };
 
 /**
@@ -191,6 +202,7 @@ const STATIC_CARDS: OgCopy[] = [
   MDD_CARD,
   INSIDER_CARD,
   DIVIDEND_CARD,
+  ETF_CARD,
   NOTE_CARD,
   PREVIEW_CARD,
   CHANGELOG_CARD,

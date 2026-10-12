@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Fragment } from "react";
 
+import { getUsDividendYield } from "@/lib/dividend";
 import { withObjectParticle } from "@/lib/format";
 import { MENTION_TREND_DAYS, getStockDetail } from "@/lib/insider-detail";
 import { groupInsiderLines } from "@/lib/insider-person";
@@ -10,6 +11,8 @@ import { PRICE_RANGES, type PriceRangeKey, stockDetailHref } from "@/lib/insider
 import { assertLoaded } from "@/lib/load-state";
 
 import { CoverMeta, MentionTrend, Module, type TrendPrice } from "../../../kadera/V2Modules";
+import { DIVIDEND_ADD_LABEL, DIVIDEND_PAGE } from "../../../dividend/copy";
+import { Icon } from "../../../ui";
 import { CurrencyToggle } from "../../../AppShell";
 import { ChartZoom } from "../../ChartZoom";
 import { StockLogo } from "../../../StockLogo";
@@ -284,7 +287,8 @@ function pricesByDate(bars: { date: string; close: number }[], days: { date: str
  *    주소에 담으면 서버가 그대로 그리고, 링크로 공유도 되고, 기간마다 사본(ISR)이 된다.
  */
 export async function StockDetailBody({ ticker, range }: { ticker: string; range: PriceRangeKey }) {
-  const d = await getStockDetail(ticker, range);
+  // 배당은 곁가지 — 못 읽으면 커뮤니티 관심 추이 카드 머리의 '내 배당 포폴에 추가하기' 단추만 빠진다(getUsDividendYield 가 null).
+  const [d, dividend] = await Promise.all([getStockDetail(ticker, range), getUsDividendYield(ticker)]);
   // notFound() 앞에서 던진다 — 조회가 죽어 null 이 온 것을 "없는 종목"으로 읽어 404 를 사본에 담거나,
   // 반쯤 빈 화면을 한 시간짜리 사본으로 남기지 않도록(투자자 상세와 같은 이유 · lib/load-state.ts).
   assertLoaded("/insider/stock/[ticker]");
@@ -506,7 +510,29 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
             ))}
           </dl>
         </Module>
-        <Module title="커뮤니티 관심 추이" meta={trendPoints.length ? `최근 ${trendPoints.length}일` : undefined} className="v2-tm-trendmod">
+        <Module
+          title="커뮤니티 관심 추이"
+          meta={trendPoints.length ? `최근 ${trendPoints.length}일` : undefined}
+          // 배당을 주는 종목이면 머리 오른쪽에 '내 배당 포폴에 추가하기'(국장 종목 상세 배당 카드 · ETF 상세 분배금 카드와 같은 단추 · 같은 말 ·
+          // app/dividend/copy.ts DIVIDEND_ADD_LABEL · 2026-10-12 이 자리로 정함). 이 화면엔 배당 카드가 없고, 첫 줄 띠는 1,440 에서 이미 1,164px 중
+          // 1,160px 이라 칸을 더하면 두 줄이 됐다. 배당수익률은 단추 말풍선에.
+          aside={
+            dividend ? (
+              <Link
+                href={`${DIVIDEND_PAGE.href}?add=${encodeURIComponent(d.ticker)}`}
+                className="v2-add-btn"
+                title={dividend.yieldPct != null ? `배당수익률 ${dividend.yieldPct.toFixed(2)}%` : undefined}
+                data-ga="cta_click"
+                data-ga-cta="to_dividend_calc"
+                data-ga-surface="insider_stock_page"
+              >
+                <Icon name="add_circle" />
+                {DIVIDEND_ADD_LABEL}
+              </Link>
+            ) : undefined
+          }
+          className="v2-tm-trendmod"
+        >
           {trendPoints.length === 0 ? (
             <p className="v2-empty">언급 기록을 아직 못 읽었습니다.</p>
           ) : d.trend.length === 0 ? (

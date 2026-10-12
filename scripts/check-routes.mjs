@@ -54,6 +54,8 @@ const EXCLUDED = new Map([
   ...(flags.THEME_PUBLIC ? [] : [["/theme", "아직 안 연 화면(app/screen-flags.ts THEME_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"]]),
   // 미장 테마 리포트(/theme/us) — 같은 플래그. 테마별 실주소(/theme/us/[theme])는 아래 DYNAMIC 에 있다.
   ...(flags.THEME_PUBLIC ? [] : [["/theme/us", "아직 안 연 화면(app/screen-flags.ts THEME_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"]]),
+  // ETF 자금 흐름(/etf) — 같은 방식. 여는 날 사이트맵에 싣고 이 줄은 빠진다(app/screen-flags.ts ETF_PUBLIC 의 여는 절차).
+  ...(flags.ETF_PUBLIC ? [] : [["/etf", "아직 안 연 화면(app/screen-flags.ts ETF_PUBLIC=false). noindex 라 사이트맵에 없어야 한다"]]),
 ]);
 
 /**
@@ -63,6 +65,7 @@ const EXCLUDED = new Map([
 const DYNAMIC = new Map([
   ["/insider/list/[kind]", "슬러그 여섯 개를 sitemap.ts 가 INSIDER_LIST_SLUGS 로 펼친다(걷은 hot · holders 는 next.config 가 308)"],
   ["/stock/[code]", "sitemap-stocks.xml 이 DB 를 읽어 펼친다(lib/stock-page.ts listIndexableStocks)"],
+  ["/etf/[code]", "ETF 상세(1,172장). 사이트맵에 아직 안 싣는다 — /etf 의 표 · 브리핑 링크로 닿는다(app/sitemap-urls.ts 의 ETF 줄)"],
   ["/theme/[theme]", "사전의 테마 26개를 app/sitemap-urls.ts 가 THEME_NAMES 로 펼친다(열린 뒤에만)"],
   ["/theme/us/[theme]", "미장 사전의 테마 16개를 app/sitemap-urls.ts 가 US_THEME_NAMES 로 펼친다(열린 뒤에만)"],
   ["/insider/stock/[ticker]", "미장 사전을 app/sitemap-insider.xml 이 읽어 펼친다(사전 밖 종목은 noindex)"],

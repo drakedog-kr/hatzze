@@ -364,12 +364,13 @@ export type IndexClose = { date: string; close: number; changePct: number | null
  * 둘 다 내부용 캐시 지표(kospi_close_raw · kosdaq_close_raw, is_public=false)라 getPublicIndicators 에 안 잡힌다.
  * 파이프라인이 하루 두 번 채우는 값이라 화면을 새로고침해도 안 바뀐다 — 햇쩨 지수와 같은 리듬이다(위 getKospiCloseSeries).
  * 지수마다 최근 두 줄만 읽는다(embedded limit 은 지수마다 걸린다).
+ * on — 그날 이하의 마지막 두 줄. ETF 자금 흐름 첫 줄 띠가 ETF 자료의 기준일로 맞춘다 — KRX 가 ETF 값을 다음 날 아침에 줘서, 그냥 읽으면
+ * 저녁마다 '10/12 종가 코스피'와 '10월 8일 거래분까지'가 한 띠에 섰다(2026-10-13).
  */
-export async function getKrIndexCloses(): Promise<MaybeFailed<{ kospi: IndexClose | null; kosdaq: IndexClose | null }>> {
-  const { data, error } = await getSupabaseServer()
-    .from("indicators")
-    .select("slug,indicator_values(date,raw_value)")
-    .in("slug", ["kospi_close_raw", "kosdaq_close_raw"])
+export async function getKrIndexCloses(on?: string): Promise<MaybeFailed<{ kospi: IndexClose | null; kosdaq: IndexClose | null }>> {
+  let q = getSupabaseServer().from("indicators").select("slug,indicator_values(date,raw_value)").in("slug", ["kospi_close_raw", "kosdaq_close_raw"]);
+  if (on) q = q.lte("indicator_values.date", on);
+  const { data, error } = await q
     .order("date", { referencedTable: "indicator_values", ascending: false })
     .limit(2, { referencedTable: "indicator_values" });
   if (error) {
@@ -390,9 +391,9 @@ export async function getKrIndexCloses(): Promise<MaybeFailed<{ kospi: IndexClos
  * 조회 클라이언트가 5xx 를 렌더 실패 목록에 적어 assertLoaded 가 화면 재생성을 통째로 멈췄다 — 주석은 '칸만 빠진다'였다
  * (2026-10-04 머지 전 점검, 홈 · 국장 카더라 · 국장 미리보기). 실패하면 LOAD_FAILED 로 그 칸만 뺀다.
  */
-export async function getKrIndexClosesSide(): ReturnType<typeof getKrIndexCloses> {
+export async function getKrIndexClosesSide(on?: string): ReturnType<typeof getKrIndexCloses> {
   try {
-    const { value, failed } = await withScopedLoadFailures(getKrIndexCloses);
+    const { value, failed } = await withScopedLoadFailures(() => getKrIndexCloses(on));
     if (!failed.length) return value;
     console.error(`[getKrIndexClosesSide] 지수 칸 조회 실패 — 그 칸만 뺍니다: ${failed.join(", ")}`);
   } catch (e) {

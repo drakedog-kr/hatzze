@@ -501,6 +501,28 @@ export async function getDividendData(): Promise<DividendData | null> {
 /* ── 종목 하나 — /stock/[code] 의 배당 카드 ───────────────────────────────
    464장이 부르는 자리라 조회는 기본키 셋뿐(kr_dividend_stock · kr_high_dividend · kr_dividend_payout).
    행이 없으면(비상장·ETF) null — 카드를 안 그린다. */
+/**
+ * 미장 종목 상세(/insider/stock/[ticker])의 '내 배당 포폴에 추가하기' 칸 — 배당으로 살기에 담길 수 있는 종목인가와 배당수익률.
+ * 배당으로 살기의 미국 줄은 us_dividend_stock(주식)과 etf_dividend 의 미국 ETF 다(loadUs · loadEtf). 1년 배당이 0 이면 null —
+ * 담아도 셀 배당이 없다(국장 종목 상세 배당 카드도 dps 가 있을 때만 단추를 건다). 조회가 죽어도 null — 단추가 빠질 뿐 화면은 그대로다.
+ */
+export async function getUsDividendYield(ticker: string): Promise<{ yieldPct: number | null } | null> {
+  try {
+    const db = getSupabaseServer();
+    const t = ticker.toUpperCase();
+    const [stock, etf] = await Promise.all([
+      db.from("us_dividend_stock").select("ttm_dps,ttm_yield_pct").eq("ticker", t).maybeSingle(),
+      db.from("etf_dividend").select("ttm_dps,ttm_yield_pct").eq("market", "US").eq("code", t).maybeSingle(),
+    ]);
+    const row = (stock.data ?? etf.data) as { ttm_dps: number | null; ttm_yield_pct: number | null } | null;
+    if (!row || !(Number(row.ttm_dps) > 0)) return null;
+    return { yieldPct: n(row.ttm_yield_pct) };
+  } catch (e) {
+    console.error("[dividend] 미국 종목 배당 조회 실패", ticker, e);
+    return null;
+  }
+}
+
 export async function getStockDividend(code: string): Promise<DividendStock | null> {
   try {
     const db = getSupabaseServer();

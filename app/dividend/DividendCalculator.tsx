@@ -163,7 +163,7 @@ export function DividendCalculator({
     }
   }, []);
 
-  // 종목 페이지의 "배당으로 살기에서 계산하기"는 `?add=코드` 로 온다 — 그 종목을 담고 주소에서 지운다.
+  // 종목 · ETF · 미장 종목 상세의 '내 배당 포폴에 추가하기'(copy.ts DIVIDEND_ADD_LABEL)는 `?add=코드` 로 온다 — 그 종목을 담고 주소에서 지운다.
   // 저장소(localStorage)가 아니라 외부 스토어를 고치는 일이라 effect 안에서 해도 된다(setState 가 아니다).
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get("add");

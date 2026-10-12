@@ -18,6 +18,12 @@
  *    배지 오른끝이 항목 안쪽 169px 중 165px 에서 끝나 4px 남는다. 여기서 한 글자만 더 길어지면
  *    배지가 아랫줄로 내려간다. 열면 배지가 빠져 125px 까지 여유가 생긴다.
  */
+/**
+ * 다른 화면에서 종목 · ETF 를 배당으로 살기에 담아 여는 단추의 말 — 국장 종목 상세 배당 카드 · ETF 상세 분배금 카드 · 미장 종목 상세 커뮤니티 관심 추이 카드 머리.
+ * 주소는 `${DIVIDEND_PAGE.href}?add=코드`(DividendCalculator.tsx 가 담고 주소에서 지운다). 2026-10-12 '배당으로 살기에서 셈하기'에서 바꿨다.
+ */
+export const DIVIDEND_ADD_LABEL = "내 배당 포폴에 추가하기";
+
 export const DIVIDEND_PAGE = {
   href: "/dividend",
   label: "배당으로 살기",

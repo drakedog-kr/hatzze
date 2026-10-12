@@ -1,8 +1,9 @@
 import { SITE_URL } from "./brand";
 import { DIVIDEND_PAGE } from "./dividend/copy";
+import { ETF_PAGE } from "./etf/copy";
 import { INSIDER_LIST_SLUGS } from "./insider/lists";
 import { RELEASES } from "./releases";
-import { DIVIDEND_PUBLIC, THEME_PUBLIC } from "./screen-flags";
+import { DIVIDEND_PUBLIC, ETF_PUBLIC, THEME_PUBLIC } from "./screen-flags";
 import { THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
 // ⚠️ 상대 경로다 — scripts/check-routes.mjs 가 이 파일을 맨 node 로 읽어서 `@/` 별칭을 못 푼다.
 import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "../lib/theme-href";
@@ -37,6 +38,9 @@ export type SitemapEntry = {
 
 export const SITEMAP_ENTRIES: SitemapEntry[] = [
   { path: "/", changeFrequency: "daily", priority: 1 },
+  // ETF 자금 흐름(2026-10-13 오픈). 거래일마다 순유입이 쌓이므로 daily. 상세(/etf/069500 · 1,172장)는 아직 싣지 않는다 —
+  // 이 화면의 표 · 브리핑 링크로 닿는다(scripts/check-routes.mjs DYNAMIC 의 그 줄).
+  ...(ETF_PUBLIC ? [{ path: ETF_PAGE.href, changeFrequency: "daily" as const, priority: 0.7 }] : []),
   { path: "/kadera", changeFrequency: "daily", priority: 0.8 },
   { path: "/kadera/us", changeFrequency: "daily", priority: 0.8 },
   { path: "/mdd", changeFrequency: "daily", priority: 0.7 },
