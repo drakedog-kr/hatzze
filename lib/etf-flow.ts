@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 
 import { ETF_GROUPS, ETF_PICK_KEYS, etfGroup, etfPickTest, type EtfGroup } from "@/lib/etf-groups";
+import { etfSortCmp } from "@/lib/etf-sort";
 import { LOAD_FAILED, type MaybeFailed } from "@/lib/load-state";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { fetchAllRows } from "@/lib/telegram-data";
@@ -15,7 +16,8 @@ import { fetchAllRows } from "@/lib/telegram-data";
  * ## 표에 싣는 줄을 줄인다
  *
  * 1,172종목을 다 클라이언트로 보내지 않는다. 고르는 판(전체 · 파킹형·채권 빼고 · 유형 열셋 — lib/etf-groups.ts ETF_PICK_KEYS)마다 ·
- * 정렬(1주 · 1달)마다 · 방향(들어온 · 빠진)마다 앞의 TABLE_ROWS 줄만 있으면 어느 판을 골라도 표가 같다 — 그 합집합만 싣는다.
+ * 기간마다 · 정렬(순유입 · 수익률 · 순유입일 · 순자산)마다 · 방향마다 앞의 TABLE_ROWS 줄만 있으면 어느 판을 골라도 표가 같다 — 그 합집합만 싣는다.
+ * 차례는 화면과 같은 함수로 센다(lib/etf-sort.ts).
  *
  * 날짜 스무 개(1달 기간 · 히어로 누적 선)는 KODEX 200(069500, 2002년 상장 · 거래일마다 있다)의 행에서 뽑는다.
  * ETF 마다 날짜별 막대를 그리던 때는 실린 줄을 40종목씩 다시 읽었는데, 표 안 그래픽을 걷으며(2026-10-11) 그 조회도 걷었다.
@@ -529,17 +531,17 @@ export const getEtfFlowBoard = cache(async (): Promise<MaybeFailed<EtfFlowBoard 
     for (const per of periods) g.p[per] = (g.p[per] ?? 0) + (r.p[per]?.f ?? 0);
   }
 
-  // 표에 싣는 줄 — 칩 · 기간 · 정렬(유입 · 수익률) · 방향마다 앞 TABLE_ROWS 줄. 수익률이 없는 줄은 그 정렬에서 맨 아래라 앞 줄에 들 일이 없다.
+  // 표에 싣는 줄 — 판 · 기간 · 정렬(순유입 · 수익률 · 순유입일 · 순자산) · 방향마다 앞 TABLE_ROWS 줄. 화면과 같은 차례(etfSortCmp)로 세야
+  // 같은 값끼리의 차례까지 같아 표가 고른 줄 밖으로 나가지 않는다.
   const keep = new Set<string>();
   for (const pick of ETF_PICK_KEYS) {
     const test = etfPickTest(pick);
     const pool = all.map((a) => a.row).filter((r) => test(r.group));
     for (const per of periods) {
-      for (const key of ["f", "r"] as const) {
-        const val = (r: EtfRow) => r.p[per]?.[key] ?? null;
-        const sorted = pool.filter((r) => val(r) != null).sort((a, b) => val(b)! - val(a)!);
-        for (const r of sorted.slice(0, TABLE_ROWS)) keep.add(r.code);
-        for (const r of sorted.slice(-TABLE_ROWS)) keep.add(r.code);
+      for (const key of ["f", "r", "d", "a"] as const) {
+        for (const desc of [true, false]) {
+          for (const r of [...pool].sort(etfSortCmp(per, key, desc)).slice(0, TABLE_ROWS)) keep.add(r.code);
+        }
       }
     }
   }
