@@ -3550,6 +3550,11 @@ a.v2-etf-row:focus-visible { outline-offset: -2px; }
   .v2-etf-L > :nth-child(3) { grid-column-start: 2; }
   .v2-etf-L.v2-th > :nth-child(2) { display: none; }
   .v2-etf-row.v2-th { padding-top: 0; padding-bottom: 0; }
+  /* 정렬 머리는 낱말째 감는다 — 칸이 55~68px 라 고른 칸에 화살표(16)까지 서면 '1년 수익률' · '연속 순유입'이 앞 칸 위로 넘었다
+     (320 에서 9px 겹침 · 2026-10-13 순유입일 · 순자산 정렬을 더하며 잼). 줄 높이 14 라 두 줄이어도 머리 줄 30 안이다 — 20 이면 고를 때마다
+     머리가 41 로 늘어 표가 들썩였다. 화살표는 12 · 사이 0 — 띄어쓰기 없는 '순유입일'은 감기지 않아 320 에서 앞 칸 글자와 2px 까지 붙었다. */
+  .v2-etf-row.v2-th > .v2-etf-sort { gap: 0; line-height: 14px; white-space: normal; word-break: keep-all; }
+  .v2-etf-row.v2-th > .v2-etf-sort .ms { font-size: 12px; }
   /* 비교표 아래 층은 숫자 넷 — 다섯이면 칸이 53~55px 라 '0.0047%'(굵게 57px) · '+6,921억'(56px)이 넘쳤다(2026-10-12 1년 수익률을 더하며).
      하루 거래대금(6)에 더해 1달 순유입(7)을 접는다 — 고를 때 보는 차례(수익률 > 분배 > 보수 > 크기)에서 가장 뒤이고, 위 'ETF 자금 흐름'이 같은 값을 보인다. */
   .v2-etf-L.v2-etf-cmp { --n: 4; }
