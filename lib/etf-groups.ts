@@ -39,7 +39,8 @@ export type EtfGroup = (typeof ETF_GROUPS)[number];
 const OVERRIDES: Record<string, EtfGroup> = {};
 
 const PARKING = /머니마켓|MMF|CD\S*금리|KOFR|SOFR|단기채|초단기|전단채|발행어음|금리액티브|머니|단기통안|단기특수은행채|단기변동금리/;
-const BOND = /채권|국고채|국채|통안|회사채|Treasury|Bond|크레딧|하이일드/i;
+// 금융채 · 은행채 · 특수채 · 물가채(2026-10-13) — 만기형 · 자동연장 채권 ETF 일곱(순자산 2.5조)이 '국내 업종·테마'로 빠져 '파킹형·채권 빼고' 합에 섞였다.
+const BOND = /채권|국고채|국채|통안|회사채|금융채|은행채|특수채|물가채|여전채|공사채|지방채|Treasury|Bond|크레딧|하이일드/i;
 const COMMODITY = /골드|금현물|금선물|은선물|은현물|은액티브|금액티브|원유|WTI|구리|원자재|천연가스|농산물|팔라듐|플래티넘|백금/;
 // 통화 선물 — 달러 · 엔 · 유로. 이름에 '미국'이 들어 있어도(미국달러선물) 해외 주식이 아니다.
 const CURRENCY = /달러선물|미국달러(?!단기)|엔선물|유로선물|위안/;
@@ -58,6 +59,9 @@ export function etfGroup(code: string, name: string, index: string | null, categ
   if (category && (g === "국내 업종·테마" || g === "국내 대표지수" || g === "반도체")) {
     if (category.startsWith("해외지수")) return "해외 업종·테마";
     if (category.startsWith("상품")) return "금·원자재·통화";
+    // 채권 낱말이 이름에 없는 채권 ETF 의 받침(위 BOND 주석). '채권/단기자금'은 파킹형 낱말 쪽 갈래다.
+    if (category === "채권/단기자금") return "파킹형";
+    if (category.startsWith("채권")) return "채권";
   }
   return g;
 }

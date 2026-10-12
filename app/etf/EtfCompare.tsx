@@ -7,9 +7,9 @@ import type { EtfCompareIndex, EtfCompareRow } from "@/lib/etf-flow";
 
 import { Module } from "../kadera/V2Modules";
 import { etfHref } from "./copy";
-import { Facts, MD_COLS } from "./Facts";
+import { Facts, mdCols } from "./Facts";
 import { MoreRow, useStepRows } from "./MoreRow";
-import { feeGapText, flowTone, fmtFee, fmtFlow, fmtPct, fmtSize, lowestFeeLabel, pctTone } from "./format";
+import { FEE_GAP_LABEL, feeGapText, flowTone, fmtFee, fmtFlow, fmtPct, fmtSize, lowestFeeLabel, pctTone } from "./format";
 import { Rail } from "./Rail";
 import { SortHead } from "./SortHead";
 
@@ -94,10 +94,10 @@ export function EtfCompare({ indexes }: { indexes: EtfCompareIndex[] }) {
     <Module id="etf-compare" title="지수별 ETF 비교" className="v2-etf-cmpmod">
       {/* 요약 칸 — 고른 지수의 셈. 카드 폭 한 줄 · 첫 칸이 왼쪽 목록 폭(아래 경계와 세로선이 맞는다). */}
       <Facts
-        cols={MD_COLS}
+        cols={mdCols(3)}
         items={[
           { k: lowestFeeLabel(brands), v: fmtFee(minFee) },
-          { k: "1,000만원 1년 보수 차이", v: feeGapText(feeGap) },
+          { k: FEE_GAP_LABEL, v: feeGapText(feeGap) },
           // 셋째 칸은 1년 수익률 폭 — ETF 를 고를 때 가장 먼저 보는 것이 수익률이다(2026-10-12 관심 점검). 한때 분배율 폭이었다(분배율은 표 칸에 있다).
           { k: "1년 수익률", v: retRange(rets) },
         ]}

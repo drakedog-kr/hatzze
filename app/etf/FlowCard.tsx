@@ -8,7 +8,7 @@ import { ETF_ALL, ETF_NOCASH, etfPickTest } from "@/lib/etf-groups";
 
 import { Module } from "../kadera/V2Modules";
 import { etfHref } from "./copy";
-import { Facts, MD_COLS } from "./Facts";
+import { Facts, mdCols } from "./Facts";
 import { flowTone, fmtFlow, fmtPct, pctTone } from "./format";
 import { Rail, type RailItem } from "./Rail";
 import { SortHead } from "./SortHead";
@@ -111,18 +111,17 @@ export function FlowCard({
     >
       {/* 요약 칸 — 고른 판 · 기간의 전 종목 셈(표는 앞 줄만이라 서버가 센다 · lib/etf-flow.ts pickFacts). 첫 칸이 왼쪽 목록 폭이라 아래 목록 | 표
           경계와 세로선이 맞는다. 그 아래 두 칸은 머리 줄 30 + 열네 줄 × 44 로 가로선이 맞는다. */}
+      {/* 금액은 칸을 나눠 하나씩 — 한 칸에 '+6.99조 · -4.83조'로 붙이니 무엇이 들고 난 돈인지 바로 안 갈렸다(2026-10-13 '위 3개 비중'을 걷고 더함). */}
       {pf && (
         <Facts
-          cols={MD_COLS}
+          cols={mdCols(4)}
           items={[
             {
               k: "순유입 · 순유출 ETF",
               v: `${pf.inN.toLocaleString("ko-KR")} · ${pf.outN.toLocaleString("ko-KR")}개`,
             },
-            {
-              k: "상위 3개 ETF 비중",
-              v: pf.top3Share == null ? "없음" : `${Math.round(pf.top3Share)}%`,
-            },
+            { k: "순유입 금액", v: fmtFlow(pf.inSum), tone: pf.inSum >= 0.5 ? "up" : undefined },
+            { k: "순유출 금액", v: fmtFlow(pf.outSum), tone: pf.outSum <= -0.5 ? "down" : undefined },
             {
               k: "순자산 대비 순유입",
               v: pf.rate == null ? "없음" : fmtPct(pf.rate, daily ? 2 : 1),

@@ -51,5 +51,7 @@ export const fmtFee = (v: number | null) => (v == null ? "없음" : `${Number(v.
  * 요약 칸(59)과 키가 갈렸다(2026-10-12).
  */
 export const lowestFeeLabel = (brands: string[]) => (brands.length ? `보수 가장 낮음 · ${brands[0]}${brands.length > 1 ? ` 외 ${brands.length - 1}` : ""}` : "보수 가장 낮음");
-/** 1,000만원을 1년 두면 가장 비싼 곳과 가장 싼 곳의 보수 차이(만원). */
-export const feeGapText = (gap: number | null) => (gap == null ? "없음" : gap < 0.1 ? "0.1만원 미만" : `${gap.toFixed(1)}만원`);
+/** 보수 가장 낮은 곳(옆 칸)과 가장 비싼 곳에 1,000만원을 1년 두면 내는 보수의 차이 — 이름표 · 값.
+ *  한때 '1,000만원 1년 보수 차이'였다 — 무엇과 무엇의 차이인지가 안 읽혀 뜻을 물었다(2026-10-13). 비교 대상은 이름표에, 기준 금액은 값에 둔다. */
+export const FEE_GAP_LABEL = "가장 비싼 곳과 1년 보수 차이";
+export const feeGapText = (gap: number | null) => (gap == null ? "없음" : `1,000만원당 ${gap < 0.1 ? "0.1만원 미만" : `${gap.toFixed(1)}만원`}`);

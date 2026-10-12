@@ -150,8 +150,9 @@ export type EtfPickFacts = {
   /** 1달 순유입이 +0.5억 넘는 · −0.5억 아래인 ETF 수(±0.5억 안쪽은 안 센다) */
   inN: number;
   outN: number;
-  /** 1달 순유입이 큰 위 3개 ETF 가 그 판의 '들어온 돈'(순유입이 0 보다 큰 ETF 합) 중 몇 % 인가 */
-  top3Share: number | null;
+  /** 순유입이 0 보다 큰 ETF 의 합 · 0 보다 작은 ETF 의 합(억원) — 순 합(유형 목록의 금액) 안에서 들고 난 돈의 크기. 요약 칸 '순유입 금액' · '순유출 금액'(2026-10-13 '위 3개 비중'을 걷고 더함). */
+  inSum: number;
+  outSum: number;
   /** 순자산 합(억원)과 그 대비 1달 순유입(%) — 한 달 사이 이 판이 얼마나 불었나(파킹형 순자산이 한 달에 10% 안팎 늘었다).
    *  '20거래일 중 들어온 날 평균'을 먼저 두었다가 걷었다 — 거래가 거의 없는 작은 ETF 가 많아 2.2일처럼 뜻 없는 값이 나왔다(2026-10-11). */
   netAsset: number;
@@ -266,8 +267,7 @@ export type EtfFlowRow = Pick<EtfRow, "code" | "name" | "group" | "streak" | "p"
 
 /** 히어로 브리핑 재료 셋 — 쏠림(위 10개 몫) · 가장 긴 연속 유입 · 새 상장. 새 상장은 20거래일 중 순유입 값이 있는 날이 20보다 적은 ETF 다
  *  (상장 첫날은 직전 좌수가 없어 값이 비므로 flowDays 가 상장 뒤 날 수 − 1). */
-function heroFacts(rows: EtfRow[]) {
-  const total = rows.reduce((s, r) => s + r.m, 0);
+function heroFacts(rows: EtfRow[], total: number) {
   const top10 = [...rows].sort((a, b) => b.m - a.m).slice(0, 10).reduce((s, r) => s + r.m, 0);
   const streak = [...rows].sort((a, b) => b.streak - a.streak || b.m - a.m)[0];
   const fresh = rows.filter((r) => r.flowDays > 0 && r.flowDays < WINDOW).sort((a, b) => b.m - a.m);
@@ -283,14 +283,13 @@ function heroFacts(rows: EtfRow[]) {
 
 function pickFacts(rows: EtfRow[], per: EtfPeriod): EtfPickFacts {
   const f = (r: EtfRow) => r.p[per]?.f ?? 0;
-  const pos = rows.filter((r) => f(r) > 0).sort((a, b) => f(b) - f(a));
-  const gross = pos.reduce((s, r) => s + f(r), 0);
   const netAsset = rows.reduce((s, r) => s + r.netAsset, 0);
   const sum = rows.reduce((s, r) => s + f(r), 0);
   return {
     inN: rows.filter((r) => f(r) >= 0.5).length,
     outN: rows.filter((r) => f(r) <= -0.5).length,
-    top3Share: gross > 0 ? (pos.slice(0, 3).reduce((s, r) => s + f(r), 0) / gross) * 100 : null,
+    inSum: rows.reduce((s, r) => s + Math.max(0, f(r)), 0),
+    outSum: rows.reduce((s, r) => s + Math.min(0, f(r)), 0),
     netAsset,
     rate: netAsset > 0 ? (sum / netAsset) * 100 : null,
   };
@@ -398,6 +397,20 @@ export const getEtfFlowBoard = cache(async (): Promise<MaybeFailed<EtfFlowBoard 
       ]),
     );
   };
+  // 1달의 스무 날 전 종목 순유입 — 히어로 선(날별 합)과 그 사이 상장폐지된 ETF 의 몫(아래 '상장폐지 몫')을 같이 낸다. 하루 1,172행이라
+  // 1,000행 캡을 넘어 날짜 하나에 두 쪽(isu_cd 차례)씩, 스무 날을 동시에. 하루라도 못 읽으면 null — 선을 안 그리고 상장폐지 몫은 1년만 남는다.
+  const perDay = Math.ceil((all.length + 100) / 1000);
+  type WindowRow = { isu_cd: string; isu_nm: string | null; index_name: string | null; net_flow: number | null };
+  const windowRowsP = Promise.all(
+    dates.map(async (d) => {
+      const pages = await Promise.all(
+        Array.from({ length: perDay }, (_, k) =>
+          db.from("etf_flow_daily").select("isu_cd,isu_nm,index_name,net_flow").eq("trade_date", d).order("isu_cd").range(k * 1000, k * 1000 + 999),
+        ),
+      );
+      return pages.some((pg) => pg.error) ? null : pages.flatMap((pg) => (pg.data ?? []) as WindowRow[]);
+    }),
+  );
   // 최근 여섯 거래일(오래된 → 최근) — 앞 하나는 1주 수익률의 기준일, 뒤 다섯은 1주 순유입일, 끝 둘은 하루 수익률의 기준일 · 그날.
   const recentDays = cal.length >= 6 ? cal.slice(-6) : [];
   // 분배금은 국내 ETF 전부(951행 · 2026-10-12) — 어느 ETF 가 1달 수익률 줄 세우기 앞에 설지 몰라 미리 거를 수 없다.
@@ -463,6 +476,59 @@ export const getEtfFlowBoard = cache(async (): Promise<MaybeFailed<EtfFlowBoard 
     for (const per of periods) g.p[per] = (g.p[per] ?? 0) + (p[per]?.f ?? 0);
   }
 
+  // 상장폐지 몫(2026-10-13) — 기간 안에 순유입이 있었지만 가장 최근 거래일에 행이 없는 ETF. 대부분 만기형 채권 ETF 가 만기에 돌려준 돈이다
+  // (1달 다섯 개 −1,151억 · 1년 마흔하나 −2.82조). 뷰(etf_flow_board)는 지금 상장된 ETF 만 실어, 합에서 이 돈이 빠져 'ETF 전체 순유입'이
+  // 1.5~2% 높게 섰다(1달 +7.52조 대 +7.40조). 그래서 **합에만** 더한다 — 히어로 합 · 날별 선 · 유형 목록 · 요약 칸. 표 · 수익률 상위 · 비교표는
+  // 지금 상장된 ETF 만이다(상세 화면이 없다). 한때 반대로 선(날별 합)에서 이 몫을 뺐다 — 큰 숫자(뷰 합)와 선 끝이 어긋나서였다(2026-10-11).
+  const listed = new Set(all.map((a) => a.row.code));
+  const windowRows = await windowRowsP;
+  const windowOk = windowRows.every((r): r is WindowRow[] => r !== null);
+  const goneDays = new Map<string, { name: string; index: string | null; flows: (number | null)[] }>();
+  if (windowOk) {
+    windowRows.forEach((rows, i) => {
+      for (const r of rows) {
+        if (listed.has(r.isu_cd)) continue;
+        const g = goneDays.get(r.isu_cd) ?? { name: r.isu_nm ?? r.isu_cd, index: r.index_name, flows: dates.map(() => null) };
+        g.flows[i] = num(r.net_flow);
+        goneDays.set(r.isu_cd, g);
+      }
+    });
+  }
+  // 스무 날 앞에 사라져 1년 합에만 남은 것 — 갈래를 가르려고 마지막 행 하나씩(종목 · 날짜 차례 색인을 탄다).
+  const yearOnly = year ? yearRows.filter((r) => !listed.has(r.isu_cd) && !goneDays.has(r.isu_cd) && eok(r.flow_1y) !== 0) : [];
+  const yearOnlyNames = await Promise.all(
+    yearOnly.map((r) =>
+      db.from("etf_flow_daily").select("isu_nm,index_name").eq("isu_cd", r.isu_cd).order("trade_date", { ascending: false }).limit(1).maybeSingle(),
+    ),
+  );
+  const stat = (flows: (number | null)[]): EtfPeriodStat => ({
+    f: flows.reduce<number>((s, f) => s + eok(f), 0),
+    r: null,
+    inDays: flows.filter((f) => f != null && f > 0).length,
+    days: flows.filter((f) => f != null).length,
+  });
+  const goneRow = (code: string, name: string, index: string | null, flows: (number | null)[]): EtfRow => {
+    const p: Partial<Record<EtfPeriod, EtfPeriodStat>> = { w: stat(flows.slice(-5)), m: stat(flows) };
+    if (periods.includes("d")) p.d = { f: 0, r: null, inDays: 0, days: 0 };
+    const yr = year?.get(code);
+    if (year) p.y = { f: eok(yr?.flow_1y ?? null), r: null, inDays: Number(yr?.in_days ?? 0), days: Number(yr?.flow_days ?? 0) };
+    const group = etfGroup(code, name, index, category.get(code));
+    return { code, name, group, w: p.w!.f, m: p.m!.f, flowDays: p.m!.days ?? 0, streak: 0, netAsset: 0, p };
+  };
+  const gone: EtfRow[] = [
+    ...[...goneDays].map(([code, g]) => goneRow(code, g.name, g.index, g.flows)),
+    ...yearOnly.map((r, i) => {
+      const n = yearOnlyNames[i].data as { isu_nm: string | null; index_name: string | null } | null;
+      return goneRow(r.isu_cd, n?.isu_nm ?? r.isu_cd, n?.index_name ?? null, []);
+    }),
+  ];
+  for (const r of gone) {
+    const g = groupMap.get(r.group)!;
+    g.w += r.w;
+    g.m += r.m;
+    for (const per of periods) g.p[per] = (g.p[per] ?? 0) + (r.p[per]?.f ?? 0);
+  }
+
   // 표에 싣는 줄 — 칩 · 기간 · 정렬(유입 · 수익률) · 방향마다 앞 TABLE_ROWS 줄. 수익률이 없는 줄은 그 정렬에서 맨 아래라 앞 줄에 들 일이 없다.
   const keep = new Set<string>();
   for (const pick of ETF_PICK_KEYS) {
@@ -516,48 +582,30 @@ export const getEtfFlowBoard = cache(async (): Promise<MaybeFailed<EtfFlowBoard 
     .filter((r) => keep.has(r.code))
     .map(({ code, name, group, streak, p }) => ({ code, name, group, streak, p }));
 
-  // ETF 전체의 하루 순유입 — 히어로 선. 날마다 **지금 상장된 ETF(뷰에 실린 것)**의 순유입을 더한다 — 그 사이 상장폐지된 ETF 까지 더하면
-  // 선 끝(+7.40조)이 뷰 합으로 낸 큰 숫자(+7.52조)와 1,200억 어긋났다(2026-10-11). 뷰는 20일 합만 주므로 날짜마다 따로 읽는다:
-  // 하루 1,172행이라 1,000행 캡을 넘어 날짜 하나에 두 쪽(isu_cd 차례)씩, 스무 날을 동시에. 하루라도 못 읽으면 선을 안 그린다
-  // (빠진 날이 0 으로 들어가면 누적선이 그날 평평해져 거짓이 된다).
-  const perDay = Math.ceil((all.length + 100) / 1000);
-  const listed = new Set(all.map((a) => a.row.code));
-  const dayTotals = await (async () => {
-    const got = await Promise.all(
-      dates.map(async (d) => {
-        const pages = await Promise.all(
-          Array.from({ length: perDay }, (_, k) =>
-            db.from("etf_flow_daily").select("isu_cd,net_flow").eq("trade_date", d).order("isu_cd").range(k * 1000, k * 1000 + 999),
-          ),
-        );
-        if (pages.some((p) => p.error)) return null;
-        const flow = pages
-          .flatMap((p) => (p.data ?? []) as { isu_cd: string; net_flow: number | null }[])
-          .reduce((s, r) => (listed.has(r.isu_cd) ? s + eok(r.net_flow) : s), 0);
-        return { date: d, flow };
-      }),
-    );
-    return got.every((g) => g !== null) ? (got as { date: string; flow: number }[]) : [];
-  })();
+  // ETF 전체의 하루 순유입 — 히어로 선. 날마다 상장폐지된 ETF 까지 전 종목을 더한다(위 '상장폐지 몫' · 선 끝이 큰 숫자와 같다).
+  const dayTotals = windowOk ? dates.map((d, i) => ({ date: d, flow: windowRows[i].reduce((s, r) => s + eok(r.net_flow), 0) })) : [];
 
   const asOf = all.map((a) => a.asOf).filter((d): d is string => !!d).sort().at(-1) ?? "";
+  const totalW = [...all.map((a) => a.row), ...gone].reduce((s, r) => s + r.w, 0);
+  const totalM = [...all.map((a) => a.row), ...gone].reduce((s, r) => s + r.m, 0);
   return {
     asOf,
     count: all.length,
     netAsset: all.reduce((s, a) => s + a.row.netAsset, 0),
-    totalW: all.reduce((s, a) => s + a.row.w, 0),
-    totalM: all.reduce((s, a) => s + a.row.m, 0),
+    totalW: totalW,
+    totalM: totalM,
     rows,
     groups: [...groupMap.values()].sort((a, b) => b.m - a.m),
     compare,
     monthStart: dates[0] ?? null,
     daily: dayTotals,
     tradeValue: all.reduce((s, a) => s + a.tradeValue, 0),
-    ...heroFacts(all.map((a) => a.row)),
-    totalY: periods.includes("y") ? all.reduce((s, a) => s + (a.row.p.y?.f ?? 0), 0) : null,
+    ...heroFacts(all.map((a) => a.row), totalM),
+    totalY: periods.includes("y") ? [...all.map((a) => a.row), ...gone].reduce((s, r) => s + (r.p.y?.f ?? 0), 0) : null,
     picks: Object.fromEntries(
       ETF_PICK_KEYS.map((k) => {
-        const pool = all.map((a) => a.row).filter((r) => etfPickTest(k)(r.group));
+        // 요약 칸은 상장폐지 몫까지 — 들고 난 돈 · ETF 수가 유형 목록 합과 맞게(위 '상장폐지 몫').
+        const pool = [...all.map((a) => a.row), ...gone].filter((r) => etfPickTest(k)(r.group));
         return [k, Object.fromEntries(periods.map((per) => [per, pickFacts(pool, per)]))];
       }),
     ),

@@ -41,7 +41,13 @@ export default async function EtfPage() {
   if (!ETF_PUBLIC && DEPLOYED) notFound();
 
   // 지수 종가 · 아래 모듈은 곁가지다 — 못 받으면 그 칸만 비고 화면은 그대로 그린다(null · 실패를 렌더 목록에 안 적는다).
-  const [board, extras, rawIndexes] = await Promise.all([getEtfFlowBoard(), getEtfExtras(), getKrIndexClosesSide()]);
+  // 지수 종가는 ETF 자료의 기준일 것 — 띠 안 날짜가 하나로 선다(lib/data.ts getKrIndexCloses 의 on).
+  const boardP = getEtfFlowBoard();
+  const [board, extras, rawIndexes] = await Promise.all([
+    boardP,
+    getEtfExtras(),
+    boardP.then((v) => getKrIndexClosesSide(v && !isLoadFailed(v) ? v.asOf : undefined)),
+  ]);
   assertLoaded("/etf", { board });
   const b = isLoadFailed(board) ? null : board;
   const indexes = isLoadFailed(rawIndexes) ? null : rawIndexes;

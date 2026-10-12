@@ -21,7 +21,7 @@ import { flowTone, fmtFlow, fmtPct, pctTone } from "./format";
 const splitUnit = (s: string) => [s.slice(0, -1), s.slice(-1)] as const;
 
 /**
- * ETF 순유입 — 홈 '햇쩨 지수' 카드와 같은 꼴: 큰 숫자(1달 합) · 20거래일 누적 선(0 점선 기준) · 곁줄 둘(하루 최대 · 빠진 날) · 아래 기간 줄 셋
+ * ETF 순유입 — 홈 '햇쩨 지수' 카드와 같은 꼴: 큰 숫자(1달 합) · 20거래일 누적 선(0 점선 기준) · 곁줄 셋(하루 최대 · 순유입일 · 순유출일) · 아래 기간 줄 셋
  * (하루 · 1주 · 1년 합 — 큰 숫자 1달을 사이에 둔 기간 사다리 · 상세 수익률 카드 아래 줄과 같은 자리). 선은 남는 키를 받는다(옆 브리핑 다섯 줄 키).
  * 기간 줄은 2026-10-12 브리핑이 다섯 줄이 되며 늘어난 키에 더했다 — 아래 'ETF 자금 흐름' 유형 목록의 '전체'는 숫자가 없어서(합은 이 카드가 말한다)
  * 전체 ETF 의 하루 · 1년 합은 이 화면 어디에도 없었다. 큰 숫자 옆 '1주'는 줄로 내렸다(같은 값이 두 번 서지 않게). 아래에 있던 ETF 수 줄 셋(들어옴 · 빠짐 · 거의 그대로)은 걷었다 — 바로 아래 'ETF 자금 흐름'
@@ -33,6 +33,8 @@ export function FlowHero({ b }: { b: EtfFlowBoard }) {
   const cum = b.daily.reduce<number[]>((acc, d) => [...acc, (acc.at(-1) ?? 0) + d.flow], []);
   const [num, unit] = splitUnit(fmtFlow(b.totalM));
   const peak = b.daily.length ? b.daily.reduce((m, d) => (d.flow > m.flow ? d : m), b.daily[0]) : null;
+  // 순유입일 · 순유출일 — 스무 날 중 ETF 전체가 순유입 · 순유출인 날 수(2026-10-13 순유입일을 앞에 더함).
+  const inDays = b.daily.filter((d) => d.flow > 0).length;
   const outDays = b.daily.filter((d) => d.flow < 0).length;
   const last = b.daily.at(-1);
   const per = [
@@ -67,6 +69,10 @@ export function FlowHero({ b }: { b: EtfFlowBoard }) {
             <span>
               <em>하루 최대 · {shortDate(peak.date)}</em>
               {fmtFlow(peak.flow)}
+            </span>
+            <span>
+              <em>순유입일</em>
+              {inDays}일
             </span>
             <span>
               <em>순유출일</em>
