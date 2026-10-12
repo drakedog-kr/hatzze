@@ -221,7 +221,7 @@ def top_surging(
     preloaded: tuple[list[dict], list[str]] | None = None,
     cap: int | None = None,
 ) -> list[dict]:
-    """급부상 상위 종목. 각 항목은 code·mentions·channels·ratio·is_new 를 갖는다.
+    """급부상 상위 종목. 각 항목은 code·mentions·channels·channels_window·ratio·is_new 를 갖는다.
 
     ⚠️ `cap` 은 '정원'이다(기본 CARD_LIMIT). 화면은 6장을 그리는데
     (app/kadera/page.tsx 의 getSurgingStocks(6)) 이 사본의 정원은 5라, 6번째 카드에
@@ -261,6 +261,9 @@ def top_surging(
     breadth = channel_breadth_map(db, [s["code"] for s in top], recent_sorted[0], recent_sorted[-1])
     for s in top:
         s["channels"] = breadth.get(s["code"], 0)
+        # channels 를 센 창(양끝 포함). 급부상 한 줄 요약 스텝이 이 값을 그대로 telegram_stock_breadth 에
+        # 적는다(generate_telegram_narratives.save_surging_breadth). 창을 따로 다시 셈하면 어긋날 수 있다.
+        s["channels_window"] = (recent_sorted[0], recent_sorted[-1])
     return top
 
 

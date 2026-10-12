@@ -70,6 +70,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from postgrest.exceptions import APIError  # noqa: E402
+
 from common.llm_client import HAS_LLM_CREDENTIAL, get_llm_client  # noqa: E402
 from common.llm_parallel import ordered  # noqa: E402
 
@@ -1863,14 +1865,79 @@ def build_schedule_block(db, latest: str, window_since: str) -> list[str]:
 
 
 BREADTH_TOP_N = 60  # 화면이 쓰는 건 10개. 순위가 흔들려도 폴백이 안 걸리게 넉넉히 둔다.
+BREADTH_TABLE = "telegram_stock_breadth"
+# 표의 열쇠(마이그레이션 098). 창이 두 벌이라 종목코드만으로는 한 줄이 안 정해진다.
+BREADTH_KEY = "stock_code,window_start,window_end"
+
+
+def _breadth_upsert(db, payload: list[dict]) -> bool:
+    """(종목, 창) 열쇠로 적는다. 표가 마이그레이션 098 전이면 아무것도 안 적고 False.
+
+    098 전 표는 열쇠가 종목코드뿐이라 이 on_conflict 가 PostgREST 42P10(맞는 유일 제약 없음)으로
+    튕긴다. 그때 호출부가 예전 방식으로 물러난다 — 코드가 먼저 머지되고 098 이 나중에 실행돼도
+    그 사이 실행이 표를 비우지 않게. 098 을 실행한 뒤에는 이 갈래를 걷어도 된다.
+    """
+    try:
+        db.table(BREADTH_TABLE).upsert(payload, on_conflict=BREADTH_KEY).execute()
+        return True
+    except APIError as e:
+        if e.code != "42P10":
+            raise
+        return False
+
+
+def save_surging_breadth(db, latest: str, cards: list[dict]) -> None:
+    """급부상 카드 종목의 '관심의 폭'을 **카드의 창**으로 적는다(마이그레이션 098).
+
+    save_stock_breadth 는 주요 종목 리포트 창(기준일 하루 전 끝)의 언급 상위 60 만 적는다. 저녁 실행
+    뒤 급부상 창은 기준일까지 들어가서(common/surging.window_end_for) 그 저장값과 창이 안 맞고,
+    카드 종목이 상위 60 에 없기도 하다(2026-10-12 저녁 10종목 중 이엠앤아이·금호건설·한화갤러리아).
+    그러면 화면이 렌더마다 조인으로 직접 센다(lib/telegram-data.ts recentChannelCount 의 느린 길 ·
+    SK하이닉스 4.1초). 그 조인이 5xx 를 내면 빌드가 /kadera 를 못 그려 배포가 실패한다(10-12 PR #716).
+
+    값은 새로 세지 않는다. `cards` 는 top_surging 결과이고, 각 항목의 `channels` 는 정원을 정한 뒤
+    `channels_window` 창으로 이미 센 값이다. 화면도 같은 창(언급 수와 같은 최근 날짜들)으로 묻는다.
+
+    부르는 곳은 scripts/generate_surging_oneliners.py 하나다. 화면을 새 창으로 넘기는
+    telegram_surging_window 쓰기 **앞에** 부른다. 뒤에 두면 그 사이 렌더가 느린 길로 떨어진다.
+    아침 실행에서는 이 창이 리포트 창과 같아 같은 줄을 덮어쓸 뿐이다(값도 같은 규칙이다).
+
+    못 적어도 경고만 남긴다. 화면은 예전처럼 직접 센다.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    payload = [
+        {
+            "stock_code": s["code"],
+            "channel_count": s["channels"],
+            "window_start": s["channels_window"][0],
+            "window_end": s["channels_window"][1],
+            "computed_for": latest,
+            "updated_at": now,
+        }
+        for s in cards
+    ]
+    if not payload:
+        return
+    first, last = payload[0]["window_start"], payload[0]["window_end"]
+    try:
+        if not _breadth_upsert(db, payload):
+            print("[관심의 폭] 표가 마이그레이션 098 전이라 급부상 창은 건너뜁니다(종목당 한 줄뿐이다).")
+            return
+        print(f"[관심의 폭] 급부상 {len(payload)}종목 저장(창 {first}~{last})")
+    except Exception as e:  # noqa: BLE001 — 문장은 이미 저장됐다. 이 값 때문에 스텝을 죽이지 않는다
+        print(f"[관심의 폭] 급부상 창 저장 실패(무시하고 계속 · 화면이 직접 센다): {e}")
 
 
 def save_stock_breadth(db, latest: str) -> None:
     """'관심의 폭'(종목별 서로 다른 채널 수)을 미리 세어 둔다(마이그레이션 028).
 
     화면 두 자리가 이 값을 쓴다 — 주요 종목 리포트의 "163개 채널", 급부상 종목의
-    "45개 채널". 둘 다 뜻이 같고 **창도 같다**: 기준일(latest) 하루 전에서 끝나는
-    WINDOW_DAYS 일.
+    "45개 채널". 둘 다 뜻이 같다. 여기서 세는 창은 기준일(latest) 하루 전에서 끝나는
+    WINDOW_DAYS 일(리포트 창)이다.
+
+    ⚠️ **저녁엔 급부상 창이 다르다.** 저녁 실행 뒤 급부상 카드는 기준일까지 넣어 센다
+    (common/surging.window_end_for). 그 창은 save_surging_breadth 가 카드 종목만 따로 적는다
+    (마이그레이션 098 로 한 종목에 창 두 벌을 둔다). 아침엔 두 창이 같다.
 
     왜 옮기나: telegram_message_stocks 에 날짜가 없어 telegram_messages 에 조인해야
     하고, 그걸 종목마다 따로 한다(한 페이지에 10번). 2026-08-07 콜드 트레이스 실측으로
@@ -1949,8 +2016,15 @@ def save_stock_breadth(db, latest: str) -> None:
     try:
         # 이전 실행의 행은 창이 달라 프론트가 어차피 안 쓴다(창을 대조해서 쓴다).
         # 그래도 지워 두는 편이 낫다 — 안 지우면 옛 종목이 영원히 남아 표가 자란다.
-        db.table("telegram_stock_breadth").delete().neq("window_end", last).execute()
-        db.table("telegram_stock_breadth").upsert(payload, on_conflict="stock_code").execute()
+        if _breadth_upsert(db, payload):
+            # ⚠️ 적은 **뒤에** 지운다. 먼저 지우고 쓰기가 실패하면 표가 빈다.
+            # ⚠️ `neq` 가 아니라 `lt` 다. 저녁 급부상 창(save_surging_breadth)은 이 창보다 하루 늦게
+            #    끝나는데 그 스텝이 이 스텝보다 먼저 돈다(daily-update.yml). neq 면 방금 적힌 그 줄을 지운다.
+            db.table(BREADTH_TABLE).delete().lt("window_end", last).execute()
+        else:
+            # 098 전 표 — 종목마다 한 줄뿐이라 예전 그대로 리포트 창만 둔다.
+            db.table(BREADTH_TABLE).delete().neq("window_end", last).execute()
+            db.table(BREADTH_TABLE).upsert(payload, on_conflict="stock_code").execute()
         print(f"[관심의 폭] {len(payload)}종목 저장(창 {first}~{last})")
     except Exception as e:  # noqa: BLE001 — 표가 없어도 문장 생성은 계속돼야 한다
         print(f"[관심의 폭] 저장 실패(무시하고 계속): {e}")
