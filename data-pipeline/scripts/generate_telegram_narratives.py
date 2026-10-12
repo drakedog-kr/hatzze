@@ -56,6 +56,7 @@
     cd data-pipeline && source .venv/bin/activate
     python scripts/generate_telegram_narratives.py --dry-run  # digest만 출력(호출 없음)
     python scripts/generate_telegram_narratives.py            # 생성 + 저장
+    python scripts/generate_telegram_narratives.py --brief-only  # 총평만 생성 + 저장
 """
 
 from __future__ import annotations
@@ -906,12 +907,22 @@ NEWS_SCHEDULE_NOTE = (
 # 재료 8건이 있었는데 "최근 3일간 낙관도가 76%로 우세를…"를 냈다). 어제 시험 10회는 전부
 # 정상이었으니 실행마다 어쩌다 한 번 나는 종류라, 프롬프트가 아니라 **검사**로 막는다.
 #
-# ⚠️ 맨 날짜(`\d{1,2}일`)를 표지로 삼지 않는다. **분위기 요약이 바로 그렇게 말한다** —
-#    "최근 3일 미국 종목 관련 이야기에서…"의 '3일'이 표지로 잡혀 검사를 그냥 통과했다
-#    (2026-09-07 실측 8회 중 2회). 앞날의 날짜는 거의 늘 '9월 21일'처럼 월이 붙거나
-#    '오는 10일'로 온다.
+# ⚠️ 맨 날짜(`14일`)는 **기간을 뜻하는 꼴만 빼고** 받는다. 분위기 요약이 "최근 3일 미국 종목
+#    관련 이야기에서…"처럼 말해서, 그 '3일'이 표지로 잡혀 검사를 그냥 통과했다(2026-09-07
+#    실측 8회 중 2회). 그래서 처음엔 맨 날짜를 아예 안 받고 "앞날의 날짜는 거의 늘 '9월 21일'
+#    처럼 월이 붙거나 '오는 10일'로 온다"고 봤는데, 그 전제가 틀렸다. 채널 글이 "14일 ASML이…",
+#    "15일 TSMC의…"처럼 월 없이 쓰면 모델도 그대로 옮긴다. 2026-10-12 미장은 "14일 ASML, 15일
+#    TSMC 실적 발표를 두고… 이번 주 9월 소비자물가…"를 다시 쓴 답까지 두 번 다 일정이 아니라고
+#    버려 세 대목으로 저장됐다. 10-03 미장의 "12월부터 주주환원을 늘리고…"도 같은 꼴로 빠졌다.
+#    앞에 최근·지난·앞·직전이 붙거나 뒤에 간·동안·째·전이 붙으면 기간이라 뺀다 — 국장 둘째
+#    대목의 "3일 전엔 거의 없던"·"앞 3일엔 거의 없던"이 이 제외로 걸러진다. 저장된 총평
+#    (2026-09-06~10-12, 국장·미장 문단 294개)에 대 보면 둘째·셋째 대목은 새로 통과하는 문단이
+#    0개, 첫째 대목은 74개 중 2개(지난 날짜를 적은 09-16·09-21)다.
 _SCHED_MARK = re.compile(
-    r"\d{1,2}월\s*\d{1,2}일|오는\s*\d{1,2}일|다음\s*주|내주|예정|앞두|앞둔|청약|만기|편입|리밸런싱|상장|기준일"
+    r"\d{1,2}월\s*\d{1,2}일|오는\s*\d{1,2}일|다음\s*주|이번\s*주|내주|예정|앞두|앞둔|청약|만기|편입|리밸런싱|상장|기준일"
+    r"|\d{1,2}월\s*(?:부터|초순|중순|하순|초|말)"
+    r"|(?<!\d)(?<!최근)(?<!최근 )(?<!지난)(?<!지난 )(?<!앞)(?<!앞 )(?<!직전 )\d{1,2}일"
+    r"(?!\s*(?:간|동안|째|연속|치|새|만에|이내|전(?!망)))"
 )
 
 
@@ -2149,6 +2160,9 @@ def main() -> None:
     # --stocks-only: 종목 흐름 요약만 다시 쓴다(총평 '오늘의 요약'은 그대로). 길이 규칙을 바꾼 날 그 자리만 바로 고치려고 둔다
     # (.github/workflows/narratives-rerun.yml, 2026-10-05 저녁 95~105 → 62~72자).
     stocks_only = "--stocks-only" in sys.argv[1:]
+    # --brief-only: 거꾸로 총평만 다시 쓴다(종목 흐름 요약은 그대로). 넷째 대목 검사를 고친 날 그날 총평을
+    # 바로 고치려고 더했다(narratives-rerun.yml what=brief, 2026-10-12 미장이 세 대목으로 저장됐다).
+    brief_only = "--brief-only" in sys.argv[1:]
 
     if not HAS_LLM_CREDENTIAL and not dry_run:
         print("[skip] LLM 자격(구독 토큰·API 키)이 없어 문장 생성을 건너뜁니다.")
@@ -2184,7 +2198,7 @@ def main() -> None:
     print(f"[재료] 메시지 {len(msgs):,}건 (창 {since}~{latest} · 하루 앞 경계 여유분 포함)")
 
     brief_digest = None if stocks_only else build_brief_digest(db, latest, msgs)
-    stock_digests, required = build_stock_digests(db, latest, msgs=msgs)
+    stock_digests, required = ([], []) if brief_only else build_stock_digests(db, latest, msgs=msgs)
 
     if dry_run:
         print("─" * 60)
@@ -2348,7 +2362,8 @@ def main() -> None:
                         digest_for, length, BRIEF_SENTENCE_CAP[key], key,
                     )
                     if not schedule_like(text):
-                        print("[WARNING] 넷째 대목이 여전히 일정이 아니라 뺍니다.")
+                        # 버린 문장도 찍는다 — 검사가 틀렸는지 문장이 틀렸는지 로그만으로 가르려고(10-12 미장).
+                        print(f"[WARNING] 넷째 대목이 여전히 일정이 아니라 뺍니다: {text[:50]}…")
                         text = ""
                 paragraphs.append(text)
             summary = "\n\n".join(p for p in paragraphs if p.strip()).strip()
@@ -2370,6 +2385,10 @@ def main() -> None:
             print(f"[WARNING] 총평 생성 실패: {type(exc).__name__}: {exc}")
     else:
         print("[안내] --stocks-only — 총평은 건드리지 않습니다." if stocks_only else "[안내] 총평을 만들 집계가 없어 건너뜁니다.")
+
+    if brief_only:
+        print("[안내] --brief-only — 종목 흐름 요약은 건드리지 않습니다.")
+        return
 
     # ── 종목 흐름 요약 ──────────────────────────────────────────────────────
     def compose_narrative(item: tuple[str, str, str]) -> str | None:

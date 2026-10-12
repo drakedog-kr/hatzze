@@ -2,6 +2,7 @@
 # what: narratives(흐름 요약 · 기본) · themes(테마 요약) · both · talk. 테마 요약은 2026-10-05 저녁 첫 문장 55자 · 급부상 이유 42~58자로
 # 줄인 PR 을 머지한 직후 그날 것을 바로 고치려고 더했다. talk 는 테마 상세 '말 많은 종목'의 요즘 도는 얘기만(요약 · 급부상은 그대로,
 # 그날 요약 행의 talk 열만 고친다 · 마이그레이션 092). summary 는 시장 브리핑 '오늘의 브리핑' 네 줄(daily_score.ai_summary · Opus).
+# brief 는 카더라 '오늘의 요약' 총평만(`--brief-only` · 종목 요약은 그대로). 넷째 대목 검사를 고친 날(2026-10-12) 그날 것을 고치려고 더했다.
 # save=false 면 문장만 로그에 찍고 표는 안 건드린다 — 머지 전에 브랜치 코드로 리허설할 때(`gh workflow run … --ref <브랜치>`).
 #
 # ## 왜 따로 있나
@@ -28,7 +29,7 @@ on:
         description: "무엇을 (narratives=흐름 요약 · themes=테마 요약 · both=둘 다)"
         type: choice
         default: narratives
-        options: [narratives, themes, both, talk, summary]
+        options: [narratives, themes, both, talk, summary, brief]
       save:
         description: "표에 저장 (끄면 문장만 로그로 · 리허설)"
         type: boolean
@@ -71,6 +72,15 @@ jobs:
         if: ${{ !cancelled() && github.event.inputs.market != 'kr' && (github.event.inputs.what == 'narratives' || github.event.inputs.what == 'both') && github.event.inputs.save != 'false' }}
         run: python data-pipeline/scripts/generate_us_telegram_narratives.py --stocks-only
 
+      # 카더라 '오늘의 요약' 총평만 — 그날 행을 덮는다. 생성기에 저장 끄기가 없어 save=false 면 안 돈다.
+      - name: (국장) 카더라 총평 다시 만들기
+        if: ${{ !cancelled() && github.event.inputs.market != 'us' && github.event.inputs.what == 'brief' && github.event.inputs.save != 'false' }}
+        run: python data-pipeline/scripts/generate_telegram_narratives.py --brief-only
+
+      - name: (미장) 카더라 총평 다시 만들기
+        if: ${{ !cancelled() && github.event.inputs.market != 'kr' && github.event.inputs.what == 'brief' && github.event.inputs.save != 'false' }}
+        run: python data-pipeline/scripts/generate_us_telegram_narratives.py --brief-only
+
       # 테마 요약은 26 · 16 테마를 다 다시 쓴다(급부상 이유 포함). 하루치 행을 그대로 덮는다.
       - name: (국장) 테마 요약 다시 만들기
         if: ${{ !cancelled() && github.event.inputs.market != 'us' && (github.event.inputs.what == 'themes' || github.event.inputs.what == 'both') }}
@@ -109,8 +119,15 @@ jobs:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: bash scripts/revalidate.sh /kadera /kadera/us '/stock/[code]'
 
+      - name: 카더라 화면 비우고 데우기
+        if: ${{ !cancelled() && github.event.inputs.save != 'false' && github.event.inputs.what == 'brief' }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /kadera /kadera/us
+
       - name: 테마 화면 비우고 데우기
-        if: ${{ !cancelled() && github.event.inputs.save != 'false' && github.event.inputs.what != 'narratives' && github.event.inputs.what != 'summary' }}
+        if: ${{ !cancelled() && github.event.inputs.save != 'false' && github.event.inputs.what != 'narratives' && github.event.inputs.what != 'summary' && github.event.inputs.what != 'brief' }}
         continue-on-error: true
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
