@@ -494,14 +494,14 @@ function sidebarItems(env: ShellEnv): SidebarRow[] {
  * 간격은 '앞 묶음과는 멀게, 제 항목과는 붙게'다 — 앞 항목 칸과 18px(4 + 14), 제 첫 항목 칸과 2px.
  * 예전 12px 이면 위아래 차이가 작아 머리가 어느 쪽 묶음인지 덜 붙어 보였다.
  */
-function NavGroupLabel({ label, first, inset }: { label: string; first: boolean; inset: number }) {
+function NavGroupLabel({ label, first, inset, gap = 16 }: { label: string; first: boolean; inset: number; gap?: number }) {
   return (
     <div
       role="presentation"
       className="hz-side-text"
       style={{
         // v2(2026-10-03): 굵은 잉크 → 본문 모듈 머리의 근거 글자 꼴(12 · 500 · 회색). 묶음 이름은 메뉴가 아니라 표지라 한 단 물린다.
-        margin: first ? "0 0 4px" : "16px 0 4px",
+        margin: first ? "0 0 4px" : `${gap}px 0 4px`,
         padding: `0 ${inset}px`,
         fontSize: "var(--fs-12)",
         fontWeight: 500,
@@ -1018,7 +1018,10 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
     display: "flex",
     alignItems: "center",
     gap: 12,
-    padding: "13px 14px",
+    // 줄 44 — 본문 표 줄과 같은 높이이자 손가락 닿는 하한. 49(위아래 13)일 때 ETF 줄이 늘자 판이 735px 이 되어
+    // 화면 높이 805 아래 폰에선 맨 아래 '시황 구독하기'가 판 밖으로 밀렸다(2026-10-13). 묶음 머리 위 간격 10 과 함께 669px.
+    minHeight: 44,
+    padding: "0 14px",
     borderRadius: 6,
     // 활성 줄의 바탕 · 글자는 사이드바와 같은 v2 규칙(.hz-menu-panel .hz-nav-item.hz-nav-active)이 맡는다 — 인라인 파랑이 이겼다(2026-10-08).
     // 항목은 묶음 머리(muted)보다 한 단 진한 label.
@@ -1038,7 +1041,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
             210px 로 묶여 있지 않아 자리가 남고, 툴팁이 안 뜨는 화면이라 배지가 유일한
             설명이므로 겹쳐 두지 않고 또렷하게 보여야 한다. */}
         {sidebarItems(env).map((row) => {
-          if (row.kind === "group") return <NavGroupLabel key={`g-${row.label}`} label={row.label} first={row.first} inset={14} />;
+          if (row.kind === "group") return <NavGroupLabel key={`g-${row.label}`} label={row.label} first={row.first} inset={14} gap={10} />;
           if (row.kind === "soon") {
             const soon = row.item;
             return (
@@ -1142,7 +1145,8 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
             </Link>
           );
         })}
-        <span style={{ height: 1, background: C.line, margin: "4px 8px" }} />
+        {/* 판이 화면 높이에 걸리면 줄 중 이 선만 줄어들 수 있어 0 으로 사라졌다(320×740) — 줄지 않게 묶는다. */}
+        <span style={{ height: 1, flexShrink: 0, background: C.line, margin: "4px 8px" }} />
         {/* 라벨은 바뀌었어도 data-ga-cta 는 "community" 그대로 둔다 — 값을 같이 바꾸면
             이름 변경 전후의 클릭수를 한 줄로 비교할 수 없다. surface 만 tabbar → menu 로
             바꾼다. 그 자리는 실제로 없어졌으니 계속 tabbar 로 적으면 거짓이 된다. */}
