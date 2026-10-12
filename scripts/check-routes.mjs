@@ -65,7 +65,7 @@ const EXCLUDED = new Map([
 const DYNAMIC = new Map([
   ["/insider/list/[kind]", "슬러그 여섯 개를 sitemap.ts 가 INSIDER_LIST_SLUGS 로 펼친다(걷은 hot · holders 는 next.config 가 308)"],
   ["/stock/[code]", "sitemap-stocks.xml 이 DB 를 읽어 펼친다(lib/stock-page.ts listIndexableStocks)"],
-  ["/etf/[code]", "ETF 상세. 아직 안 연 화면(app/screen-flags.ts ETF_PUBLIC=false · noindex) — 여는 날 사이트맵에 펼칠 방식을 정한다"],
+  ["/etf/[code]", "ETF 상세(1,172장). 사이트맵에 아직 안 싣는다 — /etf 의 표 · 브리핑 링크로 닿는다(app/sitemap-urls.ts 의 ETF 줄)"],
   ["/theme/[theme]", "사전의 테마 26개를 app/sitemap-urls.ts 가 THEME_NAMES 로 펼친다(열린 뒤에만)"],
   ["/theme/us/[theme]", "미장 사전의 테마 16개를 app/sitemap-urls.ts 가 US_THEME_NAMES 로 펼친다(열린 뒤에만)"],
   ["/insider/stock/[ticker]", "미장 사전을 app/sitemap-insider.xml 이 읽어 펼친다(사전 밖 종목은 noindex)"],

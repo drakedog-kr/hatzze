@@ -8,6 +8,7 @@ import { fmtKoDate } from "@/lib/stock-page";
 
 import { PageJsonLd } from "../../JsonLd";
 import { CoverMeta } from "../../kadera/V2Modules";
+import { ETF_CARD } from "../../og-copy";
 import { ETF_PUBLIC } from "../../screen-flags";
 import { pageMetadata } from "../../seo";
 import { ETF_PAGE, etfHref } from "../copy";
@@ -66,6 +67,9 @@ export async function generateMetadata({ params }: { params: Promise<{ code: str
     title: `${d.name}(${d.code}) 분배금 · 수익률 · 자금 흐름 | hatzze`,
     description: `${d.name}의 ${parts.join(", ")}. 날마다의 자금 유입·유출과 분배 이력, 같은 지수 ETF를 함께 봅니다.`,
     path: etfHref(d.code),
+    // 상세는 자기 폴더에 카드가 없어 구역(/etf)의 카드를 쓴다 — 안 주면 홈 과열도 카드로 떨어진다(app/seo.ts imagePath).
+    ownImage: ETF_CARD.alt,
+    imagePath: ETF_PAGE.href,
   });
   return ETF_PUBLIC ? meta : { ...meta, robots: { index: false, follow: false } };
 }

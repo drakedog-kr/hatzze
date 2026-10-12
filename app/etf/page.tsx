@@ -8,6 +8,7 @@ import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import { fmtKoDate } from "@/lib/stock-page";
 
 import { CoverIndexCell, CoverMeta, Module } from "../kadera/V2Modules";
+import { ETF_CARD } from "../og-copy";
 import { ETF_PUBLIC } from "../screen-flags";
 import { pageMetadata } from "../seo";
 import { ETF_PAGE } from "./copy";
@@ -28,6 +29,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: `${ETF_PAGE.label} | hatzze`,
     description: ETF_PAGE.description,
     path: ETF_PAGE.href,
+    // ⚠️ ownImage 를 안 주면 옆의 opengraph-image.tsx 가 그린 카드가 안 쓰인다(app/seo.ts).
+    ownImage: ETF_CARD.alt,
   });
   return ETF_PUBLIC ? meta : { ...meta, robots: { index: false, follow: false } };
 }

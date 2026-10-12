@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { B, DocCell, DocPage, Lead, P, PREV_EFFECTIVE, Revision, Section, TERMS_EFFECTIVE, Ul } from "../legal";
+import { B, DocCell, DocPage, Lead, P, Revision, Section, TERMS_EFFECTIVE, TERMS_PREV_EFFECTIVE, Ul } from "../legal";
 import { C } from "../ui";
 import { pageMetadata } from "../seo";
 
@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-/** 약관 시행일. 개인정보처리방침과 같은 날로 맞춘다(배포일 + 7일 이후 — app/legal.tsx 주석). */
+/** 약관 시행일. 배포일 + 7일 이후(app/legal.tsx 주석). 두 문서를 같이 고치면 같은 날로 맞추고, 하나만 고치면 그 문서만 올린다. */
 // 시행일은 app/legal.tsx 에 둔다 — 셸의 제목 아래 줄(DOC_PAGES)과 본문 마지막 조항이 같은 값을 본다.
 const EFFECTIVE_DATE = TERMS_EFFECTIVE;
 /** 문의 창구. Footer·개인정보처리방침과 같은 주소를 쓴다. */
@@ -45,12 +45,10 @@ export default function TermsPage() {
       links={[{ href: "/privacy", label: "개인정보처리방침" }, { href: "/disclaimer", label: "투자 유의사항" }]}
       cells={<DocCell k="시행일" v={EFFECTIVE_DATE} />}
       revision={
-        <Revision effective={EFFECTIVE_DATE} prev={PREV_EFFECTIVE}>
-          <li>2조 서비스의 내용에 국장 미리보기·데일리 노트·테마 리포트·배당으로 살기·텔레그램 채널을 더했습니다</li>
-          <li>3조에 국장 미리보기와 배당으로 살기가 보여 드리는 정보의 성격을 적었습니다</li>
-          <li>4조에 생성형 인공지능이 작성하는 문장의 목록을 넓혔습니다</li>
-          <li>8조에서 출처를 밝혀 인용하는 자료에 배당 자료를 더했습니다</li>
-          <li>머리말에 채널 등록 신청 때 이메일 주소를 받는다는 사실을 적었습니다</li>
+        <Revision effective={EFFECTIVE_DATE} prev={TERMS_PREV_EFFECTIVE}>
+          <li>2조 서비스의 내용에 ETF 자금 흐름을 더했습니다</li>
+          <li>3조에 ETF 자금 흐름이 보여 드리는 정보의 성격을 적었습니다</li>
+          <li>8조에서 출처를 밝혀 인용하는 자료에 ETF 기본 정보를 더했습니다</li>
         </Revision>
       }
     >
@@ -87,6 +85,10 @@ export default function TermsPage() {
           <li>
             <B>시장 브리핑</B>. 여러 시장·감성 지표를 모아 코스피 시장의 과열 정도를 0에서 100
             사이의 점수로 보여 드립니다
+          </li>
+          <li>
+            <B>ETF 자금 흐름</B>. 국내에 상장된 ETF마다 설정·환매로 자금이 얼마나 유입되고
+            빠져나갔는지를 수익률·분배금·총보수와 함께 보여 드립니다
           </li>
           <li>
             <B>국장 미리보기</B>. 미국 증시에서 평소보다 크게 움직인 종목이 있는 날, 그 회사와
@@ -137,6 +139,10 @@ export default function TermsPage() {
           <li>
             과열도 점수와 저온·상온·고온·초고온이라는 표현은 시장의 분위기를 하나의 눈금으로
             옮겨 본 것일 뿐, 앞으로의 가격 방향을 예측하거나 보장하지 않습니다
+          </li>
+          <li>
+            ETF 자금 흐름의 순유입은 상장좌수의 변화로 셈한 값입니다. 자금이 몰렸다는 사실이 그 ETF가
+            좋은 상품이라는 뜻이 아니며, 수익률과 분배금은 지난 기록입니다
           </li>
           <li>
             국장 미리보기의 과거 기록은 지난 비슷한 날에 있었던 일을 센 것이며, 오늘 국내 증시가
@@ -268,7 +274,7 @@ export default function TermsPage() {
         <P>
           다만 서비스가 이용하는 <B>원본 자료의 권리는 각 제공 기관에 있습니다.</B> 서비스의 화면에는
           한국거래소 통계정보를 사용한 결과가 포함되어 있고, 미국 공시 자료, 애널리스트 투자의견
-          집계, 배당 자료는 각 제공처의 조건에 따라 출처를 밝혀 인용합니다. 원본 자료를 다시 이용하실 때에는
+          집계, 배당 자료, ETF 기본 정보는 각 제공처의 조건에 따라 출처를 밝혀 인용합니다. 원본 자료를 다시 이용하실 때에는
           해당 기관이 정한 조건을 따르셔야 합니다.
         </P>
       </Section>

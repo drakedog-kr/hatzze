@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { B, DocPage, Lead, Section, SOURCES_ID, Ul } from "../legal";
-import { DIVIDEND_PUBLIC } from "../screen-flags";
+import { DIVIDEND_PUBLIC, ETF_PUBLIC } from "../screen-flags";
 import { Module } from "../kadera/V2Modules";
 import { pageMetadata } from "../seo";
 
@@ -84,6 +84,9 @@ const SOURCE_GROUPS: { label: string; items: string }[] = [
      2026-09-17부터 과표(과세되는 몫)만 받는데 출처 표기를 조건으로 건 약관이 없어 적지 않는다(2026-09-13 결정과 같음).
      여는 날까지는 숨긴다(DIVIDEND_PUBLIC) — 안 쓰는 곳을 적으면 없는 권위를 빌리는 것이다(위 주석). */
   ...(DIVIDEND_PUBLIC ? [{ label: "배당", items: "한국예탁결제원 · 한국거래소 KIND" }] : []),
+  /* ETF 자금 흐름(2026-10-13 오픈). 한국거래소 — ETF 일별매매정보(etp/etf_bydd_trd · 좌수 · NAV · 순자산 · 추적 지수 값),
+     한국예탁결제원 — SEIBro ETF종합정보(총보수 · 설정일 · 운용사 · 분류) · 분배금지급현황. 안 연 동안은 숨긴다(위 배당과 같은 이유). */
+  ...(ETF_PUBLIC ? [{ label: "ETF", items: "한국거래소 통계정보 · 한국예탁결제원" }] : []),
   { label: "검색·뉴스", items: "네이버 · 유튜브" },
   { label: "커뮤니티·소비", items: "텔레그램 · 디시인사이드 · 알라딘" },
   { label: "가상자산·기타", items: "업비트 · GitHub · 앱스토어" },
@@ -145,6 +148,15 @@ export default function DisclaimerPage() {
           </li>
         </Ul>
       </Section>
+
+      {ETF_PUBLIC && (
+        <Section title="ETF 자금 흐름" id="etf">
+          <Ul>
+            <li>순유입은 상장좌수의 변화로 셈한 값입니다. 자금이 몰렸다는 사실이 그 ETF가 좋은 상품이라는 뜻이 아닙니다.</li>
+            <li>수익률과 분배금은 지난 기록이며, 앞으로 같은 값이 나온다는 근거가 아닙니다.</li>
+          </Ul>
+        </Section>
+      )}
 
       <Section title="카더라·테마 판세·데일리 노트" id="kadera">
         <Ul>

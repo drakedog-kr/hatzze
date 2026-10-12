@@ -106,7 +106,7 @@ export const THEME_PUBLIC = true;
 
 /**
  * ETF 자금 흐름(/etf) — 국내 상장 ETF 하나하나에 돈이 얼마나 들어오고 나갔는지(설정·환매) 보는 화면.
- * 2026-10-11 에 만들기 시작했고 **아직 안 열었다.** 지금은 이 화면 하나만 이 값을 읽는다.
+ * 2026-10-11 에 만들기 시작했고 2026-10-13 운영자 지시로 연다 — PR #718 이 머지되는 순간 열린다(배포본 404 · noindex 를 푼다).
  *
  *   app/etf/page.tsx   배포된 곳에서 404 를 낼지, noindex 를 달지
  *
@@ -121,10 +121,10 @@ export const THEME_PUBLIC = true;
  *      finalize 의 전체 비우기가 사본은 지우지만 데우는 목록에 없으면 첫 방문자가 새로 그린다.
  *   5. `app/releases.ts` 에 한 줄 올린다(화면이 하나 느는 것이라 Minor).
  *
- * ⛔ **여라는 말이 있기 전에는 바꾸지 말 것.** 화면이 다 만들어졌다는 것과 여는 것은
- *    다른 판단이다.
+ * 다섯 단계를 다 밟았다(2026-10-13) — 사이트맵 · 약관 2 · 3 · 8조와 시행일 · 투자 유의사항 묶음과 출처 · DEFAULT_WARM · 업데이트 기록 2.10.0.
+ * 공유 카드(app/etf/opengraph-image.tsx · og-copy.ts ETF_CARD)도 같이 만들었다.
  */
-export const ETF_PUBLIC = false;
+export const ETF_PUBLIC = true;
 
 /**
  * 사이드바에 ETF 항목을 세우나 — 열었거나, **개발 서버(next dev)**일 때. 만드는 동안 로컬에서 사이드바로 들어가 보려고 둔다

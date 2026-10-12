@@ -26,10 +26,15 @@ export const DOC_WIDTH = "68ch";
  * ⚠️ 두 문서가 스스로 "시행 7일 전부터 이 페이지를 통해 알려 드린다"고 적었다. 고친 판은 **배포일 + 7일
  *    이후**를 시행일로 잡는다. 머지가 늦어지면 이 날짜도 같이 뒤로 민다.
  */
-export const TERMS_EFFECTIVE = "2026년 10월 5일";
+export const TERMS_EFFECTIVE = "2026년 10월 20일";
 export const PRIVACY_EFFECTIVE = "2026년 10월 5일";
 /** 바로 앞 판의 시행일(베타 오픈일). 개정 안내 상자가 "이전 판"으로 가리킨다. */
 export const PREV_EFFECTIVE = "2026년 8월 6일";
+/**
+ * 이용약관의 이전 판 시행일. 2026-10-13 ETF 자금 흐름을 열며 약관만 고쳤다(2조 · 3조 · 8조) — 개인정보처리방침은 그대로라
+ * 방침의 이전 판(PREV_EFFECTIVE)과 갈린다. 시행일은 머지일(2026-10-13) + 7일. 머지가 늦어지면 TERMS_EFFECTIVE 를 같이 민다.
+ */
+export const TERMS_PREV_EFFECTIVE = "2026년 10월 5일";
 
 /**
  * 투자 유의사항(토스증권 '투자 유의사항'의 자리). 면책 고지와 데이터 출처를 여기 모은다 — 화면마다 적지 않고
