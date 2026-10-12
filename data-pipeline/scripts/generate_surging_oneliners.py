@@ -33,6 +33,8 @@
 그 끝날로 여섯을 고르고 문장을 만든 **뒤에** telegram_surging_window 에 적고, 화면은 그 값을
 읽는다. 문장이 다 만들어진 다음에 적으므로 화면은 새 목록과 그 문장을 함께 바꾼다.
 문장을 하나도 못 만든 실행은 적지 않는다 — 화면은 전날 끝 창(예전 규칙)으로 남는다.
+창을 적기 **전에** 그 카드 종목의 '관심의 폭'도 같은 창으로 telegram_stock_breadth 에 적는다
+(마이그레이션 098 · KR.save_surging_breadth). 안 적으면 저녁 화면이 그 값을 렌더마다 조인으로 센다.
 
 ## 길이
 
@@ -218,7 +220,8 @@ def run_kr(db, client, dry_run: bool) -> int:
     # ⚠️ 화면과 같은 창·같은 정원으로 부른다(위 머리 주석의 ⚠️⚠️). 창의 끝날도 여기서 정한다.
     end = window_end_for(db, latest)
     pre = load_stock_daily(db, end_date=end)
-    codes = [s["code"] for s in top_surging(db, CARDS, preloaded=pre, cap=CARDS)]
+    cards = top_surging(db, CARDS, preloaded=pre, cap=CARDS)
+    codes = [s["code"] for s in cards]
     if not codes:
         print("[국장] 급부상 종목이 없습니다.")
         return 0
@@ -228,6 +231,9 @@ def run_kr(db, client, dry_run: bool) -> int:
           + " · ".join(f"{name_of.get(c, c)}({c})" for c in codes))
     saved = _generate(db, client, dry_run, "telegram_surging_oneliner", "stock_code", latest, digests)
     if saved:
+        # 카드의 '관심의 폭'을 카드의 창으로 먼저 적고 화면을 넘긴다. 순서가 바뀌면 그 사이 렌더가
+        # 저장값 없는 창을 보고 종목마다 조인으로 직접 센다(KR.save_surging_breadth docstring).
+        KR.save_surging_breadth(db, latest, cards)
         save_window(db, latest, end)
     return saved
 
