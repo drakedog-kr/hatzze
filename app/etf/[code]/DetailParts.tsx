@@ -7,7 +7,7 @@ import { DIVIDEND_ADD_LABEL, DIVIDEND_PAGE } from "../../dividend/copy";
 import { Module, Spark } from "../../kadera/V2Modules";
 import { Icon } from "../../ui";
 import { Facts, PANES_COLS } from "../Facts";
-import { feeGapText, flowTone, fmtFee, fmtFlow, fmtPct, lowestFeeLabel, pctTone } from "../format";
+import { FEE_GAP_LABEL, feeGapText, flowTone, fmtFee, fmtFlow, fmtPct, lowestFeeLabel, pctTone } from "../format";
 import type { BriefRow } from "./brief";
 import { dayShort } from "./dates";
 import { SiblingTable } from "./SiblingTable";
@@ -439,7 +439,7 @@ export function DistModule({ d }: { d: EtfDetail }) {
                         <span className="v2-sk-mbar">
                           <i className={v > 0 ? undefined : "is-none"} style={{ height: v > 0 ? `${Math.max(8, (v / max) * 100)}%` : 3 }} />
                         </span>
-                        <em>{m}월</em>
+                        <em>{m}<span className="v2-sk-mu">월</span></em>
                       </span>
                     );
                   })}
@@ -475,7 +475,7 @@ export function DistModule({ d }: { d: EtfDetail }) {
 }
 
 /**
- * 같은 지수 ETF — 메인 화면 '지수별 ETF 비교'와 같은 꼴: 요약 칸 줄(보수 가장 낮음 · 1,000만원 1년 보수 차이 · 이 ETF 의 순자산 비중) → 같은 칸의 표
+ * 같은 지수 ETF — 메인 화면 '지수별 ETF 비교'와 같은 꼴: 요약 칸 줄(보수 가장 낮음 · 가장 비싼 곳과 1년 보수 차이 · 이 ETF 의 순자산 비중) → 같은 칸의 표
  * (열 줄 + 더 보기 · SiblingTable.tsx).
  */
 export function SiblingModule({ d }: { d: EtfDetail }) {
@@ -491,7 +491,7 @@ export function SiblingModule({ d }: { d: EtfDetail }) {
       <Facts
         items={[
           { k: lowestFeeLabel(brands), v: fmtFee(minFee) },
-          { k: "1,000만원 1년 보수 차이", v: feeGapText(feeGap) },
+          { k: FEE_GAP_LABEL, v: feeGapText(feeGap) },
           { k: "같은 지수 중 순자산 비중", v: self && total > 0 ? `${((self.netAsset / total) * 100).toFixed(1)}%` : "없음" },
         ]}
       />

@@ -84,7 +84,7 @@ export function DividendCard({ s, wide = false }: { s: DividendStock; wide?: boo
                     <span className="v2-sk-mbar">
                       <i className={v > 0 ? undefined : "is-none"} style={{ height: v > 0 ? `${Math.max(8, (v / max) * 100)}%` : 3 }} />
                     </span>
-                    <em>{m}월</em>
+                    <em>{m}<span className="v2-sk-mu">월</span></em>
                     {/* 그달 받은 돈 — 누르지 않아도 보이게(1주 기준 · 원은 머리 근거가 말한다). */}
                     {v > 0 && <b>{Math.round(v).toLocaleString("ko-KR")}</b>}
                   </span>
