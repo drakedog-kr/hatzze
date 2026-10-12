@@ -8,8 +8,9 @@ import { INSIDER_LISTS, INSIDER_LIST_SLUGS, insiderListHref } from "./insider/li
 import { PageJsonLd } from "./JsonLd";
 import { NOTE_PAGE } from "./daily/copy";
 import { DIVIDEND_PAGE } from "./dividend/copy";
+import { ETF_PAGE } from "./etf/copy";
 import { KR_THEME_SHORT, THEME_PAGE, US_THEME_PAGE } from "./theme/copy";
-import { DAILY_PUBLIC, DIVIDEND_PUBLIC, THEME_PUBLIC } from "./screen-flags";
+import { DAILY_PUBLIC, DIVIDEND_PUBLIC, ETF_NAV, THEME_PUBLIC } from "./screen-flags";
 import { DOC_PAGES } from "./legal";
 import { THEME_NAMES, US_THEME_NAMES, themeHref, usThemeHref } from "@/lib/theme-href";
 import { ShellEnvContext, useShellEnv, type ShellEnv } from "./shell-env";
@@ -236,6 +237,10 @@ const NEW_INDICATORS_HINT: Omit<HintSpec, "at"> = {
 function buildNav(themeNav: boolean): NavItem[] {
   return [
   { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 28개로 잰 오늘의 시장 온도" },
+  // ETF 자금 흐름(/etf) — '오늘 시장' 묶음에서 시장 브리핑 바로 아래(시장 온도 → 돈이 어디로 갔나). 자리 이유는 app/etf/copy.ts.
+  // ⛔ 여는 것은 `app/screen-flags.ts` 의 ETF_PUBLIC 한 줄이다. 안 연 동안은 개발 서버에서만 선다(ETF_NAV) — 배포엔 예고 줄도 없다.
+  // 라벨 옆 빨간 N(isNew) — 새로 생긴 화면이라는 표식(2026-10-12 · 테마 리포트가 오픈부터 열하루 달았던 것과 같다). 기한이 없으니 연 뒤 두 주쯤 지나 이 값을 지운다.
+  ...(ETF_NAV ? [{ href: ETF_PAGE.href, label: ETF_PAGE.label, icon: ETF_PAGE.icon, sub: ETF_PAGE.sub, isNew: true }] : []),
   // 카더라가 국장·미장 둘로 갈린다. **부모는 그대로 두고 밑에 서브 항목을 단다** —
   // 부모를 국장으로 바꿔 버리면 카더라라는 이름이 사이드바에서 사라지고, 나중에 시장을
   // 하나 더 붙일 자리도 없어진다.
@@ -416,7 +421,8 @@ const comingSoonFor = (env: ShellEnv): SoonItem[] => (env.themeNav ? COMING_SOON
  * 여기 없는 주소는 맨 뒤에 머리 없이 붙는다(새 화면을 NAV 에만 넣어도 사라지지 않는다).
  */
 const NAV_GROUPS: { label: string; hrefs: string[] }[] = [
-  { label: "오늘 시장", hrefs: ["/", "/preview", NOTE_PAGE.href] },
+  // ETF 자금 흐름은 날마다 바뀌는 시장 자료라 여기(2026-10-11) — 묶음 안 차례는 NAV 배열 차례(시장 브리핑 바로 아래).
+  { label: "오늘 시장", hrefs: ["/", ETF_PAGE.href, "/preview", NOTE_PAGE.href] },
   { label: "시장 여론", hrefs: ["/kadera", THEME_PAGE.href] },
   // 배당 → MDD → 내부자(2026-09-26).
   { label: "분석과 기록", hrefs: [DIVIDEND_PAGE.href, "/mdd", "/insider"] },
@@ -1417,7 +1423,8 @@ function encodedPath(pathname: string): string {
  * `/insider` 아래라 부모를 집어 와 h1 이 '내부자 리포트'가 됐다(2026-09-27 점검 · `<title>` 은
  * '엔비디아(NVDA) 내부자 공시'). 여기 적힌 주소는 제목 칸을 비우고, 화면이 히어로에 자기 h1 을 둔다.
  */
-const SELF_TITLED_PREFIXES = ["/insider/stock/", "/insider/investor/"];
+// ETF 상세(`/etf/069500`)도 같다 — NAV 의 '/etf' 가 startsWith 로 잡아 h1 이 'ETF 자금 흐름'이 됐다(2026-10-12 · app/etf/[code]/page.tsx).
+const SELF_TITLED_PREFIXES = ["/insider/stock/", "/insider/investor/", "/etf/"];
 
 /**
  * 제목 칸을 **그대로 보이되 h1 은 아닌** 주소. 날짜별 데일리 노트(`/daily/2026-09-05`)는 맨 위에 '데일리 노트'가
@@ -1433,13 +1440,14 @@ const LABEL_TITLED_PREFIXES = [`${NOTE_PAGE.href}/`];
  * 이 화면의 이름을 읽는 자리다). 오른쪽 도구(미장 전환·테마)는 그대로 선다.
  */
 // 시장 브리핑(/) · MDD · 배당으로 살기 · 테마 판세(목록 · 테마 한 장, 국장 · 미장) · 국장 미리보기 · 미장 카더라는 2026-10-03 에 들였다 — 카더라 v2 의 디자인 규칙을 옮겼다.
-const V2_PAGES = ["/", "/kadera", "/kadera/us", "/mdd", "/dividend", "/preview", "/insider"];
+// ETF 자금 흐름(/etf)은 처음부터 v2 로 지었다(2026-10-11).
+const V2_PAGES = ["/", "/kadera", "/kadera/us", "/mdd", "/dividend", "/preview", "/insider", "/etf"];
 /** 테마 판세(/theme/semiconductor · /theme/us/memory) · 데일리 노트(/daily/2026-10-02) · 내부자 전체보기 · 종목 · 투자자 상세 ·
  *  종목 페이지(/stock/005930)는 주소가 여럿이라 앞머리로 가른다. 문서 화면 넷(app/legal.tsx DOC_PAGES)은 2026-10-04 에 들였다. */
 const isV2Page = (pathname: string) =>
   V2_PAGES.includes(pathname) ||
   [THEME_PAGE.href, NOTE_PAGE.href].some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
-  ["/insider/list/", "/insider/stock/", "/insider/investor/", "/stock/"].some((p) => pathname.startsWith(p)) ||
+  ["/insider/list/", "/insider/stock/", "/insider/investor/", "/stock/", "/etf/"].some((p) => pathname.startsWith(p)) ||
   pathname in DOC_PAGES;
 
 function PageHeader() {
