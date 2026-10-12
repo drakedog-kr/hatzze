@@ -46,6 +46,7 @@ loadUsStockDaily(windowBefore)로 읽어 기준일 앞 사흘을 세기 때문�
     cd data-pipeline && source .venv/bin/activate
     python scripts/generate_us_telegram_narratives.py --dry-run  # digest만 출력(호출 없음)
     python scripts/generate_us_telegram_narratives.py            # 생성 + 저장
+    python scripts/generate_us_telegram_narratives.py --brief-only  # 총평만 생성 + 저장
 """
 
 from __future__ import annotations
@@ -767,6 +768,8 @@ def main() -> None:
     # --stocks-only: 종목 흐름 요약만 다시 쓴다(총평 '오늘의 요약'은 그대로). 길이 규칙을 바꾼 날 그 자리만 바로 고치려고 둔다
     # (.github/workflows/narratives-rerun.yml, 2026-10-05 저녁 95~105 → 62~72자).
     stocks_only = "--stocks-only" in sys.argv[1:]
+    # --brief-only: 총평만 다시 쓴다(국장 main 같은 자리 주석).
+    brief_only = "--brief-only" in sys.argv[1:]
     if not HAS_LLM_CREDENTIAL and not dry_run:
         print("[skip] LLM 자격(구독 토큰·API 키)이 없어 문장 생성을 건너뜁니다.")
         return
@@ -799,7 +802,7 @@ def main() -> None:
     print(f"[재료] 창 안 미국 언급 메시지 {len([m for m in msgs if since <= m['date'] <= end]):,}건")
 
     brief_digest = None if stocks_only else build_brief_digest(db, latest, msgs, name_of)
-    stock_digests, required = build_stock_digests(latest, msgs, name_of)
+    stock_digests, required = ([], []) if brief_only else build_stock_digests(latest, msgs, name_of)
 
     if dry_run:
         print("─" * 60)
@@ -916,7 +919,7 @@ def main() -> None:
                         digest_for, length, BRIEF_SENTENCE_CAP[key], key,
                     )
                     if not schedule_like(text):
-                        print("[WARNING] 넷째 대목이 여전히 일정이 아니라 뺍니다.")
+                        print(f"[WARNING] 넷째 대목이 여전히 일정이 아니라 뺍니다: {text[:50]}…")
                         text = ""
                 paragraphs.append(text)
             summary = "\n\n".join(p for p in paragraphs if p.strip()).strip()
@@ -937,6 +940,10 @@ def main() -> None:
             print(f"[WARNING] 총평 생성 실패: {type(exc).__name__}: {exc}")
     else:
         print("[안내] --stocks-only — 총평은 건드리지 않습니다." if stocks_only else "[안내] 총평을 만들 집계가 없어 건너뜁니다.")
+
+    if brief_only:
+        print("[안내] --brief-only — 종목 흐름 요약은 건드리지 않습니다.")
+        return
 
     # ── 종목 흐름 요약 ──────────────────────────────────────────────────────
     def compose_narrative(item: tuple[str, str, str]) -> str | None:
