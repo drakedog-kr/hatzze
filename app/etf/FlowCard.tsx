@@ -98,6 +98,8 @@ export function FlowCard({
     <Module
       title="ETF 자금 흐름"
       className="v2-etf-main"
+      // 안내 쪽지 — 줄이 상세로 가는 링크인데 화살표가 없다(app/V2Hint.tsx). 상세 '같은 지수 ETF' 줄과 같은 가르침이라 id 를 같이 쓴다.
+      hint={shown.length ? { id: "etf-row", order: 1, anchor: "ol.v2-etf-body > li:first-child", text: "ETF를 누르면 수익률 · 분배금 · 자금 흐름이 나옵니다" } : undefined}
       aside={
         periods.length > 1 ? (
           <span className="hz-seg hz-seg-hover" role="group" aria-label="기간">
