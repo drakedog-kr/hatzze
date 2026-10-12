@@ -23,4 +23,4 @@ python scripts/calculate_score.py   # 지표 종합 점수
 python -m pytest tests -q           # 단위 테스트(CI 와 같다)
 ```
 
-LLM을 부르는 생성기(`generate_*.py` · `send_telegram_broadcast.py`)를 로컬에서 돌리면, 구독 토큰이 없을 때 조용히 API 키로 청구됩니다(`common/llm_client.py` 머리말). 급등 종목 까닭이나 급부상 한 줄 요약만 다시 써야 하면 러너에서 도는 `*-rerun` 워크플로를 씁니다.
+LLM을 부르는 생성기(`generate_*.py` · `send_telegram_broadcast.py`)를 로컬에서 돌리면, 구독 토큰이 없을 때 조용히 API 키로 청구됩니다(`common/llm_client.py` 머리말). 급등 종목 이유 · 급부상 한 줄 요약 · 흐름·테마 요약만 다시 써야 하면 러너에서 도는 `*-rerun` 워크플로를 씁니다.
