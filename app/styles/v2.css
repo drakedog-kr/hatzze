@@ -1061,6 +1061,8 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 /* 큰 숫자 — 40 → 20. v2 눈금(20 · 13 · 12 · 11)의 맨 위 칸 — 카더라 · MDD · 배당의 큰 숫자와 같다. */
 .v2-bf .hz-big { font-size: 20px !important; font-weight: 700 !important; line-height: 28px !important; letter-spacing: -0.01em !important; }
 .v2-bf .hz-big-unit { font-size: 13px !important; font-weight: 500 !important; }
+/* ETF 순유입 히어로도 같은 꼴 — 홈 범위(.v2-bf)라 안 따라와 '조'가 숫자와 같은 20/700 이었다(2026-10-13 마지막 점검). */
+.v2-etf-hero .hz-big-unit { font-size: 13px; font-weight: 500; }
 .v2-bf .hz-big-sub { font-size: 12px !important; font-weight: 500 !important; color: var(--t-ink3) !important; }
 .v2-bf .hz-cell-graphic { min-height: 0; gap: 12px !important; }
 /* 같은 줄 셀은 키가 같다 — 짧은 셀은 바닥이 비었다(풋/콜 72px · 안전장치 57px). 마지막 그림(막대 · 차트 · 목록)을 셀 바닥에 붙여

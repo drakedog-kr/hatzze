@@ -15,7 +15,7 @@ import { dayLong } from "./dates";
  *   분배금    가장 최근 분배(매달 나누면 직전 달 대비 증감까지), 없으면 없다는 사실(기간 합은 아래 '분배금' 요약 칸이 말한다)
  *   같은 지수 순자산 · 총보수 순위(가까운 쪽 끝에서 센다)
  *   1년 수익률 같은 지수 ETF 중 1년 수익률 순위 · 1위 이름(링크) — 같은 지수 ETF 가 없거나 1년이 안 됐으면 건넌다
- *   (메움)    거래대금 · 괴리율 → 최고가(지수 줄이 최고가가 아니었으면)
+ *   (메움)    거래대금 · 괴리율 → 최고가(지수 줄이 최고가가 아니었으면) → 규모(순자산의 전 ETF 순위)
  * ⭐ 줄마다 PC 에서 한 줄 — 문장 폭 331px 안(메인 브리핑 app/etf/brief.ts 머리말과 같은 잣대 · 2026-10-12 "되도록 한 줄"). 그래서 수익률 줄은
  *    이름표를 '1년 수익률'로 두고 같은 지수 줄 뒤에 세워 '15개 중 8위'로 연다.
  * 말은 시장에서 쓰는 꼴로 — 돈이 '들어왔다'가 아니라 자금이 '유입됐다' · '빠져나갔다'(2026-10-12 "들어왔다는 건 흔하지 않다").
@@ -160,6 +160,11 @@ export function buildEtfDetailBrief(d: EtfDetail, mult: number | null): BriefRow
   if (rows.length < ROWS && !usedHigh) {
     const r = high();
     if (r) rows.push(r);
+  }
+  // 규모 — 같은 지수 ETF 가 없는 해외 기초 상품(ACE 미국반도체데일리타겟커버드콜 등)은 넷에서 멈춰 줄이 74px 로 늘었다(2026-10-13).
+  if (rows.length < ROWS && d.sizeRank) {
+    const size = fmtSize(d.netAsset);
+    rows.push({ label: "규모", parts: ["순자산 ", { b: size }, size.endsWith("조") ? "로" : "으로", " 전체 ETF 중 ", { b: `${d.sizeRank.toLocaleString("ko-KR")}위` }, "입니다."] });
   }
   return rows.slice(0, ROWS);
 }

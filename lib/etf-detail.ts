@@ -143,6 +143,8 @@ export type EtfDetail = {
   streak: number;
   /** 1달 순유입 순위(전 ETF) */
   rank: { flow: number; of: number } | null;
+  /** 순자산 순위(전 ETF) — 브리핑 메움 줄 '규모' */
+  sizeRank: number | null;
   dist: {
     cadence: string | null;
     yld: number | null;
@@ -251,6 +253,7 @@ export const getEtfDetail = cache(async (code: string): Promise<EtfDetail | null
   // 순위 · 같은 지수 — 뷰 한 벌(지금 상장된 ETF).
   const ranked = [...board].sort((a, b) => Number(b.flow_20d ?? 0) - Number(a.flow_20d ?? 0));
   const at = ranked.findIndex((r) => r.isu_cd === code);
+  const sizeAt = [...board].sort((a, b) => Number(b.net_asset ?? 0) - Number(a.net_asset ?? 0)).findIndex((r) => r.isu_cd === code);
   const peers = last.indexName ? board.filter((r) => r.index_name?.trim() === last.indexName) : [];
   const peerCodes = peers.map((r) => r.isu_cd);
   // 1년 수익률 — 시작일 종가는 1년 뷰(etf_flow_year · 메인 비교표와 같은 시작일), 끝은 기준일 종가, 사이 분배금을 더한다.
@@ -380,6 +383,7 @@ export const getEtfDetail = cache(async (code: string): Promise<EtfDetail | null
     })),
     streak,
     rank: at >= 0 ? { flow: at + 1, of: ranked.length } : null,
+    sizeRank: sizeAt >= 0 ? sizeAt + 1 : null,
     dist: distRows.length
       ? {
           cadence: div?.cadence ?? null,

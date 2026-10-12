@@ -384,7 +384,8 @@ export function DistModule({ d }: { d: EtfDetail }) {
       className="v2-etfd-distmod"
     >
       <Facts
-        cols={paired ? PANES_COLS : undefined}
+        // 짝 칸(달 막대)이 없어도 위 '자금 흐름' 요약 칸과 같은 틀 — 3등분이면 세로선이 383 · 765 대 388 · 776 으로 어긋났다(2026-10-13).
+        cols={PANES_COLS}
         items={[
           { k: `${d.head.label} 분배금 합`, v: won(dist.yearSum) },
           { k: "분배 횟수", v: `${dist.yearCount}회` },
@@ -488,7 +489,9 @@ export function SiblingModule({ d }: { d: EtfDetail }) {
   const self = d.siblings.find((s) => s.self);
   return (
     <Module title="같은 지수 ETF" meta={`${d.index?.label ?? ""} · ${d.siblings.length}개`} className="v2-etfd-sibmod">
+      {/* 위 '자금 흐름' · '분배금' 요약 칸과 같은 틀 — 3등분이면 세로선이 388 · 776 으로 위 두 카드(383 · 765)와 어긋났다(2026-10-13 "오와 열"). */}
       <Facts
+        cols={PANES_COLS}
         items={[
           { k: lowestFeeLabel(brands), v: fmtFee(minFee) },
           { k: FEE_GAP_LABEL, v: feeGapText(feeGap) },
