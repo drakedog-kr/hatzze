@@ -269,7 +269,12 @@ export function FlowModule({ d }: { d: EtfDetail }) {
   const month = d.periods.find((p) => p.key === "m");
   const rate = month && d.netAsset > 0 ? (month.flow / d.netAsset) * 100 : null;
   return (
-    <Module title="자금 흐름" className="v2-etfd-flowmod">
+    <Module
+      title="자금 흐름"
+      className="v2-etfd-flowmod"
+      // 날마다의 값은 막대 말풍선에만 있다 — 테마 · 종목 화면의 추이 막대와 같은 가르침(id 'trend-bar' · 같은 칸 .v2-tm-trend).
+      hint={d.flows.length ? { id: "trend-bar", order: 1, anchor: ".v2-tm-trend", at: "inside", text: "막대를 누르면 그날 값이 나옵니다" } : undefined}
+    >
       <Facts
         cols={PANES_COLS}
         items={[
@@ -488,7 +493,13 @@ export function SiblingModule({ d }: { d: EtfDetail }) {
   const total = d.siblings.reduce((a, s) => a + s.netAsset, 0);
   const self = d.siblings.find((s) => s.self);
   return (
-    <Module title="같은 지수 ETF" meta={`${d.index?.label ?? ""} · ${d.siblings.length}개`} className="v2-etfd-sibmod">
+    <Module
+      title="같은 지수 ETF"
+      meta={`${d.index?.label ?? ""} · ${d.siblings.length}개`}
+      className="v2-etfd-sibmod"
+      // 메인 'ETF 자금 흐름' 표 줄과 같은 가르침(id 'etf-row'). '이 ETF' 줄(.is-self)은 링크가 아니라 그다음 줄을 가리킨다.
+      hint={{ id: "etf-row", order: 2, anchor: "ol.v2-etf-body > li:not(.is-self)", target: "ol.v2-etf-body > li:not(.is-self)", text: "ETF를 누르면 수익률 · 분배금 · 자금 흐름이 나옵니다" }}
+    >
       {/* 위 '자금 흐름' · '분배금' 요약 칸과 같은 틀 — 3등분이면 세로선이 388 · 776 으로 위 두 카드(383 · 765)와 어긋났다(2026-10-13 "오와 열"). */}
       <Facts
         cols={PANES_COLS}

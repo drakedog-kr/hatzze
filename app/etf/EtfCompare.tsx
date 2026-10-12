@@ -91,7 +91,14 @@ export function EtfCompare({ indexes }: { indexes: EtfCompareIndex[] }) {
   const items = ordered.map((f) => ({ key: f.key, label: f.label, m: f.m }));
 
   return (
-    <Module id="etf-compare" title="지수별 ETF 비교" className="v2-etf-cmpmod">
+    <Module
+      id="etf-compare"
+      title="지수별 ETF 비교"
+      className="v2-etf-cmpmod"
+      // 안내 쪽지 — 왼쪽 지수를 고르면 오른쪽 표가 그 지수의 ETF 로 바뀐다. 첫 줄 밑을 가리킨다 — 둘째 줄이면 폰(가로 칩 줄)에서
+      // 둘째 칩이 이미 오른쪽이라 쪽지가 화면 밖(167~467 · 375 폰)으로 나갔다(2026-10-13).
+      hint={indexes.length > 1 ? { id: "etf-index-pick", order: 2, anchor: ".v2-etf-rail-body > li:first-child", target: ".v2-etf-rail-body > li", text: "지수를 고르면 그 지수를 따르는 ETF끼리 견줍니다" } : undefined}
+    >
       {/* 요약 칸 — 고른 지수의 셈. 카드 폭 한 줄 · 첫 칸이 왼쪽 목록 폭(아래 경계와 세로선이 맞는다). */}
       <Facts
         cols={mdCols(3)}
