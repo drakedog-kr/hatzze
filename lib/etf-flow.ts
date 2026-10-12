@@ -263,7 +263,7 @@ const eok = (won: number | null) => Number(won ?? 0) / EOK;
 const num = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
 /** 'ETF 자금 흐름' 표로 보내는 줄 — 표가 쓰는 칸만(EtfRow 의 나머지는 서버에서 히어로 · 비교표가 쓴다). 기간 셋 × 줄 수백이 클라이언트로
  *  간다. ⛔ 값을 미리 반올림해 줄이지 말 것 — 화면이 한 번 더 반올림해 숫자가 1씩 달라졌다(2026-10-12 · 들어온 ETF 275 → 276). */
-export type EtfFlowRow = Pick<EtfRow, "code" | "name" | "group" | "streak" | "p">;
+export type EtfFlowRow = Pick<EtfRow, "code" | "name" | "group" | "streak" | "netAsset" | "p">;
 
 /** 히어로 브리핑 재료 셋 — 쏠림(위 10개 몫) · 가장 긴 연속 유입 · 새 상장. 새 상장은 20거래일 중 순유입 값이 있는 날이 20보다 적은 ETF 다
  *  (상장 첫날은 직전 좌수가 없어 값이 비므로 flowDays 가 상장 뒤 날 수 − 1). */
@@ -580,7 +580,7 @@ export const getEtfFlowBoard = cache(async (): Promise<MaybeFailed<EtfFlowBoard 
   const rows: EtfFlowRow[] = all
     .map((a) => a.row)
     .filter((r) => keep.has(r.code))
-    .map(({ code, name, group, streak, p }) => ({ code, name, group, streak, p }));
+    .map(({ code, name, group, streak, netAsset, p }) => ({ code, name, group, streak, netAsset, p }));
 
   // ETF 전체의 하루 순유입 — 히어로 선. 날마다 상장폐지된 ETF 까지 전 종목을 더한다(위 '상장폐지 몫' · 선 끝이 큰 숫자와 같다).
   const dayTotals = windowOk ? dates.map((d, i) => ({ date: d, flow: windowRows[i].reduce((s, r) => s + eok(r.net_flow), 0) })) : [];

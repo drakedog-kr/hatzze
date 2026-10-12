@@ -9,7 +9,7 @@ import { ETF_ALL, ETF_NOCASH, etfPickTest } from "@/lib/etf-groups";
 import { Module } from "../kadera/V2Modules";
 import { etfHref } from "./copy";
 import { Facts, mdCols } from "./Facts";
-import { flowTone, fmtFlow, fmtPct, pctTone } from "./format";
+import { flowTone, fmtFlow, fmtPct, fmtSize, pctTone } from "./format";
 import { Rail, type RailItem } from "./Rail";
 import { SortHead } from "./SortHead";
 
@@ -29,7 +29,8 @@ const PERIOD_LABEL: Record<EtfPeriod, string> = {
  *
  * 기간(하루 · 1주 · 1달 · 1년)은 머리 오른쪽 세그먼트로 고른다(2026-10-12 "다른 페이지처럼 기간을 고르게") — 유형 목록 · 요약 칸 · 표가
  * 같이 바뀐다. 1년은 1년 합 뷰가 생기고 일별 표가 1년을 덮을 때만 선다(lib/etf-flow.ts 머리말 '기간').
- * 표 칸은 셋으로 고정이다: 순유입 · 수익률(분배금 포함) · 순유입일(2026-10-12 '들어온 날'에서 바꿈). 하루는 순유입일이 1/1일뿐이라 그 자리에 이어서 들어온 날 수를 둔다.
+ * 표 칸은 넷으로 고정이다: 순유입 · 수익률(분배금 포함) · 순유입일(2026-10-12 '들어온 날'에서 바꿈) · 순자산(2026-10-13 — 얼마짜리 ETF 에
+ * 그만큼 들어왔는지 옆에서 견준다). 하루는 순유입일이 1/1일뿐이라 그 자리에 이어서 들어온 날 수를 둔다.
  * 순유입 · 수익률 머리를 눌러 줄 세운다(한 번 더 누르면 반대 순). 줄은 서버가 판 · 기간 · 정렬 · 방향마다 앞 줄만 골라 보낸다(lib/etf-flow.ts).
  * 이름 아래 곁줄(유형)은 걷었다 — 다른 화면 표는 이름 한 줄이다(2026-10-12 "짜잘한 설명이 많다").
  */
@@ -133,19 +134,20 @@ export function FlowCard({
       <div className="v2-etf-md">
         <Rail items={items} sel={pick} onPick={setPick} head="유형" numHead="순유입" ga="etf_type_pick" />
         <div className="v2-etf-list">
-          <div className="v2-etf-row v2-etf-L v2-th" style={{ ["--n" as string]: 3 }}>
+          <div className="v2-etf-row v2-etf-L v2-th" style={{ ["--n" as string]: 4 }}>
             <span />
             <span className="v2-etf-sel">{label}</span>
             <SortHead label="순유입" on={key === "f"} desc={desc} onClick={() => sortBy("f")} ga="etf_sort" />
             <SortHead label="수익률" on={key === "r"} desc={desc} onClick={() => sortBy("r")} ga="etf_sort" />
             <span>{daily ? "연속 순유입" : "순유입일"}</span>
+            <span>순자산</span>
           </div>
           <ol className="v2-etf-body">
             {shown.map((r, i) => {
               const s = r.p[per];
               return (
                 <li key={r.code}>
-                  <Link href={etfHref(r.code)} className="v2-etf-row v2-etf-L" style={{ ["--n" as string]: 3 }} data-ga="etf_detail_click">
+                  <Link href={etfHref(r.code)} className="v2-etf-row v2-etf-L" style={{ ["--n" as string]: 4 }} data-ga="etf_detail_click">
                     <span className="v2-td-rank">{i + 1}</span>
                     <span className="v2-etf-name">
                       <span className="v2-td-name" title={r.name}>
@@ -164,6 +166,7 @@ export function FlowCard({
                         <span className="v2-etf-unit">/{s.days}일</span>
                       </span>
                     )}
+                    <span className="v2-td-num">{fmtSize(r.netAsset)}</span>
                   </Link>
                 </li>
               );

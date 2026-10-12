@@ -31,6 +31,12 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 'ETF 자금 흐름' 표에 순자산 칸 — 쓰는 법은 그대로라 Patch. 날짜는 머지하는 날로 고친다.
+    version: "2.10.1",
+    date: "2026-10-13",
+    changes: ["ETF 자금 흐름 표에 순자산을 더했습니다."],
+  },
+  {
     // ETF 자금 흐름(/etf)을 열고 미장 종목 상세에 배당 담기 단추를 새로 걸어 Minor. 날짜는 머지하는 날로 고친다.
     version: "2.10.0",
     date: "2026-10-13",
