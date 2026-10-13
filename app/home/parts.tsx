@@ -644,17 +644,27 @@ export function AreaChart({
         {/* shadcn 영역 차트 꼴(2026-09-27, MDD 언더워터와 같은 방식) — 선은 1px, 면은 선 쪽이 진하고 바닥으로 옅어지는 그라데이션.
             SVG 그라데이션은 id 가 문서 전역이라 카드마다 색이 다르면 서로 덮어쓴다 — 그래서 한때 반투명 한 겹이었고,
             지금은 카드마다 다른 id(gid)를 짓는다. */}
+        {/* zero 기준 — 0 위(빨강) · 아래(파랑) 면도 다른 차트처럼 선 쪽이 진하고 0 선 쪽으로 옅어지는 그라데이션(한 색 면이던 것 · 2026-10-13).
+            0 선은 옆 거래대금 칸의 평균선과 같은 점선(시작점이라는 기준선이다). id 는 카드마다 다르게(gid). */}
         {baseline === "zero" && (
           <defs>
-            <clipPath id="hz-clip-up"><rect x="0" y="0" width="100" height={base} /></clipPath>
-            <clipPath id="hz-clip-dn"><rect x="0" y={base} width="100" height={H - base} /></clipPath>
+            <clipPath id={`${gid}-cu`}><rect x="0" y="0" width="100" height={base} /></clipPath>
+            <clipPath id={`${gid}-cd`}><rect x="0" y={base} width="100" height={H - base} /></clipPath>
+            <linearGradient id={`${gid}-up`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={base}>
+              <stop offset="0%" stopColor="var(--c-hot)" stopOpacity={0.32} />
+              <stop offset="100%" stopColor="var(--c-hot)" stopOpacity={0.03} />
+            </linearGradient>
+            <linearGradient id={`${gid}-dn`} gradientUnits="userSpaceOnUse" x1="0" y1={H} x2="0" y2={base}>
+              <stop offset="0%" stopColor="var(--c-blue)" stopOpacity={0.32} />
+              <stop offset="100%" stopColor="var(--c-blue)" stopOpacity={0.03} />
+            </linearGradient>
           </defs>
         )}
         {baseline === "zero" ? (
           <>
-            <polygon points={`0,${base} ${line} 100,${base}`} fill="var(--c-hot)" opacity={0.2} clipPath="url(#hz-clip-up)" />
-            <polygon points={`0,${base} ${line} 100,${base}`} fill="var(--c-blue)" opacity={0.2} clipPath="url(#hz-clip-dn)" />
-            <line x1="0" y1={base} x2="100" y2={base} stroke="var(--c-line)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+            <polygon points={`0,${base} ${line} 100,${base}`} fill={`url(#${gid}-up)`} clipPath={`url(#${gid}-cu)`} />
+            <polygon points={`0,${base} ${line} 100,${base}`} fill={`url(#${gid}-dn)`} clipPath={`url(#${gid}-cd)`} />
+            <line x1="0" y1={base} x2="100" y2={base} stroke={C.muted} strokeWidth={1.25} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
           </>
         ) : (
           <>
