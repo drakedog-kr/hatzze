@@ -70,7 +70,7 @@ from config.stock_themes import THEMES  # noqa: E402
 import generate_telegram_narratives as KR  # noqa: E402
 
 from common.theme_hot import theme_hot  # noqa: E402
-from common.theme_risers import theme_risers  # noqa: E402
+from common.theme_risers import RISER_MAX, RISER_SPARE, theme_risers  # noqa: E402
 
 MODEL = KR.MODEL
 TABLE = "telegram_theme_brief"
@@ -812,7 +812,8 @@ def main() -> None:
     # ── 둘째 몫: 갑자기 많이 언급된 종목의 까닭 ──
     # theme_risers 는 기준일을 넣은 사흘로 고른다. digest 도 그 사흘이어야 까닭이 같은 날들을 말한다 — end=기준일.
     # (end 를 안 주면 build_stock_digests 는 기준일 전날에서 끝난다 — 카더라 종목 리포트의 창이다.)
-    risers = theme_risers(db, latest)
+    # 여유 후보까지 이유를 쓴다 — 이유를 못 쓴 종목은 화면이 빼고 다음 후보가 열 줄을 채운다(RISER_SPARE 주석).
+    risers = theme_risers(db, latest, RISER_MAX + RISER_SPARE)
     riser_codes = [r["code"] for r in risers]
     riser_digests, _ = KR.build_stock_digests(db, latest, codes=riser_codes, msgs=msgs_list, end=latest) if riser_codes else ([], [])
     digest_of = {code: d for code, _n, d in riser_digests}

@@ -39,7 +39,7 @@ export type RiserRow = { theme: string; date: string; riser: { code: string; nam
  *    RISER_MAX 에 못 든 테마는 riser: null 이다. 그 행을 조회에서 빼거나 여기서 건너뛰면 어제 riser 가 최신이 돼,
  *    어제의 배수·까닭이 오늘 것과 섞여 줄을 서고 오늘 것을 카드 밖으로 밀어냈다.
  */
-export function parseRisers(rows: RiserRow[], known: (theme: string) => boolean): ThemeRiser[] {
+export function parseRisers(rows: RiserRow[], known: (theme: string) => boolean, limit = RISER_MAX): ThemeRiser[] {
   const seen = new Set<string>();
   const out: ThemeRiser[] = [];
   for (const r of rows) {
@@ -66,7 +66,7 @@ export function parseRisers(rows: RiserRow[], known: (theme: string) => boolean)
     if (a.ratio !== null && b.ratio !== null && a.ratio !== b.ratio) return a.ratio > b.ratio;
     return a.recent > b.recent;
   };
-  return out.sort((a, b) => (better(a, b) ? -1 : better(b, a) ? 1 : 0)).slice(0, RISER_MAX);
+  return out.sort((a, b) => (better(a, b) ? -1 : better(b, a) ? 1 : 0)).slice(0, limit);
 }
 
 /** 기준일에 줄이 하나도 없을 때 거슬러 갈 날수 — 연휴(추석 닷새)도 넘게. */
@@ -85,7 +85,9 @@ export function risersWithFallback(
   known: (theme: string) => boolean,
   carryFrom: string,
 ): { risers: ThemeRiser[]; asOf: string | null } {
-  const withReason = (rs: RiserRow[]) => parseRisers(rs, known).filter((r) => r.reason);
+  // 이유 없는 줄을 먼저 거르고 자른다 — 자른 뒤 거르면 열 중 하나만 이유가 비어도 아홉 줄이었다(2026-10-13). 파이프라인은 여유 후보까지
+  // 이유를 써 둔다(common/theme_risers.py RISER_SPARE).
+  const withReason = (rs: RiserRow[]) => parseRisers(rs, known, Infinity).filter((r) => r.reason).slice(0, RISER_MAX);
   const now = withReason(rows.filter((r) => r.date >= carryFrom));
   if (now.length) return { risers: now, asOf: null };
   // 날마다 따로 본다 — 어제(이어 읽기 안의 날)도 오늘 행에 가려졌을 수 있다(테마마다 최신 행만 보므로).

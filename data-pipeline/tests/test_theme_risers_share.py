@@ -6,7 +6,7 @@
 """
 from datetime import date, timedelta
 
-from common.theme_risers import RISER_MIN_RATIO, pick_risers, window_days
+from common.theme_risers import RISER_MAX, RISER_MIN_RATIO, RISER_SPARE, pick_risers, window_days
 
 THEMES_OF = {"A": ["로봇"], "B": ["원전"], "BIG": ["반도체", "AI"]}
 NAMES = {"A": "에이", "B": "비", "BIG": "빅"}
@@ -90,3 +90,18 @@ def test_fewer_mentions_is_not_a_riser_even_if_share_grew():
 
     got = pick_risers(_rows(base, vol), "stock_code", THEMES_OF, NAMES, recent)
     assert [r["code"] for r in got] == []
+
+
+def test_limit_keeps_spare_candidates():
+    """이유를 쓰는 쪽은 RISER_MAX + RISER_SPARE 까지 받는다 — 이유를 못 쓴 종목 자리를 다음 후보가 채운다(2026-10-13)."""
+    base = "2026-10-01"
+    _, recent = window_days(base)
+    themes_of = {f"S{i}": [f"테마{i}"] for i in range(RISER_MAX + RISER_SPARE + 2)}
+    themes_of["BIG"] = ["앞 사흘"]  # 앞 사흘 대화를 까는 종목(최근 사흘 0회라 후보가 아니다)
+    names = {c: c for c in themes_of}
+    # 모두 앞 사흘 0회 · 최근 사흘 언급(새로 등장). 최근 언급 수가 다 달라 차례가 정해진다. 앞 사흘 대화가 0 이면 카드를 비우므로 다른 종목을 깐다.
+    rows = [{"date": d, "stock_code": c, "mention_count": 6 + i} for i, c in enumerate(themes_of) if c != "BIG" for d in sorted(recent)]
+    rows += [{"date": "2026-09-27", "stock_code": "BIG", "mention_count": 3}]
+    assert len(pick_risers(rows, "stock_code", themes_of, names, recent)) == RISER_MAX
+    assert len(pick_risers(rows, "stock_code", themes_of, names, recent, RISER_MAX + RISER_SPARE)) == RISER_MAX + RISER_SPARE
+

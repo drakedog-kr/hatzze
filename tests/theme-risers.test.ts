@@ -95,6 +95,19 @@ describe("risersWithFallback — 그날 줄이 없으면 줄이 있던 가장 �
   });
 });
 
+describe("risersWithFallback — 이유 없는 줄을 먼저 거르고 RISER_MAX 로 자른다", () => {
+  it("상위 열 중 하나가 이유 없으면 다음 후보가 채워 열 줄", () => {
+    // 2026-10-13 국장 · 미장 — 열 후보 중 하나(철강 포스코인터내셔널)가 '까닭 없음'이라 아홉 줄이었다. 파이프라인은 여유 후보까지 이유를 쓴다.
+    const rows: RiserRow[] = Array.from({ length: RISER_MAX + 3 }, (_, i) =>
+      row("2026-10-13", `T${i}`, riser(`t${i}`, 10 - i * 0.5, i === 0 ? "" : "이유")),
+    );
+    const got = risersWithFallback(rows, () => true, "2026-10-12");
+    assert.equal(got.risers.length, RISER_MAX);
+    assert.ok(!got.risers.some((r) => r.code === "t0"));
+    assert.equal(got.risers.at(-1)?.code, `t${RISER_MAX}`);
+  });
+});
+
 describe("risersWithFallback — 어제 목록이 오늘 빈 행에 가려지지 않게", () => {
   it("오늘 행이 다 비면 어제 목록(asOf 어제)", () => {
     const rows = [row("2026-10-05", "반도체", null), row("2026-10-04", "반도체", riser("G", 2, "이유"))];

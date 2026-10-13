@@ -41,6 +41,7 @@ from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
 from common.theme_hot import theme_hot  # noqa: E402
 from common.timeutil import KST  # noqa: E402
+from common.theme_risers import RISER_MAX, RISER_SPARE  # noqa: E402
 from common.us_theme_risers import us_theme_risers  # noqa: E402
 from config.us_stock_extraction import is_house  # noqa: E402
 from config.us_stock_themes import US_THEMES  # noqa: E402
@@ -189,7 +190,8 @@ def main() -> None:
     print(f"[재료] 창 안 미국 언급 메시지 {len(msgs):,}건")
 
     # ── 둘째 몫: 급부상 종목의 이유 ── digest 는 종목 요약과 같은 함수·같은 창.
-    risers = us_theme_risers(db, latest)
+    # 여유 후보까지 이유를 쓴다(국장 generate_theme_briefs.py · common/theme_risers.py RISER_SPARE 와 같은 까닭).
+    risers = us_theme_risers(db, latest, RISER_MAX + RISER_SPARE)
     riser_digests, _ = US.build_stock_digests(latest, msgs, name_of, tickers=[r["code"] for r in risers]) if risers else ([], [])
     digest_of = {t: d for t, _n, d in riser_digests}
     riser_of = {r["theme"]: r for r in risers}
