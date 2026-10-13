@@ -1375,12 +1375,13 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 /* 첫 줄 띠 — 같은 기간 지수의 고점 대비는 낙폭색. */
 .v2-cover-v b.is-down { color: var(--t-down); }
 
-/* 사례 표 줄 — 누르면 물속 차트에 그 구간을 칠한다(Controls.tsx Results). 고른 줄은 왼쪽 띠 + 옅은 파랑. */
+/* 사례 표 줄 — 누르면 물속 차트에 그 구간을 칠한다(Controls.tsx Results). 고른 줄은 옅은 파랑만.
+   ⛔ 고른 줄 · 칩 왼쪽의 진한 파란 띠(inset 3px)는 쓰지 않는다 — 사이트 전체에서 걷었다(2026-10-13 운영자 지시). */
 .v2-md-case[role="button"] { cursor: pointer; transition: background-color 0.15s; }
 .v2-md-case[role="button"]:hover { background: var(--t-tint); }
 .v2-md-case[role="button"]:focus-visible { outline: 2px solid var(--t-down); outline-offset: -2px; }
 .v2-md-case.is-on,
-.v2-md-case.is-on:hover { background: var(--t-down-weak); box-shadow: inset 3px 0 0 var(--t-down); }
+.v2-md-case.is-on:hover { background: var(--t-down-weak); }
 /* 사례 번호 — 물속 차트의 번호 표식과 같은 꼴(작은 동그라미). */
 /* 사례 번호 — 물속 차트 바닥 표식(.mdd-uw-num 18px · 11px)과 같은 크기. 10px 은 v2 눈금 밖이었다(2026-10-03). */
 .v2-md-case-n { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-right: 8px; border: 1.5px solid var(--t-down); border-radius: 50%; font-style: normal; font-size: var(--fs-11); font-weight: 600; line-height: 1; color: var(--t-down); vertical-align: 1px; font-variant-numeric: tabular-nums; }
@@ -1805,7 +1806,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-dv-bk-row { flex: 1 0 auto; min-height: 44px; border: 0; border-bottom: 1px solid var(--t-line); background: none; font-family: inherit; color: inherit; text-align: left; cursor: pointer; transition: background-color 0.15s; }
 .v2-dv-bk-group:last-child .v2-dv-bk-row:last-child { border-bottom: 0; }
 .v2-dv-bk-row:hover { background: var(--t-tint); }
-.v2-dv-bk-row.is-on { background: var(--t-down-weak); box-shadow: inset 3px 0 0 var(--t-down); }
+.v2-dv-bk-row.is-on { background: var(--t-down-weak); }
 .v2-dv-bk-row:focus-visible { outline: 2px solid var(--t-down); outline-offset: -2px; }
 .v2-dv-bk-name { min-width: 0; font-size: 13px; font-weight: 600; color: var(--t-ink); word-break: keep-all; }
 .v2-dv-bk-num { text-align: right; font-size: 13px; font-weight: 500; color: var(--t-ink2); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -3513,7 +3514,7 @@ a.v2-isd-row:hover { background: var(--t-tint); }
 .v2-etf-div > i.is-down { right: 50%; border-radius: 2px 0 0 2px; background: var(--t-down); }
 
 /* 카드 — 물음 하나에 카드 하나(app/etf/page.tsx 머리말). 고르는 목록과 보이는 표가 이어진 것은 한 카드 안 두 칸이다.
-   .v2-etf-md = [왼쪽 목록(히어로 띠 첫 칸과 같은 폭) | 표] — 배당 '성향별 바스켓'처럼 고른 줄은 옅은 파랑 + 왼쪽 띠, 표 머리에 고른 이름.
+   .v2-etf-md = [왼쪽 목록(히어로 띠 첫 칸과 같은 폭) | 표] — 배당 '성향별 바스켓'처럼 고른 줄은 옅은 파랑, 표 머리에 고른 이름.
    .v2-etf-panes = [표 | 오른쪽 칸 400(히어로 띠 오른쪽 칸과 같은 폭)]. 칸 사이는 카드 안 가는 선. */
 .v2-etf .v2-etf-main,
 .v2-etf .v2-etf-cmpmod,
@@ -3548,7 +3549,7 @@ a.v2-isd-row:hover { background: var(--t-tint); }
 .v2-etf-rail-row.is-link:hover { background: var(--t-tint); }
 .v2-etf-rail-row.is-link:focus-visible { outline-offset: -2px; }
 .v2-etf-rail-row.is-link.is-on,
-.v2-etf-rail-row.is-link.is-on:hover { background: var(--t-down-weak); box-shadow: inset 3px 0 0 var(--t-down); }
+.v2-etf-rail-row.is-link.is-on:hover { background: var(--t-down-weak); }
 /* 고른 줄의 숫자는 옅은 면 위라 한 단 진한 오르내림 색(-deep) — 다크에서 기본 빨강이 파란 면 위 대비 3.95 로 기준(4.5) 아래였다(2026-10-12).
    라이트는 -deep 이 기본색과 같거나 한 단 진할 뿐이라 달라 보이지 않는다. */
 .v2-etf-rail-row.is-link.is-on .v2-td-num.is-up { color: var(--t-up-deep); }
@@ -3681,7 +3682,7 @@ a.v2-etf-row:focus-visible { outline-offset: -2px; }
    ([[굵기 세 단]] · 2026-10-12 디테일 점검). */
 .v2-etf .v2-td-name.is-plain { font-weight: 500; }
 /* 같은 지수 ETF — 이 ETF 의 줄은 메인 화면 왼쪽 목록의 고른 줄 꼴. 옅은 면 위 숫자는 한 단 진한 오르내림 색(다크 대비 · 2026-10-12). */
-.v2-etf-row.is-self { background: var(--t-down-weak); box-shadow: inset 3px 0 0 var(--t-down); }
+.v2-etf-row.is-self { background: var(--t-down-weak); }
 .v2-etf-row.is-self .v2-td-num.is-up { color: var(--t-up-deep); }
 .v2-etf-row.is-self .v2-td-num.is-down { color: var(--t-down-deep); }
 
@@ -3704,7 +3705,7 @@ a.v2-etf-row:focus-visible { outline-offset: -2px; }
   .v2-etf-rail-body::-webkit-scrollbar { display: none; }
   .v2-etf-rail-body > li { flex: none; }
   .v2-etf-rail-row.is-link { display: flex; align-items: baseline; gap: 6px; min-height: 0; padding: 6px 10px; border: 1px solid var(--t-frame) !important; border-radius: 6px; white-space: nowrap; }
-  .v2-etf-rail-row.is-link.is-on { box-shadow: none; border-color: transparent !important; }
+  .v2-etf-rail-row.is-link.is-on { border-color: transparent !important; }
   /* 요약 칸 틀 — 넓은 화면은 아래 두 칸 경계에 맞춘 틀을 인라인으로 받는다(Facts cols · 끝 칸 400px). 두 칸이 위아래로 쌓이는 여기서는
      그 경계가 없으니 같은 폭 n 칸으로 — 인라인 틀이 남아 폰에서 400px 칸이 판 밖으로 밀렸다(2026-10-12). */
   .v2-etf-facts { grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)) !important; }
