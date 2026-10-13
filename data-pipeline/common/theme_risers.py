@@ -45,6 +45,10 @@ WINDOW_DAYS = 3
 RISER_MIN_MENTIONS = 5
 RISER_MIN_RATIO = 1.5
 RISER_MAX = 10
+# 이유를 쓸 후보는 RISER_MAX 보다 몇 개 더 — 이유를 못 쓴 종목(채널에 뚜렷한 소식이 없거나 문장 검사에 걸림)은 화면이 빼서,
+# 딱 열만 고르면 하나가 빠진 날 카드가 아홉 줄이었다(2026-10-13 국장 · 미장 둘 다, 철강 포스코인터내셔널 '까닭 없음').
+# 화면(lib/theme-risers.ts risersWithFallback)은 이유 있는 줄을 먼저 거르고 RISER_MAX 로 자른다.
+RISER_SPARE = 3
 
 
 def _better(a: dict, b: dict) -> bool:
@@ -68,8 +72,10 @@ def pick_risers(
     themes_of: dict[str, list[str]],
     name_of: dict[str, str],
     recent: set[str],
+    limit: int = RISER_MAX,
 ) -> list[dict]:
     """[{theme, code, name, recent, prior, ratio}] — 화면과 같은 순서. DB 없이 부르는 순수 함수(테스트가 부른다).
+    `limit` — 몇 테마까지. 이유를 쓰는 쪽(generate_*_theme_briefs.py)은 RISER_MAX + RISER_SPARE 를 넘긴다.
 
     `rows` 는 창 안 여섯 날의 종목 일별 집계 [{date, <key>, mention_count}] 다. 사전 밖 종목 행은 무시한다.
     `recent` 에 든 날이 최근 사흘이고 나머지가 앞 사흘이다.
@@ -112,10 +118,10 @@ def pick_risers(
 
     out = list(best.values())
     out.sort(key=cmp_to_key(lambda a, b: -1 if _better(a, b) else (1 if _better(b, a) else 0)))
-    return out[:RISER_MAX]
+    return out[:limit]
 
 
-def theme_risers(db, base_date: str) -> list[dict]:
+def theme_risers(db, base_date: str, limit: int = RISER_MAX) -> list[dict]:
     """[{theme, code, name, recent, prior, ratio}] — 화면과 같은 순서."""
     days, recent = window_days(base_date)
 
@@ -133,4 +139,4 @@ def theme_risers(db, base_date: str) -> list[dict]:
         db, "telegram_stock_daily", "id,date,stock_code,mention_count",
         narrow=lambda q: q.in_("date", days),
     )
-    return pick_risers(rows, "stock_code", dict(themes_of), name_of, recent)
+    return pick_risers(rows, "stock_code", dict(themes_of), name_of, recent, limit)

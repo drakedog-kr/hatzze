@@ -14,11 +14,11 @@ from __future__ import annotations
 from collections import defaultdict
 
 from common.supabase_client import load_all, load_keyset
-from common.theme_risers import pick_risers, window_days
+from common.theme_risers import RISER_MAX, pick_risers, window_days
 from config.us_stock_themes import US_THEMES
 
 
-def us_theme_risers(db, base_date: str) -> list[dict]:
+def us_theme_risers(db, base_date: str, limit: int = RISER_MAX) -> list[dict]:
     """[{theme, code(티커), name, recent, prior, ratio}] — 화면과 같은 순서."""
     days, recent = window_days(base_date)
 
@@ -32,4 +32,4 @@ def us_theme_risers(db, base_date: str) -> list[dict]:
         db, "telegram_us_stock_daily", "id,date,ticker,mention_count",
         narrow=lambda q: q.in_("date", days),
     )
-    return pick_risers(rows, "ticker", dict(themes_of), name_of, recent)
+    return pick_risers(rows, "ticker", dict(themes_of), name_of, recent, limit)
