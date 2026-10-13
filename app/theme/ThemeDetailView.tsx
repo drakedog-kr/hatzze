@@ -224,7 +224,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
             {!d.loadFailed && (
               // '최근 3일 언급 49'는 49 가 횟수인지 종목 수인지 안 읽혔다(2026-10-04 점검).
               <em>
-                최근 {KADERA_WINDOW_DAYS}일 언급된 종목 {mentionedCount}
+                최근 {KADERA_WINDOW_DAYS}일 언급 {mentionedCount}종목
               </em>
             )}
           </span>
@@ -260,9 +260,9 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
               <b className={toneCls(d.quotes.avgChange).trim() || undefined}>{signPct(d.quotes.avgChange)}</b>
               {/* 종목 수는 색만 — 한 줄에 굵은 덩어리가 셋이었다(2026-10-05 점검). 굵게는 평균 등락 하나. */}
               <em>오른 종목</em>
-              <span className="v2-cover-chg is-up">{d.quotes.up}</span>
+              <span className="v2-cover-chg is-up">{d.quotes.up}개</span>
               <em>내린 종목</em>
-              <span className="v2-cover-chg is-down">{d.quotes.down}</span>
+              <span className="v2-cover-chg is-down">{d.quotes.down}개</span>
             </span>
           </div>
         )}
@@ -300,7 +300,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
           hint={!d.loadFailed && d.trend.length ? { id: "trend-bar", anchor: ".v2-tm-trend", at: "inside", text: "막대를 누르면 그날 값이 나옵니다" } : undefined}
         >
           {d.loadFailed ? (
-            <p className="v2-empty">집계를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.</p>
+            <p className="v2-empty">집계를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 주십시오.</p>
           ) : (
             <div className="v2-tm-trendbody">
               <div className="v2-tm-figs">

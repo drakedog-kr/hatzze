@@ -73,7 +73,7 @@ const leverLabel = (index: string) =>
   LEVER_LABELS[index] ??
   indexLabel(index)
     .replace(/^(FnGuide|KRX|iSelect)\s+/, "")
-    .replace(/\s*지수(\s*\(PR\))?$/, "")
+    .replace(/\s*(지수|Index)(\s*\((PR|Price Return)\))?$/i, "")
     .replace(/^코스피 200 /, "코스피200 ");
 
 export type EtfCoveredRow = {

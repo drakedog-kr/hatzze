@@ -184,7 +184,7 @@ export function MoreRows({
   return (
     <div className="dv-more" data-scope={scope} role="region" aria-label={`${label} 더 보기`}>
       <div className="dv-more-head">
-        <span className="dv-more-title">{label} 더 보기</span>
+        <span className="dv-more-title">{label}</span>
         <button type="button" className="dv-more-toggle" onClick={onClose}>
           접기
         </button>

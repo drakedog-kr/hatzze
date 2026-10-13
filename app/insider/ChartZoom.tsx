@@ -44,7 +44,8 @@ export function ChartZoom({ label, children }: { label: string; children: React.
       </button>
       {used && (
         <ZoomDialog open={zoom} onOpenChange={setZoom} label={`${label} 확대`}>
-          {children}
+          {/* 판은 body 포털이라 화면 뿌리의 통화 기본값(data-cur-default="usd")이 안 닿아 세로축이 원화로 섰다(2026-10-13 점검). */}
+          <div data-cur-default="usd">{children}</div>
         </ZoomDialog>
       )}
     </div>

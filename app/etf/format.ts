@@ -1,7 +1,8 @@
 /**
  * ETF 자금 흐름 화면의 금액 표기 — 서버(page.tsx)와 표(EtfFlowTable.tsx)가 같이 쓴다.
  *
- * 1조가 넘으면 소수 둘째 자리 조(`+1.78조`), 그 아래는 억(`+6,249억`). 1조 2,929억처럼 조·억을 함께 적으면(lib/format.ts
+ * 1조가 넘으면 소수 둘째 자리 조(`+1.78조`), 10조가 넘으면 한 자리(`+135.7조` — 같은 줄 순자산 '21.1조'와 자릿수를 맞춘다),
+ * 그 아래는 억(`+6,249억`). 1조 2,929억처럼 조·억을 함께 적으면(lib/format.ts
  * formatEokMixed) 표의 숫자 칸 폭이 줄마다 달라져 오른끝 정렬이 흐트러져서 한 단위로 끊는다.
  * 부호는 늘 붙인다 — 이 화면의 숫자는 전부 들어온(+) · 빠진(-) 돈이다. 0 은 부호 없이.
  */
@@ -10,6 +11,7 @@ export function fmtFlow(eok: number): string {
   if (r === 0) return "0억";
   const sign = r > 0 ? "+" : "-";
   const abs = Math.abs(eok);
+  if (abs >= 100000) return `${sign}${(abs / 10000).toFixed(1)}조`;
   return abs >= 10000 ? `${sign}${(abs / 10000).toFixed(2)}조` : `${sign}${Math.abs(r).toLocaleString("ko-KR")}억`;
 }
 

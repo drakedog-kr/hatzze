@@ -45,11 +45,13 @@ export function formatIndicatorValue(
     };
   }
 
+  // '%'는 1 이상이면 소수 한 자리 — '7.00%'가 같은 화면의 '+6.3%' · '-4.0%'와 자릿수가 갈렸다(2026-10-13 점검). 1 미만 %(0.96%)와 배 · 비율은 두 자리.
+  const digits = unit === "%" && Math.abs(value) >= 1 ? 1 : 2;
   const display =
     Math.abs(value) < 10
       ? value.toLocaleString("ko-KR", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
+          minimumFractionDigits: digits,
+          maximumFractionDigits: digits,
         })
       : Math.round(value).toLocaleString("ko-KR");
 

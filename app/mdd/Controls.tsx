@@ -268,6 +268,8 @@ export function Controls({
               top: 50,
               left: 0,
               right: 0,
+              // 넓은 화면에서 검색창 폭(946)을 다 쓰면 이름과 근거가 700px 떨어졌다(2026-10-13 점검). 폰(351)은 그대로.
+              maxWidth: 480,
               zIndex: 20,
               padding: showSuggest ? "14px 8px 8px" : 6,
               background: "var(--c-float)",
@@ -421,7 +423,7 @@ export function Results({ data, onPick }: { data: MddResult; onPick: (s: StockOp
                 ? "지금은 고점 부근이라 원인을 나눌 하락이 없습니다."
                 : // 일시 실패(야후 제한·타임아웃)를 자료 부재로 설명하지 않는다 — 응답의 partial 이 가른다(api/mdd).
                   data.partial?.market
-                  ? `${benchName(data.market)} 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.`
+                  ? `${benchName(data.market)} 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 주십시오.`
                   : `고점(${a.athDate}) 무렵의 ${benchName(data.market)} 기록이 없어 같은 기간을 나란히 놓지 못했습니다.`
             }
           />
@@ -440,7 +442,7 @@ export function Results({ data, onPick }: { data: MddResult; onPick: (s: StockOp
             title="업종 안에서"
             body={
               data.partial && (data.partial.lookupFailed || data.partial.peersRequested > 0)
-                ? "테마 대표 종목의 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오."
+                ? "테마 대표 종목의 시세를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 주십시오."
                 : "이 종목이 묶인 테마를 찾지 못했습니다."
             }
           />

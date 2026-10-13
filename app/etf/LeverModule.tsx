@@ -72,8 +72,8 @@ export function LeverModule({ year, month, className }: { year: EtfLeverRow[]; m
         <div className="v2-etf-list">
           <div className="v2-etf-row v2-etf-L v2-th" style={{ ["--n" as string]: 3 }}>
             <span />
-            <span>상품</span>
-            <span>지수</span>
+            <span>지수 · 배수</span>
+            <span>기초 지수</span>
             <span>수익률</span>
             <span>실제 배수</span>
           </div>

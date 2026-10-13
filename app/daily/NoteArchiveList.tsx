@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { keepPctWord } from "@/lib/daily-note-md";
 import { Icon } from "../ui";
 
 /**
@@ -81,7 +82,7 @@ export function NoteArchiveList({ items, current }: { items: NoteArchiveItem[]; 
           <li key={n.date} aria-current={n.date === current ? "page" : undefined}>
             <Link href={n.href} data-ga="note_archive_click">
               <time dateTime={n.date}>{n.label}</time>
-              <span>{n.title}</span>
+              <span>{keepPctWord(n.title)}</span>
             </Link>
           </li>
         ))}

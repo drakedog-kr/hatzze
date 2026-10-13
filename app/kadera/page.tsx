@@ -25,7 +25,7 @@ import { THEME_NAMES, themeHref } from "@/lib/theme-href";
 import { THEMES } from "@/lib/stock-themes";
 import { THEME_PUBLIC } from "../screen-flags";
 import { BOARD_TILES, getMoveReasons, getUpcomingEvents, todayKst } from "@/lib/kadera-why";
-import { CoverIndexCell, CoverLinkCell, CoverMeta, EventsModule, KeywordTable, Module, SentimentModule, ThemeShares } from "./V2Modules";
+import { CoverIndexCell, CoverLinkCell, CoverMeta, EventsModule, KeywordTable, Module, SentimentModule, ThemeShares, pairGridClass } from "./V2Modules";
 import { SignalTable } from "./KaderaBoard";
 import { loadCoverChips } from "./cover-chips";
 import type { BoardRow, BoardSection } from "./KaderaBoard";
@@ -270,7 +270,7 @@ export default async function KaderaPage() {
       heads: ["", "종목", whyDay ? `${whyDay} 등락` : "등락", "움직인 이유"],
       aiText: true,
       rows: moveRows,
-      empty: whyFailed ? "이유를 불러오지 못했습니다." : "오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.",
+      empty: whyFailed ? "이유를 불러오지 못했습니다." : "저녁 집계가 끝나면 채워집니다.",
     },
     {
       id: "talk",
@@ -298,7 +298,7 @@ export default async function KaderaPage() {
   const keywordModule = <KeywordTable keywords={keywords} split={false} />;
 
   return (
-    <div className="hz-tx v2-kd">
+    <div className="hz-tx v2-kd is-kadera">
       {/* 첫 줄 — 집계 개요 */}
       <div className="v2-cover">
         {indexes && <CoverIndexCell kospi={indexes.kospi} kosdaq={indexes.kosdaq} />}
@@ -343,7 +343,7 @@ export default async function KaderaPage() {
 
       {/* 셋째 줄 — [급부상 | 테마 점유율] · [크게 움직인 | 이슈 키워드] · [많이 언급(판 폭 전체)]. 자리는 v2.css .v2-grid 의 영역 이름이 정한다.
           ⭐ 왼쪽 · 오른쪽을 같은 줄에 짝지어 경계가 맞는다. 한 줄에서 짧은 쪽은 표 줄이 고르게 늘어난다 — 2026-10-02 "공백은 있으면 안 된다". */}
-      <div className="v2-grid">
+      <div className={pairGridClass(sections.find((s) => s.id === "surging")?.rows.length ?? 0, sections.find((s) => s.id === "why")?.rows.length ?? 0, themes.length, keywords.length)}>
         {sections.map((sec) => (
           <SignalTable key={sec.id} sec={sec} />
         ))}

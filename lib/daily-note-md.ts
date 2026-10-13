@@ -187,3 +187,11 @@ export function noteDescription(md: string, max = 150): string {
 export function noteHeadings(blocks: NoteBlock[]): NoteHeading[] {
   return blocks.filter((b): b is NoteHeading => b.k === "heading");
 }
+
+/**
+ * '%' 뒤 한글을 떼지 않는다 — '4%대'가 고르게 감기 계산에서 '4%' / '대,'로 갈렸다(목차 · 소제목 · 지난 노트 제목, 2026-10-13 점검).
+ * '%'와 한글 사이는 줄을 바꿔도 되는 자리라 낱말 결합자(U+2060)를 끼운다. 보이는 글자는 그대로다.
+ */
+export function keepPctWord(text: string): string {
+  return text.replace(/%(?=[가-힣])/g, "%\u2060");
+}

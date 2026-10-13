@@ -154,6 +154,10 @@ export function Treemap({
                 : wp >= 4 && hp >= 20 && t.label.length <= 6
                   ? "tall"
                   : "xs";
+        // 크기 단계는 폭 %(900px 가정)라 1,146px 지도에선 칸이 실제보다 작게 판정된다 — 이름이 들어갈 크기(76×81)인데 글자가 없던 칸이
+        // 26칸 중 다섯이었다(2026-10-13 점검). 가장 작은 단(xs)도 가운뎃점으로 나눈 조각이 세 자 이하면 이름을 그리고, 실제로 작은 칸은
+        // kadera.css 의 컨테이너 쿼리(54×38 아래)가 숨긴다. '신재생에너지'처럼 긴 한 낱말은 지금처럼 뺀다(낱말이 깨진다).
+        const xsName = size === "xs" && Math.max(...t.label.split("·").map((p) => p.length)) <= 3;
         return (
           <Link
             key={r.key}
@@ -169,14 +173,15 @@ export function Treemap({
               height: `${(r.h / H) * 100}%`,
             }}
           >
-            {size !== "xs" && (
+            {(size !== "xs" || xsName) && (
               <span className="hz-tm-in">
                 {/* 가운뎃점 앞에 단어 결합자(U+2060)를 둬 폰에서 줄바꿈할 때 점이 앞 낱말에 붙는다 —
                     안 두면 "전자 / · / 부품" 처럼 점이 혼자 한 줄을 차지한다(2026-09-19 실측). */}
                 {/* 점 앞은 붙이고(\u2060) 점 뒤에 끊을 자리(\u200b)를 둔다 — '전기차·자율주 / 행' 대신 '전기차· / 자율주행'. */}
                 <span className="hz-tm-name">{t.label.replace(/·/g, "\u2060·\u200b")}</span>
-                {size !== "sm" && size !== "tall" && (
+                {size !== "xs" && size !== "tall" && (
                   // 큰 칸에도 변화(+12.3%p)는 적지 않는다 — 띠 · 흐름 표와 한 화면에 세 번 섰고, 칸 색이 이미 말한다(2026-10-05 점검). 툴팁엔 있다.
+                  // 작은 칸(sm)도 값을 그린다 — 숨김은 칸을 재는 컨테이너 쿼리(88×76 아래)가 맡는다. 판정이 어긋나 더 큰 칸에 값이 없었다.
                   <span className="hz-tm-val" style={{ fontFamily: MONO }}>
                     {t.valueText}
                   </span>

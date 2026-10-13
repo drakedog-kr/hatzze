@@ -43,7 +43,7 @@ function Row({
       <Link href={href} className={`v2-in-row${ticker ? "" : " is-person"}`} data-ga={ga}>
         <span className="v2-in-rank">{rank}</span>
         <span className="v2-in-who">
-          {ticker && <StockLogo code={ticker} name={name} market="US" size={20} />}
+          {ticker && <StockLogo code={ticker} name={name} market="US" size={22} />}
           {ticker && <b>{ticker}</b>}
           {showName && <span className={ticker ? "v2-in-name" : "v2-in-name is-lead"}>{name}</span>}
           {/* 운용사가 사람 이름으로 시작하면('국민연금 국민연금공단') 같은 말이 두 번 — 뺀다(2026-10-04 점검). */}

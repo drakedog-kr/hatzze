@@ -400,7 +400,7 @@ export function DistModule({ d }: { d: EtfDetail }) {
       />
       {paired ? (
         <div className="v2-etf-panes">
-          <div className="v2-etf-list">
+          <div className="v2-etf-list v2-etfd-dist">
             <div className="v2-etf-row v2-etf-L v2-th" style={{ ["--n" as string]: 3 }}>
               <span />
               <span>기준일</span>
@@ -455,7 +455,7 @@ export function DistModule({ d }: { d: EtfDetail }) {
           </div>
         </div>
       ) : (
-        <div className="v2-etf-list">
+        <div className="v2-etf-list v2-etfd-dist">
           <div className="v2-etf-row v2-etf-L v2-th" style={{ ["--n" as string]: 3 }}>
             <span />
             <span>기준일</span>

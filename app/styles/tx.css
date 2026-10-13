@@ -1171,9 +1171,6 @@
 .dv-tstrong { font-weight: 600; color: var(--c-ink); }
 /* 미국 줄의 달러 표기 — 원화 아래 작은 글씨. 원화가 주인공이다(국내 줄과 한 열에서 더해지니까). */
 .dv-tsub { display: block; font-size: var(--fs-11); font-weight: 500; color: var(--c-sub); }
-/* 비중 칸 — 숫자 아래 얇은 막대. */
-.dv-tweight-bar { display: block; width: 52px; height: 4px; margin: 5px 0 0 auto; border-radius: 2px; background: var(--c-track); overflow: hidden; }
-.dv-tweight-bar > span { display: block; height: 100%; border-radius: 0 2px 2px 0; background: var(--c-blue); } /* 데이터 끝만 둥글게(shadcn 막대 꼴, 09-27) */
 /* 줄의 투자금 — 넓은 화면은 비중 막대 아래(.dv-tinvest), 비중 칸이 접히는 1,128 아래는 1년 배당 아래(.dv-tinvest-m). */
 .dv-tinvest { margin-top: 4px; white-space: nowrap; }
 .dv-tinvest-m { display: none; }
@@ -1205,7 +1202,6 @@
 /* 다크에서는 카드색(#202027)이 타일(#2f2f39)보다 어두워 빈 트랙이 홈처럼 꺼져 보이고 테두리(--c-line)는 타일과 같은 색이라 사라진다(대비 1.17).
    흰색을 얹어 타일보다 밝은 띠로. 비중 막대 트랙도 같은 값(--c-track 은 1.49). */
 :root[data-theme="dark"] .dv-goal-bar { background: rgba(255, 255, 255, 0.09); border-color: rgba(255, 255, 255, 0.12); }
-:root[data-theme="dark"] .dv-tweight-bar { background: rgba(255, 255, 255, 0.12); }
 .dv-goal-fill { display: block; height: 100%; min-width: 2%; border-radius: 999px; background: var(--c-blue); transition: width 0.2s ease; }
 
 /* 달마다 얼마 — 회색 타일 위 열두 칸. 막대는 그 달 금액에 비례한다. */

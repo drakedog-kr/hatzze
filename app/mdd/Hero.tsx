@@ -278,10 +278,10 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
               어디인지 알려 줄 뿐이고, 밟힌 쪽은 마커 라벨이 자기 값으로 이미 말한다.
           접을 때 visibility 를 쓰는 건 폭을 계속 잴 수 있어야 해서다 — 자리를 아예
           비우면 다음 측정이 "접었으니 이제 안 겹치네" 로 되짚어 깜빡인다. */}
-      <div ref={rowRef} style={{ position: "relative", height: 13 }}>
+      <div ref={rowRef} style={{ position: "relative", height: 14 }}>
         <span
           ref={startRef}
-          style={{ position: "absolute", left: 0, top: 0, fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub, visibility: fit.showStart ? "visible" : "hidden" }}
+          style={{ position: "absolute", left: 0, top: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, visibility: fit.showStart ? "visible" : "hidden" }}
         >
           0%
         </span>
@@ -293,7 +293,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
               left: fit.left ?? `${worst}%`,
               top: 0,
               transform: "translateX(-50%)",
-              fontSize: "var(--fs-11)",
+              fontSize: "var(--fs-12)",
               fontWeight: 500,
               color: C.sub,
               whiteSpace: "nowrap",
@@ -305,7 +305,7 @@ function DrawdownGauge({ current, mdd, periodLabel }: { current: number; mdd: nu
         )}
         <span
           ref={endRef}
-          style={{ position: "absolute", right: 0, top: 0, fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub, visibility: fit.showEnd ? "visible" : "hidden" }}
+          style={{ position: "absolute", right: 0, top: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub, visibility: fit.showEnd ? "visible" : "hidden" }}
         >
           −100%
         </span>
@@ -480,7 +480,13 @@ export function Underwater({
   // 옮기는 건 폰 컨테이너 쿼리 안에서만(v2.css) — 넓은 화면은 표식이 작아 안 겹친다(2026-10-05 모바일 점검, 삼성전자 5 · 6번).
   const markXY = marks.map((m) => [x(m.k), y(series[m.k].dd)] as const);
   const nudged = marks.map((_, i) => markXY.slice(0, i).some(([px, py]) => Math.abs(px - markXY[i][0]) < 50 && Math.abs(py - markXY[i][1]) < 26));
-  const nowBelow = marks.some((m) => m.k !== n - 1 && x(n - 1) - x(m.k) < 62);
+  // 위아래도 본다 — 가까운 표식이 대개 진행 중 하락의 바닥이라 점보다 아래에 있는데, 그때도 글자를 아래로 내려 표식 밑에 깔렸다
+  // (2026-10-13 점검, 375 삼성전자 '지금'이 ② 밑에 깔려 '금'만 보임). 47 units ≈ 폰 35px = 글자 22 + 표식 반지름 9 + 여유.
+  const nowY = y(series[n - 1].dd);
+  const nearY = marks.filter((m) => m.k !== n - 1 && x(n - 1) - x(m.k) < 62).map((m) => y(series[m.k].dd));
+  const markAbove = nearY.some((py) => py < nowY && nowY - py < 47);
+  const markBelow = nearY.some((py) => py > nowY && py - nowY < 47);
+  const nowPlace = markAbove && markBelow ? " is-left" : markAbove ? " is-below" : "";
   const at = (k: number) => ({ left: `${(x(k) / W) * 100}%`, top: `${((y(series[k].dd) + VB_PAD) / VBH) * 100}%` });
   // 선 끝 '지금' — 진행 중인 사례의 바닥이 곧 오늘이면(신저점) 그 번호 표식에 '지금'을 붙이고 점은 따로 안 찍는다.
   const nowOnMark = marks.some((m) => m.k === n - 1);
@@ -594,7 +600,7 @@ export function Underwater({
         <div className="mdd-uw-marks">
           {/* 끝 점이 고점 바로 밑(−2% 안)이면 '지금' 글자를 점 왼쪽에 — 위에 두면 머리 띠 선을 넘었다(2026-10-04 점검, 신고가 심텍). */}
           {!nowOnMark && (
-            <span className={`mdd-uw-now${series[n - 1].dd > -2 ? " is-top" : nowBelow ? " is-below" : ""}`} style={at(n - 1)} aria-hidden>
+            <span className={`mdd-uw-now${series[n - 1].dd > -2 ? " is-top" : nowPlace}`} style={at(n - 1)} aria-hidden>
               <em>지금</em>
             </span>
           )}

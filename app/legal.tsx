@@ -69,7 +69,8 @@ export const DOC_PAGES: Record<string, { label: string; sub: string; ld: "WebPag
  */
 export function Revision({ effective, prev, children }: { effective: string; prev: string; children: React.ReactNode }) {
   return (
-    <Module title={`${effective} 시행 개정`} meta={`이전 판 ${prev} 시행`} className="v2-dc-rev">
+    // 머리 근거는 두지 않는다 — 바로 아래 첫 문장이 같은 날짜를 말하고, 폰(360)에서 근거가 말줄임으로 잘렸다(2026-10-13 점검).
+    <Module title={`${effective} 시행 개정`} className="v2-dc-rev">
       <div className="v2-dc-revbody">
         <p>
           {prev}부터 시행한 이전 판에서 바뀐 곳입니다. {effective} 전까지는 이전 판이 적용됩니다.

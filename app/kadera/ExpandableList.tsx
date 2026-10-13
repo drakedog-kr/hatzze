@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { track } from "@/lib/ga";
 import { C } from "../ui";
@@ -21,6 +21,7 @@ export function ExpandableList({
   footerClassName,
   name,
   moreLabel,
+  narrowInitial,
 }: {
   items: React.ReactNode[];
   initial?: number;
@@ -41,10 +42,20 @@ export function ExpandableList({
   name?: string;
   /** '더 보기 +N' 대신 쓸 글 — 처음에 하나도 안 펴는 목록(애널리스트 '최근 의견 8건 보기')은 무엇을 더 보는지 적어야 한다. */
   moreLabel?: string;
+  /**
+   * 폰(≤560)에서 처음 펼 줄 수. 넓은 화면은 짝 모듈 키를 맞추려고 접어 두는 목록(애널리스트 의견)이 짝이 없는 폰에서도 접혀
+   * '보기' 단추 하나만 서던 것을 편다(2026-10-13 점검, '누르지 않아도 보이게').
+   */
+  narrowInitial?: number;
 }) {
-  const [shown, setShown] = useState(initial);
+  const narrow = useSyncExternalStore(subscribeNarrow, isNarrow, () => false);
+  const base = narrow && narrowInitial != null ? Math.max(initial, narrowInitial) : initial;
+  // 펼친 만큼(base 위로 더한 줄 수)만 상태로 든다 — 폭이 바뀌어 base 가 달라져도 따라간다.
+  const [extra, setExtra] = useState(0);
+  const shown = Math.min(base + extra, items.length);
+  const setShown = (n: number) => setExtra(Math.max(0, n - base));
   const canExpand = shown < items.length;
-  const isExpanded = shown > initial;
+  const isExpanded = shown > base;
 
   // 알약형 버튼이 아니라 **목록의 마지막 줄**이다. 시트 안에서는 위 헤어라인이 이미
   // 경계를 그어 주므로 테두리를 또 두르면 선이 두 겹이 되고, 그 상자가 표에서 저 혼자
@@ -111,8 +122,8 @@ export function ExpandableList({
                  있으면 어디까지가 '더 보기'인지 눌러 보기 전엔 알 수 없다. */
               style={canExpand ? { ...buttonStyle, borderLeft: `1px solid ${C.line}` } : buttonStyle}
               onClick={() => {
-                if (name) track("list_expand", { list: name, action: "fold", shown: initial });
-                setShown(initial);
+                if (name) track("list_expand", { list: name, action: "fold", shown: base });
+                setShown(base);
               }}
             >
               접기
@@ -122,4 +133,14 @@ export function ExpandableList({
       )}
     </>
   );
+}
+
+const NARROW = "(max-width: 560px)";
+function subscribeNarrow(cb: () => void) {
+  const mq = window.matchMedia(NARROW);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+function isNarrow() {
+  return window.matchMedia(NARROW).matches;
 }

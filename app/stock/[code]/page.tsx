@@ -148,7 +148,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           {peers.map((p) => (
             <li key={p.code}>
               <Link href={stockHref(p.code)} className="v2-sk-peer" data-ga="stock_peer_click">
-                <StockLogo code={p.code} name={p.name} market={p.market} size={20} lazy />
+                <StockLogo code={p.code} name={p.name} market={p.market} size={22} lazy />
                 <span className="v2-sk-peer-n">{p.name}</span>
                 {p.price != null && <span className="v2-sk-peer-p">{p.price.toLocaleString("ko-KR")}원</span>}
                 {p.changeRate != null && <span className={`v2-sk-peer-c${tone(p.changeRate)}`}>{signPct(p.changeRate)}</span>}
@@ -282,7 +282,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
         >
           {/* 실패와 '없음'을 다른 문장으로 — 같은 문장이면 고장이 자료로 위장된다. */}
           {d.loadFailed ? (
-            <p className="v2-empty">언급 자료를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.</p>
+            <p className="v2-empty">언급 자료를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 주십시오.</p>
           ) : d.trend.every((p) => !p.mentions) ? (
             // 판정도 문장도 막대와 같은 기간(30일) — 90일 합으로 보면 8월에만 말이 있던 종목에 빈 막대 30개와 '0회 · 0일'이 섰다(2026-10-04 점검).
             <p className="v2-empty">

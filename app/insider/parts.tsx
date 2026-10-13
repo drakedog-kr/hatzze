@@ -929,19 +929,22 @@ export function MarkBadges({ id }: { id: string }) {
  */
 /* 첫 칸은 고정 폭 — 비율(1.2fr)이면 이름 뒤 · 가운데 칸 뒤에 270~470px 가 비었다. 본 화면 줄처럼 이름 → 곁말 → 값(2026-10-05 점검).
    가장 긴 'MSFT 마이크로소프트'가 약 220px. */
+/* 맨 앞 20 은 순위 칸 — 카드(본 화면)는 1~5 순위가 서는데 그 나머지인 이 표만 순위 없이 로고부터라 100줄에서 몇째인지 셀 길이 없었다
+   (2026-10-13 점검, 왼쪽 표 규칙 '순위 20 · 이름'). 칸 수에 넣지 않는다 — WideRow 가 앞에 붙인다. */
 export const WIDE_COLS = {
-  exec: "240px minmax(0, 1fr) 128px",
-  congress: "240px minmax(0, 1fr) 96px",
-  move: "240px minmax(0, 1fr) 96px",
+  exec: "20px 240px minmax(0, 1fr) 128px",
+  congress: "20px 240px minmax(0, 1fr) 96px",
+  move: "20px 240px minmax(0, 1fr) 96px",
   /** 거물 명단. 사람이 주인공이라 첫 칸이 이름, 둘째가 대표 보유, 끝이 금액이다. */
-  managers: "200px minmax(0, 1fr) 92px 124px",
+  managers: "20px 200px minmax(0, 1fr) 92px 124px",
   /** 증권가 순위. 끝 칸이 "62명 중 49명"이라 다른 표의 금액 칸보다 넓어야 한다. */
-  analyst: "240px minmax(0, 1fr) 132px",
+  analyst: "20px 240px minmax(0, 1fr) 132px",
 } as const;
 
 export function WideHead({ cols, labels }: { cols: string; labels: (string | null)[] }) {
   return (
     <div className="hz-thead hz-wide-head" style={{ gridTemplateColumns: cols }}>
+      <span />
       {labels.map((l, i) => (
         <span key={i} style={{ textAlign: i === 0 || i === 1 ? "left" : "right" }}>
           {l}
@@ -952,9 +955,10 @@ export function WideHead({ cols, labels }: { cols: string; labels: (string | nul
 }
 
 /** 넓은 줄 하나. 첫 칸은 종목, 나머지는 오른쪽 정렬이 기본이다. */
-function WideRow({ cols, cells }: { cols: string; cells: React.ReactNode[] }) {
+function WideRow({ cols, cells, rank }: { cols: string; cells: React.ReactNode[]; rank: number }) {
   return (
     <div className="hz-trow hz-wide" style={{ gridTemplateColumns: cols }}>
+      <span className="v2-in-rank hz-wide-rank">{rank}</span>
       {/* ⚠️ 배열을 그대로 넣으면 React 가 칸마다 key 를 요구해 콘솔이 경고로 뒤덮인다
           (넓은 줄이 뜨는 화면 전부에서 났다). Fragment 는 DOM 을 안 만들어서 격자의
           칸 수가 그대로다 — 여기에 <div> 를 두르면 한 칸이 통째로 어긋난다. */}
@@ -998,8 +1002,8 @@ function WideStock({ ticker, name, badge }: { ticker: string; name: string; badg
       className="hz-cellhead"
       style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, textDecoration: "none" }}
     >
-      {/* 본 화면 줄(V2Rows)과 같은 20px — 26px 이던 땐 같은 종목이 두 화면에서 다른 크기로 섰다(2026-10-04 점검). */}
-      <StockLogo code={ticker} name={name} market="US" size={20} />
+      {/* 본 화면 줄(V2Rows)과 같은 22px(카더라 표와 같은 값 · 2026-10-13) — 26px 이던 땐 같은 종목이 두 화면에서 다른 크기로 섰다(2026-10-04 점검). */}
+      <StockLogo code={ticker} name={name} market="US" size={22} />
       <strong style={{ ...ROW.lead, fontFamily: MONO }}>{ticker}</strong>
       {name && name.toUpperCase() !== ticker.toUpperCase() && (
         <span className="hz-cellname" style={{ ...ROW.sub }}>{name}</span>
@@ -1015,9 +1019,10 @@ function WideStock({ ticker, name, badge }: { ticker: string; name: string; badg
  *    이 builder 만 같이 안 줄인 탓이다. **cells 수와 WIDE_COLS 의 칸 수는 늘 같아야 한다.**
  */
 export function wideExecRows(rows: InsiderActivity[], rate: number | null, side: "buy" | "sell") {
-  return rows.map((b) => (
+  return rows.map((b, i) => (
     <li key={b.ticker}>
       <WideRow
+        rank={i + 1}
         cols={WIDE_COLS.exec}
         cells={[
           <WideStock key="s" ticker={b.ticker} name={b.name} />,
@@ -1038,9 +1043,10 @@ export function wideExecRows(rows: InsiderActivity[], rate: number | null, side:
 
 /** 전체보기의 거물 명단 줄. 메인 카드와 **같은 순서·같은 값**이다. */
 export function wideManagerRows(rows: ManagerRank[], rate: number | null) {
-  return rows.map((m) => (
+  return rows.map((m, i) => (
     <li key={m.cik}>
       <WideRow
+        rank={i + 1}
         cols={WIDE_COLS.managers}
         cells={[
           <Link
@@ -1074,11 +1080,12 @@ export function wideManagerRows(rows: ManagerRank[], rate: number | null) {
 
 /** 전체보기의 증권가 순위 줄. ⛔ 숫자는 원천 값 그대로다(analystTopRows 머리말 참고). */
 export function wideAnalystRows(rows: AnalystTop[]) {
-  return rows.map((a) => {
+  return rows.map((a, i) => {
     const share = a.analystCount > 0 ? (a.strongBuy / a.analystCount) * 100 : 0;
     return (
       <li key={a.ticker}>
         <WideRow
+          rank={i + 1}
           cols={WIDE_COLS.analyst}
           cells={[
             <WideStock key="s" ticker={a.ticker} name={a.name} />,
@@ -1096,11 +1103,12 @@ export function wideAnalystRows(rows: AnalystTop[]) {
 }
 
 export function wideCongressRows(rows: CongressTicker[], side: "buy" | "sell") {
-  return rows.map((c) => {
+  return rows.map((c, i) => {
     const names = side === "buy" ? c.buyMembers : c.sellMembers;
     return (
       <li key={c.ticker}>
         <WideRow
+          rank={i + 1}
           cols={WIDE_COLS.congress}
           cells={[
             // '카더라 언급' 알약은 걷었다 — 본 화면 줄엔 없고, 한 줄에 굵은 덩어리가 셋이었다(2026-10-05 점검).
@@ -1121,9 +1129,10 @@ export function wideCongressRows(rows: CongressTicker[], side: "buy" | "sell") {
 
 export function wideMoveRows(rows: ManagerMove[], kind: "add" | "trim") {
   const markLabel = kind === "add" ? "신규" : "청산";
-  return rows.map((m) => (
+  return rows.map((m, i) => (
     <li key={m.ticker}>
       <WideRow
+        rank={i + 1}
         cols={WIDE_COLS.move}
         cells={[
           <WideStock key="s" ticker={m.ticker} name={m.name} />,
@@ -1299,12 +1308,11 @@ export function AnalystActions({
           엔비디아는 사흘, 가장 긴 곳은 176일이다(커버리지가 뜸한 종목).
           그래서 기간을 **재서 적는다.** 그래야 "64명 중 왜 8명뿐이냐"에도 답이 된다 —
           64명은 등급을 걸어 둔 사람 수, 이 목록은 그 사이에 움직인 사람이다. */}
-      {!folded && (
-        <span style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 14px 4px" }}>
-          <span style={{ ...ROW.sub }}>최근 의견</span>
-          {span && <span style={{ fontSize: "var(--fs-12)", color: C.muted, fontFamily: MONO }}>{span}</span>}
-        </span>
-      )}
+      {/* 접힌 목록도 폰에선 다섯 줄을 펴므로(아래 narrowInitial) 이름 줄도 폰에선 선다(v2.css .v2-isd-ophead). */}
+      <span className={`v2-isd-ophead${folded ? " is-folded" : ""}`} style={{ alignItems: "baseline", gap: 6, padding: "0 14px 4px" }}>
+        <span style={{ ...ROW.sub }}>최근 의견</span>
+        {span && <span style={{ fontSize: "var(--fs-12)", color: C.muted, fontFamily: MONO }}>{span}</span>}
+      </span>
       {/* ⭐ 다섯 줄로 열고 눌러서 늘린다. 다 펴면 '접기'가 함께 뜬다(ExpandableList 기본).
           ⚠️⚠️ 바닥 띠는 **`hz-sheet-foot-row`** 를 쓴다. 기본 푸터로 뒀더니 카드 한가운데
              떠 있는 옅은 글자가 되어 **버튼으로 안 읽혔다** — 이미 있는데도 "더 보기를
@@ -1313,6 +1321,7 @@ export function AnalystActions({
         items={items}
         name="stock_analyst_actions"
         initial={initial}
+        narrowInitial={folded ? Math.min(5, rows.length) : undefined}
         moreLabel={folded ? `최근 의견 ${rows.length}건 보기` : undefined}
         step={10}
         listStyle={{ padding: 0, display: "block" }}
@@ -1368,11 +1377,12 @@ export function ConsensusBody({
     <div style={{ display: "flex", flexDirection: "column" }}>
       {/* ⭐ **두 값을 나란히 세운다.** 등급과 목표가는 이 카드가 답하는 질문 둘이라 위아래로
           쌓으면 카드가 길기만 하고 무엇이 요점인지 안 보인다. 좁아지면 저절로 접힌다.
-          칸 기준 폭 220 — 260 이면 1,280(칸 496)에서 두 칸이 위아래로 접혀 모듈이 116px 길어졌다(2026-10-10). */}
+          칸 기준 폭 160 — 260 이면 1,280(칸 496)에서 두 칸이 위아래로 접혀 모듈이 116px 길어졌고(2026-10-10), 220 이면 1,024(칸 안쪽 351)에서
+          접혀 짝 거물 칸 아래가 133px 비었다(2026-10-13). */}
       {/* 좌우 14 — v2 모듈 안쪽 여백(제목 · 다른 모듈 줄과 한 세로줄). 옛 시트의 22 가 남아 8px 더 깊었다(2026-10-04 점검). */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "14px 14px 16px" }}>
         {total > 0 && (
-          <div style={{ flex: stack ? "1 1 100%" : "1 1 220px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
+          <div style={{ flex: stack ? "1 1 100%" : "1 1 160px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
             <span style={{ ...ROW.sub }}>증권가 종합</span>
             <span style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
               <strong style={{ fontSize: "var(--fs-22)", fontWeight: 700, color: C.ink, letterSpacing: "-.02em" }}>
@@ -1397,7 +1407,10 @@ export function ConsensusBody({
               {RATING.filter((r) => counts[r.key] > 0).map((r, k, arr) => (
                 <span key={r.key} style={{ display: "inline-flex", alignItems: "center", gap: 5, marginRight: k === arr.length - 1 ? 0 : 12, verticalAlign: "middle", ...ROW.sub }}>
                   <span style={{ width: 8, height: 8, borderRadius: 2, background: r.tone, flexShrink: 0 }} />
-                  {r.label} <strong style={{ fontFamily: MONO, color: C.ink, fontWeight: 600 }}>{counts[r.key]}</strong>
+                  {r.label}{" "}
+                  <span>
+                    <strong style={{ fontFamily: MONO, color: C.ink, fontWeight: 600 }}>{counts[r.key]}</strong>명
+                  </span>
                 </span>
               ))}
             </span>
@@ -1405,7 +1418,7 @@ export function ConsensusBody({
         )}
 
         {c.targetAvg != null && (
-          <div style={{ flex: stack ? "1 1 100%" : "1 1 220px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
+          <div style={{ flex: stack ? "1 1 100%" : "1 1 160px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
             <span style={{ ...ROW.sub }}>
               1년 목표가 평균{c.targetCount != null ? ` · 애널리스트 ${c.targetCount}명` : ""}
             </span>

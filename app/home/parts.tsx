@@ -627,11 +627,11 @@ export function AreaChart({
   const vals = points.map((p) => p.value);
   const hi = Math.max(...vals, baseline === "zero" ? 0 : -Infinity);
   const lo = Math.min(...vals, baseline === "zero" ? 0 : Infinity);
-  // zero 기준일 땐 0이 한가운데 오도록 위아래를 같은 폭으로 잡는다.
-  const span = baseline === "zero" ? Math.max(Math.abs(hi), Math.abs(lo), 1) * 1.12 : (hi - lo) || 1;
-  const y = (t: number) =>
-    baseline === "zero" ? H / 2 - (t / span) * (H / 2) : H - 4 - ((t - lo) / span) * (H - 8);
-  const base = baseline === "zero" ? H / 2 : H;
+  // zero 기준일 땐 0 을 포함한 실제 범위만 그린다(위아래 4px 여백) — 0 을 한가운데 고정하던 때 석 달 내내 0 아래면 그림 위 절반이
+  // 통째로 비었다(쓰는 높이 45% · 2026-10-13 점검). 0 선 · 빨강/파랑 자르기 경계는 y(0) 에 선다.
+  const span = (hi - lo) || 1;
+  const y = (t: number) => (baseline === "zero" ? 4 + ((hi - t) / span) * (H - 8) : H - 4 - ((t - lo) / span) * (H - 8));
+  const base = baseline === "zero" ? y(0) : H;
   const line = points.map((p, i) => `${(i / (points.length - 1)) * 100},${y(p.value)}`).join(" ");
   // 그라데이션 id — 카드마다 달라야 한다(아래 주석: id 는 문서 전역이라 같은 이름이면 먼저 그린 색으로 다 칠해진다).
   // 색·첫 날짜·점 수·높이로 짓는다. 같은 차트가 두 번 그려질 때만 같은 이름이 되고, 그땐 모양도 같다.
@@ -646,15 +646,15 @@ export function AreaChart({
             지금은 카드마다 다른 id(gid)를 짓는다. */}
         {baseline === "zero" && (
           <defs>
-            <clipPath id="hz-clip-up"><rect x="0" y="0" width="100" height={H / 2} /></clipPath>
-            <clipPath id="hz-clip-dn"><rect x="0" y={H / 2} width="100" height={H / 2} /></clipPath>
+            <clipPath id="hz-clip-up"><rect x="0" y="0" width="100" height={base} /></clipPath>
+            <clipPath id="hz-clip-dn"><rect x="0" y={base} width="100" height={H - base} /></clipPath>
           </defs>
         )}
         {baseline === "zero" ? (
           <>
             <polygon points={`0,${base} ${line} 100,${base}`} fill="var(--c-hot)" opacity={0.2} clipPath="url(#hz-clip-up)" />
             <polygon points={`0,${base} ${line} 100,${base}`} fill="var(--c-blue)" opacity={0.2} clipPath="url(#hz-clip-dn)" />
-            <line x1="0" y1={H / 2} x2="100" y2={H / 2} stroke="var(--c-line)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+            <line x1="0" y1={base} x2="100" y2={base} stroke="var(--c-line)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
           </>
         ) : (
           <>

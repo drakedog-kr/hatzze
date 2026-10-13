@@ -129,7 +129,8 @@ export function BasketBoard({
     <div className="v2-dv-bk">
       {/* 근거는 '투자금 기준' — 표는 입력한 투자금으로 환산한 값이라 읽기 칸 바닥(실제로 담기는 금액)과 숫자가 갈렸다(2026-10-05 점검).
           '1년에 받는 배당'은 바로 아래 열 머리와 같은 말이라 뺐다. */}
-      <Module title="성향별 바스켓" meta={`${wonShort(amount)} 기준${mode === "gross" ? " · 세전" : ` · 세후${accountTag(mode)}`}`} className="v2-dv-bk-list">
+      {/* 근거는 계좌 꼬리만 — 투자금 · 세후는 바로 아래 투자금 칸 · 열 머리('세후 수익률')가 말한다(같은 값 · 같은 말이 두 번이었다, 2026-10-13 점검). */}
+      <Module title="성향별 바스켓" meta={mode !== "gross" && accountTag(mode) ? `세후${accountTag(mode)}` : undefined} className="v2-dv-bk-list">
         <AmountBar amount={amount} onChange={onAmount} />
         <div className="v2-dv-bk-th" aria-hidden="true">
           <span>바스켓</span>
@@ -211,7 +212,7 @@ export function BasketBoard({
                     title={`${l.stock.name} 내 종목에 담기`}
                   >
                     <span className="v2-dv-bk-rank">{i + 1}</span>
-                    <StockLogo code={l.stock.code} name={l.stock.name} market={l.stock.market} size={20} lazy />
+                    <StockLogo code={l.stock.code} name={l.stock.name} market={l.stock.market} size={22} lazy />
                     {/* 이름 위 · 고른 까닭(15년 넘게 · 70년 연속 늘림) 아래 두 줄, 주 수는 줄 오른쪽 끝(2026-10-04). 까닭이 주 수 바로 앞에
                         오른쪽 정렬로 붙어 있을 땐 '15년 넘게 5주'가 한 덩어리로 읽혔다. */}
                     <span className="v2-dv-bk-stx">

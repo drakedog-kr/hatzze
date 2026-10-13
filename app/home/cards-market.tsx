@@ -215,7 +215,7 @@ export function CardTurnover({ v }: { v: Pick }) {
     ...top.map((t, i) => ({ key: t.name, label: t.name, code: t.code, pct: t.share, fill: BLUE_SCALE[i] ?? "var(--c-blue-5)", ink: C.ink })),
     // '나머지 상위 10종목'은 또 다른 열 종목처럼 읽혔다 — 순위 구간으로 부른다.
     { key: "__rest", label: `${top.length + 1}~10위`, code: undefined, pct: restOfTop, fill: "var(--c-blue-5)", ink: C.ink },
-    { key: "__others", label: "그 외 전 종목", code: undefined, pct: others, fill: C.track, ink: C.sub2 },
+    { key: "__others", label: "그 외", code: undefined, pct: others, fill: C.track, ink: C.sub2 },
   ];
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>

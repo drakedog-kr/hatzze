@@ -116,7 +116,7 @@ export default function CommandPalette({
         setOpen(v);
         if (!v && index === "error") setIndex(null);
       }}
-      description="찾을 종목·테마를 입력하세요"
+      description="찾을 종목·테마를 입력하십시오"
       // 폰에서는 위에 붙인다. 화면 1/3 지점(375×812 에서 271px)에서 시작하면 자판이 올라올 때 목록 절반이 가린다.
       className="max-sm:top-4"
     >
@@ -242,8 +242,8 @@ const mentionNote = (m: number | null) => (m === null ? null : `${m.toLocaleStri
 function Heading({ title, unit }: { title: string; unit?: string }) {
   return (
     <span className="flex items-baseline justify-between gap-3">
-      <span style={{ color: C.ink, fontWeight: 700 }}>{title}</span>
-      {unit && <span className="font-normal">{unit}</span>}
+      <span style={{ color: C.ink, fontWeight: 600 }}>{title}</span>
+      {unit && <span className="font-medium">{unit}</span>}
     </span>
   );
 }
