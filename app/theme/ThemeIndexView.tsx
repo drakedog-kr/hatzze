@@ -156,7 +156,7 @@ export function ThemeIndexView({
         className="v2-tm-map"
       >
         {themes === null ? (
-          <p className="v2-empty">테마 집계를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.</p>
+          <p className="v2-empty">테마 집계를 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 주십시오.</p>
         ) : themes.length === 0 ? (
           <p className="v2-empty">아직 집계된 테마가 없습니다.</p>
         ) : (
@@ -297,12 +297,13 @@ export function ThemeIndexView({
         ai
       >
         {risers === null ? (
-          <p className="v2-empty">테마 요약을 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오.</p>
+          <p className="v2-empty">테마 요약을 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 주십시오.</p>
         ) : risers.length === 0 ? (
           <p className="v2-empty">앞 3일보다 언급이 늘고 채널이 이유를 말한 종목이 없습니다.</p>
         ) : (
           <div className="v2-tbl v2-tm-risertbl">
             <div className="v2-tr v2-th" aria-hidden="true">
+              <span />
               <span>테마</span>
               <span>종목</span>
               {/* 채널이 그 종목에 대해 말한 이유다 — 바로 위 테마 흐름 표의 '요즘 도는 얘기'(테마 요약 첫 문장)와 다른 글이라 이름을 가른다(상세 화면과 같은 말). */}
@@ -310,9 +311,11 @@ export function ThemeIndexView({
               <span>최근 {KADERA_WINDOW_DAYS}일 언급</span>
             </div>
             <ol className="v2-tbody">
-              {risers.map((r) => (
+              {risers.map((r, i) => (
                 <li key={r.theme} id={`riser-${r.code}`}>
                   <div className="v2-tr">
+                    {/* 줄 차례는 새로 등장 > 배수 > 언급 수(lib/theme-risers.ts parseRisers) — 위 테마 흐름 표와 같은 순위 칸. */}
+                    <span className="v2-td-rank">{i + 1}</span>
                     <Link href={market.themeHref(r.theme)} className="v2-td-theme" data-ga="theme_riser_theme_click">
                       {r.theme}
                     </Link>

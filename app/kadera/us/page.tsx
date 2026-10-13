@@ -23,7 +23,7 @@ import { lastSession, liveChangeHead } from "@/lib/yahoo-quote";
 import { pageMetadata } from "../../seo";
 import { US_KADERA_CARD } from "../../og-copy";
 import { ThemeVsUsualRows, highlightTerms, termsFor } from "../parts";
-import { CoverLinkCell, CoverMeta, CoverUsIndexCell, EventsModule, KeywordTable, Module, SentimentModule, ThemeShares } from "../V2Modules";
+import { CoverLinkCell, CoverMeta, CoverUsIndexCell, EventsModule, KeywordTable, Module, SentimentModule, ThemeShares, pairGridClass } from "../V2Modules";
 import { SignalTable } from "../KaderaBoard";
 import { loadUsCover } from "../cover-chips";
 import type { BoardRow, BoardSection } from "../KaderaBoard";
@@ -179,7 +179,7 @@ export default async function UsKaderaPage() {
       heads: ["", "종목", sessionDay ? `${sessionDay} 등락` : "등락", "움직인 이유"],
       aiText: true,
       rows: moveRows,
-      empty: whyFailed ? "이유를 불러오지 못했습니다." : "오늘 집계가 끝나면 채워집니다. 저녁 실행 뒤에 그날 것이 붙습니다.",
+      empty: whyFailed ? "이유를 불러오지 못했습니다." : "저녁 집계가 끝나면 채워집니다.",
     },
     {
       id: "talk",
@@ -197,7 +197,7 @@ export default async function UsKaderaPage() {
   ];
 
   return (
-    <div className="hz-tx v2-kd">
+    <div className="hz-tx v2-kd is-kadera">
       {/* 첫 줄 — 그 미국 거래일 S&P500 · 국장 급부상 칸 · 언제 · 얼마나 읽었나 */}
       <div className="v2-cover">
         {cover.index && <CoverUsIndexCell label={cover.index.label} spx={cover.index.spx} />}
@@ -245,7 +245,7 @@ export default async function UsKaderaPage() {
       </div>
 
       {/* 셋째 줄 — [급부상 | 테마 점유율] · [크게 움직인 | 이슈 키워드] · [많이 언급(판 폭 전체)]. 자리는 v2.css .v2-grid 의 영역 이름이 정한다. */}
-      <div className="v2-grid">
+      <div className={pairGridClass(sections.find((s) => s.id === "surging")?.rows.length ?? 0, sections.find((s) => s.id === "why")?.rows.length ?? 0, themes.rows.length, keywords.length)}>
         {sections.map((sec) => (
           <SignalTable key={sec.id} sec={sec} />
         ))}

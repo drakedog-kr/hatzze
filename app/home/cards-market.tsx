@@ -215,7 +215,7 @@ export function CardTurnover({ v }: { v: Pick }) {
     ...top.map((t, i) => ({ key: t.name, label: t.name, code: t.code, pct: t.share, fill: BLUE_SCALE[i] ?? "var(--c-blue-5)", ink: C.ink })),
     // '나머지 상위 10종목'은 또 다른 열 종목처럼 읽혔다 — 순위 구간으로 부른다.
     { key: "__rest", label: `${top.length + 1}~10위`, code: undefined, pct: restOfTop, fill: "var(--c-blue-5)", ink: C.ink },
-    { key: "__others", label: "그 외 전 종목", code: undefined, pct: others, fill: C.track, ink: C.sub2 },
+    { key: "__others", label: "그 외", code: undefined, pct: others, fill: C.track, ink: C.sub2 },
   ];
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
@@ -373,26 +373,34 @@ export function CardSpeed({ v, path = [], failed = false }: { v: Pick; path?: Cl
   return (
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       <TitleRow desc={v.headline} icon="trending_up" name={v.name} />
-      <Big
-        disp={`${spd >= 0 ? "+" : ""}${v.disp}`}
-        unit={v.unit}
-        color={v.color}
-        size={32}
-        sub={typeof from === "number" && typeof to === "number" ? `${num(from)} → ${num(to)}` : undefined}
-      />
+      {/* 짜임은 같은 줄 옆 '코스피 거래대금' 칸과 같다 — 큰 숫자 · 차트(남는 높이) · 축 글자 · 값 두 줄. 차트가 칸 키를 혼자 다 받아 옆 칸 차트(109)보다
+          58px 컸다(2026-10-13 운영자 "다른 차트 지표에 비해 크다"). 시작 · 끝 값은 큰 숫자 곁줄에서 아래 두 줄로 옮겼다(점선 = 3개월 전). */}
+      <Big disp={`${spd >= 0 ? "+" : ""}${v.disp}`} unit={v.unit} color={v.color} size={32} sub="3개월 전 대비" />
       {pts.length >= 2 ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <AreaChart
-            points={pts}
-            baseline="zero"
-            tip={(x) => `${shortDate(x.key)} · ${x.value >= 0 ? "+" : ""}${x.value.toFixed(1)}%`}
-          />
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>3개월 전부터</span>
-            {/* 시작점(0%)에 머문 쪽은 적지 않는다 — 석 달 내내 아래였으면 '최고 +0.0%'가 뜻 없이 섰다(2026-10-05 점검). */}
-            {hiLo && <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>{hiLo}</span>}
+        <>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+            <AreaChart
+              points={pts}
+              baseline="zero"
+              tip={(x) => `${shortDate(x.key)} · ${x.value >= 0 ? "+" : ""}${x.value.toFixed(1)}%`}
+            />
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              {/* 시작점(0%)에 머문 쪽은 적지 않는다 — 석 달 내내 아래였으면 '최고 +0.0%'가 뜻 없이 섰다(2026-10-05 점검). */}
+              <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>{hiLo}</span>
+              <span style={{ fontSize: "var(--fs-11)", color: C.sub }}>최근 3개월</span>
+            </div>
           </div>
-        </div>
+          {typeof from === "number" && typeof to === "number" && (
+            <RefRows
+              color="var(--c-blue)"
+              fmt={num}
+              rows={[
+                { label: "최근 거래일", value: to, dashed: false },
+                { label: "3개월 전", value: from, dashed: true },
+              ]}
+            />
+          )}
+        </>
       ) : (
         /* 점이 모자라면 게이지로 물러난다. 다만 **왜** 물러났는지는 갈린다 — 아직 궤적이
            안 쌓인 것과 조회가 깨진 것은 다른 일이라, 뒤엣것만 한 줄로 밝힌다.

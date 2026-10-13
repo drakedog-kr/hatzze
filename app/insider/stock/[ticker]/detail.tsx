@@ -356,7 +356,8 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
   const holdersMod =
     d.holders.length > 0
       ? (open?: number) => (
-          <Module title="이 종목을 든 월가 거물" meta={`${d.holders.length}/${d.managerCount}명 · ${q ? `${q} 말` : "분기말"}`} className="v2-isd-mod">
+          // 근거는 기간만 — '14/63명'은 바로 위 '공시에 남은 것' 첫 줄이 말한다(2026-10-13 점검, 한 화면에 63 이 세 번).
+          <Module title="이 종목을 든 월가 거물" meta={q ? `${q} 말` : "분기말"} className="v2-isd-mod">
             <DetailList name="stock_holders" cols="holder" items={holderLines(d.holders.slice(0, ROWS_MAX), d.usdKrw)} open={open} />
           </Module>
         )
@@ -476,7 +477,7 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
           </div>
         )}
         {/* 언급이 없는 종목도 언급 표의 끝날로 — '언급 준비 중'은 자료가 준비 중인 것으로 읽혔다(2026-10-04 점검). */}
-        <CoverMeta updated={d.mentionDate ?? d.mentionAsOf ? `${fmtDate(d.mentionDate ?? d.mentionAsOf)} 언급 기준` : "언급 기록 없음"} basis={`월가 거물 ${d.managerCount}명 추적`} />
+        <CoverMeta updated={d.mentionDate ?? d.mentionAsOf ? `${fmtDate(d.mentionDate ?? d.mentionAsOf)} 언급 기준` : "언급 기록 없음"} />
       </div>
 
       {/* 둘째 줄 — 공시에 남은 것 | 커뮤니티 관심 추이. 둘 다 안이 늘어난다(줄 · 막대). */}
@@ -488,13 +489,14 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
               { label: "월가 거물 보유", n: d.holders.length, unit: `/${d.managerCount}명`, sub: quarterMoves },
               // 기간을 적는다 — 세 축의 기간이 달라(거물 분기 · 의원 표 전체 · 임원 표 전체) 본 화면의 90일 숫자와 어긋나 보였다(2026-10-04 점검).
               // 기간을 앞에 — 거물 줄('2026 Q2 늘림 2명')과 같은 순서다. 뒤에 붙이면 '· 26.1.2 이후'가 셋째 갈래처럼 읽혔다(2026-10-10).
-              { label: "미 하원의원 신고", n: members, unit: "명", sub: [since(d.congressSince), `매수 ${num(cgBuys.length)} · 매도 ${num(cgSells.length)}건`].filter(Boolean).join(" ") },
+              // 0명 · 0건이면 기간만 — '매수 0 · 매도 0건'은 큰 숫자 '0명'의 되풀이였다(2026-10-13 점검).
+              { label: "미 하원의원 신고", n: members, unit: "명", sub: [since(d.congressSince), members ? `매수 ${num(cgBuys.length)} · 매도 ${num(cgSells.length)}건` : ""].filter(Boolean).join(" ") },
               // 셋째 갈래(그 밖)를 넣어 합이 큰 숫자와 맞는다 — 낱말 · 순서는 아래 임원 모듈 머리와 같게(장내 매수 · 처분).
               {
                 label: "임원 신고",
                 n: d.insiders.length,
                 unit: "건",
-                sub: [since(d.insiderSince), `장내 매수 ${num(execBuys.length)} · 처분 ${num(execSells.length)}${execOther > 0 ? ` · 그 밖 ${num(execOther)}` : ""}`].filter(Boolean).join(" "),
+                sub: [since(d.insiderSince), d.insiders.length ? `장내 매수 ${num(execBuys.length)} · 처분 ${num(execSells.length)}${execOther > 0 ? ` · 그 밖 ${num(execOther)}` : ""}건` : ""].filter(Boolean).join(" "),
               },
             ].map((s) => (
               <div key={s.label}>
@@ -534,7 +536,7 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
           className="v2-tm-trendmod"
         >
           {trendPoints.length === 0 ? (
-            <p className="v2-empty">언급 기록을 아직 못 읽었습니다.</p>
+            <p className="v2-empty">언급 기록을 불러오지 못했습니다.</p>
           ) : d.trend.length === 0 ? (
             // 언급이 한 번도 없는 종목 — 문장 한 줄 아래가 비던 것을 같은 꼴(0 막대 · 숫자 칸)로(2026-10-04 점검).
             <div className="v2-tm-trendbody">
@@ -575,7 +577,8 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
           title="주가와 매매 시점"
           // '28곳'은 무엇이 28 인지 안 읽혔다(2026-10-04 점검) — 차트 위 점(매매 시점)의 수다.
           // 차트가 그리는 자리 수 — 같은 날 · 같은 봉의 신고는 한 점이라 신고 수(d.marks)와 달랐다(2026-10-05 점검).
-          meta={`${PRICE_RANGES.find((r) => r.key === range)?.label} · 매매 시점 ${markSpotCount(d.bars, d.marks)}개`}
+          // 기간은 옆 기간 단추가 말한다(같은 머리에 '6개월'이 둘이었다 · 2026-10-13 점검).
+          meta={`매매 시점 ${markSpotCount(d.bars, d.marks)}개`}
           className="v2-isd-chart"
           // 누가 언제 사고팔았는지는 차트 말풍선 안에만 있다 — 폰은 눌러야 열린다. 차트 안 왼쪽 위에 한 번.
           hint={{ id: "insider-chart", anchor: ".hz-mkfilter-chart", at: "inside", text: "차트를 누르면 그날 주가와 신고된 매매가 나옵니다" }}

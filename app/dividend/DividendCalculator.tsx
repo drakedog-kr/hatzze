@@ -191,7 +191,8 @@ export function DividendCalculator({
   const byAccount = (a: Account) => active.filter((l) => l.account === a);
   const invest = active.reduce((s, l) => s + (l.investKrw ?? 0), 0);
   // 목표까지 칸도 투자금을 아는 줄로만 센다 — 종가 없는 줄의 배당까지 넣으면 수익률이 부풀어 필요한 투자금이 몇 분의 1로 적혔다.
-  const goalIn = goalBasis(active);
+  // 목표는 세후가 뜻이다(Goal.tsx 근거 '세후') — 세전 보기에서도 세후 줄로 센다. 세전 줄로 세면 근거가 세전 수익률을 '세후 3.69%'라 적었다(2026-10-13 점검).
+  const goalIn = goalBasis(taxedLines.filter((l) => !l.off));
   // 금융소득 종합과세 문턱과 고배당기업(분리과세 대상) 배당의 몫 — **일반 계좌 줄만** 합친다(ISA·연금 계좌 안 소득은 금융소득에
   // 안 합친다). 못 담아 일반 세율로 센 줄(outside)도 실제론 일반 계좌라 넣는다. 세전 합이 문턱 근처인 사람에게만 뜻이 있어 그때만 적는다.
   const generalLines = active.filter((l) => l.account === "general" || l.outside);
@@ -369,7 +370,7 @@ export function DividendCalculator({
           {failedSources.length ? (
             <SectionHead icon="calculate" title="자료를 불러오지 못했습니다" desc="잠시 뒤 다시 열어 주십시오. 저장된 배당 기록은 그대로 있습니다." level={2} />
           ) : (
-            <SectionHead icon="calculate" title="아직 자료가 없습니다" desc="파이프라인이 종목별 배당 요약을 만들면 이 자리에 계산기가 뜹니다." level={2} />
+            <SectionHead icon="calculate" title="아직 자료가 없습니다" desc="종목별 배당 요약이 만들어지면 이 자리에 계산기가 뜹니다." level={2} />
           )}
         </section>
       </div>

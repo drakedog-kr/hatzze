@@ -81,7 +81,7 @@ export async function GET(request: Request) {
     }
     return NextResponse.json(
       known
-        ? { ok: false, error: "이 종목의 과거 시세를 불러오지 못했습니다. 잠시 뒤 다시 열어 보십시오." }
+        ? { ok: false, error: "이 종목의 과거 시세를 불러오지 못했습니다. 잠시 뒤 다시 열어 주십시오." }
         : { ok: false, missing: true, error: "찾을 수 없는 종목 코드입니다. 위 검색창에서 종목 이름으로 찾아 보십시오." },
       { status: known ? 502 : 404 },
     );

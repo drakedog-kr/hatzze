@@ -373,6 +373,14 @@ type ThemeShareRow = Pick<ThemeRotation, "theme" | "sharePct" | "shareDelta"> & 
  *  복잡했던 건 줄 수가 아니라 카드 한 장에 다섯 가지가 선 꼴이었다 — 줄은 한 가지(막대)만 말한다. */
 const THEME_ROWS = 10;
 
+/**
+ * 셋째 줄 격자(.v2-grid) 클래스 — 짝 모듈(급부상 | 테마 점유율 · 크게 움직인 | 이슈 키워드)이 줄 트랙을 나눠 쓰는 꼴(is-sub, v2.css)은
+ * 네 모듈이 다 열 줄일 때만 건다. 트랙 수(머리 + 표 머리 + 열 줄)를 CSS 가 못 박아 두기 때문이다 — 줄 수가 다른 날은 지금처럼 따로 쌓고 짧은 쪽이 늘어난다.
+ */
+export function pairGridClass(surging: number, why: number, themes: number, keywords: number): string {
+  return surging === 10 && why === 10 && Math.min(themes, THEME_ROWS) === 10 && Math.min(keywords, 10) === 10 ? "v2-grid is-sub" : "v2-grid";
+}
+
 export function ThemeShares({
   themes,
   hrefOf,
@@ -491,7 +499,7 @@ export function EventsModule({ events, today, failed, limit = 5 }: { events: Upc
             const body = (
               <>
                 <span className={`v2-daypill${e.date === today ? " is-today" : ""}`}>{dayPill(e.date, today)}</span>
-                <span className="v2-event-txt">
+                <span className="v2-event-txt" title={`${e.name} ${e.event}`}>
                   <b>{e.name}</b> {e.event}
                 </span>
               </>

@@ -282,7 +282,7 @@ function PerpRow({ r }: { r: OvernightRow }) {
   return (
     <div className="v2-tr">
       <span className="v2-td-stock">
-        <StockLogo code={r.code} name={r.name} market="KOSPI" size={24} />
+        <StockLogo code={r.code} name={r.name} market="KOSPI" size={22} />
         <span className="v2-pv-name">
           {/* 이름은 아래 엮인 국장 종목 표처럼 종목 화면으로 잇는다. */}
           <Link href={stockHref(r.code)} className="v2-pv-stock" data-ga="cta_click" data-ga-cta="stock" data-ga-surface="preview_perp">
@@ -364,8 +364,7 @@ function BriefModule({
         </p>
       ) : moverCount === 0 ? (
         <p className="v2-pv-briefp">
-          {when} 크게 움직인 종목이 없습니다. 눈여겨보는 미국 종목 가운데 평소 폭을 크게 넘어선 곳이 없었다는 뜻이고, 고장이 아니라
-          조용한 밤이었습니다. 한 해에 두세 번 있는 밤입니다.
+          {when} 평소 폭을 넘게 움직인 미국 종목이 없습니다.
         </p>
       ) : (
         <dl className="v2-brief3">
@@ -373,7 +372,7 @@ function BriefModule({
             <div className="v2-brief3-row">
               <dt>미장</dt>
               <dd>
-                {when} {moverCount}곳이 평소 폭을 넘게 움직였습니다. 가장 큰 곳은 <b>{biggest.usName}</b>
+                {when} {moverCount}곳이 평소 폭을 넘게 움직였습니다. 등락이 가장 큰 곳은 <b>{biggest.usName}</b>
                 {euro(biggest.usName)} <b className={tone(biggest.dp).trim() || undefined}>{PCT(biggest.dp)}</b>, 평소 폭의 {zx(biggest.z)}배였습니다.
               </dd>
             </div>
@@ -405,9 +404,10 @@ function BriefModule({
   );
 }
 
-/** 평소 폭 배수. 문턱(1.0)을 막 넘은 값이 '1.0배'로 찍히면 평소와 같다는 말로 읽혀, 1.5 밑은 소수 둘째 자리(1.04배)까지 적는다. */
+/** 평소 폭 배수 — 늘 소수 둘째 자리(1.04배 · 1.60배). 문턱(1.0)을 막 넘은 값이 '1.0배'로 찍히면 평소와 같다는 말로 읽혔고,
+ *  1.5 위만 한 자리로 두니 한 세로 열에 '1.6배'와 '1.33배'가 섞였다(2026-10-13 점검). */
 function zx(z: number): string {
-  return z < 1.5 ? z.toFixed(2) : z.toFixed(1);
+  return z.toFixed(2);
 }
 
 /* ── 엮인 국장 종목 표 ───────────────────────────────────────────────────── */
@@ -452,7 +452,7 @@ function MoverGroup({ m, when }: { m: PreviewMover; when: string }) {
             <li key={l.stock}>
               <Link href={stockHref(l.code)} className="v2-pv-kr" data-ga="preview_stock_click" data-ga-symbol={l.code}>
                 <span className="v2-td-stock">
-                  <StockLogo code={l.code} name={l.stock} market={l.market} size={20} />
+                  <StockLogo code={l.code} name={l.stock} market={l.market} size={22} />
                   <span className="v2-td-name">{l.stock}</span>
                 </span>
                 {/* 관계는 짧은 꼬리표다 — 쌍마다 다른 개별 관계(사전의 why). */}

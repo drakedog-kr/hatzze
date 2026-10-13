@@ -447,10 +447,8 @@ function HoldingRow({
       <span className="dv-tcell dv-tnum dv-tweight" role="cell">
         {weightPct != null ? (
           <>
+            {/* 비중 막대는 걷었다 — 표 안 그래픽은 두지 않는다(막대는 목록에만 · 2026-10-13 점검). */}
             {weightPct.toFixed(0)}%
-            <span className="dv-tweight-bar" aria-hidden="true">
-              <span style={{ width: `${Math.min(100, weightPct)}%` }} />
-            </span>
           </>
         ) : (
           "·"

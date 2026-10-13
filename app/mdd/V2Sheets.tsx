@@ -40,7 +40,7 @@ export function MddCover({ data, periodLabel }: { data: MddResult; periodLabel: 
       ga: "mdd_cover_stock",
     },
   ];
-  if (data.theme?.href) links.push({ cap: "테마 리포트", name: data.theme.name, href: data.theme.href, ga: "mdd_cover_theme" });
+  if (data.theme?.href) links.push({ cap: "테마", name: data.theme.name, href: data.theme.href, ga: "mdd_cover_theme" });
   // 지수 칸은 '시장 탓 · 종목 탓' 칸이 없는 종목(신고가 부근 — 그 자리엔 '시장 대비 최근 1년')에만 — 그 칸이 서면 같은 화면에 코스피 낙폭이
   // 기준이 다른 세 숫자(띠 −23.2% · 시장 탓 −22.7% · 사례 표 −38.3%)로 섰다(2026-10-05 점검).
   const showIdx = !data.attribution;

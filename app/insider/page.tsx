@@ -150,16 +150,17 @@ export default async function InsiderPage() {
       <div className="v2-in-pair">
         <Module
           title={INSIDER_LISTS.managers.title}
-          meta={`${insiderNote("managers", ov)} · 월가 거물 ${ov.scale.managers.toLocaleString("ko-KR")}명`}
+          // 근거는 기간 한 마디 — 표본 수는 머리 title 로(2026-10-13 '근거 글은 기간까지').
+          meta={<span title={`월가 거물 ${ov.scale.managers.toLocaleString("ko-KR")}명`}>{insiderNote("managers", ov)}</span>}
           aside={<SeeAll href={insiderListHref("managers")} />}
           // 이름이 거물 상세로 가는 링크다. 옛 문구의 '비중 순으로'는 '~ 순' 표기를 걷은 판단(2026-10-05)에 맞춰 뺐다.
           hint={ov.managerRanks.length ? { id: "insider-investor", order: 2, anchor: ".v2-in-rows > li:first-child", text: "이름을 누르면 그 거물이 담은 종목이 모두 나옵니다" } : undefined}
         >
-          {ov.managerRanks.length === 0 ? <p className="v2-empty">명단을 못 읽었습니다.</p> : <Rows items={managerLines(ov.managerRanks.slice(0, BLOCK_ROWS), ov.usdKrw)} />}
+          {ov.managerRanks.length === 0 ? <p className="v2-empty">명단을 불러오지 못했습니다.</p> : <Rows items={managerLines(ov.managerRanks.slice(0, BLOCK_ROWS), ov.usdKrw)} />}
         </Module>
         <Module
           title="증권가가 긍정적으로 보는 종목"
-          meta={`${insiderNote("analyst", ov)} · 애널리스트 ${RANK_MIN_ANALYSTS}명 이상`}
+          meta={<span title={`애널리스트 ${RANK_MIN_ANALYSTS}명 이상`}>{insiderNote("analyst", ov)}</span>}
           aside={<SeeAll href={insiderListHref("analyst")} />}
         >
           {ov.analystTop.length === 0 ? <p className="v2-empty">아직 받은 컨센서스가 없습니다.</p> : <Rows items={analystLines(ov.analystTop.slice(0, BLOCK_ROWS))} />}

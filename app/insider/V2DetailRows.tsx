@@ -158,7 +158,7 @@ export function congressLines(rows: StockCongress[], rate: number | null) {
 function StockWho({ ticker, name }: { ticker: string; name: string }) {
   return (
     <span className="v2-isd-who">
-      <StockLogo code={ticker} name={name} market="US" size={20} />
+      <StockLogo code={ticker} name={name} market="US" size={22} />
       <b>{ticker}</b>
       {name && name.toUpperCase() !== ticker.toUpperCase() && <span>{name}</span>}
     </span>

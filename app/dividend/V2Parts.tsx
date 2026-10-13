@@ -32,24 +32,34 @@ export function DvCover({
   usPriceDate: string | null;
 }) {
   const n = (v: number) => v.toLocaleString("ko-KR");
+  // 날짜 꼴은 한 가지로 — 한 줄에 '10월 8일(목)'과 '10/12'가 섞였고, 폰에서 '10/12'만 다음 줄로 떨어졌다(2026-10-13 점검).
   const meta = priceDate
-    ? `${fmtCloseDay(priceDate)} 종가 기준${usPriceDate && usPriceDate !== priceDate ? ` · 미국 ${md(usPriceDate)}` : ""}`
+    ? usPriceDate && usPriceDate !== priceDate
+      ? `국내 ${md(priceDate)} · 미국 ${md(usPriceDate)} 종가 기준`
+      : `${fmtCloseDay(priceDate)} 종가 기준`
     : "종가 기준일 없음";
   return (
     <div className="v2-cover">
       <div className="v2-cover-cell v2-cover-idx">
         <span className="v2-cover-k">담을 수 있는 종목</span>
+        {/* 단위 '개' — 같은 띠 자리에 다른 화면은 '17장' · '1,172개'처럼 단위를 붙인다(2026-10-13 점검). */}
         <span className="v2-cover-v">
           <em>국내</em>
-          <b>{n(counts.kr)}</b>
+          <span>
+            <b>{n(counts.kr)}</b>개
+          </span>
         </span>
         <span className="v2-cover-v">
           <em>미국</em>
-          <b>{n(counts.us)}</b>
+          <span>
+            <b>{n(counts.us)}</b>개
+          </span>
         </span>
         <span className="v2-cover-v">
           <em>ETF</em>
-          <b>{n(counts.etf)}</b>
+          <span>
+            <b>{n(counts.etf)}</b>개
+          </span>
         </span>
       </div>
       {usdkrw && (
@@ -57,7 +67,8 @@ export function DvCover({
           <span className="v2-cover-k">달러 환율</span>
           <span className="v2-cover-v">
             <b>{usdkrw.rate.toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}원</b>
-            {usdkrw.date && <span className="v2-cover-chg">{md(usdkrw.date)}</span>}
+            {/* 미국 종가 날과 같으면 뺀다 — 업데이트 칸이 이미 '미국 10/12'를 말한다. */}
+            {usdkrw.date && usdkrw.date !== usPriceDate && <span className="v2-cover-chg">{md(usdkrw.date)}</span>}
           </span>
         </div>
       )}
@@ -207,7 +218,7 @@ export function CalendarModule({
 }) {
   const paid = MONTHS.filter((m) => monthly[m] > 0).length;
   // '1년에 12달'은 '1년은 12달'로 읽혔다(2026-10-05 점검) — 빈 달 수로(빈 달 칸의 '0원'과 같은 말).
-  const meta = [paid ? (paid === 12 ? "빈 달 없음" : `빈 달 ${12 - paid}`) : "지급 달 모름", "최근 12개월", noCalCount > 0 ? `${noCalCount}종목 제외` : null]
+  const meta = [paid ? (paid === 12 ? "빈 달 없음" : `빈 달 ${12 - paid}개`) : "지급 달 모름", "최근 12개월", noCalCount > 0 ? `${noCalCount}종목 제외` : null]
     .filter(Boolean)
     .join(" · ");
   return (

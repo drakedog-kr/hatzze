@@ -116,8 +116,8 @@ export function FlowCard({
               k: "순유입 · 순유출 ETF",
               v: `${pf.inN.toLocaleString("ko-KR")} · ${pf.outN.toLocaleString("ko-KR")}개`,
             },
-            { k: "순유입 금액", v: fmtFlow(pf.inSum), tone: pf.inSum >= 0.5 ? "up" : undefined },
-            { k: "순유출 금액", v: fmtFlow(pf.outSum), tone: pf.outSum <= -0.5 ? "down" : undefined },
+            { k: "순유입 ETF 합계", v: fmtFlow(pf.inSum), tone: pf.inSum >= 0.5 ? "up" : undefined },
+            { k: "순유출 ETF 합계", v: fmtFlow(pf.outSum), tone: pf.outSum <= -0.5 ? "down" : undefined },
             {
               k: "순자산 대비 순유입",
               v: pf.rate == null ? "없음" : fmtPct(pf.rate, daily ? 2 : 1),

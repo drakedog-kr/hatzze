@@ -627,11 +627,11 @@ export function AreaChart({
   const vals = points.map((p) => p.value);
   const hi = Math.max(...vals, baseline === "zero" ? 0 : -Infinity);
   const lo = Math.min(...vals, baseline === "zero" ? 0 : Infinity);
-  // zero 기준일 땐 0이 한가운데 오도록 위아래를 같은 폭으로 잡는다.
-  const span = baseline === "zero" ? Math.max(Math.abs(hi), Math.abs(lo), 1) * 1.12 : (hi - lo) || 1;
-  const y = (t: number) =>
-    baseline === "zero" ? H / 2 - (t / span) * (H / 2) : H - 4 - ((t - lo) / span) * (H - 8);
-  const base = baseline === "zero" ? H / 2 : H;
+  // zero 기준일 땐 0 을 포함한 실제 범위만 그린다(위아래 4px 여백) — 0 을 한가운데 고정하던 때 석 달 내내 0 아래면 그림 위 절반이
+  // 통째로 비었다(쓰는 높이 45% · 2026-10-13 점검). 0 선 · 빨강/파랑 자르기 경계는 y(0) 에 선다.
+  const span = (hi - lo) || 1;
+  const y = (t: number) => (baseline === "zero" ? 4 + ((hi - t) / span) * (H - 8) : H - 4 - ((t - lo) / span) * (H - 8));
+  const base = baseline === "zero" ? y(0) : H;
   const line = points.map((p, i) => `${(i / (points.length - 1)) * 100},${y(p.value)}`).join(" ");
   // 그라데이션 id — 카드마다 달라야 한다(아래 주석: id 는 문서 전역이라 같은 이름이면 먼저 그린 색으로 다 칠해진다).
   // 색·첫 날짜·점 수·높이로 짓는다. 같은 차트가 두 번 그려질 때만 같은 이름이 되고, 그땐 모양도 같다.
@@ -644,17 +644,27 @@ export function AreaChart({
         {/* shadcn 영역 차트 꼴(2026-09-27, MDD 언더워터와 같은 방식) — 선은 1px, 면은 선 쪽이 진하고 바닥으로 옅어지는 그라데이션.
             SVG 그라데이션은 id 가 문서 전역이라 카드마다 색이 다르면 서로 덮어쓴다 — 그래서 한때 반투명 한 겹이었고,
             지금은 카드마다 다른 id(gid)를 짓는다. */}
+        {/* zero 기준 — 0 위(빨강) · 아래(파랑) 면도 다른 차트처럼 선 쪽이 진하고 0 선 쪽으로 옅어지는 그라데이션(한 색 면이던 것 · 2026-10-13).
+            0 선은 옆 거래대금 칸의 평균선과 같은 점선(시작점이라는 기준선이다). id 는 카드마다 다르게(gid). */}
         {baseline === "zero" && (
           <defs>
-            <clipPath id="hz-clip-up"><rect x="0" y="0" width="100" height={H / 2} /></clipPath>
-            <clipPath id="hz-clip-dn"><rect x="0" y={H / 2} width="100" height={H / 2} /></clipPath>
+            <clipPath id={`${gid}-cu`}><rect x="0" y="0" width="100" height={base} /></clipPath>
+            <clipPath id={`${gid}-cd`}><rect x="0" y={base} width="100" height={H - base} /></clipPath>
+            <linearGradient id={`${gid}-up`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={base}>
+              <stop offset="0%" stopColor="var(--c-hot)" stopOpacity={0.32} />
+              <stop offset="100%" stopColor="var(--c-hot)" stopOpacity={0.03} />
+            </linearGradient>
+            <linearGradient id={`${gid}-dn`} gradientUnits="userSpaceOnUse" x1="0" y1={H} x2="0" y2={base}>
+              <stop offset="0%" stopColor="var(--c-blue)" stopOpacity={0.32} />
+              <stop offset="100%" stopColor="var(--c-blue)" stopOpacity={0.03} />
+            </linearGradient>
           </defs>
         )}
         {baseline === "zero" ? (
           <>
-            <polygon points={`0,${base} ${line} 100,${base}`} fill="var(--c-hot)" opacity={0.2} clipPath="url(#hz-clip-up)" />
-            <polygon points={`0,${base} ${line} 100,${base}`} fill="var(--c-blue)" opacity={0.2} clipPath="url(#hz-clip-dn)" />
-            <line x1="0" y1={H / 2} x2="100" y2={H / 2} stroke="var(--c-line)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+            <polygon points={`0,${base} ${line} 100,${base}`} fill={`url(#${gid}-up)`} clipPath={`url(#${gid}-cu)`} />
+            <polygon points={`0,${base} ${line} 100,${base}`} fill={`url(#${gid}-dn)`} clipPath={`url(#${gid}-cd)`} />
+            <line x1="0" y1={base} x2="100" y2={base} stroke={C.muted} strokeWidth={1.25} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
           </>
         ) : (
           <>

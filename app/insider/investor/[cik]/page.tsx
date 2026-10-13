@@ -207,18 +207,23 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
         <div className="v2-cover-cell v2-cover-idx">
           <span className="v2-cover-k">보유</span>
           <span className="v2-cover-v">
-            <b>{d.holdings.length}종목</b>
+            {/* 굵은 덩어리는 보유 수 하나 — 단위 · 곁 값까지 600 이면 한 칸에 셋이었다(2026-10-13 점검). */}
+            <span>
+              <b>{d.holdings.length}</b>종목
+            </span>
           </span>
           <span className="v2-cover-v">
             {/* 보유가 다섯 아래면 그 수로 — 4종목인데 '상위 5종목 100%'였다(2026-10-05 점검). */}
             <em>상위 {Math.min(5, d.holdings.length)}종목</em>
-            <b>{top5.toFixed(0)}%</b>
+            <b style={{ fontWeight: 500 }}>{top5.toFixed(0)}%</b>
           </span>
           <span className="v2-cover-v">
             {/* 짧게 — 폰에서 값 셋이 한 줄에 들게(2026-10-04 점검). */}
             {/* '카더라 언급' — 무엇을 센 수인지(보유 중 카더라에서 언급된 종목, 2026-10-05 점검). */}
             <em>카더라 언급</em>
-            <b>{kaderaCount}종목</b>
+            <span>
+              <b style={{ fontWeight: 500 }}>{kaderaCount}</b>종목
+            </span>
           </span>
         </div>
         {d.usdKrw != null && (

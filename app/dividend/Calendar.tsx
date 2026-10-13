@@ -167,7 +167,9 @@ export function UpcomingRows({ items }: { items: UpcomingItem[] }) {
       {items.map((it) => (
         <li key={it.key} className="dv-upcoming-row">
           <span className="dv-upcoming-when">{it.when}</span>
-          <span className="dv-upcoming-name">{it.name}</span>
+          <span className="dv-upcoming-name" title={it.name}>
+            {it.name}
+          </span>
           {it.tag && <span className={`dv-upcoming-tag${it.tag === "확정" ? " dv-upcoming-tag-sure" : ""}`}>{it.tag}</span>}
           {it.what && <span className="dv-upcoming-what">{it.what}</span>}
           {it.amount && <span className="dv-upcoming-amt">{it.amount}</span>}

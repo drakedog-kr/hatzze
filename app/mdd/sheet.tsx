@@ -72,7 +72,7 @@ export function AbsentSheet({ title, body, className }: { title: string; body: s
 /** 지금 낙폭 칸 바닥의 3분할 통계 한 칸 — 라벨 / 값. 보조 줄은 걷었다(2026-10-03, 옆 칸 · 띠와 같은 말이었다). */
 export function StatCell({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
       {/* 한 줄 고정·말줄임은 클래스(.mdd-stat-clip)가 쥔다 — 폰에선 접어야 해서(sheets.css). */}
       <span className="mdd-stat-clip mdd-stat-label" style={{ fontSize: "var(--fs-11)", fontWeight: 700, letterSpacing: ".06em", color: C.sub }}>
         {label}
@@ -107,7 +107,7 @@ export function CoverPlaceholder({ idx = false, theme = true }: { idx?: boolean;
           </span>
         </div>
       )}
-      {(theme ? ["종목 화면", "테마 리포트"] : ["종목 화면"]).map((cap) => (
+      {(theme ? ["종목 화면", "테마"] : ["종목 화면"]).map((cap) => (
         // href 없는 <a> — 실제 링크 칸(CoverLinkCell 의 Link)과 같은 태그여야 폰 규칙 `a.v2-cover-go:last-of-type` 이 똑같이 걸린다
         // (div 로 두면 NVDA 띠에서 마지막 칸이 10px 컸다). href 가 없어 누를 수도 포커스될 수도 없다.
         <a key={cap} className="v2-cover-cell v2-cover-go" style={hidden}>

@@ -11,7 +11,7 @@ import {
   type NoteStocks,
   type NoteStub,
 } from "@/lib/daily-note";
-import { noteHeadings, parseNoteMarkdown, type NoteBlock, type NoteInline } from "@/lib/daily-note-md";
+import { keepPctWord, noteHeadings, parseNoteMarkdown, type NoteBlock, type NoteInline } from "@/lib/daily-note-md";
 import { stockDetailHref } from "@/lib/insider-range";
 import { stockHref } from "@/lib/stock-page";
 
@@ -67,7 +67,7 @@ function Inline({ inline }: { inline: NoteInline[] }) {
 function Block({ block }: { block: NoteBlock }) {
   switch (block.k) {
     case "heading":
-      return block.level === 2 ? <h2 id={block.id}>{block.text}</h2> : <h3 id={block.id}>{block.text}</h3>;
+      return block.level === 2 ? <h2 id={block.id}>{keepPctWord(block.text)}</h2> : <h3 id={block.id}>{keepPctWord(block.text)}</h3>;
     case "rule":
       return <hr className="hz-note-rule" />;
     case "table":
@@ -150,7 +150,7 @@ function NoteTocModule({ blocks }: { blocks: NoteBlock[] }) {
         <ol className="v2-nt-toc">
           {items.map((h) => (
             <li key={h.id}>
-              <a href={`#${h.id}`}>{h.text}</a>
+              <a href={`#${h.id}`}>{keepPctWord(h.text)}</a>
             </li>
           ))}
         </ol>
@@ -180,7 +180,8 @@ function NoteStocksModule({ stocks }: { stocks: NoteStocks }) {
   //    국내 날짜를 국내 수 뒤에 두어도 미국 줄까지 걸리는지 헷갈렸다. 미국 시세는 늘 가장 최근 미국장이라
   //    지난 글에선 본문이 다룬 장(글 날 전날 뉴욕)과 다를 수 있다 — 10월 7일 글 본문 '마이크론은 1.7% 내렸습니다'(10월 6일 장)
   //    옆에 +4.06%(10월 7일 장)가 섰다. 날짜를 적는 대신 값을 맞추려면 lib/daily-note usQuote 가 그 장의 종가를 받아야 한다.
-  const counts = [`국내 ${stocks.kr.length}`, `미국 ${stocks.us.length}`].join(" · ");
+  // 단위까지 — 맨 숫자는 무엇의 수인지 안 읽혔다(2026-10-13 점검, 다른 화면 근거는 '17장' · '1,172개').
+  const counts = [`국내 ${stocks.kr.length}종목`, `미국 ${stocks.us.length}종목`].join(" · ");
   return (
     <Module
       id="stocks"
@@ -197,10 +198,10 @@ function NoteStocksModule({ stocks }: { stocks: NoteStocks }) {
           return (
             <li key={s.code}>
               <Link href={stockHref(s.code)} className="v2-nt-stock" data-ga="note_stock_click">
-                <StockLogo code={s.code} name={s.name} market={s.market} size={20} />
+                <StockLogo code={s.code} name={s.name} market={s.market} size={22} />
                 <span className="v2-nt-stock-name">{s.name}</span>
                 <span className="v2-nt-stock-px">
-                  {s.price != null ? <b>{s.price.toLocaleString("ko-KR")}</b> : <em>시세 없음</em>}
+                  {s.price != null ? <b>{s.price.toLocaleString("ko-KR")}원</b> : <em>시세 없음</em>}
                   {chg != null && (
                     <i className={chg > 0 ? "is-up" : chg < 0 ? "is-down" : undefined}>
                       {chg > 0 ? "+" : chg < 0 ? "-" : ""}
@@ -220,7 +221,7 @@ function NoteStocksModule({ stocks }: { stocks: NoteStocks }) {
           return (
             <li key={u.ticker}>
               <Link href={stockDetailHref(u.ticker)} className="v2-nt-stock is-us" data-ga="note_stock_click">
-                <StockLogo code={u.ticker} name={u.name} market="US" size={20} />
+                <StockLogo code={u.ticker} name={u.name} market="US" size={22} />
                 {/* 티커는 이름 꼬리로 — 값 자리에 서면 머리 '10월 2일 종가'의 값으로 읽혔다(2026-10-05 점검). */}
                 <span className="v2-nt-stock-name">
                   {u.name}
@@ -290,7 +291,7 @@ export function NoteView({
           updated={note ? formatKstUpdate(note.updatedAt, "업데이트") : "글 준비 중"}
           // 꼭지 수는 안 적는다(2026-10-04 운영자 판단 — 2026-09-06 의 "꼭지 수를 머리에 적지 않는다"와 같은 까닭). 종목 수만.
           // '종목 15'는 무엇의 15 인지 안 읽혔다(2026-10-04 점검) — 이 글에 언급된 종목 수.
-          basis={note && stocks.kr.length + stocks.us.length ? `언급된 종목 ${stocks.kr.length + stocks.us.length}` : null}
+          basis={note && stocks.kr.length + stocks.us.length ? `언급된 종목 ${stocks.kr.length + stocks.us.length}개` : null}
         />
       </div>
       <div className="v2-nt-page">

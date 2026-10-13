@@ -59,7 +59,7 @@ export function IndexModule({
           {delta !== null && (
             <span className="v2-index-delta">
               {compareLabel(dailyScore.date, dailyScore.prevDay?.date ?? null)}
-              <b className={delta > 0 ? "is-up" : delta < 0 ? "is-down" : undefined}>{delta > 0 ? `+${delta}` : delta < 0 ? `-${-delta}` : "0"}</b>
+              <b className={delta > 0 ? "is-up" : delta < 0 ? "is-down" : undefined}>{delta > 0 ? `+${delta}℃` : delta < 0 ? `-${-delta}℃` : "0℃"}</b>
             </span>
           )}
         </span>

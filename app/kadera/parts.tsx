@@ -159,7 +159,7 @@ export function ThemeVsUsualRows({ themes, market = "kr" }: { themes: (ThemeRow 
               {/* 평소 눈금 — 데이터가 아니라 '자'라서 채움보다 가늘고 위아래로 조금 길다. --c-marker 는 트랙을 진하게 한 뒤로 트랙보다 옅어 틈처럼 보여 잉크 섞은 색이다. */}
               <span style={{ position: "absolute", left: "50%", top: -3, bottom: -3, width: 2, borderRadius: 1, transform: "translateX(-50%)", background: "var(--tx-tick)" }} />
             </span>
-            <span style={{ fontSize: "var(--fs-11)", fontWeight: 600, color: ink, whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: ink, whiteSpace: "nowrap" }}>
               {lean ? LEAN_WORD[lean.shift] : LEAN_WORD.none}
             </span>
           </div>
