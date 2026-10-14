@@ -813,6 +813,9 @@ a.v2-ev-row:hover { background: var(--t-tint); }
   .v2-band { grid-template-columns: minmax(0, 1fr); }
   /* 일정 아홉은 둘째 줄 세 칸의 키를 맞추려는 것이다. 한 줄기인 폰에선 길어지기만 해서 다섯으로. */
   .v2-band .v2-events li:nth-child(n + 6) { display: none; }
+  /* 테마 상세 '다가오는 일정'은 여섯 줄 — 개수(max(6, 주인공 줄 + 2))는 넓은 화면에서 옆 칸 키를 맞추려는 값이라 폰에선 길기만 했다
+     (반도체 11줄 · 574px, 2026-10-14). 종목 화면(.v2-sk) 일정은 따로 둔다. */
+  .v2-tm:not(.v2-sk) .v2-tm-events .v2-events li:nth-child(n + 7) { display: none; }
   .v2-band > #events .v2-events { display: flex; }
   /* 왼쪽은 데스크톱처럼 14(모듈 글자 시작선), 오른쪽은 10 으로 줄여 글자 폭을 그대로 둔다. */
   .v2-cover-cell { flex: 1 1 40%; padding: 8px 10px 8px 14px; }
@@ -1271,6 +1274,37 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 /* 짝 줄 — 표가 넓은 쪽을 차지한다(사례 표 2 : 회복 1 · 시장 탓 1 : 업종 2). 짧은 쪽은 안쪽 줄이 늘어 키를 맞춘다. */
 .v2-md-row { display: grid; gap: 12px; align-items: stretch; }
 .v2-md-row.is-21 { grid-template-columns: minmax(0, 1fr) var(--md-r); }
+/* MDD 자리표시자(app/mdd/sheet.tsx ResultPlaceholder · .is-ph) — 실물(삼성전자 기본) 키를 최소 키로. 짧은 골격이 실물로 바뀔 때 차트 · 사례 줄이
+   오르내렸다(2026-10-14). 실물 모듈은 .v2-mod 라 이 규칙에 안 걸린다. 폭 단계는 아래 999 · 679 묶음. */
+.v2-md .hz-sheet.is-ph.v2-md-stock,
+.v2-md .hz-sheet.is-ph.v2-md-dd,
+.v2-md .hz-sheet.is-ph.v2-md-sum { min-height: 266px; }
+.v2-md .hz-sheet.is-ph.v2-md-chartph { min-height: 375px; }
+.v2-md .hz-sheet.is-ph.v2-md-cases-mod,
+.v2-md .hz-sheet.is-ph.v2-md-rec { min-height: 338px; }
+.v2-md .hz-sheet.is-ph.v2-md-years,
+.v2-md .hz-sheet.is-ph.v2-md-attr { min-height: 260px; }
+.v2-md .hz-sheet.is-ph.v2-md-theme,
+.v2-md .hz-sheet.is-ph.v2-md-pl { min-height: 392px; }
+@container kd (max-width: 999px) {
+  .v2-md .hz-sheet.is-ph.v2-md-sum { min-height: 215px; }
+  .v2-md .hz-sheet.is-ph.v2-md-chartph { min-height: 269px; }
+  .v2-md .hz-sheet.is-ph.v2-md-rec,
+  .v2-md .hz-sheet.is-ph.v2-md-attr { min-height: 315px; }
+}
+@container kd (max-width: 679px) {
+  .v2-md .hz-sheet.is-ph.v2-md-dd { min-height: 205px; }
+  .v2-md .hz-sheet.is-ph.v2-md-sum { min-height: 237px; }
+  .v2-md .hz-sheet.is-ph.v2-md-chartph { min-height: 260px; }
+  .v2-md .hz-sheet.is-ph.v2-md-cases-mod { min-height: 397px; }
+  .v2-md .hz-sheet.is-ph.v2-md-attr { min-height: 241px; }
+  .v2-md .hz-sheet.is-ph.v2-md-theme { min-height: 546px; }
+  .v2-md .hz-sheet.is-ph.v2-md-pl { min-height: 347px; }
+}
+/* 폰(본문 480 아래)은 요약 칸 글이 한 줄 더 꺾여 325 — 태블릿 세로(834)는 237. */
+@container kd (max-width: 479px) {
+  .v2-md .hz-sheet.is-ph.v2-md-sum { min-height: 325px; }
+}
 /* 사례 · 회복 / 해마다 · 시장 탓 네 칸을 한 격자에. [판단 2] 두 줄 키를 같게 묶던 grid-auto-rows: 1fr 을 걷었다 — 둘째 줄이 첫 줄 키(338)에
    묶여 시장 탓 칸이 큰 숫자 위아래로 비었다. 줄마다 제 키(둘째 줄 260 안팎). */
 .v2-md-row > .v2-mod,
@@ -2828,6 +2862,9 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
 }
 .v2-in-cur .hz-cur-switch { height: 22px; padding: 2px; gap: 2px; border-color: var(--t-frame); background: var(--t-card); }
 .v2-in-cur .hz-cur-switch > button { min-width: 22px; height: 16px; padding: 0 5px; border-radius: 3px; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
+/* 누르는 자리만 넓힌다(꼴은 그대로) — 22×16 이라 태블릿 손가락 · 24px 최소 누름 자리에 못 미쳤다. 위아래 6 씩 · 옆은 사이 2 의 반만. */
+.v2-in-cur .hz-cur-switch > button { position: relative; }
+.v2-in-cur .hz-cur-switch > button::after { content: ""; position: absolute; inset: -6px -1px; }
 /* 고른 칸은 다른 v2 고르기(ETF 기간 · MDD · 배당 세후)와 같은 꼴 — 흰 판 + 옅은 면 · 600 · 그림자 없음. 옛 꼴(회색 트랙 + 흰 칸 + 그림자)은
    mobile.css 의 :root[data-cur] 규칙이라 그보다 한 단 높은 특이도로 덮는다(2026-10-13 점검). */
 :root[data-cur="krw"] .v2-in-cur .hz-cur-switch > button[data-cur="krw"],
@@ -2858,9 +2895,9 @@ a.v2-nt-stock:hover .v2-nt-stock-name { text-decoration: underline; text-decorat
   .v2-in-rank { grid-row: 1 / span 2; }
   .v2-in-who { grid-column: 2; grid-row: 1; }
   .v2-in-val { grid-column: 3; grid-row: 1 / span 2; }
-  .v2-in-aux { grid-column: 2; grid-row: 2; padding-left: 28px; }
-  /* 사람이 주인공인 줄(로고 없음)은 둘째 줄을 들여 쓰지 않는다 — 28px 는 로고 몫이다. 넓은 화면엔 걸지 않는다(곁 숫자가 8px 왼쪽에 섰다). */
-  .v2-in-row.is-person .v2-in-aux { padding-left: 0; }
+  /* 둘째 줄은 로고 왼끝에서 — 전체보기 · 카더라 두 줄 줄과 같은 시작선(2026-10-14). 티커 아래(28px 들여쓰기)로 두니 같은 자료가
+     화면마다 다른 들여쓰기로 섰다(본 화면 x67 · 전체보기 x27 · 카더라 x59). 사람 줄(로고 없음)도 같은 0 이라 예외 규칙이 걷혔다. */
+  .v2-in-aux { grid-column: 2; grid-row: 2; padding-left: 0; }
   .v2-in-aux:empty { display: none; }
 }
 @container kd (max-width: 679px) {
@@ -3212,6 +3249,22 @@ a.v2-isd-row:hover { background: var(--t-tint); }
 .v2-isd-legend { display: inline-flex; align-items: center; gap: 12px; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-isd-legend > span { display: inline-flex; align-items: center; gap: 5px; }
 .v2-in .hz-mkfilter-set label { font-size: 12px; font-weight: 500; }
+/* 애널리스트 요약(ConsensusBody) 두 칸 — 등급 · 목표가. 나란할 땐 가로줄 다섯(머리 · 큰 숫자 · 곁줄 · 막대 · 범례)을 함께 쓴다(subgrid) —
+   칸마다 따로 쌓으니 목표가 칸의 '현재가' 줄과 큰 숫자 줄바꿈만큼 두 막대가 21~38px 어긋났다(2026-10-14). 칸이 160 아래로 좁아지면
+   예전처럼 위아래로 접는다(칸 160 둘 + 사이 16 + 좌우 여백 28 = 364). 막대 바로 위 곁줄은 두 칸 같은 꼴(.v2-cons-cap · .v2-cons-now). */
+.v2-cons-wrap { display: flex; flex-direction: column; container: cons / inline-size; }
+.v2-cons-grid { display: flex; flex-direction: column; gap: 16px; padding: 14px 14px 16px; }
+.v2-cons-col { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+@container cons (min-width: 364px) {
+  .v2-cons-grid:not(.is-stack) { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; row-gap: 9px; }
+  .v2-cons-grid:not(.is-stack) > .v2-cons-col { display: grid; grid-row: span 5; grid-template-rows: subgrid; }
+  .v2-cons-grid:not(.is-stack) > .v2-cons-col:only-child { grid-column: 1 / -1; }
+  .v2-cons-grid:not(.is-stack) .v2-cons-cnt { display: none; }
+  .v2-cons-grid:not(.is-stack) .v2-cons-cap { display: block; }
+}
+/* 곁줄은 나란할 때만(위) — 쌓을 땐 애널리스트 수가 큰 글자 옆(.v2-cons-cnt)이라 모듈 키가 예전(쌓은 꼴 289)과 같다. */
+.v2-cons-cap { display: none; height: 16px; margin-bottom: -4px; white-space: nowrap; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--c-muted); }
+.v2-cons-cap b { font-weight: 500; color: var(--c-ink); }
 /* 애널리스트 요약의 목표가 막대(ConsensusBody) — 축은 목표가 구간에 현재가까지 넣는다. 굵은 칸이 목표가 구간, 가는 선이 현재가까지 늘린 축,
    점이 현재가. 현재가가 구간 밖이면 점이 막대 밖에 떠 보였다(CCL · 201종목 중 49, 2026-10-10). '현재가 $X'는 점 바로 위, 최저 · 최고는 굵은 칸 양끝 밑. */
 .v2-cons-nowrow { position: relative; display: block; height: 16px; margin-bottom: -4px; }
@@ -3333,6 +3386,8 @@ a.v2-isd-row:hover { background: var(--t-tint); }
   .v2-dv .v2-mod-head .dv-table-clear::before { content: ""; position: absolute; inset: -4px -2px; }
   /* 종목을 담은 판은 갈래 칩을 넷씩 — 칩 23개가 '내 종목'을 1,354px 로 키워 목표 · 바스켓이 멀었다. 나머지는 '더 보기' 뒤. */
   .v2-dv-mine .dv-body:has(> .dv-table) .dv-group > .dv-chips > .dv-chip:nth-of-type(n + 5) { display: none; } /* 유형 칩만 — '더 보기' 판 칩 줄까지 넷으로 잘랐다. */
+  /* 빈 달 채우기 판('N월에 주는 종목')도 줄마다 넷 — 여덟짜리 줄 셋이 774px 라 내 종목을 그만큼 밀었다(2026-10-14). 나머지는 검색으로 담는다. */
+  .v2-dv-fill .dv-chips > .dv-chip:nth-of-type(n + 5) { display: none; }
   .v2-tm-pills { gap: 8px; }
   /* 내부자 종목 주가 차트 — 좁은 뷰박스(360) 그림으로. 720 을 화면 폭(≈290)에 눌러 담으면 키 70 · 표식 지름 3px 로 납작했다(2026-10-08).
      표식 손닿는 자리 폭(--hz-mkw)도 그 그림에 맞춘다. */
@@ -3434,10 +3489,11 @@ a.v2-isd-row:hover { background: var(--t-tint); }
 }
 @container kd (max-width: 679px) {
   /* 화면 대표 숫자 하나만 크게(2026-10-05 운영자 판단) — 폰은 한 번에 한 덩어리만 보여, 대표 값이 카드 숫자들과 같은 20px 이면
-     첫 화면에서 위계가 안 섰다. 햇쩨 지수 · 여론 낙관도(국장 · 미장)는 32, 종목 · 내부자 종목 화면 첫 줄 가격은 22. 꼬리표 · 전일 대비 ·
-     나머지 카드 숫자는 그대로다(넓은 화면 20 그대로). */
+     첫 화면에서 위계가 안 섰다. 햇쩨 지수 · 여론 낙관도(국장 · 미장) · ETF 순유입은 32, 종목 · 내부자 종목 화면 첫 줄 가격은 22. 꼬리표 · 전일 대비 ·
+     나머지 카드 숫자는 그대로다(넓은 화면 20 그대로). ETF 순유입은 같은 꼴(큰 숫자 + 30일 선)인데 빠져 20 이었다(2026-10-14). */
   #index .v2-card-val.is-big > b,
-  #mood .v2-card-val.is-big > b { font-size: 32px; line-height: 36px; }
+  #mood .v2-card-val.is-big > b,
+  #etf-flow .v2-card-val.is-big > b { font-size: 32px; line-height: 36px; }
   .v2-cover-price .v2-cover-v b { font-size: 22px; line-height: 28px; font-weight: 700; }
 }
 @container kd (max-width: 679px) {
@@ -3704,6 +3760,9 @@ a.v2-etf-row:focus-visible { outline-offset: -2px; }
   /* 왼쪽 목록 → 표 위 가로 띠(옆으로 민다). 줄마다 이름 · 1달, 고른 것은 옅은 파랑. 열네 줄을 표 위에 세로로 쌓으면 표가 600px 밀렸다. */
   .v2-etf-md { grid-template-columns: minmax(0, 1fr); }
   .v2-etf-md > * + * { box-shadow: none; }
+  /* 표는 열 줄 — 열다섯은 넓은 화면에서 왼쪽 유형 목록과 가로선을 맞추려는 수인데, 여기선 목록이 표 위 칩 줄이라 맞출 상대가 없다
+     (폰 914px · 화면 키의 26%). 카더라 폰 표와 같은 열 줄(2026-10-14). */
+  .v2-etf-main .v2-etf-md > .v2-etf-list ol > li:nth-child(n + 11) { display: none; }
   .v2-etf-rail { border-bottom: 1px solid var(--t-line); }
   .v2-etf-rail > .v2-th { display: none; }
   .v2-etf-rail-body { flex-direction: row; gap: 6px; padding: 10px 14px; overflow-x: auto; scrollbar-width: none; }

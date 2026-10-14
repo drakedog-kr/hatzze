@@ -147,47 +147,38 @@ export function CoverPlaceholder({ idx = false, theme = true }: { idx?: boolean;
  * 가르는 값은 `data` 유무가 아니라 **조작 자체**다(아래 onSelect/onYears). 종목과 기간을
  * 구분해야 하는데 결과 유무로는 둘이 같아 보인다.
  */
-export function Skeleton({ periodOnly }: { periodOnly: boolean }) {
-  // 실제 결과와 같은 골격(모듈 셋 + 전폭 차트 + 2:1 짝)으로 깜빡여, 로딩 뒤
-  // 레이아웃이 튀지 않는다.
-  const block = (h: number) => <SkeletonBlock style={{ height: h }} />;
-  const body = (children: React.ReactNode) => (
-    <div style={{ padding: PAD, display: "flex", flexDirection: "column", gap: 12 }}>{children}</div>
+/**
+ * 결과 자리 골격 — 라우트 자리표시자(app/mdd/loading.tsx)와 조회 중 Skeleton 이 **같은 것**을 쓴다(둘이 이어 붙어 모양이 같아야 한다).
+ * 실물과 같은 줄 구성(둘째 줄 모듈 셋 → 전폭 차트 → 사례 · 회복 · 해마다 · 시장 탓 넷 → 테마 · 손익 둘)과 같은 자리 클래스에 .is-ph 를 달아,
+ * 폭마다 실물(삼성전자 기본) 키를 최소 키로 준다(v2.css MDD 자리표시자). 예전엔 아래 두 줄이 없고 판이 짧아(1,440 603 대 실물 1,679)
+ * 들어갈 때 · 종목이나 기간을 바꿀 때마다 차트가 104px, 사례 줄이 239px 오르내렸다(2026-10-14).
+ * 결과(HeroStrip)와 같은 자리 클래스가 없으면 1,000 미만에서 셋째 칸이 첫 칸 밑 216px 에 서서 결과가 오면 판이 튀었다(2026-10-04 점검).
+ */
+export function ResultPlaceholder() {
+  const block = (h: number, k: number) => <SkeletonBlock key={k} style={{ height: h }} />;
+  const sheet = (cls: string, blocks: number[]) => (
+    <section key={cls} className={`hz-sheet ${cls} is-ph`}>
+      <div style={{ padding: PAD, display: "flex", flexDirection: "column", gap: 12 }}>{blocks.map(block)}</div>
+    </section>
   );
   return (
-    // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
-    <div style={{ position: "relative" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }} aria-hidden>
-        {/* 첫 줄 띠 자리는 조회 바 위에서 MddExplorer 가 지킨다. */}
-        {/* v2: 둘째 줄은 모듈 셋(Hero.tsx HeroStrip 과 같은 .v2-md-band). */}
-        <div className="v2-md-band">
-          {/* 결과(HeroStrip)와 같은 자리 클래스 — 없으면 1,000 미만에서 셋째 칸이 첫 칸 밑 216px 에 서서 결과가 오면 판이 튀었다(2026-10-04 점검). */}
-          {(["v2-md-stock", "v2-md-dd", "v2-md-sum"] as const).map((cls) => (
-            <section key={cls} className={`hz-sheet ${cls}`}>
-              {body(
-                <>
-                  {block(14)}
-                  {block(38)}
-                  {block(48)}
-                </>,
-              )}
-            </section>
-          ))}
-        </div>
-        <section className="hz-sheet">{body(block(201))}</section>
-        <div className="v2-md-row is-21">
-          {[0, 1].map((i) => (
-            <section key={i} className="hz-sheet">
-              {body(
-                <>
-                  {block(16)}
-                  {block(112)}
-                </>,
-              )}
-            </section>
-          ))}
-        </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }} aria-hidden>
+      <div className="v2-md-band">{(["v2-md-stock", "v2-md-dd", "v2-md-sum"] as const).map((cls) => sheet(cls, [14, 38, 48]))}</div>
+      {sheet("v2-md-chartph", [201])}
+      <div className="v2-md-row is-21 is-quad">
+        {(["v2-md-cases-mod", "v2-md-rec", "v2-md-years", "v2-md-attr"] as const).map((cls) => sheet(cls, [16, 112]))}
       </div>
+      <div className="v2-md-row is-21">{(["v2-md-theme", "v2-md-pl"] as const).map((cls) => sheet(cls, [16, 112]))}</div>
+    </div>
+  );
+}
+
+export function Skeleton({ periodOnly }: { periodOnly: boolean }) {
+  return (
+    // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
+    // 첫 줄 띠 자리는 조회 바 위에서 MddExplorer 가 지킨다.
+    <div style={{ position: "relative" }}>
+      <ResultPlaceholder />
 
       <div className="hz-loading-float" aria-hidden>
         <span className="hz-loading-badge">

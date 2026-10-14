@@ -237,11 +237,34 @@
     gap: 4px;
   }
 }
+/* 지금 화면 이름(AppShell TopBar · usePhoneTitle) — 로고 오른쪽, 베타 배지 자리. 375 에서 로고 끝 ~ 검색 단추 사이 109px,
+   가장 긴 'MDD 정밀분석'이 89px. 넘치면 말줄임. 340 아래는 워드마크를 숨기고 유령 심볼 + 이름(2026-10-14). */
+.hz-topbar-page {
+  align-self: center;
+  min-width: 0;
+  margin-left: 4px;
+  padding-left: 9px;
+  border-left: 1px solid var(--c-line);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--c-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hz-topbar-logo:has(> .hz-topbar-page) { min-width: 0; align-items: center; }
+/* 통화 단추(₩ $)까지 서는 화면(내부자)은 이름 자리가 38px 뿐이라 워드마크를 숨기고 유령 심볼 + 이름. 워드마크는 display 를 인라인으로 들고 있어
+   !important 로만 이긴다. */
+.hz-topbar:has(.hz-cur-switch) .hz-topbar-logo:has(> .hz-topbar-page) .hz-logo-link > span > :last-child { display: none !important; }
 @media (max-width: 340px) {
-  /* ③ BetaBadge 가 display 를 인라인으로 들고 있어 !important 로만 이긴다. */
-  .hz-topbar-logo > span {
+  /* ③ BetaBadge 가 display 를 인라인으로 들고 있어 !important 로만 이긴다. 화면 이름(.hz-topbar-page)은 남긴다. */
+  .hz-topbar-logo > span:not(.hz-topbar-page) {
     display: none !important;
   }
+  .hz-topbar-logo:has(> .hz-topbar-page) .hz-logo-link > span > :last-child { display: none !important; }
+  /* 통화 단추까지 서면 심볼만 남겨도 이름 자리가 65px 라 잘린 이름 대신 걷는다. */
+  .hz-topbar:has(.hz-cur-switch) .hz-topbar-page { display: none; }
 }
 
 /* 탑바의 '채널 등록 신청'. `hz-btn-soft` 를 그대로 쓰되 좌우 여백만 준다.

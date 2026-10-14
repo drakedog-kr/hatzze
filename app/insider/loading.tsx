@@ -1,4 +1,4 @@
-import { InsiderSkeleton } from "./InsiderSkeleton";
+import { INSIDER_COVER, InsiderSkeleton } from "./InsiderSkeleton";
 
 /**
  * `/insider` 의 자리표시자.
@@ -18,5 +18,5 @@ import { InsiderSkeleton } from "./InsiderSkeleton";
  */
 
 export default function Loading() {
-  return <InsiderSkeleton brief />;
+  return <InsiderSkeleton brief cover={INSIDER_COVER} />;
 }

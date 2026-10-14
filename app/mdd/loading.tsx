@@ -1,7 +1,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { C } from "../ui";
-import { CoverPlaceholder } from "./sheet";
+import { CoverPlaceholder, ResultPlaceholder } from "./sheet";
 
 /**
  * 클릭 직후 즉시 그려지는 자리표시자. 카더라(app/kadera/loading.tsx)와 같은 이유로 둔다 —
@@ -33,9 +33,6 @@ function Block({ h, w = "100%", r = 8, bg = C.bg }: { h: number; w?: number | st
   return <Skeleton style={{ height: h, width: w, borderRadius: r, background: bg }} />;
 }
 
-/** 시트 안쪽 본문 — MddExplorer 의 PAD 와 같은 값. */
-const body: React.CSSProperties = { padding: "18px 22px", display: "flex", flexDirection: "column", gap: 12 };
-
 export default function Loading() {
   return (
     // position:relative 는 아래 hz-loading-float 의 기준 상자가 되기 위한 것이다.
@@ -52,36 +49,8 @@ export default function Loading() {
         <Block h={41} w={218} r={6} bg={C.track} />
       </div>
 
-      {/* MddExplorer 의 Skeleton 과 같은 골격 — 둘째 줄 모듈 셋 + 전폭 차트 + 사례 표 · 회복 짝(2:1). */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }} aria-hidden>
-        <div className="v2-md-band">
-          {/* 결과와 같은 자리 클래스(sheet.tsx Skeleton 과 같다). */}
-          {(["v2-md-stock", "v2-md-dd", "v2-md-sum"] as const).map((cls) => (
-            <section key={cls} className={`hz-sheet ${cls}`}>
-              <div style={body}>
-                <Block h={14} />
-                <Block h={38} />
-                <Block h={48} />
-              </div>
-            </section>
-          ))}
-        </div>
-        <section className="hz-sheet">
-          <div style={body}>
-            <Block h={201} />
-          </div>
-        </section>
-        <div className="v2-md-row is-21">
-          {[0, 1].map((i) => (
-            <section key={i} className="hz-sheet">
-              <div style={body}>
-                <Block h={16} />
-                <Block h={112} />
-              </div>
-            </section>
-          ))}
-        </div>
-      </div>
+      {/* MddExplorer 의 Skeleton 과 같은 골격(sheet.tsx ResultPlaceholder — 한 벌을 같이 쓴다). */}
+      <ResultPlaceholder />
 
       {/* 보이는 자리표시자의 한가운데(globals.css 의 hz-loading-float 주석). 이 페이지는
           자리표시자가 창보다 짧아서, 예전의 '창 한가운데'는 푸터 코앞에 찍혔다. */}

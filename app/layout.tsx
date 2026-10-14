@@ -5,6 +5,7 @@ import AppShell from "./AppShell";
 import { DAILY_PUBLIC, THEME_PUBLIC } from "./screen-flags";
 import { NOTE_PAGE } from "./daily/copy";
 import { SLOGAN } from "./brand";
+import { NEWS_OFF_CSS, NEWS_OFF_SCRIPT, newsAt } from "./news";
 import { SITE_NAME, SITE_URL, pageMetadata } from "./seo";
 import { ICON_FONT_HREF } from "@/lib/icon-names";
 import { PRETENDARD_CSS, PRETENDARD_PRELOAD } from "@/lib/fonts";
@@ -135,7 +136,10 @@ const THEME_COLOR_PHONE = { light: "#ffffff", dark: "#17171c" } as const;
  * 안 가르면 /insider 에서 ₩ 를 눌러도 다시 달러로 돌아간다.
  */
 // 끝의 try 하나 — 배당으로 살기에 담은 종목이 있으면 data-dv-has(결과 셋 자리표시자를 세운다, app/dividend/BandSkeleton.tsx).
-const PREF_SCRIPT = `(function(){try{var c=document.cookie.split("; "),t,u,s;for(var i=0;i<c.length;i++){var p=c[i].split("=");if(p[0]==="hz-theme")t=p[1];else if(p[0]==="hz-cur")u=p[1];else if(p[0]==="hz-side")s=p[1];}var d=document.documentElement;if(s==="icon")d.setAttribute("data-sidebar","icon");if(t==="dark"){d.setAttribute("data-theme","dark");var ms=document.querySelectorAll('meta[name="theme-color"]');for(var j=0;j<ms.length;j++)ms[j].setAttribute("content",ms[j].media?${JSON.stringify(THEME_COLOR_PHONE.dark)}:${JSON.stringify(THEME_COLOR.dark)});}if(u==="usd"||u==="krw")d.setAttribute("data-cur",u);}catch(e){}try{var h=localStorage.getItem("hz-dividend-holdings");if(h&&h!=="[]")document.documentElement.setAttribute("data-dv-has","1");}catch(e){}})();`;
+const PREF_SCRIPT = `(function(){try{var c=document.cookie.split("; "),t,u,s;for(var i=0;i<c.length;i++){var p=c[i].split("=");if(p[0]==="hz-theme")t=p[1];else if(p[0]==="hz-cur")u=p[1];else if(p[0]==="hz-side")s=p[1];}var d=document.documentElement;if(s==="icon")d.setAttribute("data-sidebar","icon");if(t==="dark"){d.setAttribute("data-theme","dark");var ms=document.querySelectorAll('meta[name="theme-color"]');for(var j=0;j<ms.length;j++)ms[j].setAttribute("content",ms[j].media?${JSON.stringify(THEME_COLOR_PHONE.dark)}:${JSON.stringify(THEME_COLOR.dark)});}if(u==="usd"||u==="krw")d.setAttribute("data-cur",u);}catch(e){}try{var h=localStorage.getItem("hz-dividend-holdings");if(h&&h!=="[]")document.documentElement.setAttribute("data-dv-has","1");}catch(e){}${NEWS_OFF_SCRIPT}})();`;
+
+/** 맨 위 소식 띠에 걸 소식 — 그리는 시각으로 고른다(app/news.ts). 렌더 안에서 Date.now() 를 바로 부르면 React 컴파일러 린트가 막아 함수로 감싼다. */
+const currentNewsKey = () => newsAt(Date.now())?.key ?? null;
 
 export default function RootLayout({
   children,
@@ -155,6 +159,8 @@ export default function RootLayout({
         <meta name="theme-color" media="(max-width: 560px)" content={THEME_COLOR_PHONE.light} />
         <meta name="theme-color" content={THEME_COLOR.light} />
         <script dangerouslySetInnerHTML={{ __html: PREF_SCRIPT }} />
+        {/* 닫은 소식 띠를 첫 그림부터 숨긴다(PREF_SCRIPT 가 적은 data-news-off · app/news.ts). */}
+        <style dangerouslySetInnerHTML={{ __html: NEWS_OFF_CSS }} />
         {/* 데일리 노트 RSS(app/daily/rss.xml). 구독기·검색엔진이 머리의 이 줄로 피드를 찾는다. 안 연 동안은 싣지 않는다.
             ⚠️ metadata 의 alternates.types 로 두지 않는 까닭 — 페이지마다 pageMetadata 가 alternates(canonical)를
             통째로 새로 선언해, 루트에 둔 types 가 모든 하위 화면에서 사라진다(Next 의 얕은 병합). */}
@@ -233,7 +239,7 @@ export default function RootLayout({
           무시한다 — 내부 컴포넌트 hydration 검사에는 영향 없다. */}
       <body className="font-sans" suppressHydrationWarning>
         {/* 테마 리포트를 사이드바 링크로 낼지는 서버가 정한다(AppShell 의 ShellEnv 주석) — 열었거나, 배포가 아닌 로컬. */}
-        <AppShell themeNav={THEME_PUBLIC || !process.env.VERCEL_ENV}>
+        <AppShell themeNav={THEME_PUBLIC || !process.env.VERCEL_ENV} newsKey={currentNewsKey()}>
           {children}
         </AppShell>
       </body>

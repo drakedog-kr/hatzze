@@ -25,6 +25,7 @@ import { TipTap } from "./TipTap";
 import { CommandMenu, openCommandMenu, preloadCommandMenu } from "@/components/command-menu";
 import { Kbd } from "@/components/ui/kbd";
 import type { IconName } from "@/lib/icon-names";
+import { TELEGRAM, newsByKey, newsLiveAt, type NewsItem } from "./news";
 
 // sub 는 본문 헤더의 페이지 부제다(목업이 사이드바 로고 밑에 있던 문장을 여기로 옮겼다).
 // 사이드바 항목에는 안 쓰이고 PageHeader 만 읽는다.
@@ -335,24 +336,6 @@ const NAV_ON = buildNav(true);
 const NAV_OFF = buildNav(false);
 const navFor = (env: ShellEnv) => (env.themeNav ? NAV_ON : NAV_OFF);
 
-// 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정 대상이
-// 아니고, 새 탭으로 열려야 해서 next/link 가 아닌 <a> 를 쓴다. 사이드바와 폰 메뉴가
-// 같은 값을 참조해야 두 내비게이션의 항목이 어긋나지 않는다.
-//
-// 라벨 "시황 구독하기"(2026-10-08, "오늘 뭐래?"에서 바꿈 — 운영자가 더 정식인 이름을 원했다).
-// "커뮤니티 합류"처럼 들어가는 행위가 아니라 **받는 것**(시황)과 누르면 되는 일(구독)을 말한다.
-// 지수·브리핑·리포트·카더라 계열 이름은 피했다 — 사이트에 이미 있는 것들이라 같은 메뉴가 둘로
-// 보인다. '텔레그램'도 라벨에 안 넣는다 — 앞세우면 리딩방 류로 읽힌다(소식 띠 TELEGRAM_NEWS 와 같은 판단).
-// ⚠️ 사이드바 단추에서 글자 자리는 약 97px(13px · 600)이다. 이 라벨이 71px.
-//
-// aria-label 은 라벨과 따로 둔다. 라벨만 읽히면 스크린리더 사용자는 이게 외부
-// 텔레그램으로 나가는 링크라는 걸 알 수 없다.
-const TELEGRAM: { href: string; label: string; aria: string; icon: IconName } = {
-  href: "https://t.me/hatzze69",
-  label: "시황 구독하기",
-  aria: "시황 구독하기 텔레그램 채널 열기(새 탭)",
-  icon: "send",
-};
 
 /* 처음 온 사람에게 이 단추가 무엇인지 한 번 알려 주는 쪽지(app/V2Hint.tsx) — 2026-10-08 운영자 지시. 사이드바는 단추 줄 오른쪽,
    폰 메뉴는 그 줄 밑(마지막 줄이라 위로 뒤집힌다). 단추를 누르거나 ✕ 를 누르면 그 주 동안 '봤음'(weekly).
@@ -1454,6 +1437,21 @@ const isV2Page = (pathname: string) =>
   ["/insider/list/", "/insider/stock/", "/insider/investor/", "/stock/", "/etf/"].some((p) => pathname.startsWith(p)) ||
   pathname in DOC_PAGES;
 
+/**
+ * 폰 탑바에 세울 지금 화면 이름 — v2 화면은 제목 줄을 화면에서 걷어(h1 은 sr-only) 폰에선 이름이 어디에도 안 보였다(사이드바가 숨는 폭 ·
+ * 2026-10-14). 이름은 화면 머리(PageHeader)와 같은 계산이다. 자기 이름을 첫 줄 띠에 세우는 화면(종목 · 투자자 · ETF 상세 · 문서)과 홈은 비운다.
+ */
+function usePhoneTitle(): string | null {
+  const pathname = useAppPathname();
+  const page = navFor(useShellEnv()).find((n) => isActive(n.href, pathname));
+  if (pathname === "/" || !isV2Page(pathname) || SELF_TITLED_PREFIXES.some((p) => pathname.startsWith(p)) || pathname in DOC_PAGES) return null;
+  // 본문 맨 위 이동 경로 줄이 이름을 이미 말하는 화면 — 테마 한 장(국장 테마 판세 › 반도체) · 내부자 전체보기.
+  if (pathname.startsWith("/insider/list/") || (pathname.startsWith(`${THEME_PAGE.href}/`) && pathname !== US_THEME_PAGE.href)) return null;
+  const child = page?.children?.find((c) => c.href === pathname);
+  const deep = DEEP_PAGES[encodedPath(pathname)] ?? DEEP_PAGES[pathname] ?? (pathname.startsWith(`${NOTE_PAGE.href}/`) ? DEEP_PAGES[NOTE_PAGE.href] : undefined);
+  return deep?.label ?? child?.label ?? page?.label ?? null;
+}
+
 function PageHeader() {
   const pathname = useAppPathname();
   // 문서 화면 넷(DOC_PAGES)도 첫 줄 띠에 자기 h1 을 둔다(v2, 2026-10-04 · app/legal.tsx DocCover). 이름 · 부제는 구조화 데이터에 그대로 쓰인다.
@@ -1608,6 +1606,7 @@ function TopBar({
   // 메뉴가 열려 있으면 감추지 않는다 — 패널이 탑바 바로 아래에 붙어 있어서, 탑바만
   // 올라가면 패널이 허공에 뜬다.
   const hidden = scrolledDown && !menuOpen;
+  const pageName = usePhoneTitle();
 
   return (
     <header
@@ -1633,7 +1632,14 @@ function TopBar({
         <Link href="/" aria-label="hatzze 홈" className="hz-logo-link" style={{ display: "inline-flex" }}>
           <LogoLockup symbolSize={22} wordmarkSize={23} gap={6} />
         </Link>
-        <BetaBadge logoSize={23} />
+        {/* 지금 화면 이름(폰만 · 탑바는 넓은 화면에서 통째로 숨는다). 베타 표시는 푸터에 남는다. aria-hidden — sr-only h1 이 이미 이름을 읽는다. */}
+        {pageName ? (
+          <span className="hz-topbar-page" aria-hidden>
+            {pageName}
+          </span>
+        ) : (
+          <BetaBadge logoSize={23} />
+        )}
       </span>
       <div style={{ flex: 1 }} />
       {/* 오른쪽 묶음: 테마 토글 + 햄버거(모바일 전용). 햄버거가 화면 맨 오른쪽 끝이다.
@@ -1715,84 +1721,8 @@ function TopBar({
    ⚠️ 옛 키(`hz-news-us-kadera`)를 되쓰지 말 것 — 미장을 닫았던 사람은 새 소식을 못 본다. */
 const NEWS_EVENT = "hz-news-change";
 
-/* 문구를 머리·이름·꼬리로 나눈 건 **이름에만 밑줄을 긋기** 위해서다 — 띠 전체가 이미
-   링크지만, 눌러서 가는 곳이 **어디인지**는 이름이 말해야 한다. 머리(head)는 이름 앞에
-   문장을 먼저 세울 때만 채운다(2026-09-19 텔레그램 소식이 처음).
-
-   ⚠️ **아이콘과 GA 라벨도 소식마다 갈아야 한다.** 예전엔 이 둘이 본문에 박혀 있어서
-   문구만 바꾸고 넘어갔고, 내부자 소식에 미장 카더라의 자유의 여신상이 그대로 붙어
-   있었다(2026-08-26). 갈아 끼울 것을 한 덩이로 모아 둔다.
-   ⭐ 아이콘은 **사이드바 NAV 의 그 화면 아이콘과 같은 것**을 쓴다. 띠를 눌러 가면
-     사이드바에서 방금 본 그림이 그 자리에 켜져 있어야 같은 곳이라고 읽힌다.
-
-   ⭐ 키를 갈아 끼우는 것이 곧 **띠를 되쓰는 것**이다. 소식은 하나뿐이라 이 덩이만
-   바꾸면 이전 소식은 사라지고 새 소식만 뜬다. 예전 소식을 닫아 둔 사람도 키가 달라져
-   다시 본다(닫힌 표시는 옛 키에 남아 있을 뿐 새 키를 막지 않는다).
-   ⚠️ 옛 키를 되쓰지 말 것 — 그 소식을 닫았던 사람은 새 소식을 못 본다.
-
-   ⛔⛔ **아직 안 연 화면을 알리는 띠는 화면을 여는 날 함께 켜진다.** 이 띠에는 사이드바
-   NAV 같은 조건부가 없어서, 띠만 먼저 넣으면 프로덕션에서 눌러 404 로 간다. 그때는
-   `app/screen-flags.ts` 의 플래그로 갈라 목적지가 열려 있을 때만 걸리게 한다(국장
-   미리보기·배당으로 살기·테마 리포트 때 그렇게 했다). */
-/* 지금 거는 소식은 하나(NEWS). 목적지가 우리 화면이면 **그 구역 안에서는 안 그린다**(NewsStrip 의 startsWith).
-   이전 소식들(내부자 → 국장 미리보기 → 데일리 노트 → 텔레그램 2판 → 배당으로 살기 → 텔레그램 3판 → 테마 리포트 오픈)은
-   git 이력에 있다 — 되살릴 땐 키를 새로 딴다.
-   ⚠️ 문구에 숫자를 넣지 않는다(위 주석).
-   ⛔ 소식을 새로 걸거나 문구를 고칠 때는 app/releases.ts 에 판을 올리지 않는다(2026-10-01 지시 — 업데이트 기록에 안 싣는다). */
-/* tailShort: 폰(≤560)에서 tail 대신 쓰는 짧은 꼬리. 이름이 앞에 서는 소식은 폰에서 한 줄로 잘리므로(components.css 의
-   .hz-news-namefirst) 긴 tail 은 문장 중간에서 '…'로 끊긴다. 한 줄(360px 폰에서 글자 칸 238px)에 들어가는 문장을 따로 둔다. */
-/* until: 이 시각부터는 안 띄운다(없으면 계속). 마감이 있는 소식(설문 · 행사)이 끝난 뒤에 남지 않게. */
-type NewsItem = { key: string; from: string; until?: string; href: string; head?: string; name: string; tail: string; tailShort?: string; aria?: string; icon: IconName; ga: string };
-
-/* 2026-10-01 · 텔레그램 구독 권유 4판. 테마 리포트 오픈 소식(9/23~)을 내리고 다시 건다.
-   ⭐ **문장이 먼저 오고 밑줄 이름이 뒤에 선다**(head → name → tail). 사람들이 가장 궁금해하는 '왜 올랐나'가 주인공이고
-   텔레그램은 뒤로 뺐다 — 텔레그램 채널이라는 말을 앞세우면 리딩방 류로 읽혀 반감이 먼저 온다(2026-09-19 결정, 3판부터).
-   그래서 문장 어디에도 '텔레그램'이 없고, 어디로 가는지는 아이콘(사이드바 채널과 같은 send)과 링크의 aria-label 이 말한다.
-   3판("매일 개장 전과 마감 뒤에 그날의 이야기와 이유를 정리합니다. 구독하고 받아 보세요!")은 git 이력에 있다.
-   ⚠️ 키를 새로 땄다(v4) — 3판을 닫았던 사람에게도 다시 뜬다. */
-const TELEGRAM_NEWS: NewsItem = {
-  key: "hz-news-telegram-v4",
-  // 머지·배포 직후부터. 채널은 이미 열려 있으니 기다릴 글이 없다.
-  from: "2026-10-01T00:00:00+09:00",
-  href: TELEGRAM.href,
-  // 밑줄 앞에 서는 문장. 끝의 공백이 이름과의 사이를 띄운다.
-  head: "오늘 왜 올랐는지, 장이 끝나면 정리해서 보내 드립니다. ",
-  name: "받아 보기",
-  tail: "",
-  // 문장이 목적지를 말하지 않으므로 스크린리더에는 여기서 말한다(사이드바 TELEGRAM.aria 와 같은 꼴).
-  aria: "오늘 왜 올랐는지, 장이 끝나면 정리해서 보내 드립니다. 받아 보기. 텔레그램 채널 열기(새 탭)",
-  // 사이드바·모바일 탭바의 채널 아이콘과 같은 것. 본문에서는 안 쓰는 아이콘이라 한 화면 두 번 규칙에 안 걸린다.
-  icon: TELEGRAM.icon,
-  ga: "news-telegram",
-};
-
-/* 2026-10-05 · v2 의견 설문(구글 설문, 1분 · 추첨 10명 커피 기프티콘 · 10월 20일 마감). 텔레그램 4판을 내리고 건다.
-   문구는 운영자가 후보 열 중에 고른 것이다. 상품 수 · 마감일은 문장에 안 넣고(설문 첫 장이 말한다) '1분'과 '커피'만 둔다.
-   ⚠️ 키를 새로 땄다 — 텔레그램 띠를 닫았던 사람에게도 한 번 뜬다. 마감 다음 날 0시(KST)부터는 저절로 텔레그램 4판으로 돌아간다(until ·
-   아래 NEWS). 4판을 이미 닫은 사람에게는 안 뜬다 — 다시 모두에게 띄우려면 그때 4판 키를 새로 딴다.
-   아이콘 campaign 은 본문 어디에도 안 쓰는 그림이라 한 화면 두 번 규칙에 안 걸린다. */
-const SURVEY_NEWS: NewsItem = {
-  key: "hz-news-survey-v2",
-  from: "2026-10-05T00:00:00+09:00",
-  until: "2026-10-21T00:00:00+09:00",
-  href: "https://forms.gle/otD2jw73frGsTBqb9",
-  head: "hatzze가 새로 바뀌었습니다. 1분 의견 설문에 답하시면 추첨으로 커피를 드립니다. ",
-  name: "참여하기",
-  tail: "",
-  aria: "hatzze가 새로 바뀌었습니다. 1분 의견 설문에 답하시면 추첨으로 커피를 드립니다. 참여하기. 의견 설문 열기(새 탭)",
-  icon: "campaign",
-  ga: "news-survey",
-};
-
-// 모듈이 읽힐 때 한 번만 본다(렌더 안에서 Date.now() 를 부르면 React 컴파일러 린트가 막는다).
-// 서버는 어차피 안 그리고(getServerSnapshot 이 false), 클라이언트는 페이지를 열 때마다 새로 읽는다.
-// 개발 서버에서는 시각과 무관하게 띄운다 — 문구·아이콘을 로컬에서 보려면 날짜를 기다릴 수 없다.
+// 클라이언트가 페이지를 열 때 한 번만 본다(렌더 안에서 Date.now() 를 부르면 React 컴파일러 린트가 막는다). 걸 소식은 서버가 고른다(app/news.ts newsAt).
 const NEWS_NOW = Date.now();
-const newsLive = (news: NewsItem) =>
-  process.env.NODE_ENV !== "production" || (NEWS_NOW >= Date.parse(news.from) && (!news.until || NEWS_NOW < Date.parse(news.until)));
-
-/** 지금 걸 소식. 소식을 바꿀 땐 이 줄과 위 덩이만 갈아 끼운다. 설문이 끝나면(until) 텔레그램 4판으로 돌아간다. */
-const NEWS: NewsItem = newsLive(SURVEY_NEWS) ? SURVEY_NEWS : TELEGRAM_NEWS;
 
 /** 소식마다 저장소 하나. 훅에 넘기는 객체가 렌더마다 새것이면 useSyncExternalStore 가 계속 다시 구독한다 — 키로 캐시한다. */
 const newsStores = new Map<string, { subscribe: (cb: () => void) => () => void; getSnapshot: () => boolean }>();
@@ -1805,7 +1735,7 @@ function newsStoreFor(news: NewsItem) {
       return () => window.removeEventListener(NEWS_EVENT, cb);
     },
     getSnapshot() {
-      if (!newsLive(news)) return false;
+      if (!newsLiveAt(news, NEWS_NOW)) return false;
       try {
         return localStorage.getItem(news.key) === null;
       } catch {
@@ -1819,11 +1749,21 @@ function newsStoreFor(news: NewsItem) {
   return store;
 }
 
-function NewsStrip() {
+/**
+ * 맨 위 소식 띠. 걸 소식은 레이아웃이 그릴 때 골라 키로 넘긴다(app/news.ts newsAt) — 서버와 하이드레이션이 같은 소식을 그린다.
+ * ⭐ 서버에서 그린다(서버 스냅숏 true). 예전엔 서버 스냅숏이 false 라 하이드레이션 뒤 localStorage 를 읽고서야 띠가 끼어들어, 안 닫은
+ *    방문자의 모든 화면이 첫 그림 1~2초 뒤 본문째 67px(폰) 내려갔다(2026-10-14). 닫은 사람은 첫 그림 전 스크립트가 숨기고
+ *    (layout PREF_SCRIPT · app/news.ts NEWS_OFF_SCRIPT) 하이드레이션 뒤 이 컴포넌트가 걷는다.
+ */
+function NewsStrip({ newsKey }: { newsKey: string | null }) {
+  const news = newsKey ? newsByKey(newsKey) : null;
+  return news ? <NewsBand news={news} /> : null;
+}
+
+function NewsBand({ news }: { news: NewsItem }) {
   const pathname = useAppPathname();
-  const news = NEWS;
   const store = newsStoreFor(news);
-  const show = useSyncExternalStore(store.subscribe, store.getSnapshot, () => false);
+  const show = useSyncExternalStore(store.subscribe, store.getSnapshot, () => true);
 
   if (!show || pathname.startsWith(news.href)) return null;
 
@@ -1835,7 +1775,8 @@ function NewsStrip() {
   };
 
   return (
-    <div className={`hz-news${news.head ? "" : " hz-news-namefirst"}`} role="status">
+    // role=status 는 걷었다 — 서버에서 그린 띠는 바뀐 알림이 아니라 처음부터 있는 글이다(쪽마다 '새 알림'으로 끼어들지 않게).
+    <div className={`hz-news${news.head ? "" : " hz-news-namefirst"}`} data-news={news.key}>
       {/* 링크와 닫기 버튼은 **형제**로 둔다. 버튼을 링크 안에 넣으면 유효하지 않은
           마크업이고, 닫으려다 페이지가 넘어간다.
 
@@ -2227,9 +2168,12 @@ function useMainScrollRestore(ref: React.RefObject<HTMLElement | null>, pathname
 export default function AppShell({
   children,
   themeNav = THEME_PUBLIC,
+  newsKey = null,
 }: {
   children: React.ReactNode;
   themeNav?: boolean;
+  /** 맨 위 소식 띠에 걸 소식(app/news.ts newsAt) — 레이아웃이 그릴 때 고른다. 없으면 띠를 안 그린다. */
+  newsKey?: string | null;
 }) {
   const env: ShellEnv = { themeNav };
   const mainRef = useRef<HTMLElement>(null);
@@ -2356,7 +2300,7 @@ export default function AppShell({
               gap: 12,
             }}
           >
-            <NewsStrip />
+            <NewsStrip newsKey={newsKey} />
             <PageHeader />
             {children}
             <Footer />

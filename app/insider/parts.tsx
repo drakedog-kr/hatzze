@@ -1374,23 +1374,34 @@ export function ConsensusBody({
   return (
     // ⚠️ 가로 여백을 여기 두지 말 것. 아래 목록의 '더 보기' 띠가 **카드 폭을 꽉 채워야**
     //    다른 목록과 같은 모양이 된다(안 그러면 버튼이 그냥 떠 있는 글자로 보인다).
-    <div style={{ display: "flex", flexDirection: "column" }}>
+    <div className="v2-cons-wrap">
       {/* ⭐ **두 값을 나란히 세운다.** 등급과 목표가는 이 카드가 답하는 질문 둘이라 위아래로
-          쌓으면 카드가 길기만 하고 무엇이 요점인지 안 보인다. 좁아지면 저절로 접힌다.
+          쌓으면 카드가 길기만 하고 무엇이 요점인지 안 보인다. 좁아지면 저절로 접힌다(v2.css .v2-cons-grid · 칸 160 둘).
           칸 기준 폭 160 — 260 이면 1,280(칸 496)에서 두 칸이 위아래로 접혀 모듈이 116px 길어졌고(2026-10-10), 220 이면 1,024(칸 안쪽 351)에서
-          접혀 짝 거물 칸 아래가 133px 비었다(2026-10-13). */}
+          접혀 짝 거물 칸 아래가 133px 비었다(2026-10-13).
+          ⭐ 나란할 땐 두 칸이 가로줄 다섯(머리 · 큰 숫자 · 곁줄 · 막대 · 범례)을 나눠 쓴다 — 칸마다 따로 쌓으니 목표가 칸의 '현재가' 줄과
+          큰 숫자 줄바꿈만큼 두 막대가 21~38px 어긋났다(2026-10-14). 그래서 두 칸 다 막대 바로 위에 곁줄 한 줄을 둔다(등급은 애널리스트 수,
+          목표가는 현재가). 줄 수가 같아야 하니 빠지는 칸에도 자리를 둔다. */}
       {/* 좌우 14 — v2 모듈 안쪽 여백(제목 · 다른 모듈 줄과 한 세로줄). 옛 시트의 22 가 남아 8px 더 깊었다(2026-10-04 점검). */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "14px 14px 16px" }}>
+      <div className={`v2-cons-grid${stack ? " is-stack" : ""}`}>
         {total > 0 && (
-          <div style={{ flex: stack ? "1 1 100%" : "1 1 160px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
+          <div className="v2-cons-col">
             <span style={{ ...ROW.sub }}>증권가 종합</span>
+            {/* 애널리스트 수 — 위아래로 쌓을 땐 예전처럼 큰 글자 옆(.v2-cons-cnt), 나란할 땐 막대 위 곁줄(.v2-cons-cap)로 내려 목표가 칸의
+                '현재가' 줄과 짝을 맞춘다. 쌓은 꼴 키(289)는 종목 상세 배치가 옆 칸과 맞추는 데 쓴다(detail.tsx analystH). */}
             <span style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-              <strong style={{ fontSize: "var(--fs-22)", fontWeight: 700, color: C.ink, letterSpacing: "-.02em" }}>
+              <strong
+                style={{ fontSize: "var(--fs-22)", fontWeight: 700, color: C.ink, letterSpacing: "-.02em" }}
+                title={c.consensus ? `원문 등급 ${c.consensus}` : undefined}
+              >
                 {(c.consensus && CONSENSUS_KO[c.consensus]) ?? c.consensus ?? "등급 미상"}
               </strong>
-              <span style={{ ...ROW.sub }} title={c.consensus ? `원문 등급 ${c.consensus}` : undefined}>
+              <span className="v2-cons-cnt" style={{ ...ROW.sub }}>
                 애널리스트 {c.analystCount ?? total}명
               </span>
+            </span>
+            <span className="v2-cons-cap">
+              애널리스트 <b>{c.analystCount ?? total}</b>명
             </span>
             {/* 분포 막대. 한 줄에 쌓아 두면 "얼마나 한쪽으로 쏠렸나"가 숫자보다 빨리 읽힌다. */}
             <span style={{ display: "flex", height: 10, borderRadius: 3, overflow: "hidden", background: "var(--c-track)" }}>
@@ -1418,7 +1429,7 @@ export function ConsensusBody({
         )}
 
         {c.targetAvg != null && (
-          <div style={{ flex: stack ? "1 1 100%" : "1 1 160px", display: "flex", flexDirection: "column", gap: 9, minWidth: 0 }}>
+          <div className="v2-cons-col">
             <span style={{ ...ROW.sub }}>
               1년 목표가 평균{c.targetCount != null ? ` · 애널리스트 ${c.targetCount}명` : ""}
             </span>
@@ -1436,17 +1447,18 @@ export function ConsensusBody({
                 </span>
               )}
             </span>
+            {/* 막대 위 점이 무엇인지 — 바로 위 큰 숫자가 '목표가 평균'이라 점도 평균 자리로 읽혔다(2026-10-04 점검). 값을 붙인다 — 구간 밖이면 점만으로는 어디인지 안 읽힌다.
+                점 바로 위에 붙인다 — 최저 · 최고 사이 범례로 두면 좁은 칸(1,280 의 225)에서 '최저 목표가'가 꺾여 석 줄이 됐다.
+                점이 없어도 줄은 둔다(왼쪽 칸 곁줄과 가로줄을 나눠 쓴다). */}
+            <span className="v2-cons-nowrow">
+              {span && dotX != null && (
+                <span className="v2-cons-now" style={pin(dotX)}>
+                  현재가 <b><ExactMoney usd={price} rate={rate} /></b>
+                </span>
+              )}
+            </span>
             {span ? (
               <>
-                {/* 막대 위 점이 무엇인지 — 바로 위 큰 숫자가 '목표가 평균'이라 점도 평균 자리로 읽혔다(2026-10-04 점검). 값을 붙인다 — 구간 밖이면 점만으로는 어디인지 안 읽힌다.
-                    점 바로 위에 붙인다 — 최저 · 최고 사이 범례로 두면 좁은 칸(1,280 의 225)에서 '최저 목표가'가 꺾여 석 줄이 됐다. */}
-                {dotX != null && (
-                  <span className="v2-cons-nowrow">
-                    <span className="v2-cons-now" style={pin(dotX)}>
-                      현재가 <b><ExactMoney usd={price} rate={rate} /></b>
-                    </span>
-                  </span>
-                )}
                 {/* 채우는 막대가 아니라 **구간 위의 점**이다. 저점부터 채우면 "이만큼 올랐다"로
                     읽히는데, 이 값은 그게 아니라 예측 범위 안 어디에 지금 값이 있느냐다. 굵은 칸이 목표가 구간, 가는 선은 현재가까지 늘린 축. */}
                 <span className="v2-cons-bar">
@@ -1471,8 +1483,11 @@ export function ConsensusBody({
                 </span>
               </>
             ) : (
-              // 왼쪽 칸에 막대와 범례가 있어 높이가 맞아야 한다. 구간이 없으면 자리만 비운다.
-              <span aria-hidden style={{ height: 10 }} />
+              // 왼쪽 칸에 막대와 범례가 있어 높이가 맞아야 한다. 구간이 없으면 자리만 비운다(막대 · 범례 두 줄).
+              <>
+                <span aria-hidden style={{ height: 10 }} />
+                <span aria-hidden />
+              </>
             )}
           </div>
         )}
