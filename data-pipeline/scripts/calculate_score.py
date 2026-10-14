@@ -290,11 +290,18 @@ def kospi_market_strength(client) -> tuple[float, float] | None:
 
 
 def get_all_values(client, indicator_id: str, last: int | None = None) -> list[float]:
-    """원값 전부(last 를 주면 최근 last 개)."""
-    q = client.table("indicator_values").select("raw_value").eq("indicator_id", indicator_id)
+    """원값 전부(last 를 주면 최근 last 개). 전부일 땐 날짜 차례로 1,000행씩 잇는다 — 한 번에 읽으면 PostgREST 1,000행 상한에서 조용히 잘린다."""
+    q = lambda: client.table("indicator_values").select("raw_value").eq("indicator_id", indicator_id)  # noqa: E731
     if last:
-        q = q.order("date", desc=True).limit(last)
-    return [float(r["raw_value"]) for r in q.execute().data]
+        return [float(r["raw_value"]) for r in q().order("date", desc=True).limit(last).execute().data]
+    out: list[float] = []
+    start = 0
+    while True:
+        page = q().order("date").range(start, start + 999).execute().data or []
+        out += [float(r["raw_value"]) for r in page]
+        if len(page) < 1000:
+            return out
+        start += 1000
 
 
 def compute_threshold(client, indicator_id: str, config: dict) -> float:
@@ -343,7 +350,7 @@ def compute_progress(slug: str, current: float, threshold: float, config: dict) 
 
 
 def raw_at_progress(
-    slug: str, target: float, threshold: float, config: dict, avg_30d: float | None = None
+    slug: str, target: float, threshold: float, config: dict, avg_30d: float | None = None, level: float | None = None
 ) -> float | None:
     """progress가 target이 되는 원값(raw_value)을 거꾸로 구한다 — compute_progress의 역함수.
 
@@ -358,7 +365,16 @@ def raw_at_progress(
     if rs is not None:
         if not avg_30d:
             return None
-        surge = rs["floor"] + target / 100.0 * (rs["ceil"] - rs["floor"])
+        # 과열도는 급증률 눈금과 250일 백분위(level)를 섞은 값이다(relative_surge_progress) — 급증률만 되돌리면 진입선이 15% 낮게
+        # 적혔다(10-12 322,750억 · 실제 372,600억). 그날 백분위에서 target 에 닿는 급증률 눈금을 구한다.
+        need = target
+        lw = config.get("level_weight")
+        if lw and level is not None:
+            need = (target - lw * float(level)) / (1 - lw)
+            if need > 100:
+                return None  # 급증률 눈금을 100 으로 잘라도 이 백분위에선 못 닿는다
+            need = max(need, 0.0)
+        surge = rs["floor"] + need / 100.0 * (rs["ceil"] - rs["floor"])
         return avg_30d * (1 + surge / 100.0)
     if slug == "kospi_high_gap":
         floor, kink = config["floor"], config["kink"]
@@ -449,7 +465,7 @@ def main() -> None:
 
             # 카드에 적을 기준선 = 초고온 진입선. 이 값을 넘으면(direction=low면 밑돌면)
             # 정확히 그때 초고온 배지가 켜진다 — 표시와 판정이 같은 지점을 가리킨다.
-            hot_threshold = raw_at_progress(slug, HOT_ZONE, threshold, config, avg_30d)
+            hot_threshold = raw_at_progress(slug, HOT_ZONE, threshold, config, avg_30d, latest_details.get("level_pct"))
             if avg_30d and hot_threshold is not None:
                 threshold = round(hot_threshold, 2)  # 거래대금은 표시용 절대값도 이 선으로
 

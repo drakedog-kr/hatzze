@@ -91,7 +91,11 @@ def score_on(d: str, series: dict[str, list[dict]], weights_db: dict[str, float]
         if cfg["kind"] == "fixed":
             thr = cfg["threshold"]
         else:
-            thr = statistics.mean(float(r["raw_value"]) for r in rows if r["date"] <= d)
+            # 라이브(calculate_score.compute_threshold)와 같이 window 가 있으면 최근 그만큼만 평균한다(주식 쇼츠 30).
+            vals = [float(r["raw_value"]) for r in rows if r["date"] <= d]
+            if cfg.get("window"):
+                vals = vals[-cfg["window"]:]
+            thr = statistics.mean(vals)
         prog = cs.compute_progress(slug, cur, thr, cfg)
         capped = cs.cap_progress(prog)
         if cfg.get("relative_surge") is not None:

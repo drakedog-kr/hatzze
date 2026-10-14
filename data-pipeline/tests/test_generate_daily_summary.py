@@ -22,6 +22,7 @@ from generate_daily_summary import (
     hot_line_of,
     hot_problems,
     keep_bold_names,
+    mover_series,
     name_forms,
     pick_movers,
     resting_names,
@@ -179,6 +180,31 @@ def test_pick_movers_sparse_indicator_uses_mean():
     # 베스트셀러 비중처럼 정수로 가끔 바뀐다. 직전 15번 변화 중 1 이 4번 → 평균 4/15, 마지막 1 → 3.75배
     got = pick_movers([_mv("best", [5, 5, 5, 6, 6, 6, 5, 5, 5, 5, 6, 6, 6, 6, 5, 5, 6])], NOW)
     assert len(got) == 1 and abs(got[0]["times"] - 15 / 4) < 1e-9
+
+
+def test_mover_series_folds_copied_rows():
+    # 최신순. 09-23 자료를 주말 · 휴장에 세 번 다시 쓴 행은 하나로 접고, 시각은 그 자료가 처음 들어온 행이다
+    rows = [
+        {"raw_value": -24.41, "source_date": 20260928, "created_at": "2026-09-28T09:00:00+00:00"},
+        {"raw_value": -22.31, "source_date": 20260923, "created_at": "2026-09-27T00:00:00+00:00"},
+        {"raw_value": -22.31, "source_date": 20260923, "created_at": "2026-09-26T00:00:00+00:00"},
+        {"raw_value": -22.31, "source_date": 20260923, "created_at": "2026-09-23T09:00:00+00:00"},
+    ]
+    assert mover_series("kospi_high_gap", rows) == ([-22.31, -24.41], "2026-09-28T09:00:00+00:00")
+    # 복사 행만 새로 들어온 날은 처음 들어온 시각이 하루 넘게 묵어 '새 값'에서 빠진다
+    values, first = mover_series("kospi_high_gap", rows[1:])
+    assert values == [-22.31] and first == "2026-09-23T09:00:00+00:00"
+
+
+def test_mover_series_divergence_uses_card_value():
+    # 괴리 지수는 원값(검색량)이 아니라 카드 · 점수의 lead 로 잰다. lead 가 없는 옛 행은 건너뛴다
+    rows = [
+        {"raw_value": 30.40, "lead": -58.5, "created_at": "b"},
+        {"raw_value": 10.82, "lead": -57.8, "created_at": "a"},
+        {"raw_value": 9.00, "created_at": "old"},
+    ]
+    assert mover_series("small_business_crisis_index", rows) == ([-57.8, -58.5], "b")
+    assert mover_series("other", rows)[0] == [9.0, 10.82, 30.40]
 
 
 def test_change_none_is_a_sentence():

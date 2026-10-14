@@ -276,8 +276,13 @@ def summarize(code: str, recs: list[dict], today: date, close: float | None) -> 
     # 12개월 합이 그 전 회계연도의 두 배를 넘으면 특별·청산배당이 섞인 것으로 본다.
     # 견주는 해가 '가장 최근 끝난 해'가 아니라 **그 전 해**인 까닭: 4월 결산 배당이 크게
     # 뛴 해는 최근 끝난 해 자체가 그 배당을 품고 있어 견줘도 안 걸린다(노바텍 2025).
+    # 전전해 배당이 없으면(지난해 배당을 시작) 지난해 합과 견주되, **12개월 안 한 번 받은 금액**이 그 두 배를 넘을 때만 —
+    # 12개월 합으로 견주면 결산 17원에 중간배당 23원을 새로 더한 회사(유니테크노)까지 걸린다. 인피니트헬스케어(지난해 100원 ·
+    # 10/12 특별 820원)는 예전엔 늘 안 걸려 8.62% 를 평범한 수익률로 냈다.
     prev_fy = annual.get(last_year - 1, 0)
-    unusual = prev_fy > 0 and ttm_dps > 2 * prev_fy
+    last_fy = annual.get(last_year, 0)
+    big = max((amt for _, _, amt in picked), default=0)
+    unusual = (prev_fy > 0 and ttm_dps > 2 * prev_fy) or (prev_fy == 0 and last_fy > 0 and big > 2 * last_fy)
 
     return {
         "code": code,

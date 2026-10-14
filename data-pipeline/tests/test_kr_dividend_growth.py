@@ -97,3 +97,20 @@ def test_first_dividend_declared_counts_before_paid():
     recs = [{"record_date": "2026-06-30", "pay_date": "2026-10-14", "kind": "현금배당", "cash_per_share": 200, "fiscal_month": "12"}]
     r = K.summarize("097870", recs, TODAY, 10000)
     assert r["ttm_dps"] == 200
+
+
+def _pay(record: str, pay: str | None, amt: float) -> dict:
+    return {"record_date": record, "pay_date": pay, "kind": "현금배당", "cash_per_share": amt, "fiscal_month": "12"}
+
+
+def test_unusual_when_dividend_started_last_year():
+    today = date(2026, 10, 13)
+    # 인피니트헬스케어 꼴 — 2025 결산 100원으로 배당을 시작했고 10/12 기준 특별 820원. 전전해가 없어도 걸린다
+    r = K.summarize("071200", [_pay("2025-12-31", "2026-04-15", 100), _pay("2026-10-12", "2026-10-28", 820)], today, 10000)
+    assert r["ttm_unusual"] is True
+    # 유니테크노 꼴 — 결산 17원에 중간배당 23원을 새로 더했다. 한 번 받은 금액이 지난해 합의 두 배 아래라 안 걸린다
+    r = K.summarize("241690", [_pay("2025-12-31", "2026-04-15", 17), _pay("2026-06-30", "2026-08-14", 23)], today, 2500)
+    assert r["ttm_unusual"] is False
+    # 전전해가 있으면 예전 그대로 12개월 합을 전전해와 견준다
+    r = K.summarize("000002", [_pay("2024-12-31", "2025-04-15", 100), _pay("2025-12-31", "2026-04-15", 100), _pay("2026-06-30", "2026-08-14", 150)], today, 5000)
+    assert r["ttm_unusual"] is True

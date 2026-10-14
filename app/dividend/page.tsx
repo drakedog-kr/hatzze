@@ -67,8 +67,12 @@ function toLite(s: DividendStock): StockLite {
     yieldPct: s.yieldPct,
     unusual: s.unusual,
     estimated: s.estimated,
-    // 지급일이 없는 건(아직 안 정해진 미래분)은 달을 모르니 달력에서 뺀다. 합(dps)에는 든다.
-    pays: s.payments.filter((p) => p.pay).map((p) => [MONTH(p.pay as string), p.amount, DAY(p.pay as string)]),
+    // 지급일이 빈 건은 확정 공시(nextPay)의 같은 금액 지급일로 메운다 — 기준일은 지났는데 1년 합에 든 건(인피니트헬스케어 820원 ·
+    // 10/28 지급)이 달력에서만 빠져 두 칸이 어긋났다. 그래도 날을 모르면(아직 안 정해진 미래분) 달력에서 뺀다. 합(dps)에는 든다.
+    pays: s.payments.flatMap((p) => {
+      const d = p.pay ?? (s.nextPay?.date && Math.abs(s.nextPay.amount - p.amount) < 0.5 ? s.nextPay.date : null);
+      return d ? [[MONTH(d), p.amount, DAY(d)] as [number, number, number]] : [];
+    }),
     streak: s.streak,
     growth5: s.growth5,
     nextRecord: s.nextRecord,

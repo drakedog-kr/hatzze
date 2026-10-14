@@ -20,7 +20,8 @@ import { themeDetailWindow } from "./theme-window";
 import { getEventsForCodes, todayKst, type UpcomingEvent } from "./kadera-why";
 import { isLoadFailed } from "./load-state";
 import { RISER_FALLBACK_DAYS, risersWithFallback, type RiserRow, type ThemeRiser } from "./theme-risers";
-import { changeRateOf, fetchYahooQuote } from "./yahoo-quote";
+import { quoteChangeRate } from "./krx-gap";
+import { fetchYahooQuote } from "./yahoo-quote";
 
 /**
  * 테마 실주소 화면(`/theme/반도체`)과 테마 목록(`/theme`)이 쓰는 자료.
@@ -231,8 +232,9 @@ async function fillTodayRates(reasons: ThemeReasonRow[]): Promise<void> {
   await Promise.all(
     todo.map(async (r) => {
       try {
-        const q = await fetchYahooQuote(`${r.code}.${r.market === "KOSDAQ" ? "KQ" : "KS"}`, { next: { revalidate: 600 } });
-        const rate = q ? changeRateOf(q) : null;
+        const symbol = `${r.code}.${r.market === "KOSDAQ" ? "KQ" : "KS"}`;
+        const q = await fetchYahooQuote(symbol, { next: { revalidate: 600 } });
+        const rate = q ? await quoteChangeRate(q, symbol) : null; // 빈 전 거래일 봉은 KRX 종가로(lib/krx-gap.ts)
         if (r.changeRate == null && rate != null) r.changeRate = rate;
         if (r.close == null && q) r.close = q.price;
       } catch (e) {

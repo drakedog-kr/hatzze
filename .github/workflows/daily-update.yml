@@ -1861,6 +1861,8 @@ jobs:
             02|05|08|11)
               if [ "$d" -ge 10 ] && [ "$d" -le 25 ]; then
                 python data-pipeline/scripts/fetch_us_13f.py
+                # 13F 주식 수는 액면분할을 보정하지 않는다 — 분기 비교가 쓸 분할 배수를 받는다(migration_099).
+                python data-pipeline/scripts/fetch_us_splits.py
               else
                 echo "13F 제출 창 밖($m/$d). 건너뛴다."
               fi

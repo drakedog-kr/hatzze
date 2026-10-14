@@ -20,8 +20,34 @@
  */
 import { canonicalTicker } from "./us-ticker-spellings.ts";
 
-/** 한 분기 · 한 클래스의 보유. 같은 (운용사, 티커, 분기)는 수집기가 한 줄로 합쳐 둔다. */
-export type ClassRow = { ticker: string; shares: number | null; value: number | null };
+/**
+ * 한 분기 · 한 클래스의 보유. 같은 (운용사, 티커, 분기)는 수집기가 한 줄로 합쳐 둔다.
+ * `adj` 는 그 분기말까지의 누적 액면분할 배수(splitAdjOf) — 없으면 1(분할 기록 없음).
+ */
+export type ClassRow = { ticker: string; shares: number | null; value: number | null; adj?: number };
+
+/** 액면분할 한 번(us_stock_split 한 줄 · fetch_us_splits.py). ratio 는 새 주식 수 ÷ 옛 주식 수 — 5:1 이면 5, 1:10 역분할이면 0.1. */
+export type StockSplit = { ticker: string; ex_date: string; ratio: number | string };
+
+/**
+ * (티커, 분기말) → 그날까지의 누적 분할 배수. 주식 수를 이 값으로 나누면 분할 전 단위가 되어, 서로 다른 분기의
+ * 주식 수를 견줘도 그 사이 분할이 빠진다.
+ *
+ * ⚠️ 13F 주식 수는 분할을 보정하지 않는다. 2026 Q2 에 카바나(5:1) · 부킹(25:1) · KLA(10:1)가 거의 모든 보유자에서
+ *    '늘림'으로 섰다 — 카바나는 '늘린 종목' 5위(늘림 8 · 줄임 1)였는데 분할을 빼면 늘림 5 · 줄임 4 다.
+ */
+export function splitAdjOf(splits: StockSplit[]): (ticker: string, date: string) => number {
+  const byTicker = new Map<string, { date: string; ratio: number }[]>();
+  for (const s of splits) {
+    const ratio = Number(s.ratio);
+    if (!(ratio > 0)) continue;
+    byTicker.set(s.ticker, [...(byTicker.get(s.ticker) ?? []), { date: s.ex_date, ratio }]);
+  }
+  return (ticker, date) => (byTicker.get(ticker) ?? []).reduce((k, s) => (s.date <= date ? k * s.ratio : k), 1);
+}
+
+/** 분할 전 단위 주식 수 — 분기끼리 견줄 땐 늘 이 값으로(위 splitAdjOf). */
+const units = (r: ClassRow) => (r.shares ?? 0) / (r.adj ?? 1);
 
 /** 분기 사이의 움직임. `exit` 는 전량 정리다(종목 상세의 보유자 표에는 안 들어간다). */
 export type QuarterShift = {
@@ -70,23 +96,25 @@ export function quarterShift(now: ClassRow[], before: ClassRow[]): QuarterShift 
   let was: number;
   if (tickers.length === 1) {
     // 인물 상세(`getManagerDetail`)와 **같은 식**이다. 한쪽만 고치면 같은 보유가
-    // 두 화면에서 다른 증감률로 뜬다.
-    shares = sum(now, "shares");
-    was = sum(before, "shares");
+    // 두 화면에서 다른 증감률로 뜬다. 분할은 둘 다 units 로 뺀다.
+    shares = now.reduce((s, r) => s + units(r), 0);
+    was = before.reduce((s, r) => s + units(r), 0);
   } else {
     const unit = (t: string) => {
       const b = before.find((r) => r.ticker === t);
       const a = now.find((r) => r.ticker === t);
-      if (b?.shares && b.value) return b.value / b.shares;
-      if (a?.shares && a.value) return a.value / a.shares;
+      if (b && units(b) && b.value) return b.value / units(b);
+      if (a && units(a) && a.value) return a.value / units(a);
       return 0;
     };
     shares = 0;
     was = 0;
     for (const t of tickers) {
       const u = unit(t);
-      shares += (now.find((r) => r.ticker === t)?.shares ?? 0) * u;
-      was += (before.find((r) => r.ticker === t)?.shares ?? 0) * u;
+      const a = now.find((r) => r.ticker === t);
+      const b = before.find((r) => r.ticker === t);
+      shares += (a ? units(a) : 0) * u;
+      was += (b ? units(b) : 0) * u;
     }
   }
   const sharesChange = was ? ((shares - was) / was) * 100 : null;

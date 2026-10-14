@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 
-import { getEtfFlowBoard, indexLabel, paidBetween, type EtfPayment, type EtfPriceRow, type EtfUniverseRow } from "@/lib/etf-flow";
+import { CALENDAR_CODE, getEtfFlowBoard, indexLabel, paidBetween, type EtfPayment, type EtfPriceRow, type EtfUniverseRow } from "@/lib/etf-flow";
 import { abroadName, type EtfGroup } from "@/lib/etf-groups";
 import { isLoadFailed } from "@/lib/load-state";
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -21,7 +21,8 @@ import { fetchAllRows } from "@/lib/telegram-data";
  *
  * 1달은 위쪽 표와 같은 20거래일이다. 수익률은 그 첫날의 **앞 거래일** 종가에서 잰다 — 20거래일 순유입이 20번의 하루 변화이듯
  * 수익률도 20번의 하루 변화다. 그 두 날의 전 종목 값은 위쪽이 이미 읽어 둔 것을 쓴다(lib/etf-flow.ts EtfFlowBoard.month).
- * 1년은 asOf 에서 365일 앞 날짜 이전의 가장 가까운 달 말일(etf_price_snapshot, 마이그레이션 096)부터다.
+ * 1년은 asOf 에서 365일 앞 날짜 이전의 가장 가까운 거래일부터다(1년 뷰 etf_flow_year · 상세와 같은 날 · 마이그레이션 100).
+ * 예전엔 그 앞 달 말일(etf_price_snapshot)이라 12~13개월을 1년으로 적었다 — 10-12 기준 2025-09-30 부터라 KODEX 200 이 +115.1%(정확히 +101.6%).
  *
  * ## 분배금
  *
@@ -109,7 +110,7 @@ export type EtfExtras = {
   asOf: string;
   /** 1달 수익률의 기준일(20거래일 앞 거래일) */
   monthBase: string;
-  /** 1년 비교의 기준일(달 말일) — 스냅숏이 없으면 null */
+  /** 1년 비교의 기준일(365일 앞 날짜 이전의 가장 가까운 거래일) — 일별 표에 없으면 null */
   yearBase: string | null;
   /** 커버드콜 — 1년(기준일 종가가 있는 것 · 스냅숏이 없으면 빈 배열) · 1달(20거래일 앞 기준일 종가가 있는 것). 화면이 머리 세그먼트로 고른다. */
   coveredYear: EtfCoveredRow[];
@@ -157,7 +158,7 @@ export const getEtfExtras = cache(async (): Promise<EtfExtras | null> => {
 
   let infoFailed = false;
   const [anchorRes, infoRows] = await Promise.all([
-    db.from("etf_price_snapshot").select("trade_date").lte("trade_date", yearAgo).order("trade_date", { ascending: false }).limit(1),
+    db.from("etf_flow_daily").select("trade_date").eq("isu_cd", CALENDAR_CODE).lte("trade_date", yearAgo).order("trade_date", { ascending: false }).limit(1),
     fetchAllRows<InfoRow>("code", () => db.from("etf_info").select("code,fee_pct,setup_date,category,benchmark"), { onError: () => (infoFailed = true) }),
   ]);
   const info = new Map(infoFailed ? [] : infoRows.map((r) => [r.code, r]));
@@ -167,13 +168,13 @@ export const getEtfExtras = cache(async (): Promise<EtfExtras | null> => {
   const snapCodes = [...new Set([...covered, ...lever].map((u) => u.code).concat(baseCodes))];
   const divCodes = [...new Set(covered.map((u) => u.code).concat(baseCodes))];
   const [snapRes, divRes] = await Promise.all([
-    yearBase ? db.from("etf_price_snapshot").select("code,close_price,nav,index_value").eq("trade_date", yearBase).in("code", snapCodes) : Promise.resolve({ data: [] }),
+    yearBase ? db.from("etf_flow_daily").select("isu_cd,close_price,nav,index_value").eq("trade_date", yearBase).in("isu_cd", snapCodes) : Promise.resolve({ data: [] }),
     db.from("etf_dividend").select("code,payments").in("code", divCodes),
   ]);
   const snap = new Map(
-    ((snapRes.data ?? []) as { code: string; close_price: number | null; nav: number | null; index_value: number | null }[]).map((r) => [
-      r.code,
-      { code: r.code, close: n(r.close_price), nav: n(r.nav), index: n(r.index_value), indexName: null } satisfies EtfPriceRow,
+    ((snapRes.data ?? []) as { isu_cd: string; close_price: number | null; nav: number | null; index_value: number | null }[]).map((r) => [
+      r.isu_cd,
+      { code: r.isu_cd, close: n(r.close_price), nav: n(r.nav), index: n(r.index_value), indexName: null } satisfies EtfPriceRow,
     ]),
   );
   const payments = new Map(((divRes.data ?? []) as { code: string; payments: EtfPayment[] | null }[]).map((r) => [r.code, r.payments ?? []]));
@@ -183,7 +184,7 @@ export const getEtfExtras = cache(async (): Promise<EtfExtras | null> => {
   // 세그먼트로 고른다(2026-10-12 "1달 · 1년 옵션 · 1년 기본"). 1달의 첫날 · 분배금 셈은 'ETF 자금 흐름' 표 1달 수익률과 같다.
   const coveredTotal = (code: string, from: EtfPriceRow | undefined, to: EtfPriceRow | undefined, since: string) => {
     if (!from?.close || !to?.close) return null;
-    const paid = paidBetween(payments.get(code), since, asOf);
+    const paid = paidBetween(payments.get(code), since, asOf, month.cal);
     const dist = (paid.sum / from.close) * 100;
     const price = pct(to.close, from.close);
     return { dist, price, total: dist + price, pays: paid.count };

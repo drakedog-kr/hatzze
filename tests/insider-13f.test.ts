@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { filedQuarters, holdersByTicker, isCik, managerMoves, quarterMarks, stockPosition } from "../lib/insider-13f.ts";
+import { filedQuarters, holdersByTicker, isCik, managerMoves, quarterMarks, splitAdjOf, stockPosition } from "../lib/insider-13f.ts";
 
 const Q4 = "2025-12-31";
 const Q1 = "2026-03-31";
@@ -257,6 +257,32 @@ describe("managerMoves", () => {
       () => null,
     );
     assert.equal(m.size, 0);
+  });
+});
+
+describe("액면분할 보정", () => {
+  // 카바나 2026 Q2 5:1 분할. 바이킹 글로벌 2,780,035 → 12,322,311주는 '4.4배로 늘림'이 아니라 줄임(−11.4%)이다
+  const adj = splitAdjOf([{ ticker: "CVNA", ex_date: "2026-05-15", ratio: 5 }]);
+  const row = (report_date: string, shares: number, value: number) => ({ cik: 1, ticker: "CVNA", report_date, shares, value, adj: adj("CVNA", report_date) });
+
+  it("누적 배수는 그 분기말까지의 분할만 곱한다", () => {
+    assert.equal(adj("CVNA", "2026-03-31"), 1);
+    assert.equal(adj("CVNA", "2026-06-30"), 5);
+    assert.equal(adj("AMD", "2026-06-30"), 1);
+  });
+
+  it("분할을 빼고 견준다 — 늘림처럼 보이던 줄임", () => {
+    const p = stockPosition([row("2026-03-31", 2_780_035, 874e6), row("2026-06-30", 12_322_311, 811e6)], ["2026-03-31", "2026-06-30"]);
+    assert.equal(p?.move, "trim");
+    assert.ok(Math.abs((p?.sharesChange ?? 0) - -11.35) < 0.05);
+    // 표에 적는 주식 수는 신고 그대로
+    assert.equal(p?.shares, 12_322_311);
+  });
+
+  it("분할 뒤 실제로 늘린 곳은 늘림", () => {
+    const p = stockPosition([row("2026-03-31", 1_754_709, 552e6), row("2026-06-30", 10_520_666, 692e6)], ["2026-03-31", "2026-06-30"]);
+    assert.equal(p?.move, "add");
+    assert.ok(Math.abs((p?.sharesChange ?? 0) - 19.91) < 0.05);
   });
 });
 

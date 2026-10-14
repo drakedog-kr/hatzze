@@ -14,7 +14,8 @@ import { pickThemeRows } from "@/lib/theme-rows";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { usableOneliner } from "@/lib/prompt-leak";
 import { trendingTodayStartISO } from "@/lib/trending-window";
-import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
+import { quoteChangeRate } from "@/lib/krx-gap";
+import { fetchYahooQuote } from "@/lib/yahoo-quote";
 
 // 카더라 리포트 데이터 접근 계층. telegram_* 테이블은 비공개(공개 read 없음)라
 // service_role 클라이언트(getSupabaseAdmin)로만 읽는다 — 서버에서만 호출된다.
@@ -746,7 +747,8 @@ type StockRow = {
 async function stockQuote(symbol: string): Promise<{ price: number; changeRate: number } | null> {
   const q = await fetchYahooQuote(symbol, { next: { revalidate: 1800 } });
   if (!q) return null;
-  const changeRate = changeRateOf(q);
+  // 전 거래일 봉이 비었으면 그날 KRX 종가로 셈한다(lib/krx-gap.ts) — 건너뛰면 이틀치 등락이었다.
+  const changeRate = await quoteChangeRate(q, symbol);
   return changeRate === null ? null : { price: q.price, changeRate };
 }
 

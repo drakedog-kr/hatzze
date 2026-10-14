@@ -1,5 +1,6 @@
 import "server-only";
 
+import { krxClosesOn, krxCodeOf } from "@/lib/krx-gap";
 import type { Bar } from "@/lib/mdd";
 import { priceContradictsDayRange } from "@/lib/yahoo-quote";
 
@@ -18,6 +19,14 @@ import { priceContradictsDayRange } from "@/lib/yahoo-quote";
  */
 
 const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
+
+/**
+ * 조회 기준 시각을 30분 단위로 끊는다(= next.revalidate 1800). 주소에 초 단위 지금 시각(period2)을 넣던 때는 1초마다 주소가 바뀌어
+ * 데이터 캐시가 한 번도 안 맞았다(MDD 조회마다 야후 12번 · 2026-10-13 점검). 같은 30분 안의 호출은 같은 주소다.
+ */
+const BUCKET_SEC = 1800;
+/** 야후가 멈추면 함수 상한(MDD 20초)까지 붙잡혀 부분 결과 대신 통째로 504 였다 — 한 종목만 빠지게 6초에서 끊는다. */
+const FETCH_TIMEOUT_MS = 6000;
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 /**
@@ -60,7 +69,7 @@ function exchangeDate(epochSec: number, gmtOffsetSec: number): string {
  *     (lib/yahoo-quote 의 같은 판정을 그대로 쓴다 — 규칙이 둘로 갈리면 티커와 MDD 가
  *     또 어긋난다. 2026-07-28 에 실제로 15.7% 어긋났었다).
  */
-function appendLastSession(bars: Bar[], meta: Record<string, unknown> | undefined, withVolume = false): void {
+function appendLastSession(bars: Bar[], meta: Record<string, unknown> | undefined, withVolume: boolean, asOf: number): void {
   const price = meta?.regularMarketPrice;
   const marketTime = meta?.regularMarketTime;
   if (typeof price !== "number" || typeof marketTime !== "number") return;
@@ -79,8 +88,10 @@ function appendLastSession(bars: Bar[], meta: Record<string, unknown> | undefine
   // ⚠️ 국장에도 regular.end 를 쓰고 싶어지지만 쓰면 안 된다 — 야후가 KRX 마감을
   //    15:00 으로 준다(실측). 실제 마감은 15:30 이라 30분 이른 값을 종가로 붙이게 된다.
   const isKrx = offset === 32_400;
+  // 지금 시각 대신 조회 기준 시각(asOf, 30분 버킷 시작)으로 가른다 — 실제 받은 시각 이하라 판정이 보수적이 되어,
+  // 캐시에 든 장중 값을 종가로 붙이는 일이 없다. 막 끝난 세션은 다음 버킷에서 붙는다(최대 30분 늦게).
   if (isKrx) {
-    const nowKst = new Date(Date.now() + KST_OFFSET_MS);
+    const nowKst = new Date(asOf * 1000 + KST_OFFSET_MS);
     const todayKst = nowKst.toISOString().slice(0, 10);
     if (sessionDate === todayKst && nowKst.getUTCHours() * 60 + nowKst.getUTCMinutes() < MARKET_CLOSE_KST_MIN) {
       return;
@@ -89,7 +100,7 @@ function appendLastSession(bars: Bar[], meta: Record<string, unknown> | undefine
     const period = meta?.currentTradingPeriod as { regular?: { end?: unknown } } | undefined;
     const end = period?.regular?.end;
     if (typeof end !== "number") return; // 마감 시각을 모르면 붙이지 않는다
-    if (Date.now() / 1000 < end + 30 * 60) return;
+    if (asOf < end + 30 * 60) return;
   }
 
   // 일봉이 이미 그 날짜를 채웠으면(야후가 뒤늦게 정리한 경우) 그대로 둔다.
@@ -109,19 +120,22 @@ export async function fetchDailyHistory(
   /** 봉에 거래량을 붙일까 — MDD 종목 조회('가격대별 거래')만 켠다. 봉을 그대로 화면에 넘기는 곳(내부자 차트)의 전송량을 안 늘린다. */
   opts: { volume?: boolean } = {},
 ): Promise<Bar[] | null> {
-  const now = Math.floor(Date.now() / 1000);
+  const asOf = Math.floor(Date.now() / 1000 / BUCKET_SEC) * BUCKET_SEC;
   // 전체(years 아주 큼)여도 야후는 상장 이후만 준다. 여유로 하루 더 뺀다.
-  const period1 = years >= 100 ? 0 : Math.max(0, now - Math.ceil(years * SECONDS_PER_YEAR) - 86_400);
+  const period1 = years >= 100 ? 0 : Math.max(0, asOf - Math.ceil(years * SECONDS_PER_YEAR) - 86_400);
   return fetchBars(
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}` + `?period1=${period1}&period2=${now}&interval=1d`,
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}` + `?period1=${period1}&period2=${asOf}&interval=1d`,
     opts.volume === true,
+    asOf,
+    symbol,
   );
 }
 
-async function fetchBars(url: string, withVolume = false): Promise<Bar[] | null> {
+async function fetchBars(url: string, withVolume: boolean, asOf: number, symbol: string): Promise<Bar[] | null> {
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       // 일봉은 하루 한 번 바뀐다. 라우트가 CDN s-maxage 로도 감싸지만, 데이터
       // 캐시로도 30분 재검증을 걸어 같은 심볼 반복 조회의 야후 왕복을 줄인다.
       // ⚠️ 900 이면 안 된다 — 카더라 '왜 올랐나'가 이 함수를 쓰는데, 라우트 안의 가장 짧은
@@ -142,19 +156,52 @@ async function fetchBars(url: string, withVolume = false): Promise<Bar[] | null>
     const gmtOffset = typeof result?.meta?.gmtoffset === "number" ? result.meta.gmtoffset : KST_OFFSET_MS / 1000;
 
     const bars: Bar[] = [];
+    // 날짜는 있는데 종가가 빈 봉 — 야후가 그 거래일 정리를 빠뜨린 것(아래 fillKrxHoles). 맨 끝 봉은 진행 중인 세션이라 늘 비어 오고
+    // appendLastSession 이 맡으니 안 모은다(모으면 장중 국장 조회마다 빈 KRX 조회가 한 번씩 붙는다).
+    const holes: string[] = [];
     for (let i = 0; i < timestamps.length; i++) {
       const t = timestamps[i];
       const c = closes[i];
-      if (typeof t !== "number" || typeof c !== "number") continue; // 휴장·결측 봉은 건너뛴다
+      if (typeof t !== "number") continue;
+      if (typeof c !== "number") {
+        if (i < timestamps.length - 1) holes.push(exchangeDate(t, gmtOffset));
+        continue; // 휴장·결측 봉은 건너뛴다
+      }
       const v = Array.isArray(volumes) ? volumes[i] : null;
       bars.push(typeof v === "number" ? { date: exchangeDate(t, gmtOffset), close: c, volume: v } : { date: exchangeDate(t, gmtOffset), close: c });
     }
 
-    appendLastSession(bars, result?.meta, withVolume);
+    await fillKrxHoles(bars, holes, symbol);
+    appendLastSession(bars, result?.meta, withVolume, asOf);
     return bars.length >= 2 ? bars : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * 국장 종목의 빈 봉을 KRX 종가로 메운다(lib/krx-gap.ts 머리말 · 2026-10-12 국내 종목 전부가 비었다). 빈 봉이 없으면 조회도 없다.
+ *
+ * 야후 종가는 수정주가, KRX 는 원종가라 분할 · 병합이 낀 기간엔 갈린다 — 그 날 KRX 등락률로 거꾸로 낸 전날 종가가 바로 앞 야후 종가와
+ * 1% 안일 때만 끼운다. 거래량은 모르니 비워 둔다(MDD '가격대별 거래'는 거래량 없는 봉을 저절로 뺀다).
+ */
+async function fillKrxHoles(bars: Bar[], holes: string[], symbol: string): Promise<void> {
+  const code = krxCodeOf(symbol);
+  if (!code || !holes.length || !bars.length) return;
+  const krx = await krxClosesOn(code, holes);
+  if (!krx.size) return;
+  let added = false;
+  for (const date of holes) {
+    const k = krx.get(date);
+    if (!k || k.changeRate == null) continue;
+    const before = [...bars].reverse().find((b) => b.date < date);
+    if (!before) continue;
+    const impliedPrev = k.close / (1 + k.changeRate / 100);
+    if (Math.abs(impliedPrev / before.close - 1) > 0.01) continue;
+    bars.push({ date, close: k.close });
+    added = true;
+  }
+  if (added) bars.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** KRX 시장 구분 → 야후 심볼 접미사. */
