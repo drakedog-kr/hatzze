@@ -3212,6 +3212,22 @@ a.v2-isd-row:hover { background: var(--t-tint); }
 .v2-isd-legend { display: inline-flex; align-items: center; gap: 12px; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-isd-legend > span { display: inline-flex; align-items: center; gap: 5px; }
 .v2-in .hz-mkfilter-set label { font-size: 12px; font-weight: 500; }
+/* 애널리스트 요약(ConsensusBody) 두 칸 — 등급 · 목표가. 나란할 땐 가로줄 다섯(머리 · 큰 숫자 · 곁줄 · 막대 · 범례)을 함께 쓴다(subgrid) —
+   칸마다 따로 쌓으니 목표가 칸의 '현재가' 줄과 큰 숫자 줄바꿈만큼 두 막대가 21~38px 어긋났다(2026-10-14). 칸이 160 아래로 좁아지면
+   예전처럼 위아래로 접는다(칸 160 둘 + 사이 16 + 좌우 여백 28 = 364). 막대 바로 위 곁줄은 두 칸 같은 꼴(.v2-cons-cap · .v2-cons-now). */
+.v2-cons-wrap { display: flex; flex-direction: column; container: cons / inline-size; }
+.v2-cons-grid { display: flex; flex-direction: column; gap: 16px; padding: 14px 14px 16px; }
+.v2-cons-col { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+@container cons (min-width: 364px) {
+  .v2-cons-grid:not(.is-stack) { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; row-gap: 9px; }
+  .v2-cons-grid:not(.is-stack) > .v2-cons-col { display: grid; grid-row: span 5; grid-template-rows: subgrid; }
+  .v2-cons-grid:not(.is-stack) > .v2-cons-col:only-child { grid-column: 1 / -1; }
+  .v2-cons-grid:not(.is-stack) .v2-cons-cnt { display: none; }
+  .v2-cons-grid:not(.is-stack) .v2-cons-cap { display: block; }
+}
+/* 곁줄은 나란할 때만(위) — 쌓을 땐 애널리스트 수가 큰 글자 옆(.v2-cons-cnt)이라 모듈 키가 예전(쌓은 꼴 289)과 같다. */
+.v2-cons-cap { display: none; height: 16px; margin-bottom: -4px; white-space: nowrap; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--c-muted); }
+.v2-cons-cap b { font-weight: 500; color: var(--c-ink); }
 /* 애널리스트 요약의 목표가 막대(ConsensusBody) — 축은 목표가 구간에 현재가까지 넣는다. 굵은 칸이 목표가 구간, 가는 선이 현재가까지 늘린 축,
    점이 현재가. 현재가가 구간 밖이면 점이 막대 밖에 떠 보였다(CCL · 201종목 중 49, 2026-10-10). '현재가 $X'는 점 바로 위, 최저 · 최고는 굵은 칸 양끝 밑. */
 .v2-cons-nowrow { position: relative; display: block; height: 16px; margin-bottom: -4px; }
