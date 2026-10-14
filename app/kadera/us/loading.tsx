@@ -1,4 +1,4 @@
-import { KaderaSkeleton } from "../KaderaSkeleton";
+import { KaderaSkeleton, US_COVER } from "../KaderaSkeleton";
 
 /**
  * `/kadera/us` 의 자리표시자. 국장과 같은 골격(KaderaSkeleton)에 글만 다르다.
@@ -9,5 +9,5 @@ import { KaderaSkeleton } from "../KaderaSkeleton";
  * 자세한 배경(왜 loading.tsx 가 필요한지, 프리페치 경계 이야기)은 ../loading.tsx 주석에.
  */
 export default function Loading() {
-  return <KaderaSkeleton badge="미장 종목 얘기를 모으는 중" label="미장 카더라를 불러오는 중입니다." />;
+  return <KaderaSkeleton badge="미장 종목 얘기를 모으는 중" label="미장 카더라를 불러오는 중입니다." cover={US_COVER} />;
 }

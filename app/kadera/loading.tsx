@@ -1,4 +1,4 @@
-import { KaderaSkeleton } from "./KaderaSkeleton";
+import { KaderaSkeleton, KR_COVER } from "./KaderaSkeleton";
 
 /**
  * 클릭 직후 즉시 그려지는 자리표시자.
@@ -21,5 +21,5 @@ import { KaderaSkeleton } from "./KaderaSkeleton";
  */
 
 export default function Loading() {
-  return <KaderaSkeleton badge="다들 뭐에 꽂혔는지 보는 중" label="카더라 리포트를 불러오는 중입니다." />;
+  return <KaderaSkeleton badge="다들 뭐에 꽂혔는지 보는 중" label="카더라 리포트를 불러오는 중입니다." cover={KR_COVER} />;
 }

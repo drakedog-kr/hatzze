@@ -1,5 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { CoverSkeleton } from "../../../CoverSkeleton";
 
 /**
  * 전체보기(`/insider/list/[kind]`)의 자리표시자.
@@ -40,14 +41,17 @@ function ListMod() {
 
 export default function Loading() {
   return (
-    <div className="hz-tx v2-kd v2-in" style={{ position: "relative" }} aria-hidden>
+    // aria-hidden 은 바깥에 걸지 않는다 — 아래 '불러오는 중' 알림까지 숨었다(2026-10-14). 골격 블록은 빈 상자라 안 읽힌다.
+    <div className="hz-tx v2-kd v2-in" style={{ position: "relative" }}>
       {/* 되돌아가는 줄(내부자 리포트 › 목록 이름). */}
-      <Block h={16} w={180} />
-      <div className="v2-cover" style={{ height: 41 }} />
+      {/* 실물 이동 경로 줄은 20px — 16 이면 띠 아래 판이 4px 움직였다. */}
+      <Block h={20} w={180} />
+      {/* 첫 줄 띠 — 실물과 같은 칸(기준기간 · 통화 · 기준일). 폰 390 실물 74. */}
+      <CoverSkeleton cells={[{ kind: "cell", k: "기준기간", v: "90일" }, { kind: "cur" }, { kind: "meta", text: "10월 12일(월) 신고까지" }]} />
       <ListMod />
       <ListMod />
 
-      <div className="hz-loading-float">
+      <div className="hz-loading-float" aria-hidden>
         <span className="hz-loading-badge">
           <Spinner />
           목록을 불러오는 중

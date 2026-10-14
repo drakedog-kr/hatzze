@@ -43,7 +43,8 @@ export function FlowHero({ b }: { b: EtfFlowBoard }) {
     ...(b.totalY != null ? [{ k: "1년", v: b.totalY }] : []),
   ];
   return (
-    <Module title="ETF 순유입" meta="1달">
+    // id — 폰에서 이 화면의 대표 숫자(순유입)만 키운다(v2.css 대표 숫자 묶음 · 홈 햇쩨 지수 · 카더라 여론과 같은 32).
+    <Module id="etf-flow" title="ETF 순유입" meta="1달">
       <div className="v2-bigcard v2-etf-hero">
         <span className="v2-card-val is-big">
           <b className={`is-${tone}`}>
