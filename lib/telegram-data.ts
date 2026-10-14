@@ -1967,6 +1967,8 @@ export function toPercents(pos: number, neu: number, neg: number): [number, numb
  * 한쪽만 고치면 총평이 옆 막대에 없는 테마의 숫자를 인용하고, 독자는 그 숫자를 확인할
  * 방법이 없다. Python 과 TS 라 import 로 공유할 수 없어 손으로 맞춘 사본이다
  * (lib/stock-themes.ts ↔ config/stock_themes.py 와 같은 관례).
+ * ⏸ 2026-10-14 부터 총평은 테마를 재료로 안 쓴다(둘째 대목이 시장 흐름으로 바뀌었다). 짝 검증
+ * (tests/theme-rows.test.ts)은 파이썬 쪽을 기준표로 그대로 둔다.
  *
  * 실제로 두 번 났던 일이다. 2026-07-22 에는 하한이 어긋나 표본 서너 건짜리 테마의
  * "100% 긍정"이 총평에만 나왔고(하한을 맞춰 고침), 2026-07-26 에는 개수가 어긋나
@@ -2019,8 +2021,9 @@ export function optimismPct(pos: number, neg: number): number | null {
  * 창과 겹치지 않게 창 첫날 전날까지만 본다. 평소가 너무 얇으면(THEME_USUAL_MIN_DECIDED 미만)
  * 그 테마는 평소가 없다 — 툴팁은 평소 없이 낙관도만 말한다.
  *
- * ⚠️ 총평 digest(generate_telegram_narratives.py theme_usual)와 **같은 날짜 범위·같은 하한**이어야
- * 한다. 총평이 "평소보다 낙관 쪽"이라고 쓴 테마를 옆 막대 툴팁이 반대로 말하면 안 된다.
+ * ⚠️ 파이썬 짝(generate_telegram_narratives.py theme_usual)과 **같은 날짜 범위·같은 하한**이어야
+ * 한다. 총평이 테마 기울기를 적던 때(2026-10-14 까지) "평소보다 낙관 쪽"이라고 쓴 테마를 옆 막대
+ * 툴팁이 반대로 말하면 안 돼서 맞췄고, 지금은 짝 검증(tests/theme-vs-usual.test.ts)의 기준표로 남아 있다.
  * 테마 넷만 30일치라 120행 남짓 — 1,000행 캡과 멀다.
  */
 export const THEME_USUAL_DAYS = 30;

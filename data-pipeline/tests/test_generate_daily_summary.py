@@ -226,7 +226,7 @@ def test_yeoron_tone_uses_kadera_window():
 
 
 def test_brief_story_is_second_paragraph():
-    assert brief_story("분위기 대목입니다.\n\n테마 대목입니다.\n\n뉴스 대목입니다.") == "테마 대목입니다."
+    assert brief_story("분위기 대목입니다.\n\n시장 흐름 대목입니다.\n\n뉴스 대목입니다.") == "시장 흐름 대목입니다."
     assert brief_story("한 대목뿐") == ""
     assert brief_story(None) == ""
 

@@ -2,6 +2,7 @@
 
 표본 하한이 없어진 뒤로(2026-10-06) 얇은 날엔 4위 자리에 같은 건수가 몰린다. 두 언어가 동점을 다르게 풀면
 총평이 옆 줄에 없는 테마를 말하므로, 아래 PICK_CASE 표를 화면 tests/theme-rows.test.ts 도 그대로 읽는다.
+2026-10-14 부터 총평은 테마를 재료로 안 쓰지만(둘째 대목이 시장 흐름으로 바뀌었다) 화면 짝 검증의 기준표라 남긴다.
 """
 from collections import Counter
 
@@ -41,8 +42,3 @@ def test_tie_falls_to_name_after_decided():
 def test_skips_overall_and_empty_themes():
     w = window_of([("반도체", 5, 0, 0), ("통신", 0, 0, 0)])
     assert [s for s, _ in KR.top_themes(w)] == ["반도체"]
-
-
-def test_digest_lists_theme_with_no_decided_messages():
-    # 중립 글만 있는 테마도 화면 줄에 선다(막대 없이 '기록 적음'). digest 가 그 테마를 조용히 빼면 안 된다.
-    assert "낙관·비관 글이 없어 견줄 수 없음" in open(KR.__file__, encoding="utf-8").read()
