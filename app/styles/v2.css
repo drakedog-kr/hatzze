@@ -1752,6 +1752,11 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-dv .dv-trow > :nth-child(6) { display: none; }
   .v2-dv .dv-tinvest-m { display: block; }
 }
+/* 뷰포트 860 아래는 tx.css 의 두 줄 배치([종목 · 빼기] / [주수 · 1년 배당])로 — 위 다섯 칸 틀(특이도 0,2,0)이 그 규칙(0,1,0)을 이겨
+   주수 칸이 0px 로 눌리고 7종목 표가 2,301px 로 늘었다(2.10.3 회귀, 2026-10-13 점검 · 종목을 담은 뒤에만 보였다). 같은 특이도로 뒤에 둔다. */
+@media (max-width: 860px) {
+  .v2-dv .dv-trow { grid-template-columns: minmax(0, 1fr) auto; }
+}
 /* 넓은 표 줄은 위에서 맞춘다 — 가운데 맞춤이면 칸마다 곁줄 수에 따라 첫 줄 높이가 16.5px 흩어졌다(2026-10-13 점검). 첫 줄은 스테퍼(32) 가운데. */
 @container kd (min-width: 680px) {
   .v2-dv .dv-trow:not(.dv-thead) { align-items: start; }
