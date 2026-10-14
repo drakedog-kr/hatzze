@@ -180,8 +180,9 @@ HOT_SYSTEM = COMMON + """
 
 # ⚠️ 분위기 말은 [여론] 줄 그대로다 — 카더라 히어로 제목("지금 여론은 낙관이 우세합니다")과 같은 창·같은
 #    경계로 셌다(yeoron_tone). 하루치 낙관도를 쓰면 카더라 화면의 창 값과 어긋나서 숫자는 아예 안 준다.
-# ⚠️ [이야기]는 카더라 총평의 둘째 대목(테마 지형)이다. 총평이 이미 '오늘 새로 오른 이야기'를 골라
-#    써 두었고 숫자가 없다(그 대목 규칙). 셋째 대목(뉴스·종목)은 종목·시세 말이 많아 안 준다.
+# ⚠️ [이야기]는 카더라 총평의 둘째 대목(시장 흐름)이다. 시장 전체를 말한 글로 며칠의 흐름을 써 두었고
+#    숫자가 없다(그 대목 규칙 · 2026-10-14 테마 지형에서 바뀜). 위 [여론] 분위기도 같은 시장 글로 세서 결이
+#    맞는다. 셋째 대목(뉴스·종목)은 종목·시세 말이 많아 안 준다.
 YEORON_SYSTEM = COMMON + """
 
 [이번 문장 — 여론]
@@ -514,7 +515,7 @@ def yeoron_tone(sent_rows: list[dict], latest: str, floor: int | None = None) ->
 
 
 def brief_story(summary: str | None) -> str:
-    """카더라 총평의 둘째 대목(테마 지형). 대목은 빈 줄로 갈린다(app/kadera/page.tsx 와 같은 규칙)."""
+    """카더라 총평의 둘째 대목(시장 흐름). 대목은 빈 줄로 갈린다(app/kadera/page.tsx 와 같은 규칙)."""
     paras = [p.strip() for p in re.split(r"\n{2,}", summary or "") if p.strip()]
     return paras[1] if len(paras) > 1 else ""
 

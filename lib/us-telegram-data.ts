@@ -709,8 +709,8 @@ export type UsTrendingMessage = {
  * 최근 3일 평균 vs **1주 전 같은 날들**의 평균(화면 글자 '1주 전 대비', lib/theme-flow.ts weekAgoDates).
  * 예전 '5일 이상 이전 평균'(5~14일 전)에서 바꿨다 — 근거와 되돌려 잰 값은 그쪽 주석에 있다(2026-10-05).
  *
- * ⚠️ 미장 총평 둘째 대목이 적는 점유율은 이 표의 값이다 — 파이썬 사본
- * (generate_us_telegram_narratives.theme_window_shares)이 같은 창·같은 평균으로 낸다.
+ * 미장 총평 둘째 대목이 이 점유율을 적던 때는 파이썬 사본(generate_us_telegram_narratives.theme_window_shares)이
+ * 같은 창·같은 평균으로 냈다. 2026-10-14 둘째 대목이 시장 흐름으로 바뀌며 그 사본은 걷었다.
  */
 const THEME_SERIES_DAYS = 14;
 const THEME_RECENT_DAYS = 3;
