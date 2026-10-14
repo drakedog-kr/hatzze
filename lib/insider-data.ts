@@ -42,6 +42,7 @@ import { usQuotes } from "@/lib/us-telegram-data";
 import { displayName } from "@/lib/us-ticker-names";
 import { canonicalTicker } from "@/lib/us-ticker-spellings";
 import { holdersByTicker, managerMoves, type MoveSide } from "@/lib/insider-13f";
+import { loadSplitAdj } from "@/lib/us-stock-split";
 import { TARGET_DAYS, targetMoves } from "@/lib/insider-brief";
 
 /**
@@ -484,8 +485,15 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
     d.setUTCDate(d.getUTCDate() - (TARGET_DAYS * 2 - 1));
     return d.toISOString().slice(0, 10);
   })();
+  // 애널리스트 컨센서스 — 종목당 최신 한 줄만 쓰니 최근 2주만 받는다. 표가 하루 202행씩 쌓여(08-22~ 1만 행 · 11쪽 2.3초)
+  // 전 이력을 읽으면 해마다 느려진다. 받기가 며칠 끊겨도 최신 줄이 남고, 2주 넘게 끊긴 종목은 낡은 값 대신 빠진다.
+  const consensusFrom = (() => {
+    const d = new Date(`${mentionDate}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - 13);
+    return d.toISOString().slice(0, 10);
+  })();
 
-  const [mentionRows, insiderRows, stockRows, managerRows, holdingRows, congressRows, consensusRows, actionRows] =
+  const [mentionRows, insiderRows, stockRows, managerRows, rawHoldingRows, congressRows, consensusRows, actionRows, splitAdj] =
     await Promise.all([
     fetchAllRows<{ ticker: string; mention_count: number | null; channel_count: number | null }>(
       "ticker",
@@ -533,7 +541,8 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
       () => db.from("us_manager_holding").select("cik,ticker,value,shares,report_date").order("cik").order("ticker"),
       { onError: failed("거물 보유") },
     ),
-    // 의원 신고. 창이 90일이라 행이 늘 수 있어 페이징한다(정렬 키는 유일해야 하므로 doc_id).
+    // 의원 신고. 창이 90일이라 행이 늘 수 있어 페이징한다. 정렬 키는 기본키 (doc_id, seq) 전부 — 한 신고서에 거래가 여럿이라 doc_id 하나면
+    // 쪽 경계에서 줄이 빠지거나 겹친다(공시가 몰린 2026-04 창은 1,254행이었다). build 가 doc_id 를 걸고 fetchAllRows 가 seq 를 얹는다.
     fetchAllRows<{
       doc_id: string;
       ticker: string;
@@ -545,16 +554,18 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
       amount_low: number | null;
       amount_high: number | null;
     }>(
-      "doc_id",
+      "seq",
       () =>
         db
           .from("us_congress_trade")
-          .select("doc_id,ticker,member,state_dst,transaction_type,transaction_date,filed_date,amount_low,amount_high")
-          .gte("filed_date", congressFrom),
+          .select("doc_id,seq,ticker,member,state_dst,transaction_type,transaction_date,filed_date,amount_low,amount_high")
+          .gte("filed_date", congressFrom)
+          .order("doc_id"),
       { onError: failed("의원 신고") },
     ),
     // 애널리스트 컨센서스. ⚠️ 종목마다 **날짜별로 쌓이므로** 최신 한 줄만 골라야 한다 —
     //    안 고르면 같은 종목이 여러 번 세어져 비중이 부풀어 오른다.
+    // ⚠️ 정렬은 기본키 (ticker, as_of_date) 전부 — ticker 하나면 종목마다 줄이 여럿이라 쪽 경계에서 빠지거나 겹친다.
     fetchAllRows<{
       ticker: string;
       as_of_date: string;
@@ -562,8 +573,8 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
       analyst_count: number | null;
       strong_buy: number | null;
     }>(
-      "ticker",
-      () => db.from("us_analyst_consensus").select("ticker,as_of_date,consensus,analyst_count,strong_buy"),
+      "as_of_date",
+      () => db.from("us_analyst_consensus").select("ticker,as_of_date,consensus,analyst_count,strong_buy").gte("as_of_date", consensusFrom).order("ticker"),
       { onError: failed("애널리스트 컨센서스") },
     ),
     // ⚠️ 정렬 키가 유일해야 쪽 경계에서 줄이 빠지거나 겹치지 않는다 — build 가 (날, 종목, 증권사)를 걸고 fetchAllRows 가 애널리스트를 얹는다.
@@ -579,7 +590,10 @@ export const getInsiderOverview = cache(async (): Promise<InsiderOverview> => {
           .order("firm"),
       { onError: failed("애널리스트 의견") },
     ),
+    loadSplitAdj(db),
   ]);
+  // 13F 주식 수는 액면분할을 보정하지 않는다 — 분기 비교(managerMoves)가 adj 로 나눠 견준다(lib/insider-13f.ts splitAdjOf).
+  const holdingRows = rawHoldingRows.map((h) => ({ ...h, adj: splitAdj(h.ticker, h.report_date) }));
 
   // ⚠️ 카더라 사전(us_stocks)은 178종목뿐인데 의원·발굴 축은 그 밖까지 담는다.
   //    사전에 없으면 **표시 전용 이름표**(lib/us-ticker-names.ts)를 본다. 그 파일은

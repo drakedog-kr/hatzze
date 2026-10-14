@@ -85,6 +85,12 @@ describe("targetMoves — 증권가 목표가", () => {
   it("줄이 없으면 0", () => {
     assert.deepEqual(targetMoves([]), { up: 0, down: 0, end: null });
   });
+
+  it("2.5배 넘게 벌어진 줄은 액면분할 앞뒤 값이라 안 센다", () => {
+    // KLAC 10:1 분할 주 2,000 → 230 은 내림이 아니다. 3배 미만으로 낮춘 실제 내림은 센다
+    const r = targetMoves([a("2026-07-30", 2000, 230), a("2026-07-30", 300, 130)]);
+    assert.deepEqual(r, { up: 0, down: 1, end: "2026-07-30" });
+  });
 });
 
 describe("insiderLean — 매매 방향", () => {

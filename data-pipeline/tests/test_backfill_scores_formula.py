@@ -43,3 +43,30 @@ def test_volume_surge_blends_level_like_live():
 def test_volume_surge_without_level_or_details():
     assert surge(surge_pct=10.0) == {"2026-09-29": 46.43}  # 250일이 안 쌓인 날은 급증률만
     assert surge() == {}  # fetch 가 세부값을 안 남긴 날짜는 뺀다
+
+
+def test_cumulative_window_matches_live():
+    # 주식 쇼츠(window 30) — 31행째부터 소급도 라이브처럼 최근 30개만 평균한다. 예전엔 소급만 전체 평균이라 11월 초부터 갈렸다.
+    slug = "youtube_stock_shorts"
+    cfg = bf.INDICATOR_THRESHOLDS[slug]
+    assert cfg.get("window") == 30
+    raws = [100.0] * 10 + [200.0] * 21  # 31행
+    rows = [{"date": f"2026-{10 + i // 28:02d}-{i % 28 + 1:02d}", "raw_value": v, "details": None} for i, v in enumerate(raws)]
+
+    class Q:
+        def __init__(self): self.n = None
+        def select(self, *_): return self
+        def eq(self, *_): return self
+        def order(self, *_, **__): return self
+        def limit(self, n): self.n = n; return self
+        def execute(self):
+            vals = raws[::-1][: self.n] if self.n else raws
+            return type("R", (), {"data": [{"raw_value": v} for v in vals]})()
+
+    class C:
+        def table(self, _): return Q()
+
+    live = cs.compute_threshold(C(), "x", cfg)
+    assert live == sum(raws[-30:]) / 30
+    got = bf.progress_by_date(slug, rows)[rows[-1]["date"]]
+    assert abs(got - cs.compute_progress(slug, raws[-1], live, cfg)) < 1e-9

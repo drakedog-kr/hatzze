@@ -29,6 +29,14 @@ describe("periodStart · eventKind", () => {
     assert.equal(eventKind("특별배당 확정"), eventKind("3분기 배당 확정 이사회"));
     assert.notEqual(eventKind("잠정실적발표"), eventKind("자사주 매입 조기 종료"));
   });
+
+  it("자사주 매입 종료는 매입 신청과 다른 일정 · 매입 및 소각 완료는 자사주 그대로", () => {
+    assert.equal(eventKind("자사주 매입 종료"), "자사주종료");
+    assert.equal(eventKind("자사주 매입 조기 종료"), "자사주종료");
+    assert.equal(eventKind("자사주 매입 완료"), "자사주종료");
+    assert.equal(eventKind("자기주식 40만주 매매 신청"), "자사주");
+    assert.equal(eventKind("자사주 매입 및 소각 완료"), "자사주");
+  });
 });
 
 describe("groupEventRows", () => {
@@ -53,7 +61,7 @@ describe("groupEventRows", () => {
     ]);
     const byKind = new Map(out.map((e) => [eventKind(e.event), e]));
     assert.equal(byKind.get("실적")?.channels, 2);
-    assert.equal(byKind.get("자사주")?.channels, 1);
+    assert.equal(byKind.get("자사주종료")?.channels, 1);
     assert.equal(byKind.get("실적")?.date, "2026-10-01");
   });
 
@@ -212,7 +220,9 @@ describe("dropOutrankedByPast · pastLookupCodes", () => {
   });
 
   it("오늘에서 먼 여러 채널 줄은 지난 일정을 묻지 않는다", () => {
-    const future = groupEventRows([...many("005930", 8, "2026-10-29", "3Q26 실적 컨퍼런스콜"), ...many("000660", 2, "2026-10-10", "자사주 매입 종료")]);
+    // 가까워도 한 번뿐인 일이 아니면(배당 · 자사주 매입 신청) 묻지 않는다. 자사주 매입 종료는 한 번뿐인 일이라 가까우면 묻는다.
+    const future = groupEventRows([...many("005930", 8, "2026-10-29", "3Q26 실적 컨퍼런스콜"), ...many("000660", 2, "2026-10-10", "자기주식 매매 신청")]);
     assert.deepEqual(pastLookupCodes(future, "2026-10-09"), []);
+    assert.deepEqual(pastLookupCodes(groupEventRows(many("000660", 2, "2026-10-10", "자사주 매입 종료")), "2026-10-09"), ["000660"]);
   });
 });

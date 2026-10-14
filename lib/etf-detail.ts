@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 
 import { isAbroadEtf, leverMult } from "@/lib/etf-extras";
-import { indexLabel, paidBetween, type EtfPayment } from "@/lib/etf-flow";
+import { CALENDAR_CODE, indexLabel, paidBetween, type EtfPayment } from "@/lib/etf-flow";
 import { etfGroup, type EtfGroup } from "@/lib/etf-groups";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { fetchAllRows } from "@/lib/telegram-data";
@@ -19,8 +19,8 @@ import { fetchAllRows } from "@/lib/telegram-data";
  *
  * ## 기간
  *
- * 1주 · 1달 · 3달 · 6달은 5 · 20 · 60 · 120거래일, 1년은 커버드콜 · 레버리지 카드와 같은 날(최근 거래일에서 365일 앞 이전의 가장 가까운
- * 달 말일)부터다. 수익률은 메인 화면 표와 같은 셈 — 기준일 종가에서 최근 종가까지 + 그 사이 기준일이 든 분배금(lib/etf-flow.ts 머리말).
+ * 1주 · 1달 · 3달 · 6달은 5 · 20 · 60 · 120거래일, 1년은 커버드콜 · 레버리지 카드 · 메인 1년 뷰와 같은 날(최근 거래일에서 365일 앞 이전의
+ * 가장 가까운 거래일)부터다. 수익률은 메인 화면 표와 같은 셈 — 기준일 종가에서 최근 종가까지 + 그 사이 기준일이 든 분배금(lib/etf-flow.ts 머리말).
  * 그 1년 안에 상장했으면 1년 대신 상장 이후를 쓴다.
  *
  * ## 셀 화면이 1,172장이다
@@ -179,6 +179,8 @@ export const getEtfDetail = cache(async (code: string): Promise<EtfDetail | null
     .from("etf_flow_daily")
     .select("trade_date,isu_nm,index_name,close_price,nav,fluc_rate,trade_value,net_asset,net_flow,index_value")
     .eq("isu_cd", code)
+    // 420일 — 1년 + 기준일 여유 + 6달 · 막대 60거래일을 덮는다. 창 없이 오름차순 1,000행이면 표가 4년을 넘는 날 최신 행을 못 읽는다.
+    .gte("trade_date", new Date(Date.now() - 420 * 864e5).toISOString().slice(0, 10))
     .order("trade_date", { ascending: true })
     .limit(1000);
   if (dayErr) throw dayErr;
@@ -208,14 +210,17 @@ export const getEtfDetail = cache(async (code: string): Promise<EtfDetail | null
   const div = (divRes.data ?? null) as DivRow | null;
   const group = etfGroup(code, name, last.indexName, info?.category);
   const abroad = isAbroadEtf(group, name, last.indexName, info?.category ?? null, info?.benchmark ?? null);
-  const payments = div?.payments ?? [];
+  // 거래일 목록 — 수익률에 더하는 분배금을 기준일 대신 분배락일로 가른다(lib/etf-flow.ts paidBetween).
+  const cal = rows.map((r) => r.date);
+  // 신규 ETF 의 예상 건(est)은 배당 달력용 앞날 값이라 수익률 · 분배 이력 · 브리핑에 넣지 않는다.
+  const payments = (div?.payments ?? []).filter((p) => !p.est);
 
   // 기간 하나 — base 는 기준일 행의 자리(그 종가에서 잰다), 그 뒤 행들의 순유입을 더한다.
   const period = (key: EtfDetailPeriodKey, label: string, base: number): EtfDetailPeriod => {
     const b = rows[base];
     const after = rows.slice(base + 1);
     const flows = after.map((r) => r.flow);
-    const ret = b.close && last.close ? pct(last.close + paidBetween(payments, b.date, asOf).sum, b.close) : null;
+    const ret = b.close && last.close ? pct(last.close + paidBetween(payments, b.date, asOf, cal).sum, b.close) : null;
     const idx = !abroad && b.index && last.index ? pct(last.index, b.index) : null;
     return {
       key,
@@ -230,12 +235,13 @@ export const getEtfDetail = cache(async (code: string): Promise<EtfDetail | null
   };
   const periods: EtfDetailPeriod[] = PERIODS.filter((p) => rows.length > p.days).map((p) => period(p.key, p.label, rows.length - 1 - p.days));
 
-  // 1년 — 365일 앞 날짜 이전의 가장 가까운 달 말일(그 달 마지막 거래일). 일별 표가 그날까지 차 있어야 한다(2025-09-08 부터 있다).
+  // 1년 — 365일 앞 날짜 이전의 가장 가까운 거래일(메인 1년 뷰 etf_flow_year · 커버드콜 · 레버리지와 같은 날). 일별 표가 그날까지 차 있어야 한다
+  // (2025-09-08 부터 있다). 예전엔 그 앞 달 말일이라 12~13개월을 1년으로 적었다.
   const yearAgo = new Date(Date.parse(`${asOf}T00:00:00Z`) - 365 * 864e5).toISOString().slice(0, 10);
   let yearBase = -1;
   for (let i = 0; i < rows.length - 1; i++) {
     if (rows[i].date > yearAgo) break;
-    if (rows[i].date.slice(0, 7) !== rows[i + 1].date.slice(0, 7)) yearBase = i;
+    yearBase = i;
   }
   const year = yearBase >= 0 ? period("y", "1년", yearBase) : null;
   if (year) periods.push(year);
@@ -256,17 +262,24 @@ export const getEtfDetail = cache(async (code: string): Promise<EtfDetail | null
   const sizeAt = [...board].sort((a, b) => Number(b.net_asset ?? 0) - Number(a.net_asset ?? 0)).findIndex((r) => r.isu_cd === code);
   const peers = last.indexName ? board.filter((r) => r.index_name?.trim() === last.indexName) : [];
   const peerCodes = peers.map((r) => r.isu_cd);
-  // 1년 수익률 — 시작일 종가는 1년 뷰(etf_flow_year · 메인 비교표와 같은 시작일), 끝은 기준일 종가, 사이 분배금을 더한다.
+  // 1년 수익률 — 시작일은 메인 1년 뷰(etf_flow_year)와 같은 거래일(069500 의 365일 앞 이전 마지막 거래일)이고 그날 종가를 일별 표에서
+  // 바로 읽는다. 뷰의 시작일을 따르면 뷰를 새로 만들기 전(마이그레이션 100)엔 이 ETF 의 1년과 다른 날에서 재 순위가 섞였다.
+  // 끝은 기준일 종가, 사이 분배금을 더한다.
+  const peerBase = peerCodes.length
+    ? (((
+        await db.from("etf_flow_daily").select("trade_date").eq("isu_cd", CALENDAR_CODE).lte("trade_date", yearAgo).order("trade_date", { ascending: false }).limit(1)
+      ).data?.[0]?.trade_date as string | undefined) ?? null)
+    : null;
   const [peerInfo, peerDiv, peerYear, peerLast] = peerCodes.length
     ? await Promise.all([
         db.from("etf_info").select("code,manager,fee_pct,category").in("code", peerCodes),
         db.from("etf_dividend").select("code,ttm_yield_pct,estimated,payments").in("code", peerCodes),
-        db.from("etf_flow_year").select("isu_cd,base_date,first_date,base_close").in("isu_cd", peerCodes),
+        peerBase ? db.from("etf_flow_daily").select("isu_cd,close_price").eq("trade_date", peerBase).in("isu_cd", peerCodes) : Promise.resolve({ data: [] }),
         db.from("etf_flow_daily").select("isu_cd,close_price").eq("trade_date", asOf).in("isu_cd", peerCodes),
       ])
     : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
   const pYear = new Map(
-    ((peerYear.data ?? []) as { isu_cd: string; base_date: string | null; first_date: string | null; base_close: number | null }[]).map((r) => [r.isu_cd, r]),
+    ((peerYear.data ?? []) as { isu_cd: string; close_price: number | null }[]).map((r) => [r.isu_cd, num(r.close_price)]),
   );
   const pLast = new Map(((peerLast.data ?? []) as { isu_cd: string; close_price: number | null }[]).map((r) => [r.isu_cd, num(r.close_price)]));
   const pInfo = new Map(
@@ -291,12 +304,11 @@ export const getEtfDetail = cache(async (code: string): Promise<EtfDetail | null
   );
   const peerYearRet = (c: string): number | null => {
     if (c === code) return year?.ret ?? null;
-    const y = pYear.get(c);
-    const from = num(y?.base_close ?? null);
+    const from = pYear.get(c) ?? null;
     const to = pLast.get(c) ?? null;
-    // 일별 표가 시작일까지 차 있어야 1년이다(first_date ≤ base_date — 메인 lib/etf-flow.ts 와 같은 문).
-    if (!y?.base_date || !y.first_date || y.first_date > y.base_date || !from || !to) return null;
-    return pct(to + paidBetween(pDiv.get(c)?.payments ?? [], y.base_date, asOf).sum, from);
+    // 시작일에 행이 없으면(그 뒤 상장했거나 일별 표가 그날까지 안 찼으면) 1년이 아니다.
+    if (!peerBase || !from || !to) return null;
+    return pct(to + paidBetween(pDiv.get(c)?.payments ?? [], peerBase, asOf, cal).sum, from);
   };
   // 같은 지수 · 같은 유형 · 같은 배수 · 액티브끼리만(커버드콜과 그 기초 ETF, 레버리지와 1배는 같은 지수라도 다른 상품이다).
   const active = name.includes("액티브");

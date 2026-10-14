@@ -165,6 +165,7 @@ async function livePerps(): Promise<{
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "metaAndAssetCtxs", dex: HL_DEX }),
+      signal: AbortSignal.timeout(6000), // 원천이 멈추면 사본 재생성이 함수 상한까지 붙잡혔다 — 그 칸만 빠지게(2026-10-13)
       next: { revalidate: REVALIDATE_SEC },
     });
     if (!res.ok) return null;
@@ -194,6 +195,7 @@ async function liveFx(): Promise<number | null> {
     // ⚠️ User-Agent 가 없으면 야후가 429 를 준다.
     const res = await fetch(`${FX_URL}&t=${bucketMs()}`, {
       headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(6000),
       next: { revalidate: REVALIDATE_SEC },
     });
     if (!res.ok) return null;
@@ -254,6 +256,7 @@ async function liveCloses(
         // ⚠️ User-Agent 가 없으면 야후가 429 를 준다.
         const res = await fetch(YF_CHART(code), {
           headers: { "User-Agent": "Mozilla/5.0" },
+          signal: AbortSignal.timeout(6000),
           next: { revalidate: REVALIDATE_SEC },
         });
         if (!res.ok) return null;

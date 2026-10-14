@@ -6,6 +6,7 @@ import { isKstWeekday } from "./cron-schedule";
 import { getDevOverrides } from "./dev-overrides";
 import { getSupabaseServer } from "./supabase-server";
 import { yahooSymbol } from "./yahoo-history";
+import { quoteChangeRate } from "./krx-gap";
 import { changeRateOf, dateInZone, fetchYahooQuote } from "./yahoo-quote";
 
 /**
@@ -308,9 +309,10 @@ function todayKst(now: Date): string {
  * 등락률을 못 내면 null 을 줘 호출부가 KRX 저장값을 그대로 쓰게 한다.
  */
 async function liveQuote(code: string, market: string | null): Promise<{ price: number; changeRate: number; date: string | null } | null> {
-  const q = await fetchYahooQuote(`${code}.${market === "KOSDAQ" ? "KQ" : "KS"}`, { next: { revalidate: 600 } });
+  const symbol = `${code}.${market === "KOSDAQ" ? "KQ" : "KS"}`;
+  const q = await fetchYahooQuote(symbol, { next: { revalidate: 600 } });
   if (!q) return null;
-  const changeRate = changeRateOf(q);
+  const changeRate = await quoteChangeRate(q, symbol); // 빈 전 거래일 봉은 KRX 종가로(lib/krx-gap.ts)
   // 시세의 거래일 — 평일 휴장일(대체공휴일 · 한글날)엔 야후가 직전 거래일 값을 준다. 글 날짜로 적으면 화면의 'n월 n일 종가'
   // 머리가 안 붙어 10/2 등락이 그날 등락처럼 섰다(2026-10-05 머지 전 점검).
   return changeRate === null ? null : { price: q.price, changeRate, date: q.marketTime != null ? dateInZone(q.marketTime, "Asia/Seoul") : null };

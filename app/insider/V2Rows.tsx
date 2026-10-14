@@ -67,7 +67,8 @@ export function execLines(rows: InsiderActivity[], rate: number | null) {
       href={stockHref(b.ticker)}
       ticker={b.ticker}
       name={b.name}
-      aux={`임원 ${b.people}명`}
+      // 값 칸의 성격(처분 · 매수)과 같은 쪽 사람 수 — b.people 은 취득만 한 신고자까지 세어 처분 줄이 부풀었다(SWKS 4명 중 처분 2명).
+      aux={`임원 ${b.direction === "buy" ? b.buyPeople : b.sellPeople}명`}
       value={
         <>
           <Money usd={b.value} rate={rate} />

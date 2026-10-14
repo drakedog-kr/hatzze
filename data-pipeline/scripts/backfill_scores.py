@@ -90,7 +90,9 @@ def progress_by_date(slug: str, rows: list[dict]) -> dict[str, float]:
 
         if cfg["kind"] == "cumulative_average":
             running.append(cur)
-            threshold = sum(running) / len(running)  # 그날까지만 — lookahead 방지
+            # 그날까지만 — lookahead 방지. window 가 있으면 라이브(compute_threshold)처럼 최근 그만큼만(주식 쇼츠 30).
+            base = running[-cfg["window"]:] if cfg.get("window") else running
+            threshold = sum(base) / len(base)
         else:
             threshold = cfg["threshold"]
 

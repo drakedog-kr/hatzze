@@ -5,6 +5,9 @@ import { ETF_GROUPS, ETF_PICK_KEYS, etfGroup, etfPickTest, type EtfGroup } from 
 import { etfSortCmp } from "@/lib/etf-sort";
 import { LOAD_FAILED, type MaybeFailed } from "@/lib/load-state";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { paidBetween, type EtfPayment } from "@/lib/etf-pay";
+
+export { paidBetween, type EtfPayment };
 import { fetchAllRows } from "@/lib/telegram-data";
 
 /**
@@ -32,8 +35,8 @@ import { fetchAllRows } from "@/lib/telegram-data";
  *   순유입일  기간 안 순유입이 0보다 큰 날 수 / 값이 있는 날 수
  * 그래서 최근 여섯 거래일(하루 · 1주의 날별 값과 1주 기준일)과 1달 기준일을 날마다 전 종목으로 읽는다. 1달 기준일 · 최근 거래일 값은
  * 아래 모듈(lib/etf-extras.ts)도 그대로 쓴다(EtfFlowBoard.month · 같은 날을 두 번 읽지 않는다).
- * 1년은 ETF 마다 한 줄로 미리 접은 머티리얼라이즈드 뷰 etf_flow_year(마이그레이션 097 · 수집기가 매일 새로 고친다)를 읽는다 —
- * 시작은 커버드콜 · 레버리지의 1년과 같은 달 말일이고, 그날 종가가 수익률의 기준이다. 뷰가 없거나(마이그레이션 전) 일별 표가 그 시작일까지
+ * 1년은 ETF 마다 한 줄로 미리 접은 머티리얼라이즈드 뷰 etf_flow_year(마이그레이션 097 · 100 · 수집기가 매일 새로 고친다)를 읽는다 —
+ * 시작은 커버드콜 · 레버리지 · 상세의 1년과 같은 날(365일 앞 날짜 이전의 가장 가까운 거래일)이고, 그날 종가가 수익률의 기준이다. 뷰가 없거나(마이그레이션 전) 일별 표가 그 시작일까지
  * 차 있지 않으면(first_date > base_date) 1년을 켜지 않는다 — 몇 주치 합을 1년이라 적으면 틀린 값이다.
  */
 
@@ -53,7 +56,9 @@ const UNRANKED: EtfGroup[] = ["레버리지", "인버스", "단일종목"];
 /** 날짜별 막대의 거래일 수 — 뷰의 20거래일과 같다. */
 const WINDOW = 20;
 /** 거래일마다 있는 ETF — 날짜 스무 개를 이 종목의 행에서 뽑는다. */
-const CALENDAR_CODE = "069500";
+export const CALENDAR_CODE = "069500";
+/** 보드가 읽는 거래일 수 — 1년(약 245거래일)과 그 기준일 앞 여유를 덮는다. */
+const CAL_DAYS = 280;
 /**
  * '지수별 ETF 비교' 표에 세우는 지수 수 — 따르는 ETF 순자산 합이 큰 차례. 왼쪽 지수 목록 줄 수가 오른쪽 표 줄 수(다섯 줄 + '10개 더 보기' 줄 =
  * 여섯 · app/etf/MoreRow.tsx)와 같아야 가로선이 맞는다. 한때 여덟(일곱 줄 + '나머지 보기')이었다 — 2026-10-12 "5위까지 보이고 10개씩"으로
@@ -118,8 +123,6 @@ export type EtfPeriodStat = { f: number; r: number | null; inDays: number | null
 
 /** 한 거래일의 ETF 하나 값 — 기간 고르기의 날들(머리말 '기간')을 전 종목으로 읽어 둔다. flow 는 그날 순유입(원). */
 export type EtfPriceRow = { code: string; close: number | null; nav: number | null; index: number | null; indexName: string | null; flow?: number | null };
-/** 분배금 한 번(배당 화면의 분배금 표 etf_dividend.payments 한 칸). */
-export type EtfPayment = { pay?: string | null; record?: string | null; amount?: number | string | null };
 /** 1달 수익률의 두 날 — 서버에서만 쓴다(아래 모듈이 같은 날을 다시 읽지 않게 넘긴다 · 클라이언트로 안 넘긴다). */
 export type EtfMonthPrices = {
   /** 20거래일 첫날의 앞 거래일 — 수익률을 이날 종가 · NAV 에서 잰다 */
@@ -128,22 +131,12 @@ export type EtfMonthPrices = {
   start: string;
   /** 가장 최근 거래일 */
   asOf: string;
+  /** 최근 CAL_DAYS 거래일(오름차순) — 수익률에 더하는 분배금을 분배락일로 가른다(paidBetween) */
+  cal: string[];
   baseRows: Map<string, EtfPriceRow>;
   lastRows: Map<string, EtfPriceRow>;
 };
 
-/** 기간(start, end] 에 기준일이 든 분배금 합과 횟수. 기준일이 없으면 지급일로 본다. */
-export function paidBetween(pays: EtfPayment[] | undefined, start: string, end: string) {
-  let sum = 0;
-  let count = 0;
-  for (const p of pays ?? []) {
-    const day = p.record ?? p.pay;
-    if (!day || day <= start || day > end) continue;
-    sum += Number(p.amount ?? 0);
-    count += 1;
-  }
-  return { sum, count };
-}
 
 /** 유형 하나의 순유입(억원) — w · m 은 히어로 브리핑이, p 는 'ETF 자금 흐름' 카드의 유형 목록이 쓴다. */
 export type EtfGroupFlow = { group: EtfGroup; w: number; m: number; count: number; p: Partial<Record<EtfPeriod, number>> };
@@ -301,7 +294,8 @@ export const getEtfFlowBoard = cache(async (): Promise<MaybeFailed<EtfFlowBoard 
   const db = getSupabaseServer();
   let failed = false;
   // 세이브로 분류(etf_info)는 갈래의 마지막 구멍을 막는 곁가지다 — 못 읽으면 이름 규칙만으로 가른다(lib/etf-groups.ts etfGroup).
-  // 날짜는 스물하나 — 앞 하나는 1달 수익률의 기준일이다(머리말 '1달 수익률').
+  // 날짜는 최근 CAL_DAYS 거래일 — 끝 스물이 1달, 그 앞 하나가 1달 수익률의 기준일이다(머리말 '1달 수익률'). 1년 남짓을 읽는 건 1년 수익률의
+  // 분배금을 분배락일로 가르려고다(paidBetween).
   const [raw, cats, days] = await Promise.all([
     fetchAllRows<BoardRow>(
       "isu_cd",
@@ -317,14 +311,14 @@ export const getEtfFlowBoard = cache(async (): Promise<MaybeFailed<EtfFlowBoard 
       .select("trade_date")
       .eq("isu_cd", CALENDAR_CODE)
       .order("trade_date", { ascending: false })
-      .limit(WINDOW + 1),
+      .limit(CAL_DAYS),
   ]);
   if (failed) return LOAD_FAILED;
   if (!raw.length) return null;
   const category = new Map(cats.map((c) => [c.code, c.category]));
   const cal = (days.data ?? []).map((d) => d.trade_date as string).reverse();
   const dates = cal.slice(-WINDOW);
-  const monthBase = cal.length > WINDOW ? cal[0] : null;
+  const monthBase = cal.length > WINDOW ? cal[cal.length - WINDOW - 1] : null;
   const lastDay = cal.at(-1) ?? null;
 
   const all = raw.map((r) => {
@@ -439,7 +433,7 @@ export const getEtfFlowBoard = cache(async (): Promise<MaybeFailed<EtfFlowBoard 
   const day = recentOk ? (recentRows as Map<string, EtfPriceRow>[]) : [];
   const lastRows = day.at(-1) ?? null;
   const month: EtfMonthPrices | null =
-    monthBase && lastDay && dates.length && baseRows && lastRows ? { base: monthBase, start: dates[0], asOf: lastDay, baseRows, lastRows } : null;
+    monthBase && lastDay && dates.length && baseRows && lastRows ? { base: monthBase, start: dates[0], asOf: lastDay, cal, baseRows, lastRows } : null;
 
   // 분배금 표를 못 읽으면 수익률을 비운다 — 분배금 없이 세우면 커버드콜 · 월배당이 1~2%p 낮게 서서 틀린 값이 된다.
   const payments = payFailed ? null : new Map(payRows.map((p) => [p.code, p.payments ?? []]));
@@ -447,7 +441,7 @@ export const getEtfFlowBoard = cache(async (): Promise<MaybeFailed<EtfFlowBoard 
     const a = from?.get(code)?.close;
     const b = lastRows?.get(code)?.close;
     if (!payments || !fromDay || !lastDay || !a || !b) return null;
-    return ((b + paidBetween(payments.get(code), fromDay, lastDay).sum) / a - 1) * 100;
+    return ((b + paidBetween(payments.get(code), fromDay, lastDay, cal).sum) / a - 1) * 100;
   };
   // 날별 값을 못 읽으면 하루는 빼고 1주는 유입만 싣는다(1주 · 1달 합은 뷰에 있다).
   const periods: EtfPeriod[] = recentOk ? ["d", "w", "m"] : ["w", "m"];

@@ -16,6 +16,11 @@ export type YahooQuote = {
   fiftyTwoWeekHigh: number | null;
   /** 이 시세가 찍힌 시각(유닉스 초, meta.regularMarketTime). 응답에 없으면 null. */
   marketTime: number | null;
+  /**
+   * 전 거래일 봉의 종가가 비어 있으면 그 거래소 날짜(YYYY-MM-DD) — 그때 prevClose 는 null 이다. 빈 봉을 건너뛰어 그 앞 날과 견주면
+   * 등락이 이틀치가 됐다(2026-10-12 국내 종목 전부 · 삼성전자 −11.5% 대 실제 −7.4%). 국장은 lib/krx-gap.ts 가 그날 KRX 종가로 셈한다.
+   */
+  prevGap: string | null;
 };
 
 /** Next 의 fetch 확장(next.revalidate)까지 받는 init 타입. */
@@ -84,12 +89,32 @@ function resolvePrevClose(closes: number[], price: number, chartPreviousClose: u
   return prev;
 }
 
+/**
+ * 세션 날짜(시세 시각의 거래소 날짜) 바로 앞 봉의 종가가 비었으면 그 날짜. 진행 중인 오늘 봉(세션 날짜와 같음)은 늘 비어 오니 세지 않는다.
+ * 시각 · 오프셋이 없으면 판정을 못 하므로 null(지금처럼 resolvePrevClose 가 정한다).
+ */
+function prevSessionGap(timestamps: unknown, closes: unknown, marketTime: unknown, gmtoffset: unknown): string | null {
+  if (!Array.isArray(timestamps) || !Array.isArray(closes) || typeof marketTime !== "number") return null;
+  const off = typeof gmtoffset === "number" ? gmtoffset : 0;
+  const day = (sec: number) => new Date((sec + off) * 1000).toISOString().slice(0, 10);
+  const session = day(marketTime);
+  for (let i = timestamps.length - 1; i >= 0; i--) {
+    const t = timestamps[i];
+    if (typeof t !== "number") continue;
+    const d = day(t);
+    if (d >= session) continue;
+    return typeof closes[i] === "number" ? null : d;
+  }
+  return null;
+}
+
 /** 시세를 가져온다. 실패(네트워크·비정상 응답·가격 없음)면 null. */
 export async function fetchYahooQuote(symbol: string, init: FetchInit): Promise<YahooQuote | null> {
   try {
     const res = await fetch(
       `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`,
-      { headers: { "User-Agent": "Mozilla/5.0" }, ...init },
+      // 6초에서 끊는다 — 야후가 멈추면 화면 사본 재생성이 함수 상한까지 붙잡혔다(시세만 빠지고 나머지는 선다 · 2026-10-13).
+      { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(6000), ...init },
     );
     if (!res.ok) return null;
     const result = (await res.json())?.chart?.result?.[0];
@@ -104,11 +129,13 @@ export async function fetchYahooQuote(symbol: string, init: FetchInit): Promise<
     );
     const high52 = result?.meta?.fiftyTwoWeekHigh;
     const mt = result?.meta?.regularMarketTime;
+    const prevGap = prevSessionGap(result?.timestamp, result?.indicators?.quote?.[0]?.close, mt, result?.meta?.gmtoffset);
     return {
       price,
-      prevClose: resolvePrevClose(closes, price, result?.meta?.chartPreviousClose),
+      prevClose: prevGap ? null : resolvePrevClose(closes, price, result?.meta?.chartPreviousClose),
       fiftyTwoWeekHigh: typeof high52 === "number" ? high52 : null,
       marketTime: typeof mt === "number" ? mt : null,
+      prevGap,
     };
   } catch {
     return null;

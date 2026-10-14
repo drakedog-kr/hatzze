@@ -24,6 +24,8 @@ type BriefInput = Pick<
 
 /** 목표가를 올린 · 내린 건수를 세는 기간(일). 마지막 의견 날부터 거꾸로 센다. */
 export const TARGET_DAYS = 7;
+/** 직전 · 새 목표가가 이 배수보다 벌어지면 분할 앞뒤 값으로 보고 안 센다(애널리스트가 한 번에 이만큼 바꾸는 일은 없다). */
+const TARGET_SPLIT_JUMP = 2.5;
 
 /**
  * 증권가 목표가 올림 · 내림 건수 — 의견 하나(증권사 · 애널리스트 · 날)가 한 건. 목표가가 그대로거나 직전 값이 없으면(신규 개시) 안 센다.
@@ -40,6 +42,8 @@ export function targetMoves(rows: { action_date: string; target_now: number | nu
   let down = 0;
   for (const r of rows) {
     if (r.action_date < from || r.target_now == null || r.target_old == null) continue;
+    // 두 값이 2.5배 넘게 벌어지면 액면분할 앞뒤 값이다 — KLAC 10:1 분할 주에 2,000 → 230 이 '내림'으로 세어졌다.
+    if (r.target_old > 0 && r.target_now > 0 && Math.max(r.target_now / r.target_old, r.target_old / r.target_now) > TARGET_SPLIT_JUMP) continue;
     if (r.target_now > r.target_old) up += 1;
     else if (r.target_now < r.target_old) down += 1;
   }

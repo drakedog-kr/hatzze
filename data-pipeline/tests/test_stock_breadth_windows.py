@@ -39,6 +39,15 @@ class _Table:
     def limit(self, _n):
         return self
 
+    # 키셋 페이징(load_keyset) — order(key) · gt(key, 마지막값)
+    def order(self, col, **_):
+        self.order_col = col
+        return self
+
+    def gt(self, col, v):
+        self.filters.append(lambda r: r[col] > v)
+        return self
+
     # 쓰기
     def upsert(self, payload, on_conflict):
         self.op, self.payload, self.on_conflict = "upsert", payload, on_conflict
@@ -59,7 +68,10 @@ class _Table:
     def execute(self):
         rows = self.db.tables.setdefault(self.name, [])
         if self.op == "select":
-            return type("R", (), {"data": [r for r in rows if all(f(r) for f in self.filters)]})()
+            got = [r for r in rows if all(f(r) for f in self.filters)]
+            if getattr(self, "order_col", None):
+                got.sort(key=lambda r: r[self.order_col])
+            return type("R", (), {"data": got})()
         self.db.log.append((self.name, self.op, self.on_conflict))
         if self.op == "delete":
             self.db.tables[self.name] = [r for r in rows if not all(f(r) for f in self.filters)]
@@ -94,7 +106,7 @@ def _card(code, channels, window=EVENING):
 
 def _daily(db, *codes):
     db.tables["telegram_stock_daily"] = [
-        {"stock_code": c, "date": d, "mention_count": 10} for c in codes for d in ("2026-10-09", "2026-10-10", "2026-10-11")
+        {"id": f"{c}-{d}", "stock_code": c, "date": d, "mention_count": 10} for c in codes for d in ("2026-10-09", "2026-10-10", "2026-10-11")
     ]
 
 

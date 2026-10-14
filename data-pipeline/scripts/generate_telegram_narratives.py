@@ -1960,16 +1960,14 @@ def save_stock_breadth(db, latest: str) -> None:
     first = (end - timedelta(days=WINDOW_OFFSET)).isoformat()
     last = end.isoformat()
 
-    # 창 안 언급 상위 N 종목만 센다. 창이 3일이라 이 조회는 ~2천 행뿐이다(전량 로드 아님).
-    rows = (
-        db.table("telegram_stock_daily")
-        .select("stock_code,mention_count")
-        .gte("date", first)
-        .lte("date", last)
-        .limit(PAGE_SIZE)
-        .execute()
-        .data
-    ) or []
+    # 창 안 언급 상위 N 종목만 센다. 창이 3일이라 ~2천 행이지만 한 쪽(1,000행)을 넘는다 — 예전엔 .limit(PAGE_SIZE) 한 번만
+    # 정렬 없이 읽어 평일 창마다 상위 60 중 16~19개를 놓쳤다(10/06~08 2,440행 → LG전자 324회 · 현대차 205회가 빠짐).
+    rows = load_keyset(
+        db,
+        "telegram_stock_daily",
+        "id,stock_code,mention_count",
+        narrow=lambda q: q.gte("date", first).lte("date", last),
+    )
     mentions: dict[str, int] = defaultdict(int)
     for r in rows:
         mentions[r["stock_code"]] += r["mention_count"] or 0

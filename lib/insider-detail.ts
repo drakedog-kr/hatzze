@@ -34,6 +34,7 @@ import { fetchDailyHistory } from "@/lib/yahoo-history";
 import { displayName } from "@/lib/us-ticker-names";
 import { canonicalTicker, tickerSpellings } from "@/lib/us-ticker-spellings";
 import { filedQuarters, isCik, quarterMarks, stockPosition } from "@/lib/insider-13f";
+import { loadSplitAdj } from "@/lib/us-stock-split";
 import { type MentionPoint, mentionTrend } from "@/lib/insider-trend";
 import { PRICE_RANGE_DEFAULT, isPriceRange, yearsOf } from "@/lib/insider-range";
 
@@ -319,7 +320,7 @@ const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<
     console.error(`[insider/stock] ${label} 조회 실패`, e);
   };
 
-  const [stockRows, mentionRows, holdingRows, managerRows, congressRows, insiderRowsAll, consensusRows, actionRows, latestMention, congressStart, insiderStart] =
+  const [stockRows, mentionRows, rawHoldingRows, managerRows, congressRows, insiderRowsAll, consensusRows, actionRows, latestMention, congressStart, insiderStart, splitAdj] =
     await Promise.all([
     db.from("us_stocks").select("ticker,name_ko,name_en").in("ticker", spellings).limit(1),
     fetchAllRows<{ date: string; mention_count: number | null; channel_count: number | null }>(
@@ -347,12 +348,14 @@ const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<
       amount_low: number | null;
       amount_high: number | null;
     }>(
-      "doc_id",
+      // 정렬은 기본키 (doc_id, seq) 전부 — 메인(lib/insider-data.ts)과 같은 규칙.
+      "seq",
       () =>
         db
           .from("us_congress_trade")
-          .select("doc_id,member,state_dst,transaction_type,transaction_date,filed_date,amount_low,amount_high")
-          .in("ticker", spellings),
+          .select("doc_id,seq,member,state_dst,transaction_type,transaction_date,filed_date,amount_low,amount_high")
+          .in("ticker", spellings)
+          .order("doc_id"),
       { onError: failed("의원 신고") },
     ),
     fetchAllRows<{
@@ -406,7 +409,10 @@ const loadStockDetail = cache(async (rawTicker: string, range: string): Promise<
     // 곁가지라 실패를 이 조회 안에 가둔다(못 읽으면 기간 글자만 빠진다) — 그냥 부르면 5xx 한 번에 화면 재생성이 통째로 멈췄다.
     firstFiled("us_congress_trade"),
     firstFiled("us_insider_txn"),
+    loadSplitAdj(db),
   ]);
+  // 13F 주식 수는 액면분할을 보정하지 않는다 — 분기 비교(stockPosition · quarterMarks)가 adj 로 나눠 견준다(lib/insider-13f.ts splitAdjOf).
+  const holdingRows = rawHoldingRows.map((h) => ({ ...h, adj: splitAdj(h.ticker, h.report_date) }));
 
   // 임원 행은 그 티커의 **주된 발행사 CIK** 것만 — 심볼 없는 다른 발행사 신고(블랙스톤 계열이 비상장 펀드를 산 것)가 폴더 CIK 의
   // 티커로 담겨 'BX 임원 장내 매수'로 섰다(2026-10-04 점검). 수집기도 이제 버리지만(fetch_us_insider.parse_filing) 이미 든 행을 막는다.
@@ -737,7 +743,7 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
     console.error(`[insider/investor] ${label} 조회 실패`, e);
   };
 
-  const [managerRows, holdingRows, mentionRows, nameRows] = await Promise.all([
+  const [managerRows, rawHoldingRows, mentionRows, nameRows, splitAdj] = await Promise.all([
     db.from("us_manager").select("cik,person,firm").eq("cik", cik).limit(1),
     // 정렬은 (ticker, report_date) — cik 는 eq 로 고정했다. ticker 하나면 분기 둘이 동점이라 큰 운용사(1,000행 넘게)에서 빠지거나 겹친다.
     fetchAllRows<{ ticker: string; shares: number | null; value: number | null; report_date: string }>(
@@ -760,7 +766,10 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
         { onError: (e: unknown) => console.error("[insider/investor] 종목 이름 조회 실패 — 티커로 둡니다", e) },
       ),
     ).then(({ value, failed }) => (failed.length ? [] : value)),
+    loadSplitAdj(db),
   ]);
+  // 액면분할 배수 — 직전 분기 주식 수와 견줄 때 나눈다(quarterShift 의 units 와 같은 식).
+  const holdingRows = rawHoldingRows.map((h) => ({ ...h, adj: splitAdj(h.ticker, h.report_date) }));
 
   // 명단 조회가 깨진 것은 "없는 인물"이 아니라 오류다. 404 대신 error.tsx 로 보낸다.
   if (managerRows.error) throw new Error(`[insider/investor] ${cik} 명단 조회 실패: ${managerRows.error.message}`);
@@ -783,8 +792,10 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
     .map((h) => {
       const b = before.get(h.ticker);
       const shares = h.shares ?? 0;
-      const was = b?.shares ?? 0;
-      const move: ManagerHolding["move"] = !prior ? null : !b ? "new" : shares > was ? "add" : shares < was ? "trim" : "hold";
+      // 견주는 값은 분할 전 단위(주식 수 ÷ 누적 분할 배수) — 표에 적는 주식 수는 신고 그대로다.
+      const nowU = shares / h.adj;
+      const was = b ? (b.shares ?? 0) / b.adj : 0;
+      const move: ManagerHolding["move"] = !prior ? null : !b ? "new" : nowU > was ? "add" : nowU < was ? "trim" : "hold";
       return {
         ticker: h.ticker,
         name: nameOf(h.ticker),
@@ -792,7 +803,7 @@ export const getManagerDetail = cache(async (cik: number): Promise<ManagerDetail
         value: h.value ?? 0,
         weight: aum ? ((h.value ?? 0) / aum) * 100 : 0,
         move,
-        sharesChange: b && was ? ((shares - was) / was) * 100 : null,
+        sharesChange: b && was ? ((nowU - was) / was) * 100 : null,
         inKadera: kadera.has(canonicalTicker(h.ticker)),
       };
     })

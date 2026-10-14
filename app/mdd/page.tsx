@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { getSurgingStocks, getTopStocksWithTrend } from "@/lib/telegram-data";
+import { fetchAllRows, getSurgingStocks, getTopStocksWithTrend } from "@/lib/telegram-data";
 import { getUsStockReports, getUsSurgingStocks } from "@/lib/us-telegram-data";
 import { MDD_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
@@ -29,17 +29,14 @@ export const dynamic = "force-dynamic";
  *
  * 코스피만 싣는 이유: (1) 첫 화면은 코스피부터 노출하기로 했고, (2) 코스닥은
  * 감자·합병·상폐가 잦아 수정주가 함정 검증을 한 번 더 하고 열기로 해서다.
- * 944행이라 PostgREST 1000행 캡 아래다. /api/mdd 자체는 코스닥 코드도 처리한다
+ * 946행(2026-10-13)이라 지금은 PostgREST 1000행 캡 아래지만, 마스터가 상장폐지 행을 안 지워 늘기만 해서 페이징한다 —
+ * 캡을 넘는 날 가나다 뒤쪽 종목이 오류 없이 빠진다. /api/mdd 자체는 코스닥 코드도 처리한다
  * (테마 비교의 코스닥 대표 종목은 그 경로로 이미 들어온다).
  */
 async function loadKospiStocks(): Promise<StockOption[]> {
   try {
-    const { data } = await getSupabaseServer()
-      .from("stocks")
-      .select("code, name, market")
-      .eq("market", "KOSPI")
-      .order("name", { ascending: true });
-    return (data ?? []) as StockOption[];
+    const rows = await fetchAllRows<StockOption>("code", () => getSupabaseServer().from("stocks").select("code, name, market").eq("market", "KOSPI"));
+    return rows.sort((a, b) => a.name.localeCompare(b.name, "ko"));
   } catch {
     return [];
   }

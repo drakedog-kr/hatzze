@@ -425,6 +425,32 @@ MOVERS_MIN_TIMES = 2.0
 MOVERS_FRESH_HOURS = 24
 MOVER_WINDOW = 15
 MOVER_MIN_CHANGES = 5
+# 원값(raw_value)이 카드 · 점수와 다른 값인 지표는 카드와 같은 칸으로 잰다. 괴리 지수의 raw_value 는
+# 폴백용 소상공인 위기 검색량이고 카드 · 점수는 lead(증시 백분위 − 실물 백분위)다 — 원값으로 재면
+# 09-29 '더 뜨거워져'(lead 는 오히려 식음) · 10-04 '식는 쪽으로'(lead 그대로)처럼 카드와 거꾸로 적었다.
+MOVER_VALUE_KEY = {"small_business_crisis_index": "lead"}
+
+
+def mover_series(slug: str | None, rows_desc: list[dict]) -> tuple[list[float], str | None]:
+    """최신순 indicator_values 행 → (값 계열 오래된→최신, 최신 값이 처음 들어온 시각).
+
+    같은 details.source_date 행(휴장 · 주말에 앞 거래일 값을 다시 쓴 복사 행)은 하나로 접고, 시각은 그 자료가
+    처음 들어온 행의 created_at 을 쓴다. 안 접으면 변화 0 이 섞여 '평소 변화 폭'(중앙값)이 바닥에 붙어
+    코스피 전고점 대비 · 버핏지수가 평소의 수십 배 움직인 것으로 섰다(09-28 전고점 −2.10%p 가 '70배').
+    """
+    key = MOVER_VALUE_KEY.get(slug or "", "raw_value")
+    groups: list[list] = []  # [source_date, 값, 처음 들어온 시각]
+    for r in reversed(rows_desc):
+        v = r.get(key)
+        if v is None:
+            continue
+        src = r.get("source_date")
+        if groups and src is not None and groups[-1][0] == src:
+            groups[-1][1] = float(v)
+            continue
+        groups.append([src, float(v), r.get("created_at")])
+    groups = groups[-(MOVER_WINDOW + 3):]
+    return [g[1] for g in groups], (groups[-1][2] if groups else None)
 
 
 def pick_movers(rows: list[dict], now: datetime) -> list[dict]:
@@ -910,14 +936,16 @@ def main() -> None:
     for ind in indicators.data:
         iv = (
             client.table("indicator_values")
-            .select("date, normalized_score, raw_value, created_at")
+            .select("date, normalized_score, raw_value, created_at, details->source_date, details->lead")
             .eq("indicator_id", ind["id"])
             .order("date", desc=True)
-            .limit(MOVER_WINDOW + 3)
+            # 복사 행을 접은 뒤에도 변화 15번이 남게 두 배를 읽는다
+            .limit(2 * (MOVER_WINDOW + 3))
             .execute()
         )
         if not iv.data:
             continue
+        values, first_seen = mover_series(ind.get("slug"), iv.data)
         progress = iv.data[0].get("normalized_score")
         if progress is None:
             continue  # 아직 진행률이 안 채워진 지표는 제외
@@ -936,8 +964,8 @@ def main() -> None:
                 "raw": iv.data[0].get("raw_value"),
                 "rest": ind["name"] in resting,
                 "direction": ind.get("direction"),
-                "values": [x["raw_value"] for x in reversed(iv.data) if x.get("raw_value") is not None],
-                "created_at": iv.data[0].get("created_at"),
+                "values": values,
+                "created_at": first_seen,
             }
         )
 

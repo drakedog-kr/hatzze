@@ -48,8 +48,8 @@ const NO_THEME: ThemeFetch = { theme: null, requested: 0, ok: 0, lookupFailed: f
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = (searchParams.get("code") ?? "").trim();
-  const market = searchParams.get("market");
-  const name = (searchParams.get("name") ?? "").trim();
+  const marketParam = searchParams.get("market");
+  const nameParam = (searchParams.get("name") ?? "").trim();
   // ⚠️ 모르는 키는 기본 기간으로 접는다 — `YEARS["constructor"]` 가 함수라 NaN 기간으로 502 가 났고, "7" 은 10년으로
   //    계산하면서 응답에 "7" 을 실어 화면이 '최근 7년'이라 적었다. 응답에도 접은 키를 싣는다.
   const yearsKey = normalizeYears(searchParams.get("years"));
@@ -57,12 +57,25 @@ export async function GET(request: Request) {
 
   // 국내는 6자리(숫자·영문), 미국은 티커 1~5자다. 예전엔 `{6}` 고정이라 미국 티커가
   // 통째로 400 이었다 — 미장 카드에서 링크를 걸 수 없던 이유가 이것이다.
-  const isUs = market === "US";
+  const isUs = marketParam === "US";
   const codeOk = isUs ? /^[A-Z][A-Z.\-]{0,6}$/.test(code) : /^[0-9A-Z]{6}$/.test(code);
   if (!codeOk) {
     return NextResponse.json({ ok: false, error: "종목 코드가 올바르지 않습니다." }, { status: 400 });
   }
 
+  // 국장은 이름 · 시장을 주소에서 믿지 않고 종목 표에서 읽는다 — name 은 자유 문자열이라 '삼성전자 코드에 에코프로비엠 이름'이면
+  // 테마 비교가 엉뚱한 테마로 섰고, 이름만 바꿔 두드리면 요청마다 CDN 을 비켜 야후를 12번 불렀다(2026-10-13 점검). 표를 못 읽으면 주소 값으로.
+  let name = nameParam;
+  let market = marketParam;
+  if (!isUs) {
+    try {
+      const { data } = await getSupabaseServer().from("stocks").select("name,market").eq("code", code).maybeSingle();
+      if (data?.name) name = String(data.name);
+      if (data?.market) market = String(data.market);
+    } catch {
+      // 표 조회가 깨지면 주소 값 그대로(예전 동작).
+    }
+  }
   const symbol = yahooSymbol(code, market);
   const bars = await fetchDailyHistory(symbol, years, { volume: true });
   const analysis = bars ? analyzeDrawdown(bars) : null;

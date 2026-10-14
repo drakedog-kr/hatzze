@@ -33,7 +33,7 @@ export async function getUsdKrw(): Promise<UsdKrw | null> {
   if (!key) return null;
   const url = `https://api.stlouisfed.org/fred/series/observations?series_id=DEXKOUS&api_key=${key}&file_type=json&sort_order=desc&limit=10`;
   try {
-    const res = await fetch(url, { next: { revalidate: REVALIDATE } });
+    const res = await fetch(url, { signal: AbortSignal.timeout(6000), next: { revalidate: REVALIDATE } });
     if (!res.ok) return null;
     const json = (await res.json()) as { observations?: { date: string; value: string }[] };
     // ⚠️ FRED 는 휴일을 "." 로 채워 보낸다. 최신 몇 개를 받아 값이 있는 첫 줄을 쓴다.

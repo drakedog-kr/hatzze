@@ -249,6 +249,10 @@ def main() -> None:
             if asset not in KEEP_ASSET:
                 stats["asset_skip"] += 1
                 continue
+            # 거래일이 신고일보다 늦으면 PDF 오기다(SONY 2026-12-26 · 신고 02-09). 종목 상세가 거래일로 점을 찍어 앞날 매수로 섰다 — 비우면 신고일로 선다.
+            if tdate and r["filed"] and to_iso(tdate) and to_iso(r["filed"]) and to_iso(tdate) > to_iso(r["filed"]):
+                print(f"  [경고] {r['doc_id']} 거래일 {tdate}이 신고일 {r['filed']} 뒤라 거래일을 비웁니다")
+                tdate = None
             out.append(
                 {
                     "doc_id": r["doc_id"], "seq": seq, "ticker": ticker.upper(),
