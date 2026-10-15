@@ -343,10 +343,12 @@ def kospi_close(db, day: date) -> float | None:
 def ewy_premium(db, prev: date, ewy_c: float | None, session: str) -> tuple[float | None, float | None]:
     """(오늘 비율, 괴리 %). 비율 = EWY 종가 × 원/달러 종가 ÷ 코스피 종가(셋 다 마지막 국장 개장일 기준).
 
-    ⭐ 괴리 = 오늘 비율 ÷ 직전 미장 세션 EWY_BASE 번의 비율 중앙값 − 1. 국장이 닫힌 뒤 한국 주식 묶음이 미국에서
-       얼마나 더 움직였나를 원화로 잰 것이다. 백테스트(night_tables)와 같은 정의다.
+    ⭐ 괴리 = 오늘 비율 ÷ 직전 **국장 개장일 아침** EWY_BASE 번의 비율 중앙값 − 1. 국장이 닫힌 뒤 한국 주식 묶음이
+       미국에서 얼마나 더 움직였나를 원화로 잰 것이다. 백테스트(night_tables)와 같은 정의다 — 거기서 비율은 국장
+       개장일마다 하나(그 아침 창의 마지막 EWY 종가)이고, 기준은 그 앞 다섯 개장일의 중앙값이다.
+    ⚠️ 수집기는 휴장일 아침에도 줄을 쓴다. 그 줄은 세지 않는다 — 2026-10-15 까지는 미장 세션으로만 골라
+       한글날(10/9) 아침 줄의 10/8 세션이 끼었고, 그날 괴리가 백테스트 정의(−1.34%)와 달리 −0.58% 로 섰다.
     ⚠️ 기록이 EWY_BASE 번 쌓이기 전에는 괴리가 None 이다 — 화면은 그 줄을 안 그린다(비율만 쌓는다).
-    ⚠️ 주말 · 연휴에는 같은 세션의 비율이 여러 날 줄에 되풀이된다. 미장 세션으로 하나씩만 센다.
     """
     if not ewy_c:
         return None, None
@@ -356,7 +358,7 @@ def ewy_premium(db, prev: date, ewy_c: float | None, session: str) -> tuple[floa
     ratio = ewy_c * fx / kc
     try:
         hist = (
-            db.table("kr_preview_day").select("us_session,ewy_ratio")
+            db.table("kr_preview_day").select("date,us_session,ewy_ratio")
             .lt("us_session", session).not_.is_("ewy_ratio", "null")
             .order("date", desc=True).limit(EWY_BASE * 4).execute().data
         ) or []
@@ -364,9 +366,12 @@ def ewy_premium(db, prev: date, ewy_c: float | None, session: str) -> tuple[floa
         # 마이그레이션 101 전에는 칸이 없다. 비율은 쌓을 곳도 없으니 괴리도 없다.
         print(f"[경고] 지난 EWY 비율을 못 읽었습니다({e}) — 괴리를 낼 수 없습니다")
         return round(ratio, 6), None
+    days = [date.fromisoformat(str(h["date"])) for h in hist]
+    open_days = set(krx_trading_days(min(days), max(days))) if days else set()
     seen: dict[str, float] = {}
-    for h in hist:
-        seen.setdefault(str(h["us_session"]), float(h["ewy_ratio"]))
+    for h, d in zip(hist, days):
+        if d in open_days:
+            seen.setdefault(str(h["us_session"]), float(h["ewy_ratio"]))
     past = list(seen.values())[:EWY_BASE]
     if len(past) < EWY_BASE:
         print(f"[EWY] 비율 기록 {len(past)}/{EWY_BASE}번 — 괴리는 기록이 찬 뒤부터 냅니다")

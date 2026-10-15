@@ -189,22 +189,24 @@ class _Db:
         return _Rows(self.rows)
 
 
-def test_ewy_premium_against_median_of_five_sessions(monkeypatch):
-    """괴리 = 오늘 비율 ÷ 직전 미장 세션 다섯 번의 비율 중앙값 − 1. 주말 · 연휴로 되풀이된 세션은 한 번만 센다."""
+def test_ewy_premium_against_median_of_five_open_days(monkeypatch):
+    """괴리 = 오늘 비율 ÷ 직전 국장 개장일 아침 다섯 번의 비율 중앙값 − 1(백테스트 night_tables 와 같은 정의).
+    주말 · 휴장일 아침 줄은 세지 않는다 — 한글날(10/9) 줄의 10/8 세션이 끼면 중앙값이 바뀐다."""
     monkeypatch.setattr(fkp, "ecos_fx_close", lambda d: 1000.0)
     monkeypatch.setattr(fkp, "kospi_close", lambda db, d: 100.0)
-    hist = [  # 최신이 앞(date desc) — 금요일 세션이 토 · 일 · 월 줄에 되풀이된다
-        {"us_session": "2026-10-09", "ewy_ratio": 1000.0},
-        {"us_session": "2026-10-09", "ewy_ratio": 1000.0},
-        {"us_session": "2026-10-09", "ewy_ratio": 1000.0},
-        {"us_session": "2026-10-08", "ewy_ratio": 990.0},
-        {"us_session": "2026-10-07", "ewy_ratio": 1010.0},
-        {"us_session": "2026-10-06", "ewy_ratio": 980.0},
-        {"us_session": "2026-10-05", "ewy_ratio": 1020.0},
+    hist = [  # 최신이 앞(date desc)
+        {"date": "2026-10-12", "us_session": "2026-10-09", "ewy_ratio": 1000.0},
+        {"date": "2026-10-11", "us_session": "2026-10-09", "ewy_ratio": 1000.0},  # 일요일
+        {"date": "2026-10-10", "us_session": "2026-10-09", "ewy_ratio": 1000.0},  # 토요일
+        {"date": "2026-10-09", "us_session": "2026-10-08", "ewy_ratio": 2000.0},  # 한글날 — 안 센다
+        {"date": "2026-10-08", "us_session": "2026-10-07", "ewy_ratio": 2000.0},
+        {"date": "2026-10-07", "us_session": "2026-10-06", "ewy_ratio": 2000.0},
+        {"date": "2026-10-06", "us_session": "2026-10-05", "ewy_ratio": 900.0},
+        {"date": "2026-10-02", "us_session": "2026-10-01", "ewy_ratio": 900.0},
     ]
     ratio, prem = ewy_premium(_Db(hist), date(2026, 10, 12), 10.2, "2026-10-12")
     assert ratio == pytest.approx(102.0)  # 10.2 × 1000 ÷ 100
-    # 다섯 세션 [1000, 990, 1010, 980, 1020] 의 중앙값은 1000 이다(되풀이된 10-09 는 한 번만 센다).
+    # 개장일 다섯 [1000, 2000, 2000, 900, 900] 의 중앙값은 1000 이다. 한글날 줄을 세면 [1000, 2000, 2000, 2000, 900] → 2000.
     assert prem == pytest.approx((102.0 / 1000.0 - 1) * 100, abs=0.01)
 
 
@@ -212,7 +214,7 @@ def test_ewy_premium_waits_for_five_sessions(monkeypatch):
     """기록이 다섯 번 쌓이기 전에는 괴리 없이 비율만 — 화면은 EWY 줄을 안 그린다."""
     monkeypatch.setattr(fkp, "ecos_fx_close", lambda d: 1000.0)
     monkeypatch.setattr(fkp, "kospi_close", lambda db, d: 100.0)
-    hist = [{"us_session": f"2026-10-0{i}", "ewy_ratio": 1000.0} for i in (5, 6, 7)]
+    hist = [{"date": f"2026-10-0{i + 1}", "us_session": f"2026-10-0{i}", "ewy_ratio": 1000.0} for i in (5, 6, 7)]
     ratio, prem = ewy_premium(_Db(hist), date(2026, 10, 12), 10.0, "2026-10-12")
     assert ratio == pytest.approx(100.0) and prem is None
 
