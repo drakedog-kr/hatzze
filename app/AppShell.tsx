@@ -238,7 +238,7 @@ const NEW_INDICATORS_HINT: Omit<HintSpec, "at"> = {
 function buildNav(themeNav: boolean): NavItem[] {
   return [
   { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 28개로 잰 오늘의 시장 온도" },
-  // ETF 자금 흐름(/etf) — '오늘 시장' 묶음에서 시장 브리핑 바로 아래(시장 온도 → 돈이 어디로 갔나). 자리 이유는 app/etf/copy.ts.
+  // ETF 자금 흐름(/etf) — '오늘 시장' 묶음에서 국장 미리보기 아래(2026-10-15 자리 바꿈). 메뉴 차례는 이 배열이 아니라 NAV_GROUPS 가 정한다.
   // ⛔ 여는 것은 `app/screen-flags.ts` 의 ETF_PUBLIC 한 줄이다. 안 연 동안은 개발 서버에서만 선다(ETF_NAV) — 배포엔 예고 줄도 없다.
   // 라벨 옆 빨간 N(isNew) — 새로 생긴 화면이라는 표식(2026-10-12 · 테마 리포트가 오픈부터 열하루 달았던 것과 같다). 기한이 없으니 연 뒤 두 주쯤 지나 이 값을 지운다.
   ...(ETF_NAV ? [{ href: ETF_PAGE.href, label: ETF_PAGE.label, icon: ETF_PAGE.icon, sub: ETF_PAGE.sub, isNew: true }] : []),
@@ -404,8 +404,10 @@ const comingSoonFor = (env: ShellEnv): SoonItem[] => (env.themeNav ? COMING_SOON
  * 여기 없는 주소는 맨 뒤에 머리 없이 붙는다(새 화면을 NAV 에만 넣어도 사라지지 않는다).
  */
 const NAV_GROUPS: { label: string; hrefs: string[] }[] = [
-  // ETF 자금 흐름은 날마다 바뀌는 시장 자료라 여기(2026-10-11) — 묶음 안 차례는 NAV 배열 차례(시장 브리핑 바로 아래).
-  { label: "오늘 시장", hrefs: ["/", ETF_PAGE.href, "/preview", NOTE_PAGE.href] },
+  // ETF 자금 흐름은 날마다 바뀌는 시장 자료라 여기(2026-10-11). ⭐ 묶음 안 차례는 이 hrefs 차례다(NAV 배열 차례가 아니다 —
+  // sidebarItems 가 이 목록을 돈다). 시장 브리핑 → 국장 미리보기 → ETF 자금 흐름 → 데일리 노트(2026-10-15 운영자 지시로 미리보기와 ETF 자리를 바꿈).
+  // 사이드바와 폰 메뉴가 같은 줄 목록(sidebarItems)을 그려 둘 다 따라온다.
+  { label: "오늘 시장", hrefs: ["/", "/preview", ETF_PAGE.href, NOTE_PAGE.href] },
   { label: "시장 여론", hrefs: ["/kadera", THEME_PAGE.href] },
   // 배당 → MDD → 내부자(2026-09-26).
   { label: "분석과 기록", hrefs: [DIVIDEND_PAGE.href, "/mdd", "/insider"] },
