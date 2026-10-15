@@ -165,9 +165,9 @@ export function CardMarketActions({ v }: { v: Pick }) {
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       {/* ⚠️ speed(속도계) 였다. 이 지표가 세는 것은 VI·사이드카·서킷브레이커 — 시장을
           **멈추는** 장치이지 속도가 아니다. 속도계는 MDD 의 '하락 vs 회복 속도' 타일이 쓴다. */}
-      {/* 기간은 이름 옆 표식으로 — 이름은 '매매 안전장치 동향', 표식 '최근 30일'(2026-10-15 운영자 · 아시아 3국 대비 코스피 카드와 같은 꼴).
-          예전엔 이름이 '최근 한 달 매매 안전장치 동향'이라 표식을 걷었었다. 이름은 fetch_market_actions.py 가 실행마다 DB 에 쓴다. */}
-      <TitleRow desc={v.headline} icon="shield" name={v.name} badge="최근 30일" />
+      {/* 기간은 이름 옆 표식으로 — 이름은 '매매 안전장치 동향', 표식 '최근 한 달'(2026-10-15 운영자 · 아시아 3국 대비 코스피 카드와 같은 꼴 ·
+          집계는 달력 30일). 예전엔 이름이 '최근 한 달 매매 안전장치 동향'이라 표식을 걷었었다. 이름은 fetch_market_actions.py 가 실행마다 DB 에 쓴다. */}
+      <TitleRow desc={v.headline} icon="shield" name={v.name} badge="최근 한 달" />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
         <strong className="hz-big" style={{ fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: dir.color, lineHeight: 1 }}>{dir.label}</strong>
         {/* 곁말은 판정을 풀어 쓴 문장('양쪽이 비슷했습니다')이었다 — 문장 대신 셋을 합친 건수. 판정은 아래 막대가 증명한다. */}
@@ -506,7 +506,9 @@ export function CardAsia({ v }: { v: Pick }) {
           (외국인)를 말하는 자리라 방향에 매이지 않는 그림이 필요하고, 이 카드가 실제로 하는
           일은 네 나라를 **한 기준선에서 견주는 것**이다. 아이콘이 카드의 모양을 되풀이하는
           것은 이 화면의 어법이다(쏠림=pie_chart · 증권앱 순위=leaderboard). */}
-      <TitleRow desc={v.headline} icon="align_horizontal_left" name={v.name} badge="최근 30일" />
+      {/* 기간 표식 '최근 한 달'(2026-10-15 운영자) — 실제는 나라별 20거래일 수익률(달력 약 4주)이라 '최근 30일'은 근삿값이었다.
+          매매 안전장치 동향(달력 30일)과 같은 말로 맞췄다. */}
+      <TitleRow desc={v.headline} icon="align_horizontal_left" name={v.name} badge="최근 한 달" />
       <Big
         disp={`${v.raw !== null && v.raw > 0 ? "+" : ""}${v.disp}`}
         unit={v.unit}
