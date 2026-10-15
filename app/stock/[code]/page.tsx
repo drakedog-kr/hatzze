@@ -278,9 +278,6 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
         </Module>
       )}
 
-      {/* 함께 움직이는 미국 종목 — 국장 미리보기의 깊은 쌍(52종목). 판 폭 표 한 줄(줄 수가 짝마다 1~4 라 짝 모듈로 세우면 바닥이 빈다). */}
-      <KrNightPairs code={d.code} night={night} />
-
       {/* 셋째 줄 — 커뮤니티 관심 추이 | 일정(없으면 배당). 짝이 없으면 추이가 판 폭. */}
       <div className={`v2-tm-band is-brief${partner || sideStack ? "" : " is-solo"}`}>
         <Module
@@ -346,6 +343,10 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           {peersMod}
         </>
       )}
+
+      {/* 함께 움직이는 미국 종목 — 국장 미리보기의 깊은 쌍(52종목). 판 폭 표 한 줄(줄 수가 짝마다 1~4 라 짝 모듈로 세우면 바닥이 빈다).
+          맨 아래 — 요즘 도는 얘기 밑에 두었더니 종목 자신의 이야기(추이 · 일정 · 배당)보다 앞에 섰다(2026-10-15 운영자 지시). 미장 종목 화면도 같다. */}
+      <KrNightPairs code={d.code} night={night} />
     </div>
   );
 }

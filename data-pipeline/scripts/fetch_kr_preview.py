@@ -744,12 +744,10 @@ def main() -> None:
     deep = [p for ps in by_ticker.values() for p in ps]
     names = sorted({p.stock for p in deep} | {r["stock_name"] for r in rows})
     codes: dict[str, str] = {}
-    markets: dict[str, str | None] = {}
     for i in range(0, len(names), 100):
         chunk = names[i : i + 100]
-        got = db.table("stocks").select("code,name,market").in_("name", chunk).execute().data
+        got = db.table("stocks").select("code,name").in_("name", chunk).execute().data
         codes.update({r["name"]: r["code"] for r in got})
-        markets.update({r["code"]: r.get("market") for r in got})
     us_names: dict[str, str] = {}
     tickers = sorted({p.ticker for p in deep} | {r["ticker"] for r in rows})
     if tickers:
@@ -758,29 +756,30 @@ def main() -> None:
 
     # ── 종목 화면용 짝 목록(마이그레이션 101 · kr_preview_day.pairs) ────────────────
     #
-    # 국장 종목 화면은 '함께 움직이는 미국 종목', 미장 종목 화면은 '함께 움직이는 국장 종목' 을 이걸로 그린다.
-    # 깊은 쌍마다 그날 미국 등락 · 평소 폭 배수 · 방향을 담고, 문턱을 넘은 쌍에만 그날 크기 칸의 5년 평균을 붙인다
-    # (문턱 아래는 '이런 날' 이 정의되지 않는다). 미장이 쉰 밤에는 이 목록도 안 쓴다(휴장 분기는 위에서 끝났다).
+    # 국장 종목 화면의 '함께 움직이는 미국 종목' 을 이걸로 그린다(미장 종목 화면의 '함께 움직이는 국장 종목' 은 2026-10-15 에 걷었다).
+    # 깊은 쌍마다 그날 미국 등락 · 평소 폭 배수 · 방향을 담고, **국장 미리보기 표에 선 짝**에만 그 표와 같은
+    # 5년 평균을 붙인다. 화면은 숫자가 붙은 쌍만 세운다 — 어느 화면이든 국장 미리보기에 나온 값만 보인다(2026-10-15 운영자 결정).
+    # 미장이 쉰 밤에는 이 목록도 안 쓴다(휴장 분기는 위에서 끝났다).
     # ⚠️ 화면은 이 목록만 읽는다 — 사전 수치를 TS 로 옮기면 kr-preview-table.ts 처럼 쌍둥이가 어긋난다.
+    # ⭐ 숫자는 표의 그 줄에서 그대로 가져온다 — 문턱(반올림 전 z) · 짝 수 상한(LINKS_MAX)까지 표와 같은 짝만 숫자를 얻는다.
+    on_table = {(r["ticker"], r["stock_name"]): r for r in rows}
     pairs = []
     for p in sorted(deep, key=lambda p: (p.ticker, -p.corr)):
         if p.ticker not in every or p.stock not in codes:
             continue
         dp, z, up = every[p.ticker]
-        leg = pick_leg(p.ticker, p.stock, up, z, p.up if up else p.down) if z >= Z_MIN else None
+        row = on_table.get((p.ticker, p.stock))
         pairs.append({
             "t": p.ticker,
             "us": us_names.get(p.ticker) or US_NAMES.get(p.ticker) or p.ticker,
             "code": codes[p.stock],
             "stock": p.stock,
-            # 로고 접미사(.KS/.KQ)에 쓴다 — 미장 종목 화면이 국장 종목 로고를 그린다.
-            "market": markets.get(codes[p.stock]),
             "why": p.why,
             "dp": round(dp, 2),
             "z": z,
             "up": up,
-            "open": leg.open if leg else None,
-            "intra": leg.intra if leg else None,
+            "open": row["kr_open"] if row else None,
+            "intra": row["kr_intra"] if row else None,
         })
 
     kept = []
