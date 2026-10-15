@@ -65,6 +65,23 @@ CACHE = Path(__file__).resolve().parent / ".kr_preview_cache"
 SPX = "SPY"
 GSPC = "^GSPC"   # ⚠️ 구간표 전용. 쌍 계산은 SPY 로 한다(위 SPX)
 KOSPI = "^KS11"
+SOXX = "SOXX"    # ⚠️ 구간표 전용. 반도체 줄(화면 '밤사이 뉴욕')이 이 값으로 칸을 고른다
+EWY = "EWY"      # ⚠️ 구간표 전용. 국장 종가 대비 괴리로 칸을 고른다(아래 EWY_AFTER)
+
+# ⭐ 움직임 크기 구간(평소 폭의 몇 배). 쌍 × 방향마다 이 칸별 평균을 따로 낸다
+#    (2026-10-15). 예전엔 1.0배 넘은 날 전체의 평균 하나라, 평소의 1.04배 움직인 밤과 3배
+#    움직인 밤에 같은 숫자가 나왔다. 5년으로 재면 실제 개장은 크기를 따라 커지는데
+#    (1.0~1.25배 +0.41% · 1.5~2배 +0.78% · 3배 이상 +2.06%, 미국 방향 기준) 카드는 0.8% 로
+#    평평했다. 실전 30거래일도 같다 — 1.5배 미만 줄 246장은 코스피 대비 +0.06%(잡음),
+#    1.5배 이상 291장은 카드 +0.93% 대 실제 +0.92%.
+#    ⚠️ 칸을 더 잘게 나누지 말 것. 1.5배에서 가르면 두 칸 다 사건이 쌍당 수십 건이지만, 2배
+#    위만 따로 떼면 쌍당 중앙 29.5건이라 사전의 '30건 이상' 문턱에 절반이 걸린다.
+ZSPLIT = 1.5
+
+# ⭐ EWY 괴리의 기준 — 직전 국장 개장일 몇 번의 (EWY × 원/달러 ÷ 코스피) 비율 중앙값과 견준다.
+#    5년 실측 코스피 개장 갭 상관: 5일 0.711 · 10일 0.719 · 20일 0.709 · 40일 0.677. 차이가 없어
+#    기록이 빨리 차는 5일로 둔다(`scripts/fetch_kr_preview.py` 의 EWY_BASE 와 같은 값이어야 한다).
+EWY_BASE = 5
 
 
 def kr_codes() -> dict[str, tuple[str, str]]:
@@ -178,20 +195,21 @@ def main() -> None:
         # 상관도 같은 정의로 다시 낸다 — 옛 값은 1.5배 문턱 시절 것이라 섞으면 안 된다.
         d = pd.concat([e, g], axis=1).dropna()
         rec: dict[str, dict] = {"corr": round(float(d.iloc[:, 0].corr(d.iloc[:, 1])), 3) if len(d) > 60 else 0.0}
-        for name, mask in (("up", e > args.zmin * sd), ("down", e < -args.zmin * sd)):
+        allg = g.dropna()
+
+        def leg(mask: pd.Series, name: str) -> dict | None:
             both = pd.concat([g[mask], e[mask]], axis=1).dropna()
             if len(both) == 0:
-                continue
+                return None
             gg = both.iloc[:, 0]
             same = (gg > 0) if name == "up" else (gg < 0)
-            allg = g.dropna()
             base = float((allg > 0).mean() if name == "up" else (allg < 0).mean())
             # ⭐ **날것 개장 갭도 같이 낸다.** 초과분(gg)은 쌍을 고르고 검증하는 데 쓰지만,
             # 화면에 낼 문장은 "이런 날 이 종목은 보통 몇 % 열렸나" 라서 날것이 필요하다.
             # 코스피 자신의 평균도 같은 날들로 낸다 — 그게 있어야 "보통 +0.9%" 가 시장
             # 덕인지 이 종목 덕인지 읽는 사람이 가늠한다.
             idx = gg.index
-            rec[name] = {
+            return {
                 "n": int(len(gg)),
                 "wins": int(same.sum()),
                 "base_wins": int(round(base * len(gg))),
@@ -204,8 +222,18 @@ def main() -> None:
                 # 이 쌍의 효과로 잘못 읽는다 — 실제로 내린 날 장중이 그랬다.
                 "intra_kospi": round(float(intra[KOSPI].reindex(idx).dropna().mean()), 2),
             }
-            if len(gg) < 30:
-                thin.append(f"{p.ticker}→{p.stock}[{name}] {len(gg)}건")
+
+        z = (e / sd).abs()
+        for name, side in (("up", e > args.zmin * sd), ("down", e < -args.zmin * sd)):
+            r = leg(side, name)
+            if r is None:
+                continue
+            # ⭐ 움직임 크기 칸(ZSPLIT 주석). 화면은 그날 z 에 맞는 칸을 쓴다.
+            r["small"] = leg(side & (z < ZSPLIT), name)
+            r["big"] = leg(side & (z >= ZSPLIT), name)
+            rec[name] = r
+            if r["n"] < 30:
+                thin.append(f"{p.ticker}→{p.stock}[{name}] {r['n']}건")
         if rec:
             out[f"{p.ticker}|{p.stock}"] = rec
 
@@ -215,6 +243,7 @@ def main() -> None:
     out["_US_VOL"] = {t: [round(beta(usx[t], spx), 2), round(float(us_sd[t]), 2)] for t in us_tickers}
     Path(args.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))
     print(f"[저장] {args.out} · 쌍 {len(out)}개")
+    z_legs_block(out, Path(args.out).with_name("z_legs.txt"))
     if thin:
         print(f"[경고] 사건 30건 미만 {len(thin)}건 — 화면에 내기 전에 걸러야 한다")
         for t in thin[:8]:
@@ -263,6 +292,8 @@ def main() -> None:
     print("]")
     print(f"[구간표] 지수 ^GSPC 기준 · 국내 거래일 {len(after)}일")
 
+    night_tables(args.years)
+
     # ── 요약 ──────────────────────────────────────────────────────────────
     for name in ("up", "down"):
         v = [r[name] for k, r in out.items() if not k.startswith("_") and name in r and r[name]["n"] >= 30]
@@ -273,6 +304,97 @@ def main() -> None:
         print(f"[{name}] 쌍 {len(v)}개 · 평균 적중 {rate:.1%} (평소 {b:.1%}) · "
               f"사건 중앙값 {int(np.median([x['n'] for x in v]))}건 · "
               f"평균 갭 {np.mean([x['mean'] for x in v]):+.2f}%p")
+
+
+def z_legs_block(out: dict, path: Path) -> None:
+    """`config/us_kr_pairs.py` 의 `Z_LEGS` 를 그대로 붙여 넣을 수 있는 꼴로 쓴다."""
+    def leg(r: dict | None) -> str:
+        if not r:
+            return "None"
+        return f"Leg({r['n']}, {r['wins']}, {r['base_wins']}, {r['mean']:.2f}, {r['open']:.2f}, {r['kospi']:.2f}, {r['intra']:.2f})"
+
+    lines = ["Z_LEGS: dict[tuple[str, str], tuple[Leg | None, Leg | None, Leg | None, Leg | None]] = {"]
+    for p in PAIRS:
+        rec = out.get(f"{p.ticker}|{p.stock}", {})
+        up, down = rec.get("up") or {}, rec.get("down") or {}
+        lines.append(f'    ("{p.ticker}", "{p.stock}"): (')
+        lines.append(f"        {leg(up.get('small'))}, {leg(up.get('big'))},")
+        lines.append(f"        {leg(down.get('small'))}, {leg(down.get('big'))}),")
+    lines.append("}")
+    path.write_text("\n".join(lines) + "\n")
+    print(f"[저장] {path} · Z_LEGS {len(PAIRS)}쌍 — config/us_kr_pairs.py 에 붙여 넣는다")
+
+
+def ecos_fx_close(start: str, end: str) -> pd.Series:
+    """원/달러 종가(15:30) — ECOS 731Y003/0000003. 코스피 종가와 같은 시각의 환율이다.
+
+    ⚠️ 매매기준율(731Y001)을 쓰지 말 것. 그건 그날 아침에 정해지는 값이라 장중 환율 움직임이
+       빠진다. 수집기(`scripts/fetch_kr_preview.py` 의 ecos_fx_close)와 같은 계열이어야 한다.
+    """
+    key = os.environ["ECOS_API_KEY"]
+    url = f"https://ecos.bok.or.kr/api/StatisticSearch/{key}/json/kr/1/3000/731Y003/D/{start}/{end}/0000003"
+    rows = json.load(urllib.request.urlopen(url, timeout=60))["StatisticSearch"]["row"]
+    return pd.Series({pd.Timestamp(r["TIME"]): float(r["DATA_VALUE"]) for r in rows}).sort_index()
+
+
+def after_table(name: str, signal: pd.Series, gap_k: pd.Series, intra_k: pd.Series, day_k: pd.Series,
+                bounds: list[tuple[float, float]]) -> None:
+    """국내 거래일별 신호(%)를 구간으로 나눠 그날 코스피 개장 · 장 중 · 종가 평균을 찍는다(KOSPI_AFTER 꼴)."""
+    print(f"export const {name}: readonly (readonly [number, number, number, number, number, number])[] = [")
+    for lo, hi in bounds:
+        idx = signal[(signal >= lo) & (signal < hi)].index
+        o, it, dy = gap_k.reindex(idx).dropna(), intra_k.reindex(idx).dropna(), day_k.reindex(idx).dropna()
+        print(f"  [{lo}, {hi}, {len(o)}, {o.mean():.2f}, {it.mean():.2f}, {dy.mean():.2f}],")
+    print("];")
+
+
+def night_tables(years: int) -> None:
+    """'밤사이 뉴욕' 의 반도체(SOXX) · EWY 줄 구간표. 화면(app/kr-preview-table.ts)에 붙여 넣는다.
+
+    ⭐ 둘 다 **화면이 내보이는 값 그대로** 칸을 고른다 — SOXX 는 핀허브가 주는 그 ETF 의 등락이고,
+       EWY 는 국장 종가 대비 괴리다. 지수(^SOX)는 핀허브 무료가 403 이라 화면에 낼 수 없다.
+    ⭐ 5년 실측 코스피 개장 갭 상관(2026-10-15): S&P500 0.534 · SOXX 0.599 · EWY 등락 그대로 0.501
+       · EWY 괴리 0.711. EWY 등락률을 그대로 쓰면 S&P 만 못하다 — EWY 는 우리 장이 닫힌 뒤
+       열리는데 그 하루 등락에는 우리 장이 낮에 이미 움직인 몫이 섞여 있기 때문이다.
+    """
+    print()
+    night = download([SOXX, EWY, KOSPI], years, "night")
+    ko, kc = night["Open"][KOSPI], night["Close"][KOSPI]
+    keep = ko.notna() & kc.notna() & (ko > 0)
+    ko, kc = ko[keep], kc[keep]
+    ko.index = kc.index = pd.to_datetime(kc.index).tz_localize(None).normalize()
+    gap_k = (ko / kc.shift(1) - 1) * 100
+    intra_k = (kc / ko - 1) * 100
+    day_k = (kc / kc.shift(1) - 1) * 100
+
+    def closes(sym: str) -> pd.Series:
+        s = night["Close"][sym].dropna()   # ⚠️ NaN 을 먼저 버린다(pad 로 메우면 등락이 조용히 0)
+        s.index = pd.to_datetime(s.index).tz_localize(None).normalize()
+        return s
+
+    soxx, ewy = closes(SOXX), closes(EWY)
+    fx = ecos_fx_close(f"{kc.index[0]:%Y%m%d}", f"{kc.index[-1]:%Y%m%d}")
+    days = list(kc.index)
+    sox_sig: dict[pd.Timestamp, float] = {}
+    ratio: list[tuple[pd.Timestamp, float]] = []
+    for prev, d in zip(days, days[1:]):
+        w = soxx[(soxx.index >= prev) & (soxx.index <= d - pd.Timedelta(days=1))]
+        before = soxx[soxx.index < prev]
+        if not w.empty and not before.empty:
+            # 창 안 세션 전부의 누적 — 연휴 뒤엔 여러 세션이 쌓인다(KOSPI_AFTER 와 같은 정의).
+            sox_sig[d] = (w.iloc[-1] / before.iloc[-1] - 1) * 100
+        e = ewy[(ewy.index >= prev) & (ewy.index <= d - pd.Timedelta(days=1))]
+        if not e.empty and prev in fx.index:
+            ratio.append((d, e.iloc[-1] * fx[prev] / kc[prev]))
+    r = pd.Series(dict(ratio))
+    ewy_sig = ((r / r.shift(1).rolling(EWY_BASE).median() - 1) * 100).dropna()
+
+    for nm, sig in (("SOXX", pd.Series(sox_sig)), ("EWY 괴리", ewy_sig)):
+        s = sig.reindex(gap_k.index).dropna()
+        print(f"[{nm}] {len(s)}일 · 코스피 개장 갭 상관 {s.corr(gap_k.reindex(s.index)):.3f}")
+    bounds = [(-99, -3), (-3, -1.5), (-1.5, -0.5), (-0.5, 0.5), (0.5, 1.5), (1.5, 3), (3, 99)]
+    after_table("SOXX_AFTER", pd.Series(sox_sig), gap_k, intra_k, day_k, bounds)
+    after_table("EWY_AFTER", ewy_sig, gap_k, intra_k, day_k, bounds)
 
 
 if __name__ == "__main__":

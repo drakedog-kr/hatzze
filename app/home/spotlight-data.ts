@@ -72,7 +72,8 @@ async function previewChip(): Promise<{ chip: SpotChip | null; date: string | nu
         name: top.usName,
         val: pct(top.dp),
         ink: top.dp > 0 ? HOT : COLD,
-        href: "/preview",
+        // 누른 이름의 묶음으로 바로(카더라 칩과 같다 · app/kadera/cover-chips.ts).
+        href: `/preview#mv-${top.ticker}`,
         ga: "spotlight_preview",
       },
       date: p.date,

@@ -45,6 +45,11 @@ export type DevOverrides = {
   //   연휴  {"usSession":"2026-09-25","usFrom":"2026-09-23"}  → "연휴 동안" 으로 그린다
   previewDay?: { usSession?: string; usHoliday?: string; usFrom?: string };
   /**
+   * 국장 미리보기의 그날 줄 전부를 DB 대신 읽을 파일 경로. 수집기를 고친 뒤 **운영 표에 쓰기 전에** 화면을 본다 —
+   * `fetch_kr_preview.py --dry-run --force --dump <경로>` 가 이 꼴({day, rows})로 뽑는다. 종목 화면의 짝 모듈도 이것을 읽는다.
+   */
+  previewDump?: string;
+  /**
    * 햇쩨 지수 추이(홈 히어로)에 얹을 점수. 같은 날짜의 DB 값을 덮는다. daily_score 를 지금 눈금으로 다시 계산해
    * **표에 쓰기 전에** 로컬에서 선을 보는 용도다(data-pipeline/scripts/recompute_score_history.py --json 이 이 꼴로 뽑는다).
    */

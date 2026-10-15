@@ -49,7 +49,8 @@ async function previewChip(): Promise<CoverChip | null> {
     // 소수 둘째 자리 — 같은 띠 지수(+0.46%) · 미리보기 표(-10.22%)와 자릿수를 맞춘다(2026-10-05 점검).
     val: `${top.dp > 0 ? "+" : top.dp < 0 ? "-" : ""}${Math.abs(top.dp).toFixed(2)}%`,
     tone: top.dp > 0 ? "up" : top.dp < 0 ? "down" : "flat",
-    href: "/preview",
+    // 누른 이름의 묶음으로 바로 — 맨 위로 떨어지면 폰에서 세 화면 반을 내려 찾았다(2026-10-15 셰브론 10번째 묶음).
+    href: `/preview#mv-${top.ticker}`,
     ga: "kadera_chip_preview",
   };
 }
