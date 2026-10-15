@@ -133,3 +133,104 @@ def test_ticker_without_matching_window_is_dropped():
     today = {"SPY": q("2026-09-25", 103, 101), "NVDA": q("2026-09-25", 55, 52), "AMD": q("2026-09-24", 11, 10)}
     _, cum, skipped = accumulate(date(2026, 9, 23), today, stored)
     assert set(cum) == {"SPY"} and sorted(skipped) == ["AMD", "NVDA"]
+
+
+# ── 움직임 크기 칸 · EWY 괴리 · 다음 개장일(2026-10-15) ─────────────────────────
+
+from fetch_kr_preview import ewy_premium, next_open_day, pick_leg  # noqa: E402
+import fetch_kr_preview as fkp  # noqa: E402
+from config.us_kr_pairs import PAIRS, Z_LEGS, Z_SPLIT  # noqa: E402
+
+
+def test_pick_leg_follows_move_size():
+    """평소의 1.5배(Z_SPLIT) 미만이면 작은 칸, 이상이면 큰 칸 — 방향별로."""
+    p = next(p for p in PAIRS if (p.ticker, p.stock) in Z_LEGS)
+    small_up, big_up, small_down, big_down = Z_LEGS[(p.ticker, p.stock)]
+    assert pick_leg(p.ticker, p.stock, True, Z_SPLIT - 0.01, p.up) == small_up
+    assert pick_leg(p.ticker, p.stock, True, Z_SPLIT, p.up) == big_up
+    assert pick_leg(p.ticker, p.stock, False, 1.2, p.down) == small_down
+    assert pick_leg(p.ticker, p.stock, False, 3.0, p.down) == big_down
+
+
+def test_pick_leg_falls_back_to_whole_leg():
+    """사전에 새로 넣고 아직 크기 칸을 안 잰 쌍은 전체 성적."""
+    p = PAIRS[0]
+    assert pick_leg("NO_SUCH", p.stock, True, 2.0, p.up) == p.up
+
+
+def test_every_pair_has_size_legs():
+    """사전 쌍마다 크기 칸이 있다 — 백테스트가 PAIRS 와 같은 실행에서 낸다."""
+    assert {(p.ticker, p.stock) for p in PAIRS} <= set(Z_LEGS)
+
+
+class _Rows:
+    """kr_preview_day 조회 흉내 — 체인 끝 execute().data 만 쓴다."""
+
+    def __init__(self, rows):
+        self._rows = rows
+
+    def __getattr__(self, name):
+        return lambda *a, **k: self
+
+    @property
+    def not_(self):
+        return self
+
+    def execute(self):
+        return type("R", (), {"data": self._rows})()
+
+
+class _Db:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def table(self, name):
+        assert name == "kr_preview_day"
+        return _Rows(self.rows)
+
+
+def test_ewy_premium_against_median_of_five_sessions(monkeypatch):
+    """괴리 = 오늘 비율 ÷ 직전 미장 세션 다섯 번의 비율 중앙값 − 1. 주말 · 연휴로 되풀이된 세션은 한 번만 센다."""
+    monkeypatch.setattr(fkp, "ecos_fx_close", lambda d: 1000.0)
+    monkeypatch.setattr(fkp, "kospi_close", lambda db, d: 100.0)
+    hist = [  # 최신이 앞(date desc) — 금요일 세션이 토 · 일 · 월 줄에 되풀이된다
+        {"us_session": "2026-10-09", "ewy_ratio": 1000.0},
+        {"us_session": "2026-10-09", "ewy_ratio": 1000.0},
+        {"us_session": "2026-10-09", "ewy_ratio": 1000.0},
+        {"us_session": "2026-10-08", "ewy_ratio": 990.0},
+        {"us_session": "2026-10-07", "ewy_ratio": 1010.0},
+        {"us_session": "2026-10-06", "ewy_ratio": 980.0},
+        {"us_session": "2026-10-05", "ewy_ratio": 1020.0},
+    ]
+    ratio, prem = ewy_premium(_Db(hist), date(2026, 10, 12), 10.2, "2026-10-12")
+    assert ratio == pytest.approx(102.0)  # 10.2 × 1000 ÷ 100
+    # 다섯 세션 [1000, 990, 1010, 980, 1020] 의 중앙값은 1000 이다(되풀이된 10-09 는 한 번만 센다).
+    assert prem == pytest.approx((102.0 / 1000.0 - 1) * 100, abs=0.01)
+
+
+def test_ewy_premium_waits_for_five_sessions(monkeypatch):
+    """기록이 다섯 번 쌓이기 전에는 괴리 없이 비율만 — 화면은 EWY 줄을 안 그린다."""
+    monkeypatch.setattr(fkp, "ecos_fx_close", lambda d: 1000.0)
+    monkeypatch.setattr(fkp, "kospi_close", lambda db, d: 100.0)
+    hist = [{"us_session": f"2026-10-0{i}", "ewy_ratio": 1000.0} for i in (5, 6, 7)]
+    ratio, prem = ewy_premium(_Db(hist), date(2026, 10, 12), 10.0, "2026-10-12")
+    assert ratio == pytest.approx(100.0) and prem is None
+
+
+def test_ewy_premium_drops_when_fx_missing(monkeypatch):
+    """원/달러 종가를 못 받은 날은 그 줄만 빠진다(ECOS 는 해외 러너에서 가끔 막힌다)."""
+    monkeypatch.setattr(fkp, "ecos_fx_close", lambda d: None)
+    monkeypatch.setattr(fkp, "kospi_close", lambda db, d: 100.0)
+    assert ewy_premium(_Db([]), date(2026, 10, 12), 10.0, "2026-10-12") == (None, None)
+
+
+@pytest.mark.parametrize(
+    "today, expect",
+    [
+        ("2026-10-15", "2026-10-15"),  # 개장일은 그날
+        ("2026-10-17", "2026-10-19"),  # 토요일 → 월요일
+        ("2026-10-09", "2026-10-12"),  # 한글날(금) → 월요일
+    ],
+)
+def test_next_open_day(today, expect):
+    assert next_open_day(date.fromisoformat(today)).isoformat() == expect

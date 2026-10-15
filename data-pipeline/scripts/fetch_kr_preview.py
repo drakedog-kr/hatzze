@@ -66,8 +66,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import KST, krx_trading_days, today_kst  # noqa: E402
-from config.us_kr_pairs import PAIRS, TICKERS, US_NAMES, US_SECTORS, US_VOL  # noqa: E402
+from config.us_kr_pairs import PAIRS, TICKERS, US_NAMES, US_SECTORS, US_VOL, Z_LEGS, Z_SPLIT, Leg  # noqa: E402
 from config.us_stock_themes import US_THEMES  # noqa: E402
+
+# ── '밤사이 뉴욕' 의 반도체 · EWY 줄(2026-10-15) ───────────────────────────
+#
+# 화면이 S&P500 아래에 두 줄을 더 낸다. 5년 실측 코스피 개장 갭 상관: S&P500 0.534 · SOXX 0.599 ·
+# EWY 괴리 0.711(backtest/kr_preview_pairs.py night_tables). 둘 다 핀허브 quote 한 건씩이다.
+#   SOXX  반도체 ETF. 지수(^SOX)는 핀허브 무료가 403 이라 ETF 로 낸다 — 화면 이름도 'SOXX' 다.
+#   EWY   미국에 상장된 한국 주식 묶음. ⚠️ **등락률을 그대로 쓰지 않는다.** EWY 는 우리 장이 닫힌 뒤
+#         열리는데 그 하루 등락에는 우리 장이 낮에 이미 움직인 몫이 섞여 있어, 그대로 쓰면 S&P 만
+#         못하다(0.501). 국장 종가와 견준 비율이 평소 비율에서 얼마나 벗어났나(괴리)로 낸다(ewy_premium).
+NIGHT_EXTRA = ("SOXX", "EWY")
+# 괴리의 기준 — 직전 미장 세션 몇 번의 비율 중앙값. 5일 0.711 · 10일 0.719 · 20일 0.709 로 차이가 없어
+# 기록이 빨리 차는 5일로 둔다. ⚠️ backtest/kr_preview_pairs.py 의 EWY_BASE 와 같은 값이어야 구간표와 맞는다.
+EWY_BASE = 5
+# 원/달러 종가(15:30) — 코스피 종가와 같은 시각의 환율. ⚠️ 매매기준율(731Y001)은 그날 아침에 정해져
+# 장중 움직임이 빠진다. 구간표도 이 계열로 쟀다.
+ECOS_FX_CLOSE = "https://ecos.bok.or.kr/api/StatisticSearch/{k}/json/kr/1/5/731Y003/D/{d}/{d}/0000003"
 
 QUOTE = "https://finnhub.io/api/v1/quote?symbol={t}&token={k}"
 # 미국 휴장 달력. 무료 티어에서 받힌다(2026-09-23 확인 · 2023~2027 62건 · 반일장도 들어 있다).
@@ -273,6 +289,98 @@ def index_change(session_day: str, from_day: str | None = None) -> float | None:
     return (rows[last][1] / rows[first - 1][1] - 1) * 100
 
 
+def pick_leg(ticker: str, stock: str, up: bool, z: float, whole: Leg) -> Leg:
+    """그날 움직임 크기에 맞는 칸의 성적. 칸이 없으면(사전에 새로 넣고 아직 안 잰 쌍) 전체 성적.
+
+    ⭐ 평소의 1.5배(Z_SPLIT) 미만이면 작은 칸, 이상이면 큰 칸이다. 예전엔 전체 평균 하나라 작은 밤에는
+       크게, 큰 밤에는 작게 말했다(config/us_kr_pairs.py Z_LEGS 주석).
+    """
+    legs = Z_LEGS.get((ticker, stock))
+    if not legs:
+        return whole
+    small_up, big_up, small_down, big_down = legs
+    got = (big_up if z >= Z_SPLIT else small_up) if up else (big_down if z >= Z_SPLIT else small_down)
+    return got or whole
+
+
+def ecos_fx_close(day: date) -> float | None:
+    """그 국장 날의 원/달러 종가(15:30). 못 받으면 None — 그날은 EWY 줄만 빠진다.
+
+    ⚠️ 재시도를 짧게 둔다. 이 스텝은 개장 전에 끝나야 하는데, ECOS 는 해외 러너에서 가끔 막힌다
+       (common/ecos_client.py 머리말). 공통 클라이언트의 여섯 번 재시도(최대 2분)를 기다릴 값어치가 없다.
+    """
+    k = os.environ.get("ECOS_API_KEY")
+    if not k:
+        print("[경고] ECOS_API_KEY 가 없어 EWY 줄을 뺍니다")
+        return None
+    for attempt in (1, 2):
+        try:
+            with urllib.request.urlopen(ECOS_FX_CLOSE.format(k=k, d=day.strftime("%Y%m%d")), timeout=10) as r:
+                rows = json.load(r).get("StatisticSearch", {}).get("row", [])
+            return float(rows[0]["DATA_VALUE"]) if rows else None
+        except (OSError, http.client.HTTPException, json.JSONDecodeError, KeyError, ValueError) as e:
+            if attempt == 2:
+                print(f"[경고] 원/달러 종가({day})를 못 받았습니다({type(e).__name__}) — EWY 줄을 뺍니다")
+    return None
+
+
+def kospi_close(db, day: date) -> float | None:
+    """그 국장 날의 코스피 종가. 저녁 실행이 `kospi_close_raw` 에 담아 둔 값을 읽는다(새로 받지 않는다)."""
+    try:
+        ind = db.table("indicators").select("id").eq("slug", "kospi_close_raw").limit(1).execute().data
+        if not ind:
+            return None
+        got = (
+            db.table("indicator_values").select("raw_value").eq("indicator_id", ind[0]["id"])
+            .eq("date", day.isoformat()).limit(1).execute().data
+        )
+        return float(got[0]["raw_value"]) if got and got[0].get("raw_value") else None
+    except Exception as e:  # noqa: BLE001
+        print(f"[경고] 코스피 종가({day})를 못 읽었습니다({e}) — EWY 줄을 뺍니다")
+        return None
+
+
+def ewy_premium(db, prev: date, ewy_c: float | None, session: str) -> tuple[float | None, float | None]:
+    """(오늘 비율, 괴리 %). 비율 = EWY 종가 × 원/달러 종가 ÷ 코스피 종가(셋 다 마지막 국장 개장일 기준).
+
+    ⭐ 괴리 = 오늘 비율 ÷ 직전 미장 세션 EWY_BASE 번의 비율 중앙값 − 1. 국장이 닫힌 뒤 한국 주식 묶음이 미국에서
+       얼마나 더 움직였나를 원화로 잰 것이다. 백테스트(night_tables)와 같은 정의다.
+    ⚠️ 기록이 EWY_BASE 번 쌓이기 전에는 괴리가 None 이다 — 화면은 그 줄을 안 그린다(비율만 쌓는다).
+    ⚠️ 주말 · 연휴에는 같은 세션의 비율이 여러 날 줄에 되풀이된다. 미장 세션으로 하나씩만 센다.
+    """
+    if not ewy_c:
+        return None, None
+    fx, kc = ecos_fx_close(prev), kospi_close(db, prev)
+    if not fx or not kc:
+        return None, None
+    ratio = ewy_c * fx / kc
+    try:
+        hist = (
+            db.table("kr_preview_day").select("us_session,ewy_ratio")
+            .lt("us_session", session).not_.is_("ewy_ratio", "null")
+            .order("date", desc=True).limit(EWY_BASE * 4).execute().data
+        ) or []
+    except Exception as e:  # noqa: BLE001
+        # 마이그레이션 101 전에는 칸이 없다. 비율은 쌓을 곳도 없으니 괴리도 없다.
+        print(f"[경고] 지난 EWY 비율을 못 읽었습니다({e}) — 괴리를 낼 수 없습니다")
+        return round(ratio, 6), None
+    seen: dict[str, float] = {}
+    for h in hist:
+        seen.setdefault(str(h["us_session"]), float(h["ewy_ratio"]))
+    past = list(seen.values())[:EWY_BASE]
+    if len(past) < EWY_BASE:
+        print(f"[EWY] 비율 기록 {len(past)}/{EWY_BASE}번 — 괴리는 기록이 찬 뒤부터 냅니다")
+        return round(ratio, 6), None
+    past.sort()
+    mid = past[len(past) // 2] if len(past) % 2 else (past[len(past) // 2 - 1] + past[len(past) // 2]) / 2
+    return round(ratio, 6), round((ratio / mid - 1) * 100, 2)
+
+
+def next_open_day(today: date) -> date:
+    """오늘이거나 그 뒤의 첫 국장 개장일. 주말 · 연휴 화면이 "어느 개장 이야기인가" 를 날짜로 적는다."""
+    return min(krx_trading_days(today, today + timedelta(days=14)))
+
+
 def us_holidays(key: str) -> list[dict] | None:
     """핀허브의 미국 휴장 달력. 못 받으면 None.
 
@@ -398,11 +506,14 @@ def write_day(db, row: dict) -> tuple[str, ...] | None:
     ⚠️ 083 이 있는데 084·085 만 없을 때 한꺼번에 빼면 휴장 표기까지 잃는다. 그래서 새 칸부터 차례로다.
     """
     errors = []
-    for drop in ((), ("us_from",), ("us_from", "quotes"), ("us_from", "quotes", "us_session", "us_holiday")):
+    # 101 전  반도체 · EWY · 다음 개장일 · 짝 목록 칸이 없다 → 그것만 빼고 쓴다(그 줄들만 빠진다)
+    n101 = ("soxx_dp", "ewy_ratio", "ewy_prem", "next_open", "pairs")
+    for drop in ((), n101, (*n101, "us_from"), (*n101, "us_from", "quotes"),
+                 (*n101, "us_from", "quotes", "us_session", "us_holiday")):
         try:
             db.table("kr_preview_day").upsert({k: v for k, v in row.items() if k not in drop}, on_conflict="date").execute()
             if drop:
-                print(f"[경고] {'·'.join(drop)} 칸 없이 썼습니다: {errors[0]} (마이그레이션 083~085 를 아직 안 돌렸다면 정상)")
+                print(f"[경고] {'·'.join(drop)} 칸 없이 썼습니다: {errors[0]} (마이그레이션 083~101 을 아직 안 돌렸다면 정상)")
             return drop
         except Exception as e:  # noqa: BLE001
             errors.append(e)
@@ -416,7 +527,11 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="저장하지 않고 무엇이 뽑히는지만 찍는다")
     ap.add_argument("--force", action="store_true", help="오후에도 돌린다(위 아침 게이트를 넘는다)")
+    ap.add_argument("--dump", metavar="PATH",
+                    help="--dry-run 과 함께. 쓸 줄을 이 파일에 JSON 으로 남긴다(dev-overrides.json 의 previewDump 꼴)")
     args = ap.parse_args()
+    if args.dump and not args.dry_run:
+        raise SystemExit("[중단] --dump 는 --dry-run 과 함께만 씁니다")
 
     # ── ⛔ 아침에만 돈다 ─────────────────────────────────────────────────────
     #
@@ -473,15 +588,25 @@ def main() -> None:
     #    지수 몫도 누적이어야 한다.
     quotes: dict[str, dict] = {SPX_PROXY: {"session": spx_day, "c": spx_c, "pc": spx_pc}}
     # 지수까지 세어 한 창에 담는다 — 71번째가 되면 429 가 난다.
-    for i, t in enumerate(TICKERS, start=1):
+    # ⭐ 반도체 · EWY(NIGHT_EXTRA)는 종목 카드가 아니라 '밤사이 뉴욕' 줄이라 dps 에 안 넣는다. 종가는 quotes 에
+    #    남긴다 — 연휴 뒤 누적(accumulate)이 그 기록으로 SOXX 도 쌓는다.
+    extra: dict[str, float] = {}
+    fetch = [*TICKERS, *NIGHT_EXTRA]
+    for i, t in enumerate(fetch, start=1):
         if i % BATCH == 0:
-            print(f"[대기] 분당 한도 때문에 {WINDOW_SEC}초 쉽니다 ({i}/{len(TICKERS)})")
+            print(f"[대기] 분당 한도 때문에 {WINDOW_SEC}초 쉽니다 ({i}/{len(fetch)})")
             time.sleep(WINDOW_SEC)
         v = quote(t, key)
-        if v is not None:
-            dps[t], day = v[0], v[1]
-            quotes[t] = {"session": day, "c": v[2], "pc": v[3]}
-            days[day] = days.get(day, 0) + 1
+        if v is None:
+            continue
+        quotes[t] = {"session": v[1], "c": v[2], "pc": v[3]}
+        if t in NIGHT_EXTRA:
+            # 지수와 다른 세션이면 쓰지 않는다(종목 카드와 같은 규칙).
+            if v[1] == spx_day:
+                extra[t] = v[0]
+            continue
+        dps[t], day = v[0], v[1]
+        days[day] = days.get(day, 0) + 1
 
     fail_pct = (len(TICKERS) - len(dps)) / len(TICKERS) * 100
     print(f"[수집] {len(dps)}/{len(TICKERS)}종목 (실패 {fail_pct:.0f}%)")
@@ -526,6 +651,8 @@ def main() -> None:
         if shown is None:
             shown = spx
         dps = {t: cum[t] for t in dps if t in cum}
+        # 반도체도 누적이어야 S&P 와 같은 구간을 말한다. 첫 세션 기록이 없으면(도입 직후 연휴) 그 줄만 뺀다.
+        extra = {t: cum[t] for t in NIGHT_EXTRA if t in cum}
         print(f"[연휴] {us_from}~{spx_day} 세션 누적 · {SPX_PROXY} {spx:+.2f}% (계산용) · 화면 숫자 {shown:+.2f}% · {len(dps)}종목")
         if skipped:
             print(f"[경고] 창 첫 세션 기록이 없어 뺀 종목: {', '.join(sorted(skipped))}")
@@ -543,14 +670,17 @@ def main() -> None:
     # 정의돼 있다 — 시장이 3% 오른 날 어떤 종목이 1% 오른 건 사전 기준으로 '내린 날'이다.
     # dp 부호로 고르면 그 날들에 엉뚱한 방향의 성적을 붙이게 된다.
     movers = []
+    # ⭐ 문턱 아래 종목까지 전부 — 종목 화면의 '함께 움직이는 미국 종목' 이 조용한 밤에도 줄을 세운다(pairs).
+    every: dict[str, tuple[float, float, bool]] = {}
     for t, dp in dps.items():
         beta, sd = US_VOL.get(t, (1.0, 0.0))
         if sd <= 0:
             continue
         ex = dp - beta * spx
         z = abs(ex) / sd
+        # 둘째 자리까지 — 화면은 1.5 밑을 1.04배처럼 둘째 자리로 적는데, 첫째 자리로 저장하면 늘 1.00 · 1.10 이었다(2026-10-05 점검).
+        every[t] = (dp, round(z, 2), ex > 0)
         if z >= Z_MIN:
-            # 둘째 자리까지 — 화면은 1.5 밑을 1.04배처럼 둘째 자리로 적는데, 첫째 자리로 저장하면 늘 1.00 · 1.10 이었다(2026-10-05 점검).
             movers.append((t, dp, round(z, 2), ex > 0))
     print(f"[선별] 평소의 {Z_MIN}배를 넘은 종목 {len(movers)}개")
 
@@ -572,7 +702,8 @@ def main() -> None:
         for p in ps:
             # ⭐ 그 방향의 성적을 그대로 쓴다. gap 은 이미 부호가 맞아 있으므로 **화면에서
             # 다시 뒤집지 말 것** — 예전엔 사전에 오른 날 값 하나뿐이라 화면이 뒤집었다.
-            leg = p.up if up else p.down
+            # ⭐ 그 방향 안에서도 **오늘 움직임 크기에 맞는 칸**을 쓴다(pick_leg · 2026-10-15).
+            leg = pick_leg(t, p.stock, up, z, p.up if up else p.down)
             rows.append(
                 {
                     "date": today.isoformat(),
@@ -609,16 +740,48 @@ def main() -> None:
         print("[결과] 간밤 크게 움직인 종목이 없습니다 — 오늘은 빈 화면입니다")
 
     # 종목 코드와 한글 표기는 우리 표에서 채운다. 사전은 이름만 갖고 있다.
-    names = sorted({r["stock_name"] for r in rows})
+    # ⭐ 깊은 쌍 **전부**의 이름을 받는다 — 종목 화면용 짝 목록(pairs)이 오늘 카드에 안 선 쌍까지 담는다.
+    deep = [p for ps in by_ticker.values() for p in ps]
+    names = sorted({p.stock for p in deep} | {r["stock_name"] for r in rows})
     codes: dict[str, str] = {}
+    markets: dict[str, str | None] = {}
     for i in range(0, len(names), 100):
         chunk = names[i : i + 100]
-        got = db.table("stocks").select("code,name").in_("name", chunk).execute().data
+        got = db.table("stocks").select("code,name,market").in_("name", chunk).execute().data
         codes.update({r["name"]: r["code"] for r in got})
+        markets.update({r["code"]: r.get("market") for r in got})
     us_names: dict[str, str] = {}
-    if rows:
-        got = db.table("us_stocks").select("ticker,name_ko").in_("ticker", sorted({r["ticker"] for r in rows})).execute().data
+    tickers = sorted({p.ticker for p in deep} | {r["ticker"] for r in rows})
+    if tickers:
+        got = db.table("us_stocks").select("ticker,name_ko").in_("ticker", tickers).execute().data
         us_names = {r["ticker"]: r["name_ko"] for r in got}
+
+    # ── 종목 화면용 짝 목록(마이그레이션 101 · kr_preview_day.pairs) ────────────────
+    #
+    # 국장 종목 화면은 '함께 움직이는 미국 종목', 미장 종목 화면은 '함께 움직이는 국장 종목' 을 이걸로 그린다.
+    # 깊은 쌍마다 그날 미국 등락 · 평소 폭 배수 · 방향을 담고, 문턱을 넘은 쌍에만 그날 크기 칸의 5년 평균을 붙인다
+    # (문턱 아래는 '이런 날' 이 정의되지 않는다). 미장이 쉰 밤에는 이 목록도 안 쓴다(휴장 분기는 위에서 끝났다).
+    # ⚠️ 화면은 이 목록만 읽는다 — 사전 수치를 TS 로 옮기면 kr-preview-table.ts 처럼 쌍둥이가 어긋난다.
+    pairs = []
+    for p in sorted(deep, key=lambda p: (p.ticker, -p.corr)):
+        if p.ticker not in every or p.stock not in codes:
+            continue
+        dp, z, up = every[p.ticker]
+        leg = pick_leg(p.ticker, p.stock, up, z, p.up if up else p.down) if z >= Z_MIN else None
+        pairs.append({
+            "t": p.ticker,
+            "us": us_names.get(p.ticker) or US_NAMES.get(p.ticker) or p.ticker,
+            "code": codes[p.stock],
+            "stock": p.stock,
+            # 로고 접미사(.KS/.KQ)에 쓴다 — 미장 종목 화면이 국장 종목 로고를 그린다.
+            "market": markets.get(codes[p.stock]),
+            "why": p.why,
+            "dp": round(dp, 2),
+            "z": z,
+            "up": up,
+            "open": leg.open if leg else None,
+            "intra": leg.intra if leg else None,
+        })
 
     kept = []
     for r in rows:
@@ -637,7 +800,28 @@ def main() -> None:
     for r in sorted(kept, key=lambda r: -abs(r["us_dp"]))[:8]:
         print(f"   {r['sector']:14s} {r['ticker']:6s} {r['us_dp']:+6.2f}% (평소의 {r['us_z']}배) → {r['stock_name']} {r['gap']:+.2f}%p")
 
+    # ⭐⭐ **그날치 한 줄은 종목이 0개여도 반드시 쓴다**(마이그레이션 063 · 아래 저장 주석).
+    soxx = extra.get("SOXX")
+    ewy_ratio, ewy_prem = ewy_premium(db, prev, (quotes.get("EWY") or {}).get("c"), spx_day)
+    print(f"[밤사이] SOXX {'없음' if soxx is None else f'{soxx:+.2f}%'} · EWY 괴리 "
+          f"{'없음' if ewy_prem is None else f'{ewy_prem:+.2f}%'} (비율 {ewy_ratio})")
+    day_row = {"date": today.isoformat(), "spx_dp": round(shown, 2), "movers": len({r["ticker"] for r in kept}),
+               # ⚠️ us_holiday 를 None 으로 **적어서** 보낸다. 같은 날 앞선 실행이 휴장으로 썼다면
+               #    upsert 가 빠진 칸은 그대로 두므로, 안 적으면 휴장 표기가 남는다.
+               "us_session": spx_day, "us_holiday": None, "quotes": quotes,
+               # 누적이 시작된 세션. us_session 과 같으면 하루치, 앞이면 화면이 "연휴 동안" 이다.
+               "us_from": us_from,
+               # ── 마이그레이션 101 ──
+               "soxx_dp": None if soxx is None else round(soxx, 2),
+               "ewy_ratio": ewy_ratio, "ewy_prem": ewy_prem,
+               "next_open": next_open_day(today).isoformat(),
+               "pairs": pairs}
+
     if args.dry_run:
+        if args.dump:
+            Path(args.dump).write_text(json.dumps({"day": {**day_row, "created_at": datetime.now(timezone.utc).isoformat()},
+                                                   "rows": kept}, ensure_ascii=False, indent=1))
+            print(f"[덤프] {args.dump} · 줄 {len(kept)} · 짝 {len(pairs)} — dev-overrides.json 의 previewDump 에 경로를 적는다")
         print("[건너뜀] --dry-run 이라 저장하지 않습니다")
         return
 
@@ -658,17 +842,10 @@ def main() -> None:
     # ⚠️ 날짜만으로는 못 가른다. 아침 실행 전에 어제 것을 보여 주는 건 의도한 동작이라
     #    "아직 안 돌았다" 와 "돌았는데 없었다" 가 구별되지 않는다. **돌았다는 기록**이
     #    남아야 갈린다. 이 줄이 그 기록이다.
-    day_row = {"date": today.isoformat(), "spx_dp": round(shown, 2), "movers": len({r["ticker"] for r in kept}),
-               # ⚠️ us_holiday 를 None 으로 **적어서** 보낸다. 같은 날 앞선 실행이 휴장으로 썼다면
-               #    upsert 가 빠진 칸은 그대로 두므로, 안 적으면 휴장 표기가 남는다.
-               "us_session": spx_day, "us_holiday": None, "quotes": quotes,
-               # 누적이 시작된 세션. us_session 과 같으면 하루치, 앞이면 화면이 "연휴 동안" 이다.
-               "us_from": us_from}
     dropped = write_day(db, day_row)
     if dropped is not None:
         kept_quotes = "빠짐" if "quotes" in dropped else f"{len(quotes)}개"
         print(f"[저장] 그날치 한 줄 · S&P {shown:+.2f}% · 미국 {day_row['movers']}종목 · 세션 {spx_day} · 종가 {kept_quotes}")
-
 
 if __name__ == "__main__":
     main()

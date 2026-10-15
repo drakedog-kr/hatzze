@@ -8,12 +8,14 @@ import { STOCK_STAT_DAYS, STOCK_TREND_DAYS, fmtKoDate, getStockPage, stockHref, 
 
 import { getStockDividend } from "@/lib/dividend";
 import { eventDateLabel, getStockEvents, getStockMoveReason, todayKst } from "@/lib/kadera-why";
+import { getNightPairs } from "@/lib/kr-preview";
 import { DIVIDEND_PUBLIC } from "../../screen-flags";
 import { DividendCard } from "./DividendCard";
 import { PageJsonLd } from "../../JsonLd";
 import { CoverLinkCell, CoverMeta, MentionTrend, Module, dayPill, type TrendPrice } from "../../kadera/V2Modules";
 import { StockLogo } from "../../StockLogo";
 import { KADERA_CARD } from "../../og-copy";
+import { KrNightPairs, krNightCover } from "../../preview/NightPairs";
 import { pageMetadata } from "../../seo";
 import { BackTrail } from "@/components/back-trail";
 import { themeHref } from "@/lib/theme-href";
@@ -107,12 +109,14 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   if (!d) notFound();
   if (code !== upper) permanentRedirect(stockHref(upper));
 
-  const [peers, why, eventList, dividend] = await Promise.all([
+  const [peers, why, eventList, dividend, night] = await Promise.all([
     themePeerStocks(d.code, d.themes),
     getStockMoveReason(d.code, d.baseDate),
     // 열둘까지 — 여덟이면 '앞으로 14건' 아래 여덟 줄뿐이라 나머지로 갈 길이 없었다(2026-10-05 점검).
     getStockEvents(d.code, 12),
     DIVIDEND_PUBLIC ? getStockDividend(d.code) : Promise.resolve(null),
+    // 국장 미리보기의 짝 목록(그날치 한 줄 하나 · 던지지 않는다). 짝이 없는 종목이면 아래 칸 · 모듈이 안 선다.
+    getNightPairs(),
   ]);
   assertLoaded("/stock/[code]");
   const events = eventList.items;
@@ -120,6 +124,7 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
   const marketLabel = d.market === "KOSDAQ" ? "코스닥" : d.market === "KOSPI" ? "코스피" : null;
   const today = todayKst();
   const hasTalk = Boolean(d.narrative || why);
+  const nightCover = krNightCover(d.code, night);
 
   /* ── v2(2026-10-03) — 테마 한 장과 같은 부품 ──────────────────────────
      뒤로 가기 줄 → 첫 줄 띠(종목 · 종가 · 테마 · MDD · 집계 기준) → 요즘 도는 얘기(판 폭) → [커뮤니티 관심 추이 | 다가오는 일정 또는 배당]
@@ -240,6 +245,8 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
         )}
         {d.themes[0] && <CoverLinkCell c={{ cap: "테마", name: d.themes[0], href: themeHref(d.themes[0]), ga: "stock_cover_theme" }} />}
         <CoverLinkCell c={{ cap: "MDD 정밀분석", name: "고점 대비 낙폭", href: stockMddHref(d.code, d.market), ga: "stock_cover_mdd" }} />
+        {/* 오늘 국장 미리보기 표에 선 종목이면 그 묶음으로 — 짝 미장 종목이 평소 폭을 넘게 움직인 아침에만 선다(2026-10-15). */}
+        {nightCover && <CoverLinkCell c={nightCover} />}
         {/* 짧게 — 1,100 에서 띠가 두 줄(둘째 줄 왼쪽 560px 빔)이었다(2026-10-05 점검). */}
         <CoverMeta updated={`${koDay(d.baseDate)} 기준`} basis="텔레그램 언급" />
       </div>
@@ -270,6 +277,9 @@ export default async function StockPage({ params }: { params: Promise<{ code: st
           </dl>
         </Module>
       )}
+
+      {/* 함께 움직이는 미국 종목 — 국장 미리보기의 깊은 쌍(52종목). 판 폭 표 한 줄(줄 수가 짝마다 1~4 라 짝 모듈로 세우면 바닥이 빈다). */}
+      <KrNightPairs code={d.code} night={night} />
 
       {/* 셋째 줄 — 커뮤니티 관심 추이 | 일정(없으면 배당). 짝이 없으면 추이가 판 폭. */}
       <div className={`v2-tm-band is-brief${partner || sideStack ? "" : " is-solo"}`}>

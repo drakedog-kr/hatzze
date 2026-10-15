@@ -8,9 +8,11 @@ import { withObjectParticle } from "@/lib/format";
 import { MENTION_TREND_DAYS, getStockDetail } from "@/lib/insider-detail";
 import { groupInsiderLines } from "@/lib/insider-person";
 import { PRICE_RANGES, type PriceRangeKey, stockDetailHref } from "@/lib/insider-range";
+import { getNightPairs } from "@/lib/kr-preview";
 import { assertLoaded } from "@/lib/load-state";
 
 import { CoverMeta, MentionTrend, Module, type TrendPrice } from "../../../kadera/V2Modules";
+import { UsNightPairs } from "../../../preview/NightPairs";
 import { DIVIDEND_ADD_LABEL, DIVIDEND_PAGE } from "../../../dividend/copy";
 import { Icon } from "../../../ui";
 import { CurrencyToggle } from "../../../AppShell";
@@ -288,7 +290,8 @@ function pricesByDate(bars: { date: string; close: number }[], days: { date: str
  */
 export async function StockDetailBody({ ticker, range }: { ticker: string; range: PriceRangeKey }) {
   // 배당은 곁가지 — 못 읽으면 커뮤니티 관심 추이 카드 머리의 '내 배당 포폴에 추가하기' 단추만 빠진다(getUsDividendYield 가 null).
-  const [d, dividend] = await Promise.all([getStockDetail(ticker, range), getUsDividendYield(ticker)]);
+  // 국장 미리보기의 짝 목록도 곁가지 — 던지지 않고, 국장 짝이 없는 종목이면 모듈이 안 선다.
+  const [d, dividend, night] = await Promise.all([getStockDetail(ticker, range), getUsDividendYield(ticker), getNightPairs()]);
   // notFound() 앞에서 던진다 — 조회가 죽어 null 이 온 것을 "없는 종목"으로 읽어 404 를 사본에 담거나,
   // 반쯤 빈 화면을 한 시간짜리 사본으로 남기지 않도록(투자자 상세와 같은 이유 · lib/load-state.ts).
   assertLoaded("/insider/stock/[ticker]");
@@ -565,6 +568,9 @@ export async function StockDetailBody({ ticker, range }: { ticker: string; range
           )}
         </Module>
       </div>
+
+      {/* 함께 움직이는 국장 종목 — 국장 미리보기의 깊은 쌍(미국 43종목). 국장 종목 화면의 '함께 움직이는 미국 종목' 과 짝이다(2026-10-15). */}
+      <UsNightPairs ticker={d.ticker} night={night} />
 
       {/* ── 주가와 매매 시점 ─────────────────────────────────────────
           ⭐ 벤치마킹한 쪽은 차트에 13F·의회·임원·ETF 를 다 얹는다. 우리는 **사람이

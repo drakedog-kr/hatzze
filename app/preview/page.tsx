@@ -7,15 +7,18 @@ import { formatKstSnappedShort, formatKstUpdateSnapped } from "@/lib/format";
 import { getOvernightLive, type OvernightData, type OvernightRow } from "@/lib/kr-overnight";
 import { getPreview, sessionWord, type PreviewLink, type PreviewMover } from "@/lib/kr-preview";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
+import { stockDetailHref } from "@/lib/insider-range";
 import { stockHref } from "@/lib/stock-page";
 
 import { loadPreviewCoverChips } from "../kadera/cover-chips";
 import { CoverIndexCell, CoverLinkCell, CoverMeta, Module } from "../kadera/V2Modules";
-import { KOSPI_AFTER } from "../kr-preview-table";
+import { EWY_AFTER, KOSPI_AFTER, SOXX_AFTER } from "../kr-preview-table";
 import { PREVIEW_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { PREVIEW_PUBLIC } from "../screen-flags";
 import { StockLogo } from "../StockLogo";
+import { DupTable } from "./DupTable";
+import { PerpRefresh } from "./PerpRefresh";
 
 /**
  * 국장 미리보기 — 간밤 미장에서 크게 움직인 종목이 오늘 아침 국내 어디와 엮이는지.
@@ -174,59 +177,98 @@ function kstStamp(iso: string): string {
 /* ── 둘째 줄 ─────────────────────────────────────────────────────────────── */
 
 /**
- * 밤사이 뉴욕 — S&P 500 과, 최근 5년 같은 구간에 든 아침의 코스피(개장 · 장 중 · 종가).
- * ⭐ 간밤 S&P 와 코스피 **개장 갭**의 상관은 0.547 인데 **장중**과는 0.018 이다 — 장 중 줄이 어느 구간에서나
- *    0 언저리인 게 이 화면이 예보가 아니라 개장 해설인 증거다. ⛔ 장 중 줄을 빼지 말 것.
- * ⚠️ 미장이 쉰 날은 큰 숫자 대신 "휴장" — 그날 spx 는 마지막 거래일 것이라 크게 두면 밤사이 움직임으로 읽힌다.
- *    그 값은 바닥 줄로 내린다.
+ * 밤사이 뉴욕 — 줄마다 [그 값의 밤사이 움직임 | 최근 5년 같은 구간에 든 날 코스피 개장 · 장 중 · 종가].
+ *   S&P500   지수 등락(KOSPI_AFTER). ⛔ 이 줄을 지우지 말 것 — 표 숫자의 기준선이다(머리말).
+ *   SOXX     반도체 ETF 등락(SOXX_AFTER · 2026-10-15). 코스피는 반도체 비중이 커서 개장과 더 맞는다(상관 0.599 대 S&P 0.534).
+ *   EWY      **국장 종가 대비** 괴리(EWY_AFTER). 하루 등락률이 아니다 — 그건 우리 장이 낮에 움직인 몫이 섞여 S&P 만 못하다.
+ *            그래서 이름 옆에 '국장 대비' 를 붙인다(해외 값 모듈의 '국장 대비' 와 같은 말). 기록이 차기 전(null)이면 줄이 없다.
+ * ⭐ 간밤 S&P 와 코스피 **개장 갭**의 상관은 0.547 인데 **장중**과는 0.018 이다 — 장 중 칸이 어느 구간에서나
+ *    0 언저리인 게 이 화면이 예보가 아니라 개장 해설인 증거다. ⛔ 장 중 칸을 빼지 말 것.
+ * ⚠️ 미장이 쉰 날은 표 대신 큰 "휴장" — 그날 spx 는 마지막 거래일 것이라 줄로 두면 밤사이 움직임으로 읽힌다.
+ *    그 값은 바닥 줄로 내린다. 반도체 · EWY 는 안 낸다.
  */
+type AfterRow = readonly [number, number, number, number, number, number];
+const pickAfter = (table: readonly AfterRow[], v: number | null) => (v == null ? null : (table.find(([lo, hi]) => v >= lo && v < hi) ?? null));
+
+/** 밤사이 뉴욕 줄들 — S&P500 · SOXX · EWY(국장 대비). 반도체 · EWY 는 값이 없으면(101 전 · 기록이 차기 전) 줄째 뺀다. */
+function nightRows(spx: number | null, soxx: number | null, ewyPrem: number | null) {
+  const rows: { key: string; name: string; tag?: string; v: number | null; after: AfterRow | null }[] = [
+    { key: "spx", name: "S&P500", v: spx, after: pickAfter(KOSPI_AFTER, spx) },
+    ...(soxx != null ? [{ key: "soxx", name: "SOXX", v: soxx, after: pickAfter(SOXX_AFTER, soxx) }] : []),
+    ...(ewyPrem != null ? [{ key: "ewy", name: "EWY", tag: "국장 대비", v: ewyPrem, after: pickAfter(EWY_AFTER, ewyPrem) }] : []),
+  ];
+  return rows;
+}
+
 function NightModule({
   when,
   spx,
+  soxx,
+  ewyPrem,
   usHoliday,
   usSession,
 }: {
   when: string;
   spx: number | null;
+  soxx: number | null;
+  ewyPrem: number | null;
   usHoliday: string | null;
   usSession: string | null;
 }) {
-  // 간밤 S&P 가 든 구간의 과거 코스피. ⚠️ 미장이 쉰 날은 고르지 않는다 — 그날 spx 의 움직임은 전날 개장에서 이미 끝났다.
-  const after = spx == null || usHoliday ? null : (KOSPI_AFTER.find(([lo, hi]) => spx >= lo && spx < hi) ?? null);
-  return (
-    <Module id="night" title={`${when} 뉴욕`} meta="S&P500">
-      <div className="v2-pv-night">
-        <div className="v2-pv-big">
-          <b className={usHoliday ? undefined : tone(spx).trim() || undefined}>{usHoliday ? "휴장" : spx == null ? "없음" : PCT(spx)}</b>
-          {usHoliday && <span>{usHoliday}</span>}
-        </div>
-        {after ? (
-          <dl className="v2-pv-after">
-            {/* ⚠️ 횟수("189번 뒤")가 아니라 기간(최근 5년)으로 — 사람이 아는 단위는 기간이다(2026-09-02).
-                날 수(231일)는 걷었다 — 무엇을 센 날인지 안 읽혔다(2026-10-04 지적). '이런 날'이 위 큰 숫자를 가리킨다. */}
-            <div className="v2-pv-after-head">
-              <dt>최근 5년 이런 날 코스피</dt>
-            </div>
-            {/* ⭐ 라벨은 개장 · 장 중 · 종가(2026-09-02 확정). '개장 뒤'로 쓰지 말 것 — 개장 직후로 읽힌다. 아래 표와 같은 말이다. */}
-            {([["개장", after[3]], ["장 중", after[4]], ["종가", after[5]]] as const).map(([label, v]) => (
-              <div key={label} className="v2-pv-after-row">
-                <dt>{label}</dt>
-                <dd className={tone(v).trim() || undefined}>{PCT(v)}</dd>
-              </div>
-            ))}
-          </dl>
-        ) : (
+  if (usHoliday) {
+    return (
+      <Module id="night" title={`${when} 뉴욕`} meta="S&P500">
+        <div className="v2-pv-night">
+          <div className="v2-pv-big">
+            <b>휴장</b>
+            <span>{usHoliday}</span>
+          </div>
           <p className="v2-pv-night-foot">
-            {usHoliday ? (
-              <>
-                마지막 거래일{usSession ? ` ${sessionDay(usSession)}` : ""} S&amp;P500{" "}
-                <b className={tone(spx).trim() || undefined}>{spx == null ? "없음" : PCT(spx)}</b>
-              </>
-            ) : (
-              "과거 같은 구간을 고를 자료를 아직 못 받았습니다"
-            )}
+            마지막 거래일{usSession ? ` ${sessionDay(usSession)}` : ""} S&amp;P500{" "}
+            <b className={tone(spx).trim() || undefined}>{spx == null ? "없음" : PCT(spx)}</b>
           </p>
-        )}
+        </div>
+      </Module>
+    );
+  }
+  const rows = nightRows(spx, soxx, ewyPrem);
+  return (
+    // ⭐ '최근 5년 이런 날 코스피' 는 머리 **오른끝**(aside) — 숫자 세 칸 바로 위라 "밤사이 값 → 최근 5년 이런 날 코스피 → 개장 · 장 중 · 종가"
+    //    차례로 읽힌다(2026-10-15 셋째 시안 판 A). 제목 옆 근거(meta)에 두면 제목의 곁말로 읽혀 그 흐름이 끊겼다. 옆 해외 값 카드 머리 오른끝
+    //    '환율' 과 같은 자리다. ⛔ 두 단 머리로 바꾸지 말 것 — 옆 카드 머리(30px 한 단)와 안 맞았다. 날 수(231일)는 걷었다(2026-10-04 지적).
+    <Module id="night" title={`${when} 뉴욕`} aside="최근 5년 이런 날 코스피" className="v2-pv-nightmod">
+      {/* ⭐ 2026-10-15 — "투박하다" 다섯 번 끝에 시안 열 개 중 운영자가 고른 꼴: 첫 칸에 이름과 밤사이 값, 그 옆 개장 · 장 중 · 종가 칸.
+          머리 줄 · 줄 높이 · 글자 크기는 **옆 '해외에서 거래 중인 값' 표와 같다**(옅은 면 30px · 줄 52px · 13px) — 두 표의 머리 줄과 줄이 한 높이에 선다.
+          숫자는 모두 오름 빨강 · 내림 파랑. 밤사이 값을 크게(16~19px) 쓰던 꼴은 셋이 나란히 서면 무거웠다 — 표의 다른 값과 같은 13px 600.
+          ⛔ 장 중 칸을 빼지 말 것(머리말). ⛔ 그래프(구간 막대)를 넣지 말 것 — "인포그래픽은 과하다". */}
+      <div className="v2-pv-ixt">
+        <div className="v2-pv-th">
+          <span>밤사이</span>
+          {/* ⭐ 라벨은 개장 · 장 중 · 종가(2026-09-02 확정). '개장 뒤'로 쓰지 말 것 — 개장 직후로 읽힌다. 아래 표와 같은 말이다. */}
+          <span>개장</span>
+          <span>장 중</span>
+          <span>종가</span>
+        </div>
+        <ol>
+          {rows.map((r) => (
+            <li key={r.key}>
+              <div className="v2-pv-ixr">
+                <span className="v2-pv-ixn">
+                  <span>
+                    {r.name}
+                    {r.tag && <em>{r.tag}</em>}
+                  </span>
+                  <b className={tone(r.v).trim() || undefined}>{r.v == null ? "없음" : PCT(r.v)}</b>
+                </span>
+                {([["개장", r.after?.[3]], ["장 중", r.after?.[4]], ["종가", r.after?.[5]]] as const).map(([label, v]) => (
+                  <span key={label} className={`v2-pv-ixv${tone(v)}`}>
+                    {v == null ? "–" : PCT(v)}
+                  </span>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ol>
       </div>
     </Module>
   );
@@ -353,6 +395,7 @@ function BriefModule({
   for (const m of movers) for (const l of m.links) linkCount.set(l.stock, (linkCount.get(l.stock) ?? 0) + 1);
   const crowded = [...linkCount.entries()].sort((a, b) => b[1] - a[1])[0];
   const crowdedWith = crowded ? movers.filter((m) => m.links.some((l) => l.stock === crowded[0])).map((m) => m.usName) : [];
+  const crowdedCode = crowded ? movers.flatMap((m) => m.links).find((l) => l.stock === crowded[0])?.code : undefined;
 
   return (
     <Module id="brief" title="오늘의 브리핑" className="v2-pv-briefmod">
@@ -372,7 +415,11 @@ function BriefModule({
             <div className="v2-brief3-row">
               <dt>미장</dt>
               <dd>
-                {when} {moverCount}곳이 평소 폭을 넘게 움직였습니다. 등락이 가장 큰 곳은 <b>{biggest.usName}</b>
+                {/* 이름은 표의 그 묶음으로 가는 링크다(같은 화면 안 이동 · 2026-10-15). 폰에서 브리핑이 꼽은 묶음이 세 화면 아래였다. */}
+                {when} {moverCount}곳이 평소 폭을 넘게 움직였습니다. 등락이 가장 큰 곳은{" "}
+                <a href={`#mv-${biggest.ticker}`} className="v2-pv-jump">
+                  <b>{biggest.usName}</b>
+                </a>
                 {euro(biggest.usName)} <b className={tone(biggest.dp).trim() || undefined}>{PCT(biggest.dp)}</b>, 평소 폭의 {zx(biggest.z)}배였습니다.
               </dd>
             </div>
@@ -382,7 +429,11 @@ function BriefModule({
               <dt>국장</dt>
               <dd>
                 {/* 관계는 표와 같은 꼬리표로 둔다 — '엮여 있어' 같은 술어는 공급 · 경쟁 관계에 안 맞고 문장만 길었다(2026-10-05 점검). */}
-                가장 크게 따라간 곳은 <b>{strongest.l.stock}</b>({strongest.m.usName} · {strongest.l.why})입니다. 최근 5년 이런 날 평균{" "}
+                가장 크게 따라간 곳은{" "}
+                <a href={`#pv-${strongest.l.code}`} className="v2-pv-jump">
+                  <b>{strongest.l.stock}</b>
+                </a>
+                ({strongest.m.usName} · {strongest.l.why})입니다. 최근 5년 이런 날 평균{" "}
                 <b className={tone(strongest.l.krOpen).trim() || undefined}>{strongest.l.krOpen == null ? "없음" : PCT(strongest.l.krOpen)}</b>에 열렸습니다.
               </dd>
             </div>
@@ -392,7 +443,9 @@ function BriefModule({
               <dt>겹친 곳</dt>
               <dd>
                 {/* 어느 미장 종목인지 이름으로 — 수만 적으면 표를 뒤져야 했다(2026-10-05 점검). 넷 이상이면 셋 + '등 N곳'. */}
-                <b>{crowded[0]}</b>
+                <a href={`#pv-${crowdedCode}`} className="v2-pv-jump">
+                  <b>{crowded[0]}</b>
+                </a>
                 {josa(crowded[0], "은", "는")} {crowdedWith.length > 3 ? `${crowdedWith.slice(0, 3).join(" · ")} 등 ${crowdedWith.length}곳` : crowdedWith.join(" · ")}
                 {crowdedWith.length > 3 ? "과" : josa(crowdedWith[crowdedWith.length - 1], "과", "와")} 함께 움직입니다.
               </dd>
@@ -424,17 +477,120 @@ function zx(z: number): string {
  *    평소와 같다는 말로 읽혀 바꿨다(2026-10-03, 그날 다섯 중 셋이 1.0~1.1배).
  * ⭐ 묶음 순서는 **평소 폭 대비 큰 순**(z) — 등락률로 세우면 늘 변동성 큰 종목만 올라와 "평소와 달랐던 밤" 이 사라진다.
  */
-function MoverGroup({ m, when }: { m: PreviewMover; when: string }) {
+/**
+ * 같은 방향으로 여러 미장 종목에 걸린 국장 종목 — 줄마다 '4곳' 처럼 걸린 수를 달고, 처음 나오는 줄(평소 폭 배수가 가장 큰 묶음)
+ * 뒤의 줄은 **낮은 줄**로 묶음 맨 아래에 둔다(2026-10-15).
+ * ⭐ 실전 30거래일 · 5년 모두 여러 곳에 걸린 종목이 더 크게 움직였다(실전: 2곳 이상 +1.25% 대 한 곳만 +0.34%, 미국 방향 기준).
+ *    예전엔 같은 종목이 묶음마다 흩어져(정유 밤에 S-Oil 7줄) 그 사실이 브리핑 '겹친 곳' 한 줄로만 보였다.
+ * ⭐⭐ 되풀이 줄도 숫자(개장 · 장 중 · 종가)는 다 낸다 — 같은 종목이라도 **짝마다 5년 평균이 다르다**(S-Oil: 셰브론 묶음 +1.38% ·
+ *    엑슨모빌 +0.76% · 필립스66 +0.55%). 한때 이름 칩으로 접었더니 그 숫자가 사라졌다(2026-10-15 "중복 종목도 숫자는 알려줘야").
+ *    되풀이 줄도 키 · 글자가 다른 줄과 같다 — 34px · 500 회색으로 낮췄다가 "볼드 스타일은 동일하게" · "위아래 간격이 더 좁다"로 되돌렸다.
+ *    묶음 맨 아래에 서는 것과 'N곳' · 함께 짙어짐만 다르다.
+ * ⚠️ 방향은 사전이 본 방향(PreviewMover.up)으로 가른다 — 같은 종목이 오른 미장 · 내린 미장에 함께 걸린 날(드물다)은
+ *    따로 센다(정반대 숫자라 같은 종목의 되풀이가 아니다).
+ * ⭐ 같은 종목 줄은 **함께 짙어진다**(2026-10-15 시안 다섯 중 '가') — 한 줄에 마우스를 올리거나 폰에서 'N곳' 을 누르면 다른 묶음의
+ *    같은 종목 줄이 같이 칠해진다(DupStyle · DupTable). 줄을 옮기거나 접지 않고 자리에서 찾게 한다.
+ */
+type Overlap = { first: Map<string, string>; count: Map<string, number>; anchor: Map<string, string> };
+const overlapKey = (code: string, up: boolean) => `${code}|${up ? 1 : 0}`;
+
+function overlapOf(wall: PreviewMover[]): Overlap {
+  const first = new Map<string, string>();
+  const count = new Map<string, number>();
+  const anchor = new Map<string, string>();
+  for (const m of wall) {
+    for (const l of m.links) {
+      const k = overlapKey(l.code, m.up);
+      count.set(k, (count.get(k) ?? 0) + 1);
+      if (!first.has(k)) first.set(k, m.ticker);
+      // 앵커는 종목마다 하나 — 반대 방향 줄이 또 숫자 줄로 서도 id 가 겹치지 않게 처음 것만.
+      if (!anchor.has(l.code)) anchor.set(l.code, k);
+    }
+  }
+  return { first, count, anchor };
+}
+
+/**
+ * 미장 종목 한 묶음 = 왼쪽 칸(그 미장 종목, 옅은 면) + 오른쪽 국장 줄들(엮인 종목 · 관계 · 개장 · 장 중 · 종가). 폰은 미장 칸이 묶음 머리 줄.
+ * ⛔ 데스크톱도 머리 줄 꼴로 바꿨다가 되돌렸다(2026-10-05 운영자 판단 "바로 전 단계가 더 좋다"). 국장 줄이 여럿인 묶음의 미장 칸 아래는
+ *    옅은 면이 메운다(v2.css .v2-pv-us).
+ *
+ * ⚠️⚠️ 국장 숫자 셋은 **최근 5년, 그 미장 종목이 이만큼(같은 방향 · 같은 크기 칸) 움직인 날의 평균**이다 — 오늘 일이 아니다.
+ *    크기 칸은 평소 폭 1.5배 미만 · 이상 둘이다(2026-10-15 · config/us_kr_pairs.py Z_LEGS). 예전엔 1.0배 넘은 날 전체의 평균이라
+ *    작은 밤에는 크게, 큰 밤에는 작게 말했다. 모듈 머리 근거('최근 5년 이런 날 평균')와 칸 경계가 그 말을 한다.
+ * ⚠️⚠️ 셋을 **다 낸다.** 개장만 있으면 "그 뒤로는 별일 없었다" 를 못 말한다. 하루 전체는 담지 않고 개장과 장 중을 곱해 낸다.
+ * ⚠️ '평소 폭의 N배' — 등락률만으로는 큰 움직임인지 알 수 없다(종목마다 평소 폭이 다르다). "평소보다 1.0배" 는
+ *    평소와 같다는 말로 읽혀 바꿨다(2026-10-03, 그날 다섯 중 셋이 1.0~1.1배).
+ * ⭐ 묶음 순서는 **평소 폭 대비 큰 순**(z) — 등락률로 세우면 늘 변동성 큰 종목만 올라와 "평소와 달랐던 밤" 이 사라진다.
+ * ⭐ 미장 이름은 그 종목의 미장 화면으로 간다(/insider/stock/티커 · 2026-10-15). 사전 밖 종목도 화면은 선다(색인만 안 한다).
+ */
+/** 국장 줄 하나 — 종목 화면 링크. 처음 줄과 되풀이 줄이 같은 꼴이다. */
+function KrRow({ l, n }: { l: PreviewLink; n: number }) {
+  const day = l.krOpen != null && l.krIntra != null ? ((1 + l.krOpen / 100) * (1 + l.krIntra / 100) - 1) * 100 : null;
+  return (
+    <Link href={stockHref(l.code)} className="v2-pv-kr" data-ga="preview_stock_click" data-ga-symbol={l.code}>
+      <span className="v2-td-stock">
+        <StockLogo code={l.code} name={l.stock} market={l.market} size={22} />
+        <span className="v2-td-name">{l.stock}</span>
+      </span>
+      {/* 관계는 짧은 꼬리표다 — 쌍마다 다른 개별 관계(사전의 why). */}
+      <span className="v2-pv-why">
+        {/* 같은 방향으로 걸린 미장 종목 수 — 처음 줄과 되풀이 줄에 같은 꼴로 서서 둘이 한 종목임이 보인다.
+            '중복' 을 붙인다 — '4곳' 만으로는 무엇이 네 곳인지 안 읽혔다(2026-10-15 운영자 "X곳 중복이라고 표시해주자").
+            ⚠️ 이름 옆이 아니라 관계 칸 앞머리에 둔다 — 이름 옆이면 종목 칸(1,440 180px · 1,024 148px)에서 '한화에어로스페이스' 가
+            두 줄로 접히고, 1,024 에서는 표시가 관계 칸까지 넘쳤다. */}
+        {n > 1 && (
+          <span className="v2-pv-n" title={`미장 ${n}곳과 엮임`}>
+            {n}곳 중복
+          </span>
+        )}
+        {l.why}
+      </span>
+      {/* ⛔ 개장 값 갈림 막대를 걷었다 — 축도 이름도 없어 무엇인지 안 읽혔다(2026-10-04 지적). 관계 칸이 남는 폭을 받는다. */}
+      <span className="v2-pv-nums">
+        {([["개장", l.krOpen], ["장 중", l.krIntra], ["종가", day]] as const).map(([label, v]) => (
+          <span key={label} className={`v2-td-num v2-td-chg${tone(v)}`} data-k={label}>
+            {v == null ? "없음" : PCT(v)}
+          </span>
+        ))}
+      </span>
+    </Link>
+  );
+}
+
+/**
+ * 그날 겹친 국장 종목마다 '함께 짙어짐' 규칙 — 줄에 마우스를 올리거나(데스크톱 · :has) 'N곳' 을 누르면(폰 · DupTable 의 data-dup-on)
+ * 다른 묶음의 같은 종목 줄이 같이 칠해진다. 종목코드를 값으로 짝지어야 해서 그날 겹친 종목만 규칙을 만든다(많아야 열몇 개).
+ * 색은 옅은 파랑(--t-down-weak) — 이 화면에서 파랑은 '고른 것' 의 색이다(고른 줄 띠 · 링크 호버). 빨강 면은 오름으로 읽힌다.
+ */
+function DupStyle({ codes }: { codes: string[] }) {
+  if (!codes.length) return null;
+  const css = codes
+    .map(
+      (c) =>
+        `.v2-pv-tbl:has([data-dup="${c}"]:hover) [data-dup="${c}"] > .v2-pv-kr,` +
+        `.v2-pv-tbl[data-dup-on="${c}"] [data-dup="${c}"] > .v2-pv-kr{background:var(--t-down-weak)}` +
+        // 켜진 종목의 'N곳' 도 파랗게 — 무엇이 켜졌는지 보이게.
+        `.v2-pv-tbl[data-dup-on="${c}"] [data-dup="${c}"] .v2-pv-n{background:var(--t-down-weak);color:var(--t-down)}`,
+    )
+    .join("");
+  return <style dangerouslySetInnerHTML={{ __html: css }} />;
+}
+
+function MoverGroup({ m, when, ov }: { m: PreviewMover; when: string; ov: Overlap }) {
+  const mine = m.links.filter((l) => ov.first.get(overlapKey(l.code, m.up)) === m.ticker);
+  const again = m.links.filter((l) => !mine.includes(l));
+  const nOf = (code: string) => ov.count.get(overlapKey(code, m.up)) ?? 1;
   return (
     <li className="v2-pv-grp" id={`mv-${m.ticker}`}>
       <div className="v2-pv-us">
         <StockLogo code={m.ticker} name={m.usName} market="US" size={24} />
         <span className="v2-pv-usname">
-          <span>
+          <Link href={stockDetailHref(m.ticker)} className="v2-pv-uslink" data-ga="cta_click" data-ga-cta="us_stock" data-ga-surface="preview_table">
             <b>{m.ticker}</b>
             {/* 티커와 이름이 같으면('RTX RTX') 한 번만 — 데일리 노트와 같은 규칙. */}
             {m.usName !== m.ticker && <em>{m.usName}</em>}
-          </span>
+          </Link>
           <em>{m.sector}</em>
         </span>
         <span className="v2-td-two">
@@ -446,29 +602,21 @@ function MoverGroup({ m, when }: { m: PreviewMover; when: string }) {
         </span>
       </div>
       <ol className="v2-pv-krs">
-        {m.links.map((l) => {
-          const day = l.krOpen != null && l.krIntra != null ? ((1 + l.krOpen / 100) * (1 + l.krIntra / 100) - 1) * 100 : null;
-          return (
-            <li key={l.stock}>
-              <Link href={stockHref(l.code)} className="v2-pv-kr" data-ga="preview_stock_click" data-ga-symbol={l.code}>
-                <span className="v2-td-stock">
-                  <StockLogo code={l.code} name={l.stock} market={l.market} size={22} />
-                  <span className="v2-td-name">{l.stock}</span>
-                </span>
-                {/* 관계는 짧은 꼬리표다 — 쌍마다 다른 개별 관계(사전의 why). */}
-                <span className="v2-pv-why">{l.why}</span>
-                {/* ⛔ 개장 값 갈림 막대를 걷었다 — 축도 이름도 없어 무엇인지 안 읽혔다(2026-10-04 지적). 관계 칸이 남는 폭을 받는다. */}
-                <span className="v2-pv-nums">
-                  {([["개장", l.krOpen], ["장 중", l.krIntra], ["종가", day]] as const).map(([label, v]) => (
-                    <span key={label} className={`v2-td-num v2-td-chg${tone(v)}`} data-k={label}>
-                      {v == null ? "없음" : PCT(v)}
-                    </span>
-                  ))}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
+        {mine.map((l) => (
+          <li
+            key={l.stock}
+            id={ov.anchor.get(l.code) === overlapKey(l.code, m.up) ? `pv-${l.code}` : undefined}
+            data-dup={nOf(l.code) > 1 ? l.code : undefined}
+          >
+            <KrRow l={l} n={nOf(l.code)} />
+          </li>
+        ))}
+        {/* 되풀이 줄 — 다른 줄과 같은 꼴, 묶음 맨 아래(위 Overlap 주석). 앵커는 처음 줄에만 있다. */}
+        {again.map((l) => (
+          <li key={l.stock} className="is-again" data-dup={l.code}>
+            <KrRow l={l} n={nOf(l.code)} />
+          </li>
+        ))}
       </ol>
     </li>
   );
@@ -482,7 +630,7 @@ export default async function PreviewPage() {
 
   // ⚠️ 나란히 부른다. 표가 서로 달라 한쪽이 비어도 다른 쪽은 그린다 — 하이퍼리퀴드 표가 없던 날에도 아래 표는 멀쩡해야 한다.
   // 첫 줄의 지수 종가 · 링크 칸 둘은 곁들이는 칸이다(칸 하나가 실패하면 그 칸만 뺀다 — cover-chips 의 scoped).
-  const [{ date, updatedAt, spx, sectors, moverCount, usHoliday, usSession, usFrom }, overnight, rawIndexes, coverLinks] = await Promise.all([
+  const [{ date, updatedAt, spx, sectors, moverCount, usHoliday, usSession, usFrom, soxx, ewyPrem, nextOpen }, overnight, rawIndexes, coverLinks] = await Promise.all([
     getPreview(),
     getOvernightLive(),
     getKrIndexClosesSide(),
@@ -496,6 +644,10 @@ export default async function PreviewPage() {
   const when = usHoliday ? "밤사이" : sessionWord(date, usSession, usFrom);
   const movers = sectors.flatMap((s) => s.movers);
   const wall = [...movers].sort((a, b) => b.z - a.z);
+  const ov = overlapOf(wall);
+  // 국장이 쉬는 날(주말 · 연휴)은 표 머리에 그 숫자가 가리키는 개장일을 적는다 — '개장 +1.2%' 가 언제 열리는 장 이야기인지
+  // 날짜로 보이게(2026-10-15). 41일 중 16일이 국장이 쉬는 날이었다. 개장일엔 예전처럼 '국장 종목'.
+  const krHead = nextOpen && date && nextOpen !== date ? `${sessionDay(nextOpen)} 국장` : "국장 종목";
   const hasOvernight = overnight.rows.length > 0;
 
   return (
@@ -515,8 +667,9 @@ export default async function PreviewPage() {
       {/* 둘째 줄 — 밤사이 뉴욕 | 해외에서 거래 중인 값 | 오늘의 브리핑. 해외 값이 없는 날(수집 실패 · 표 없음)은 그 모듈째 빼고 두 칸.
           ⚠️ 빈 모듈을 남기지 말 것 — 고장으로 읽힌다. */}
       <div className={`v2-pv-band${hasOvernight ? "" : " is-pair"}`}>
-        <NightModule when={when} spx={spx} usHoliday={usHoliday} usSession={usSession} />
+        <NightModule when={when} spx={spx} soxx={soxx} ewyPrem={ewyPrem} usHoliday={usHoliday} usSession={usSession} />
         {hasOvernight && <OvernightModule overnight={overnight} />}
+        {hasOvernight && <PerpRefresh />}
         <BriefModule when={when} usHoliday={usHoliday} moverCount={moverCount} movers={movers} />
       </div>
 
@@ -530,11 +683,12 @@ export default async function PreviewPage() {
           // 국장 줄이 종목 화면으로 가는 링크다(카더라 · 데일리 노트와 같은 가르침 'stock-row' — 한 번 보면 셋 다 끝).
           hint={{ id: "stock-row", anchor: ".v2-pv-krs > li:first-child", text: "종목을 누르면 언급 추이와 요즘 도는 얘기가 나옵니다" }}
         >
-          <div className="v2-pv-tbl">
+          <DupStyle codes={[...new Set([...ov.count.entries()].filter(([, n]) => n > 1).map(([k]) => k.split("|")[0]))]} />
+          <DupTable>
             <div className="v2-pv-grp v2-pv-head">
               <span className="v2-pv-us">{when} 미장</span>
               <span className="v2-pv-kr">
-                <span>국장 종목</span>
+                <span>{krHead}</span>
                 <span>관계</span>
                 <span className="v2-pv-nums">
                   <span>개장</span>
@@ -545,10 +699,10 @@ export default async function PreviewPage() {
             </div>
             <ol>
               {wall.map((m) => (
-                <MoverGroup key={m.ticker} m={m} when={when} />
+                <MoverGroup key={m.ticker} m={m} when={when} ov={ov} />
               ))}
             </ol>
-          </div>
+          </DupTable>
         </Module>
       )}
     </div>

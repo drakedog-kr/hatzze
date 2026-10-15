@@ -1,5 +1,7 @@
 import "server-only";
 
+import { readFileSync } from "node:fs";
+
 import { getDevOverrides } from "./dev-overrides";
 import { getSupabaseServer } from "./supabase-server";
 
@@ -49,6 +51,12 @@ export type PreviewMover = {
   dp: number;
   /** 그 종목 평소 폭의 몇 배인가. 등락률만으로는 큰 움직임인지 알 수 없어서 함께 낸다. */
   z: number;
+  /**
+   * ⭐ 사전이 본 방향 — 지수 몫을 뺀 초과분이 (+)인가. 국장 줄의 숫자(오른 날 · 내린 날 성적)가 이 방향을 따른다.
+   * ⚠️ 등락률 부호와 다를 수 있다(시장이 3% 오른 날 1% 오른 종목은 '내린 날'). 그날치 한 줄의 짝 목록(pairs ·
+   *    마이그레이션 101)에서 읽고, 그 전 줄은 등락률 부호로 물러선다. '겹친 국장 종목'을 셀 때 같은 방향끼리만 센다.
+   */
+  up: boolean;
   links: PreviewLink[];
 };
 
@@ -78,15 +86,46 @@ export type PreviewData = {
    * 미장이 여러 번 열린 날이고, `spx`·종목 등락이 그 세션들의 **누적**이다. 화면이 "연휴 동안" 으로 적는다.
    */
   usFrom: string | null;
+  /** ⭐ 밤사이 SOXX(반도체 ETF) 등락 %(마이그레이션 101). 없으면 화면이 그 줄을 안 그린다. */
+  soxx: number | null;
+  /**
+   * ⭐ EWY 의 국장 종가 대비 괴리 %(마이그레이션 101). EWY 하루 등락률이 아니다 — 국장이 닫힌 뒤 한국 주식 묶음이
+   * 미국에서 더 움직인 몫이다(fetch_kr_preview.py ewy_premium). 기록이 다섯 번 쌓이기 전에는 null.
+   */
+  ewyPrem: number | null;
+  /** 오늘이거나 그 뒤의 첫 국장 개장일(마이그레이션 101). `date` 와 다르면 오늘은 국장이 쉬는 날이다. */
+  nextOpen: string | null;
 };
 
 const EMPTY: PreviewData = {
   date: null, updatedAt: null, spx: null, sectors: [], moverCount: 0, pairCount: 0, usHoliday: null, usSession: null, usFrom: null,
+  soxx: null, ewyPrem: null, nextOpen: null,
+};
+
+/** 깊은 쌍 하나의 그날 값(kr_preview_day.pairs · 마이그레이션 101). 종목 화면의 '함께 움직이는' 모듈이 읽는다. */
+export type NightPair = {
+  /** 미국 티커 · 한글 이름 */
+  t: string;
+  us: string;
+  /** 국내 종목코드 · 이름 */
+  code: string;
+  stock: string;
+  /** KOSPI · KOSDAQ — 로고 접미사. 수집기가 2026-10-15 뒤로 담는다(없으면 로고 대신 글자 배지). */
+  market?: string | null;
+  why: string;
+  /** 밤사이 미국 등락 % · 평소 폭 배수 · 사전이 본 방향(초과분 부호) */
+  dp: number;
+  z: number;
+  up: boolean;
+  /** 최근 5년 이런 날 국내 개장 · 장 중 평균 %. 평소 폭(1.0배)을 넘은 쌍에만 있다 — 문턱 아래는 '이런 날' 이 아니다. */
+  open: number | null;
+  intra: number | null;
 };
 
 type DayRow = {
   date: string; spx_dp: number | null; created_at: string;
   us_session?: string | null; us_holiday?: string | null; us_from?: string | null;
+  soxx_dp?: number | null; ewy_prem?: number | null; next_open?: string | null; pairs?: NightPair[] | null;
 };
 
 /**
@@ -96,6 +135,7 @@ type DayRow = {
  * ⚠️ 이게 다 실패해 줄이 없으면 아래가 종목 표로 물러서서 063 이 고친 '조용한 밤' 문제가 되살아난다.
  */
 const DAY_COLS = [
+  "date,spx_dp,created_at,us_session,us_holiday,us_from,soxx_dp,ewy_prem,next_open,pairs",
   "date,spx_dp,created_at,us_session,us_holiday,us_from",
   "date,spx_dp,created_at,us_session,us_holiday",
   "date,spx_dp,created_at",
@@ -123,8 +163,45 @@ type Row = {
   kr_intra: number | null;
 };
 
+/**
+ * 로컬 전용 — 수집기가 `--dry-run --dump` 로 뽑은 그날 줄을 DB 대신 읽는다(dev-overrides.json 의 previewDump 경로).
+ * 수집 · 계산을 고친 뒤 **운영 표에 쓰기 전에** 화면을 보는 길이다. 운영 빌드에서는 getDevOverrides 가 늘 비어 있다.
+ */
+function devDump(): { day: DayRow; rows: Row[] } | null {
+  const path = getDevOverrides().previewDump;
+  if (!path) return null;
+  try {
+    return JSON.parse(readFileSync(path, "utf-8")) as { day: DayRow; rows: Row[] };
+  } catch {
+    return null;
+  }
+}
+
+/** 미장이 쉬었을 때를 뺀, 그날치 한 줄의 새 칸들(101)을 화면 값으로. */
+function nightExtras(day: DayRow | null): Pick<PreviewData, "soxx" | "ewyPrem" | "nextOpen"> {
+  return {
+    soxx: day?.soxx_dp == null ? null : Number(day.soxx_dp),
+    ewyPrem: day?.ewy_prem == null ? null : Number(day.ewy_prem),
+    nextOpen: day?.next_open ?? null,
+  };
+}
+
+/** 가장 최근 그날치 한 줄. 새 칸부터 하나씩 빼며 읽는다(DAY_COLS 주석). 로컬 덤프가 있으면 그것. */
+async function latestDay(): Promise<DayRow | null> {
+  const dump = devDump();
+  if (dump) return dump.day;
+  const db = getSupabaseServer();
+  for (const cols of DAY_COLS) {
+    const day = await db.from("kr_preview_day").select(cols).order("date", { ascending: false }).limit(1);
+    if (day.error) continue;
+    return (day.data?.[0] ?? null) as unknown as DayRow | null;
+  }
+  return null;
+}
+
 export async function getPreview(): Promise<PreviewData> {
   const db = getSupabaseServer();
+  const dump = devDump();
 
   /**
    * ⭐⭐ **날짜는 `kr_preview_day`(하루 한 줄)에서 고른다.** 종목 표에서 고르면 안 된다.
@@ -141,13 +218,7 @@ export async function getPreview(): Promise<PreviewData> {
    * ⚠️ 그 표가 아직 없으면(마이그레이션 전) 예전처럼 종목 표에서 고른다. 그때는 조용한
    *    날 문제가 그대로지만 화면이 죽지는 않는다.
    */
-  let dayRow: DayRow | null = null;
-  for (const cols of DAY_COLS) {
-    const day = await db.from("kr_preview_day").select(cols).order("date", { ascending: false }).limit(1);
-    if (day.error) continue;
-    dayRow = (day.data?.[0] ?? null) as unknown as DayRow | null;
-    break;
-  }
+  let dayRow = await latestDay();
   // 로컬에서만 세션·휴장을 얹어 본다(lib/dev-overrides.ts · 운영 빌드에선 늘 비어 있다).
   const devDay = getDevOverrides().previewDay;
   if (devDay && dayRow) {
@@ -176,6 +247,8 @@ export async function getPreview(): Promise<PreviewData> {
       usHoliday: dayRow.us_holiday,
       usSession,
       usFrom,
+      // 다음 개장일만 — 반도체 · EWY 는 지난 세션 값이라 휴장 화면에 안 낸다(S&P 를 큰 숫자로 안 두는 것과 같은 이유).
+      nextOpen: dayRow.next_open ?? null,
     };
   }
 
@@ -197,10 +270,12 @@ export async function getPreview(): Promise<PreviewData> {
     date = latest.data[0].date as string;
   }
 
-  const { data, error } = await db
-    .from("kr_preview_daily")
-    .select("date,created_at,ticker,us_name,sector,us_dp,us_z,stock_code,stock_name,why,kind,gap,events,wins,base,kr_open,kospi_open,spx_dp,kr_intra")
-    .eq("date", date);
+  const { data, error } = dump
+    ? { data: dump.rows.map((r) => ({ ...r, created_at: dump.day.created_at })), error: null }
+    : await db
+        .from("kr_preview_daily")
+        .select("date,created_at,ticker,us_name,sector,us_dp,us_z,stock_code,stock_name,why,kind,gap,events,wins,base,kr_open,kospi_open,spx_dp,kr_intra")
+        .eq("date", date);
   // ⚠️ **줄이 0개인 것은 고장이 아니다** — 조용한 밤이다. 그날치 한 줄이 있으면 날짜와
   //    지수를 그 줄에서 꺼내 "오늘은 조용했다" 를 말할 수 있다. 그 줄조차 없을 때만 빈다.
   if (error) return EMPTY;
@@ -215,11 +290,16 @@ export async function getPreview(): Promise<PreviewData> {
     for (const s of got.data ?? []) mk.set(s.code as string, s.market as string);
   }
 
+  // 사전이 본 방향(초과분 부호). 짝 목록이 없는 줄(101 전)은 등락률 부호로 물러선다(PreviewMover.up 주석).
+  const upOf = new Map((dayRow?.pairs ?? []).map((p) => [p.t, p.up]));
   const byTicker = new Map<string, PreviewMover>();
   for (const r of rows) {
     let m = byTicker.get(r.ticker);
     if (!m) {
-      m = { ticker: r.ticker, sector: r.sector, usName: r.us_name, dp: Number(r.us_dp), z: Number(r.us_z), links: [] };
+      m = {
+        ticker: r.ticker, sector: r.sector, usName: r.us_name, dp: Number(r.us_dp), z: Number(r.us_z),
+        up: upOf.get(r.ticker) ?? Number(r.us_dp) > 0, links: [],
+      };
       byTicker.set(r.ticker, m);
     }
     m.links.push({
@@ -273,7 +353,48 @@ export async function getPreview(): Promise<PreviewData> {
     usHoliday: null,
     usSession,
     usFrom,
+    ...nightExtras(dayRow),
   };
+}
+
+export type NightPairs = {
+  date: string;
+  usSession: string | null;
+  usFrom: string | null;
+  pairs: NightPair[];
+};
+
+/**
+ * 종목 화면(국장 /stock/[code] · 미장 /insider/stock/[ticker])의 '함께 움직이는' 모듈 재료 — 그날 깊은 쌍 전부.
+ *
+ * ⭐ 짝 목록(pairs · 101)이 있으면 그것을, 없으면(101 전 줄) 그날 카드 줄(문턱을 넘은 쌍만)로 물러선다.
+ * ⚠️ 미장이 쉰 밤에는 null — 지난 세션 값을 오늘 것처럼 세우지 않는다(getPreview 의 휴장 분기와 같은 이유).
+ * ⚠️ 던지지 않는다. 이 모듈 하나 때문에 종목 화면 464장이 무너지면 안 된다.
+ */
+export async function getNightPairs(): Promise<NightPairs | null> {
+  try {
+    const day = await latestDay();
+    if (!day || day.us_holiday) return null;
+    const base = { date: day.date, usSession: day.us_session ?? null, usFrom: day.us_from ?? null };
+    if (day.pairs) return { ...base, pairs: day.pairs };
+    const dump = devDump();
+    const got = dump
+      ? { data: dump.rows, error: null }
+      : await getSupabaseServer()
+          .from("kr_preview_daily")
+          .select("ticker,us_name,us_dp,us_z,stock_code,stock_name,why,kr_open,kr_intra")
+          .eq("date", day.date);
+    if (got.error) return null;
+    const pairs = ((got.data ?? []) as Row[]).map((r) => ({
+      t: r.ticker, us: r.us_name, code: r.stock_code, stock: r.stock_name, why: r.why,
+      dp: Number(r.us_dp), z: Number(r.us_z), up: Number(r.us_dp) > 0,
+      open: r.kr_open == null ? null : Number(r.kr_open), intra: r.kr_intra == null ? null : Number(r.kr_intra),
+    }));
+    return { ...base, pairs };
+  } catch (e) {
+    console.error("[getNightPairs] 짝 목록을 못 읽었습니다 — 모듈만 뺍니다", e);
+    return null;
+  }
 }
 
 /**
