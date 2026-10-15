@@ -658,7 +658,7 @@ _EXEMPT_RE = re.compile("|".join(re.escape(w) for w in BANNED_EXEMPT))
 #   (없어짐) 증권계좌에 대기 중인 매수 자금 ⊃ 매수  investor_deposit → limit_up_breadth
 #            2026-07-31 에 '급등 종목 강도'로 갈렸다. 새 이름·헤드라인에 금지 조합이 없다.
 #   코스피 신고가 대비 괴리율        ⊃ 신고가    kospi_high_gap
-#   최근 한 달 매매 안전장치 동향    ⊃ 매매      market_actions_30d
+#   매매 안전장치 동향              ⊃ 매매      market_actions_30d
 #
 # 히어로 요약은 '가장 뜨거운 시장 지표'를 골라 그 이름을 굵게 쓰고 뜻을 풀어 준다
 # (generate_daily_summary.py). 그러니 저 넷이 주인공이 되는 날은 첫 문장이 반드시 걸린다.
@@ -685,7 +685,7 @@ _EXEMPT_RE = re.compile("|".join(re.escape(w) for w in BANNED_EXEMPT))
 #             print(i["slug"], f, banned_hits(i[f] or ""))
 INDICATOR_EXEMPT = (
     "신고가",         # 코스피 신고가 대비 괴리율
-    "매매 안전장치",  # 최근 한 달 매매 안전장치 동향
+    "매매 안전장치",  # 매매 안전장치 동향
 )
 
 

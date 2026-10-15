@@ -165,8 +165,9 @@ export function CardMarketActions({ v }: { v: Pick }) {
     <Shell slug={v.ind?.slug} hit={v.isHit} warm={v.warm} minH={230}>
       {/* ⚠️ speed(속도계) 였다. 이 지표가 세는 것은 VI·사이드카·서킷브레이커 — 시장을
           **멈추는** 장치이지 속도가 아니다. 속도계는 MDD 의 '하락 vs 회복 속도' 타일이 쓴다. */}
-      {/* '최근 한 달' 꼬리표는 걷었다 — 지표 이름('최근 한 달 매매 안전장치 동향')이 이미 말한다. */}
-      <TitleRow desc={v.headline} icon="shield" name={v.name} />
+      {/* 기간은 이름 옆 표식으로 — 이름은 '매매 안전장치 동향', 표식 '최근 30일'(2026-10-15 운영자 · 아시아 3국 대비 코스피 카드와 같은 꼴).
+          예전엔 이름이 '최근 한 달 매매 안전장치 동향'이라 표식을 걷었었다. 이름은 fetch_market_actions.py 가 실행마다 DB 에 쓴다. */}
+      <TitleRow desc={v.headline} icon="shield" name={v.name} badge="최근 30일" />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
         <strong className="hz-big" style={{ fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: dir.color, lineHeight: 1 }}>{dir.label}</strong>
         {/* 곁말은 판정을 풀어 쓴 문장('양쪽이 비슷했습니다')이었다 — 문장 대신 셋을 합친 건수. 판정은 아래 막대가 증명한다. */}
