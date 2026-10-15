@@ -238,16 +238,19 @@
   }
 }
 /* 지금 화면 이름(AppShell TopBar · usePhoneTitle) — 로고 오른쪽, 베타 배지 자리. 375 에서 로고 끝 ~ 검색 단추 사이 109px,
-   가장 긴 'MDD 정밀분석'이 89px. 넘치면 말줄임. 340 아래는 워드마크를 숨기고 유령 심볼 + 이름(2026-10-14). */
+   가장 긴 'MDD 정밀분석'이 89px. 넘치면 말줄임. 340 아래는 워드마크를 숨기고 유령 심볼 + 이름(2026-10-14).
+   상자 가운데 맞춤이면 글자 바닥이 워드마크 바닥보다 1px 위에 떠서(소문자 워드마크는 무게가 아래에 있다) 줄 높이 20 을 18 + 위 2 로 나눠
+   글자만 1px 내린다. 상자 20 · 구분선은 그대로(2026-10-15 픽셀 실측, 바닥 차 2배율 1.0 → 0 · 3배율 1.17 → 0.17). */
 .hz-topbar-page {
   align-self: center;
   min-width: 0;
   margin-left: 4px;
+  padding-top: 2px;
   padding-left: 9px;
   border-left: 1px solid var(--c-line);
   font-size: 15px;
   font-weight: 600;
-  line-height: 20px;
+  line-height: 18px;
   color: var(--c-ink);
   white-space: nowrap;
   overflow: hidden;
