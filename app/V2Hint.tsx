@@ -40,6 +40,12 @@ import { Icon } from "./ui";
  */
 const { storeFor, markSeen } = createHintStore("hz-v2hint-", "hz-v2hint-change");
 
+/**
+ * 쪽지 밖에서 '봤음'을 적는다 — 가르친 동작의 누름이 판(host)까지 안 올라오는 자리에서 쓴다. 미리보기 표의 'N곳 중복' 은 링크 안이라
+ * 누름을 링크로 안 보내려고 그 자리에서 멈춘다(app/preview/DupTable.tsx) — 그래서 쪽지의 click 듣기에 안 닿는다.
+ */
+export const seeHint = (id: string) => markSeen(id);
+
 /** 호버 쪽지가 '봤음'이 되는 머무름(ms). 지나가던 마우스가 스치기만 해선 안 닫힌다. */
 const HOVER_SEEN_MS = 600;
 
@@ -202,11 +208,19 @@ export function V2Hint({
         slot.style.top = `${Math.round(r.top + r.height / 2 - slot.offsetHeight / 2)}px`;
         return;
       }
-      slot.style.left = `${Math.round(r.left - h.left + (at === "inside" ? 8 : 14))}px`;
+      const left = r.left - h.left + (at === "inside" ? 8 : 14);
       if (at === "inside") {
+        slot.style.left = `${Math.round(left)}px`;
         slot.style.top = `${Math.round(r.top - h.top + 8)}px`;
         return;
       }
+      // 가리킨 것이 판 오른쪽에 있으면(폰의 'N곳 중복' 표시) 쪽지가 판 밖으로 나간다 — 판 안으로 당기고 꼭지만 제자리를 가리키게 민다.
+      // 폭은 왼쪽 0 에서 잰다 — 오른쪽에 붙은 채 재면 남은 폭에 눌린 값이 나온다.
+      slot.style.left = "0px";
+      const w = (slot.firstElementChild as HTMLElement | null)?.offsetWidth ?? 0;
+      const fit = Math.max(0, Math.min(left, h.width - w - 14));
+      slot.style.left = `${Math.round(fit)}px`;
+      slot.style.setProperty("--hint-beak", `${Math.round(12 + left - fit)}px`);
       // 판(overflow:hidden) 바닥을 넘으면 가리킨 줄 위로 뒤집는다 — 잘린 쪽지는 무엇을 말하는지 안 읽힌다.
       const above = r.bottom - h.top + 4 + slot.offsetHeight > h.height && r.top - h.top - 4 - slot.offsetHeight >= 0;
       slot.classList.toggle("is-above", above);

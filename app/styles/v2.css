@@ -142,12 +142,13 @@
 .v2-hint-x:hover,
 .v2-hint-x:focus-visible { opacity: 1; background: color-mix(in srgb, var(--t-card) 16%, transparent); }
 .v2-hint-x > * { font-size: 16px; }
-/* 위 줄(가리키는 것)을 향한 꼭지 — 안에 띄우는 쪽지(차트 위)엔 없다. 위로 뒤집힌 쪽지(.is-above)는 아래를 가리킨다. */
+/* 위 줄(가리키는 것)을 향한 꼭지 — 안에 띄우는 쪽지(차트 위)엔 없다. 위로 뒤집힌 쪽지(.is-above)는 아래를 가리킨다.
+   판 안으로 당긴 쪽지는 --hint-beak 로 꼭지를 밀어 가리킨 자리를 지킨다(V2Hint 의 place). */
 .v2-hint-slot:not(.is-inside) .v2-hint::before {
   content: "";
   position: absolute;
   top: -5px;
-  left: 12px;
+  left: var(--hint-beak, 12px);
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
   border-bottom: 5px solid var(--t-ink);

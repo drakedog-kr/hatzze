@@ -2,6 +2,11 @@
 
 import { useState, type MouseEvent, type ReactNode } from "react";
 
+import { seeHint } from "../V2Hint";
+
+/** 'N곳 중복' 을 가르치는 쪽지(page.tsx). 표시를 누르면 '봤음' — 누름을 여기서 멈춰 쪽지의 click 듣기에 안 닿아서다. */
+export const DUP_HINT_ID = "dup-badge";
+
 /**
  * '함께 움직인 국장 종목' 표를 감싸 **겹친 국장 종목을 함께 짙게** 한다(2026-10-15 · 시안 다섯 중 '가').
  *
@@ -19,8 +24,10 @@ export function DupTable({ children }: { children: ReactNode }) {
     const code = badge.closest<HTMLElement>("li[data-dup]")?.dataset.dup;
     if (!code) return;
     e.preventDefault();
+    // 멈추지 않으면 링크 바깥 문서의 GA 위임 리스너가 '종목 누름'(preview_stock_click)으로 센다 — 종목 화면으로 안 갔는데도.
     e.stopPropagation();
     setOn((cur) => (cur === code ? null : code));
+    seeHint(DUP_HINT_ID);
   };
   return (
     <div className="v2-pv-tbl" data-dup-on={on ?? undefined} onClickCapture={onClickCapture}>

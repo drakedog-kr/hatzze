@@ -17,7 +17,8 @@ import { PREVIEW_CARD } from "../og-copy";
 import { pageMetadata } from "../seo";
 import { PREVIEW_PUBLIC } from "../screen-flags";
 import { StockLogo } from "../StockLogo";
-import { DupTable } from "./DupTable";
+import { V2Hint } from "../V2Hint";
+import { DUP_HINT_ID, DupTable } from "./DupTable";
 import { PerpRefresh } from "./PerpRefresh";
 
 /**
@@ -645,6 +646,8 @@ export default async function PreviewPage() {
   const movers = sectors.flatMap((s) => s.movers);
   const wall = [...movers].sort((a, b) => b.z - a.z);
   const ov = overlapOf(wall);
+  // 그날 여러 미장 종목에 같은 방향으로 걸린 국장 종목 — 함께 짙어짐 규칙(DupStyle)과 안내 쪽지가 쓴다.
+  const dupCodes = [...new Set([...ov.count.entries()].filter(([, n]) => n > 1).map(([k]) => k.split("|")[0]))];
   // 국장이 쉬는 날(주말 · 연휴)은 표 머리에 그 숫자가 가리키는 개장일을 적는다 — '개장 +1.2%' 가 언제 열리는 장 이야기인지
   // 날짜로 보이게(2026-10-15). 41일 중 16일이 국장이 쉬는 날이었다. 개장일엔 예전처럼 '국장 종목'.
   const krHead = nextOpen && date && nextOpen !== date ? `${sessionDay(nextOpen)} 국장` : "국장 종목";
@@ -683,7 +686,13 @@ export default async function PreviewPage() {
           // 국장 줄이 종목 화면으로 가는 링크다(카더라 · 데일리 노트와 같은 가르침 'stock-row' — 한 번 보면 셋 다 끝).
           hint={{ id: "stock-row", anchor: ".v2-pv-krs > li:first-child", text: "종목을 누르면 언급 추이와 요즘 도는 얘기가 나옵니다" }}
         >
-          <DupStyle codes={[...new Set([...ov.count.entries()].filter(([, n]) => n > 1).map(([k]) => k.split("|")[0]))]} />
+          <DupStyle codes={dupCodes} />
+          {/* 'N곳 중복' 안내 쪽지 — 누르면(데스크톱은 올려도) 같은 종목 줄이 함께 칠해지는 것을 한 번 알린다(2026-10-15 운영자 "가이드 툴팁 필요").
+              모듈의 '종목을 누르면 …' 쪽지(order 0) 다음 차례다 — 한 화면에 쪽지는 하나씩(app/V2Hint.tsx). 겹친 종목이 없는 날은 안 단다.
+              판(모듈)이 쪽지의 자리 기준이라 모듈의 자식으로 둔다. */}
+          {dupCodes.length > 0 && (
+            <V2Hint id={DUP_HINT_ID} order={1} anchor="li[data-dup] .v2-pv-n" target=".v2-pv-n" hover text="누르면 같은 종목 줄이 함께 칠해집니다" />
+          )}
           <DupTable>
             <div className="v2-pv-grp v2-pv-head">
               <span className="v2-pv-us">{when} 미장</span>
