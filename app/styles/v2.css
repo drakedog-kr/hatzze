@@ -300,7 +300,8 @@
 }
 .v2-more:hover { background: var(--t-tint); color: var(--t-ink); }
 .v2-more .ms { font-size: 16px; }
-/* 카드 머리 오른쪽 단추 — '내 배당 포폴에 추가하기'(국장 종목 상세 배당 · ETF 상세 분배금 · 미장 종목 상세 커뮤니티 관심 추이). 글자 링크(.v2-more)
+/* 카드 머리 오른쪽 단추 — '내 배당 포폴에 추가하기'(국장 종목 상세 배당 · ETF 상세 분배금 · 미장 종목 상세 커뮤니티 관심 추이) · '국장 미리보기'(두 종목 상세의
+   함께 움직이는 짝 · 2026-10-15 "버튼같이"). 글자 링크(.v2-more)
    로는 눌리는 것인지 안 읽혀(2026-10-12 "지금은 그냥 텍스트 같다") 옅은 파랑 면 + 진한 파랑 글자 + 더하기 아이콘으로. 머리 띠 키(42)를 안
    늘리게 위아래 −4px(높이 28 중 20 만 줄을 먹는다 · .v2-more 의 −2px 와 같은 셈). */
 .v2-add-btn {
@@ -2670,17 +2671,15 @@ a.v2-pv-kr:hover { background: var(--t-tint); }
   .v2-pv-nums > [data-k]::before { content: attr(data-k) " "; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 }
 
-/* ── 종목 화면의 '함께 움직이는' 짝(2026-10-15 · app/preview/NightPairs.tsx) ─────────────────────────────
-   국장 종목 화면은 [미국 종목 | 관계 | 밤사이 | 개장 · 장 중 · 종가], 미장 종목 화면은 [국장 종목 | 관계 | 개장 · 장 중 · 종가].
-   숫자 셋은 미리보기 표와 같은 값(최근 5년 이런 날 평균)이라 칸 이름 · 폭(72)도 그 표와 같다. 평소 폭을 안 넘은 밤은 숫자 칸이 '–'. */
+/* ── 국장 종목 화면의 '함께 움직이는 미국 종목'(2026-10-15 · app/preview/NightPairs.tsx) ─────────────────────────────
+   [미국 종목 | 관계 | 밤사이 | 개장 · 장 중 · 종가]. 숫자 셋은 최근 5년 이런 날 평균이라 칸 이름 · 폭(72)이 미리보기 표와 같다.
+   국장 미리보기 표에 선 짝만 서서 줄마다 숫자가 있다 — 줄마다 꼴 · 굵기가 같다(미장 종목 화면의 짝 카드는 같은 날 걷었다). */
 .v2-np ol { list-style: none; margin: 0; padding: 0; }
 
 .v2-np-th,
 .v2-np-tr { display: grid; align-items: center; column-gap: 12px; padding: 0 14px; }
 .v2-np-kr .v2-np-th,
 .v2-np-kr .v2-np-tr { grid-template-columns: 220px minmax(0, 1fr) 112px 72px 72px 72px; }
-.v2-np-us .v2-np-th,
-.v2-np-us .v2-np-tr { grid-template-columns: 220px minmax(0, 1fr) 72px 72px 72px; }
 .v2-np-th { min-height: 30px; background: var(--t-head); border-bottom: 1px solid var(--t-line); font-size: 12px; font-weight: 500; color: var(--t-ink3); }
 .v2-np-th > :nth-child(n + 3) { text-align: right; white-space: nowrap; }
 .v2-np-tr { min-height: 48px; color: var(--t-ink); text-decoration: none; transition: background-color 0.15s; }
@@ -2697,36 +2696,28 @@ a.v2-np-tr:hover { background: var(--t-tint); }
 .v2-np-move b.is-down { color: var(--t-down); }
 .v2-np-move em { font-style: normal; font-size: 12px; font-weight: 500; color: var(--t-ink3); white-space: nowrap; }
 .v2-np .v2-td-num { font-weight: 500; text-align: right; }
-/* 평소 폭 안의 밤 — 등락은 굵기를 한 단 내린다(그 줄의 주인공이 아니다). */
-.v2-np-tr.is-quiet .v2-np-move b { font-weight: 500; }
 
 @container kd (max-width: 999px) {
   .v2-np-kr .v2-np-th,
   .v2-np-kr .v2-np-tr { grid-template-columns: 168px minmax(0, 1fr) 104px 64px 64px 64px; }
-  .v2-np-us .v2-np-th,
-  .v2-np-us .v2-np-tr { grid-template-columns: 168px minmax(0, 1fr) 64px 64px 64px; }
 }
 @container kd (max-width: 679px) {
-  /* 머리 — 폰은 근거를 둘째 줄로. 미장 화면 근거('밤사이 −4.10% · 평소 폭의 0.68배 · 최근 5년 이런 날 평균')가 길어 제목 · 근거 · 링크가
-     세 줄(81px)로 쌓였다 — 제목 · 링크가 첫 줄, 근거가 둘째 줄(2026-10-15 점검). */
+  /* 머리 — 폰은 근거를 둘째 줄로. 제목 · 근거 · '국장 미리보기' 단추가 한 줄에 안 들어가 세 줄로 쌓였다 — 제목 · 단추가 첫 줄,
+     근거가 둘째 줄(2026-10-15 점검). */
   .v2-np-mod .v2-mod-head { flex-wrap: wrap; row-gap: 0; }
   .v2-np-mod .v2-mod-meta { order: 3; flex-basis: 100%; }
-  /* 폰 — 머리 줄을 숨기고 두 층: 위 이름 · (국장 화면은 밤사이 등락 / 미장 화면은 관계), 아래 개장 · 장 중 · 종가(값 앞에 칸 이름). 미리보기 표와 같은 꼴. */
+  /* 폰 — 머리 줄을 숨기고 층으로: 위 이름 · 밤사이 등락, 관계, 아래 개장 · 장 중 · 종가(값 앞에 칸 이름). 미리보기 표와 같은 꼴. */
   .v2-np-th { display: none; }
   .v2-np-kr .v2-np-tr { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "stock move" "why why" "nums nums"; row-gap: 2px; padding-top: 8px; padding-bottom: 8px; }
-  .v2-np-us .v2-np-tr { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "stock why" "nums nums"; row-gap: 4px; padding-top: 8px; padding-bottom: 8px; }
   .v2-np-tr > .v2-td-stock { grid-area: stock; }
   .v2-np-why { grid-area: why; }
   .v2-np-kr .v2-np-why { padding-left: 30px; }
-  .v2-np-us .v2-np-why { text-align: right; }
   .v2-np-move { grid-area: move; }
   .v2-np-nums { grid-area: nums; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 12px; padding-left: 30px; }
   .v2-np-nums > * { grid-area: auto; }
   .v2-np .v2-np-nums > :first-child { text-align: left; }
   .v2-np .v2-np-nums > :nth-child(2) { text-align: center; }
   .v2-np-nums > [data-k]::before { content: attr(data-k) " "; font-size: 12px; font-weight: 500; color: var(--t-ink3); }
-  /* 평소 폭 안의 밤은 숫자 층을 접는다 — '개장 – 장 중 – 종가 –' 한 층이 줄마다 섰다. 데스크톱은 칸이 열이라 '–' 를 둔다. */
-  .v2-np-tr.is-quiet .v2-np-nums { display: none; }
 }
 
 /* ── v2 데일리 노트(2026-10-03) — [글 | 오른쪽 칸] ─────────────────────────────

@@ -110,14 +110,13 @@ export type NightPair = {
   /** 국내 종목코드 · 이름 */
   code: string;
   stock: string;
-  /** KOSPI · KOSDAQ — 로고 접미사. 수집기가 2026-10-15 뒤로 담는다(없으면 로고 대신 글자 배지). */
-  market?: string | null;
   why: string;
   /** 밤사이 미국 등락 % · 평소 폭 배수 · 사전이 본 방향(초과분 부호) */
   dp: number;
   z: number;
   up: boolean;
-  /** 최근 5년 이런 날 국내 개장 · 장 중 평균 %. 평소 폭(1.0배)을 넘은 쌍에만 있다 — 문턱 아래는 '이런 날' 이 아니다. */
+  /** 최근 5년 이런 날 국내 개장 · 장 중 평균 % — 그날 국장 미리보기 표의 그 줄 값. 표에 안 선 짝(평소 폭 1.0배 미만)은 null 이고
+   *  종목 화면이 그 짝을 세우지 않는다. */
   open: number | null;
   intra: number | null;
 };
@@ -365,7 +364,7 @@ export type NightPairs = {
 };
 
 /**
- * 종목 화면(국장 /stock/[code] · 미장 /insider/stock/[ticker])의 '함께 움직이는' 모듈 재료 — 그날 깊은 쌍 전부.
+ * 국장 종목 화면(/stock/[code])의 '함께 움직이는 미국 종목' 모듈 재료 — 그날 깊은 쌍 전부.
  *
  * ⭐ 짝 목록(pairs · 101)이 있으면 그것을, 없으면(101 전 줄) 그날 카드 줄(문턱을 넘은 쌍만)로 물러선다.
  * ⚠️ 미장이 쉰 밤에는 null — 지난 세션 값을 오늘 것처럼 세우지 않는다(getPreview 의 휴장 분기와 같은 이유).
