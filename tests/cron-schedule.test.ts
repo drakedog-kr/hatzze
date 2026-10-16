@@ -92,43 +92,62 @@ describe("슬롯 경계(fireUtc)", () => {
   });
 });
 
+describe("워크플로 guard 의 시간대 경계 — fireUtc 와 같은 값이어야 한다", () => {
+  // daily-update.yml 의 guard 는 '이 시간대를 이미 누가 처리했나'를 자기 경계로 다시 센다(concurrency 로 기다렸다 시작한 실행).
+  // 시계(여기)와 guard 의 경계가 갈리면, 그 틈에 만든 실행을 한쪽은 이 슬롯 몫으로 · 다른 쪽은 직전 슬롯 몫으로 센다.
+  const wf = readFileSync(new URL("../.github/workflows/daily-update.yml", import.meta.url), "utf8");
+  const bound = (name: string) => wf.match(new RegExp(`${name}=\\$\\(date -u -d "\\$day (\\d\\d:\\d\\d)"`))?.[1];
+
+  it("아침(b_m) · 저녁(b_e) 경계가 lib/cron-schedule.ts 의 fireUtc 와 같다", () => {
+    const fireOf = (slot: string) => CRON_TO_JOB[mainPipelineCrons.find((c) => slotOf(c) === slot)!.schedule].fireUtc;
+    assert.equal(bound("b_m"), fireOf("morning"), "guard 아침 경계를 못 찾았거나 fireUtc 와 다르다");
+    assert.equal(bound("b_e"), fireOf("evening"), "guard 저녁 경계를 못 찾았거나 fireUtc 와 다르다");
+  });
+});
+
+describe("저녁 발사의 바닥 — 야후 지수 종가 하한(16:00 KST = 07:00Z)", () => {
+  it("저녁 슬롯의 크론은 07:00Z 보다 늦다 — 앞이면 그날 지수 종가를 하루 밀려 담는다(data-pipeline/common/yahoo_client.py MARKET_CLOSE_KST)", () => {
+    for (const c of pipelineCrons.filter((x) => slotOf(x) === "evening")) assert.ok(fireMin(c.schedule) > 7 * 60, c.schedule);
+  });
+});
+
 describe("이미 돌았나(sinceIso + hasRunSince) — 실제 시각으로 재현", () => {
   const morning = mainPipelineCrons.find((c) => CRON_TO_JOB[c.schedule].inputs(new Date()).slot === "morning")!;
   const evening = mainPipelineCrons.find((c) => CRON_TO_JOB[c.schedule].inputs(new Date()).slot === "evening")!;
   const mFire = CRON_TO_JOB[morning.schedule].fireUtc;
   const eFire = CRON_TO_JOB[evening.schedule].fireUtc;
-  // 2026-09-23(수) KST 아침 06:30 = 09-22 21:30Z, 저녁 17:30 = 09-23 08:30Z.
+  // 2026-09-23(수) KST 아침 06:30 = 09-22 21:30Z, 저녁 17:10 = 09-23 08:10Z.
   const at = (iso: string) => new Date(iso);
   const run = (created_at: string) => ({ created_at, html_url: `run@${created_at}` });
 
   it("아침: 전날 저녁 실행만 있으면 던진다", () => {
     const since = sinceIso(mFire, at("2026-09-22T21:30:00Z"));
-    assert.equal(hasRunSince([run("2026-09-22T08:30:04Z"), run("2026-09-21T21:30:03Z")], since).covered, false);
+    assert.equal(hasRunSince([run("2026-09-22T08:10:04Z"), run("2026-09-21T21:30:03Z")], since).covered, false);
   });
 
   it("아침: 크론이 1초 일찍 와도 던진다", () => {
     const since = sinceIso(mFire, at("2026-09-22T21:29:59Z"));
-    assert.equal(hasRunSince([run("2026-09-22T08:30:04Z")], since).covered, false);
+    assert.equal(hasRunSince([run("2026-09-22T08:10:04Z")], since).covered, false);
   });
 
   it("아침: 같은 크론이 두 번 오면 두 번째는 안 던진다", () => {
     const since = sinceIso(mFire, at("2026-09-22T21:30:09Z"));
-    assert.equal(hasRunSince([run("2026-09-22T21:30:04Z"), run("2026-09-22T08:30:04Z")], since).covered, true);
+    assert.equal(hasRunSince([run("2026-09-22T21:30:04Z"), run("2026-09-22T08:10:04Z")], since).covered, true);
   });
 
   it("저녁: 그날 아침 실행만 있으면 던진다", () => {
-    const since = sinceIso(eFire, at("2026-09-23T08:30:00Z"));
+    const since = sinceIso(eFire, at("2026-09-23T08:10:00Z"));
     assert.equal(hasRunSince([run("2026-09-22T21:30:04Z")], since).covered, false);
   });
 
   it("저녁: 크론이 1초 일찍 와도 던진다", () => {
-    const since = sinceIso(eFire, at("2026-09-23T08:29:59Z"));
+    const since = sinceIso(eFire, at("2026-09-23T08:09:59Z"));
     assert.equal(hasRunSince([run("2026-09-22T21:30:04Z")], since).covered, false);
   });
 
   it("저녁: 같은 크론이 두 번 오면 두 번째는 안 던진다", () => {
-    const since = sinceIso(eFire, at("2026-09-23T08:30:09Z"));
-    assert.equal(hasRunSince([run("2026-09-23T08:30:03Z"), run("2026-09-22T21:30:04Z")], since).covered, true);
+    const since = sinceIso(eFire, at("2026-09-23T08:10:09Z"));
+    assert.equal(hasRunSince([run("2026-09-23T08:10:03Z"), run("2026-09-22T21:30:04Z")], since).covered, true);
   });
 
   it("왜 경계를 앞에 두나 — 경계가 발사와 같으면 1초 이른 호출이 전날로 물러난다", () => {
@@ -136,7 +155,7 @@ describe("이미 돌았나(sinceIso + hasRunSince) — 실제 시각으로 재�
     // 그 사이 저녁 실행이 '처리됨'으로 잡히고 아침 슬롯이 통째로 안 돈다.
     const since = sinceIso("21:30", at("2026-09-22T21:29:59Z"));
     assert.equal(since, "2026-09-21T21:30:00Z");
-    assert.equal(hasRunSince([run("2026-09-22T08:30:04Z")], since).covered, true);
+    assert.equal(hasRunSince([run("2026-09-22T08:10:04Z")], since).covered, true);
   });
 });
 
@@ -163,7 +182,7 @@ describe("만회 크론 — 본 발화가 못 던진 몫을 한 번 더 본다(a
     const up = pipelineCrons.find((c) => CRON_TO_JOB[c.schedule].catchUp && slotOf(c) === "morning")!;
     const since = sinceIso(CRON_TO_JOB[up.schedule].fireUtc, new Date("2026-09-22T21:50:00Z"));
     assert.equal(hasRunSince([run("2026-09-22T21:30:04Z")], since).covered, true);
-    assert.equal(hasRunSince([run("2026-09-22T08:30:04Z")], since).covered, false);
+    assert.equal(hasRunSince([run("2026-09-22T08:10:04Z")], since).covered, false);
   });
 
   it("아침 만회도 KRX 공표 게이트(08:00 KST = 23:00Z) 전에 던진다 — 늦으면 개장 전 브리핑이 밀린다", () => {
