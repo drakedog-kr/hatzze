@@ -603,14 +603,16 @@ jobs:
       # 미장 갈래 나머지(일별 집계 → 트렌딩 → 테마 → 동시 언급 → 센티먼트 → 총평 → 테마 요약)를 뒤에서 시작한다.
       # 국장 추출이 끝난 뒤여야 한다(미장 일별 집계가 국장 태그를 읽는다 — scripts/kadera-us-chain.sh 규칙 ①).
       # 국장 추출 결과를 넘긴다 — 동시 언급은 두 추출이 다 성공해야 돈다(아래 '종목 추출이 실패한 날' 규칙 ②).
-      # ⚠️ LLM 동시 호출을 4로 줄인다(워크플로 기본 6). 미장 총평 · 테마 요약이 국장 쪽 분위기 판정 · 총평과 겹쳐 돈다 —
-      #    구독 경로에서 검증된 동시 호출은 8이고(common/llm_parallel 머리 주석), 겹치는 동안 8+4=12 안쪽으로 묶는다.
-      #    구독 호출이 실패하면 API 로 넘어가며 Opus 문장이 Haiku 로 바뀐다(common/llm_client API_FALLBACK_MODEL).
+      # ⚠️ LLM 동시 호출을 2로 줄인다(워크플로 기본 6). 미장 갈래에서 LLM 을 부르는 건 미장 총평 · 미장 테마 요약 둘뿐이고
+      #    둘 다 '분위기 판정 끝' 표시 뒤라(분류 · 판정의 8 과는 안 겹친다), 겹치는 상대는 국장 급부상 한 줄 · 총평 · 테마
+      #    요약(각 6)이다. 6 + 2 = 8 — 지금까지 구독 경로에서 검증된 동시 호출(분류 · 판정의 8, common/llm_parallel 머리 주석)을
+      #    넘지 않는다. 구독 호출이 실패하면 API 로 넘어가며 Opus 총평이 Haiku 로 바뀐다(common/llm_client API_FALLBACK_MODEL).
+      #    2 여도 늦지 않다 — 미장 둘(6개로 4~5분)이 2개로 13~15분 걸려도 국장 쪽 셋(18~30분)보다 먼저 끝난다.
       - name: (텔레그램) 미장 갈래 나머지 — 뒤에서 시작
         continue-on-error: true
         env:
           KR_EXTRACT: ${{ steps.telegram_extract.outcome }}
-          LLM_WORKERS: "4"
+          LLM_WORKERS: "2"
         run: bash scripts/bg-step.sh start us_rest -- bash scripts/kadera-us-chain.sh rest
 
       - name: (텔레그램) 종목 일별 집계

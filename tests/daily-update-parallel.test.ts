@@ -124,11 +124,14 @@ describe("순서 규칙(scripts/kadera-us-chain.sh 머리 주석)", () => {
     assert.equal(update[mark].if, "always()", "판정이 실패해도 표시는 남겨야 미장 총평이 120분을 헛기다리지 않는다");
   });
 
-  it("미장 갈래의 LLM 동시 호출은 워크플로 기본보다 낮다 — 국장 쪽과 겹쳐 도는 동안 구독 한도 안쪽에 둔다", () => {
+  it("겹쳐 도는 동안 LLM 동시 호출이 8을 넘지 않는다 — 구독 경로에서 검증된 최대(분류 · 판정의 8)", () => {
+    // 미장 갈래의 LLM 스텝(미장 총평 · 테마 요약)은 '분위기 판정 끝' 뒤라 분류 · 판정(8)과는 안 겹치고, 국장의 급부상 한 줄 ·
+    // 총평 · 테마 요약(워크플로 기본 LLM_WORKERS)과 겹친다. 넘으면 구독 호출이 실패할 때 Opus 총평이 Haiku 로 바뀐다.
     const rest = update.find((s) => s.body.includes("bg-step.sh start us_rest"))!;
     const n = Number(rest.body.match(/LLM_WORKERS: "(\d+)"/)?.[1]);
     const base = Number(wf.match(/\n {2}LLM_WORKERS: "(\d+)"/)?.[1]);
-    assert.ok(n > 0 && base > 0 && n < base, `미장 ${n} · 기본 ${base}`);
+    assert.ok(n > 0 && base > 0 && n + base <= 8, `미장 ${n} + 국장 ${base}`);
+    assert.ok(chain.indexOf("wait market_done") < chain.indexOf("generate_us_telegram_narratives.py"), "미장 LLM 이 판정(8)과 겹친다");
   });
 
   it("국장 스텝이 미장 결과를 읽기 전에 그 결과를 기다린다", () => {
