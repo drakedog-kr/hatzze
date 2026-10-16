@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import sys
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
@@ -32,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common.config import YOUTUBE_API_KEY  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
+from common.timeutil import today_kst  # noqa: E402
 from config.finance_content_keywords import FINANCE_KEYWORDS  # noqa: E402
 
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
@@ -146,7 +147,8 @@ def main() -> None:
     score = round(avg_views, 2)
     print(f"[YouTube] 평균 조회수: {score:,.2f}회")
 
-    today = date.today().isoformat()
+    # 행 날짜는 KST 다. 러너가 UTC 라 date.today() 를 쓰면 09:00 KST 전에 도는 아침 실행이 전날 행을 덮어썼다(2026-10-16 전수 검사 4).
+    today = today_kst().isoformat()
     client.table("indicator_values").upsert(
         {"indicator_id": indicator_id, "date": today, "raw_value": score},
         on_conflict="indicator_id,date",

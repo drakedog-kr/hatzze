@@ -9,7 +9,8 @@ import calculate_score as cs
 
 def divergence(monkeypatch, ccsi, gap):
     rows = {
-        "ccsi": [{"date": "2026-09-01", "raw_value": ccsi, "details": None}],
+        # 9월 CCSI 는 09-23 에 나왔다 — 그 전 날짜엔 안 쓴다(common/indicator.usable_from)
+        "ccsi": [{"date": "2026-09-01", "raw_value": ccsi, "details": {"published": "2026-09-23"}}],
         "gap": [{"date": "2026-09-29", "raw_value": gap, "details": None}],
     }
     monkeypatch.setattr(bf, "load_series", lambda client, iid: rows[iid])

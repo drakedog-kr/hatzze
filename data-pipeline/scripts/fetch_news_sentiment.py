@@ -233,7 +233,7 @@ def backfill_daily_sentiment(client, indicator_id: str) -> None:
 
     rows_to_save = []
     for d, links in combined.items():
-        if d not in missing_dates:
+        if d not in missing_dates or not links:
             continue
         result = compute_sentiment(list(links.values()))
         score = round(result["score"], 2)
@@ -271,6 +271,11 @@ def main() -> None:
         return
 
     titles = collect_today_titles()
+    if not titles:
+        # 표본이 0건이면 저장하지 않는다(LLM 분류 불가와 같은 처리). 0.0 을 정상 값으로 쓰면 풀링값이 그쪽으로 끌린다
+        # (2026-10-16 전수 검사 4). 날짜 비교가 어긋나면 0건이 된다 — common/timeutil 머리말의 UTC 사고.
+        print("[WARNING] [Naver News] 오늘 표본이 0건이라 계산을 건너뜁니다 — 검색 응답·날짜 비교를 볼 것")
+        return
     result = compute_sentiment(titles)
     today = today_kst().isoformat()
 

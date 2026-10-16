@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import sys
 import time
-from datetime import date
 from pathlib import Path
 
 import requests
@@ -33,6 +32,7 @@ from common.config import ALADIN_TTB_KEY  # noqa: E402
 from common.retry import backoff_delay  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
+from common.timeutil import today_kst  # noqa: E402
 
 ALADIN_URL = "https://www.aladin.co.kr/ttb/api/ItemList.aspx"
 # 알라딘은 한 번에 최대 50권만 준다 — MaxResults=100 을 넣어도 조용히 50 으로 잘린다.
@@ -131,7 +131,8 @@ def main() -> None:
     score = round(ratio, 2)
     print(f"[Aladin] 경제·재테크 도서 비중: {score}%")
 
-    today = date.today().isoformat()
+    # 행 날짜는 KST 다. 러너가 UTC 라 date.today() 를 쓰면 09:00 KST 전에 도는 아침 실행이 전날 행을 덮어썼다(2026-10-16 전수 검사 4).
+    today = today_kst().isoformat()
     client.table("indicator_values").upsert(
         {"indicator_id": indicator_id, "date": today, "raw_value": score},
         on_conflict="indicator_id,date",

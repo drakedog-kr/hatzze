@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -216,7 +216,8 @@ def main() -> None:
         f"-> 괴리율 {gap_pct:.2f}%"
     )
 
-    today = date.today().isoformat()
+    # 행 날짜는 KST 다. 러너가 UTC 라 date.today() 를 쓰면 09:00 KST 전에 도는 아침 실행이 전날 행을 덮어썼다(2026-10-16 전수 검사 4).
+    today = today_kst().isoformat()
     rounded_gap = round(gap_pct, 2)
     client.table("indicator_values").upsert(
         {

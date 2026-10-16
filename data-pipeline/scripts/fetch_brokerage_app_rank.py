@@ -18,7 +18,6 @@ froth 논리: 증권(주식거래) 앱이 인기차트 상위로 치솟으면 = 
 from __future__ import annotations
 
 import sys
-from datetime import date
 from pathlib import Path
 
 
@@ -27,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common.http_client import get_with_retry  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
+from common.timeutil import today_kst  # noqa: E402
 
 # genre=6015 = 금융(Finance). limit=100 상위 100개 무료앱.
 RSS_URL = "https://itunes.apple.com/kr/rss/topfreeapplications/genre=6015/limit=100/json"
@@ -108,7 +108,8 @@ def main() -> None:
     top_rank = min((c["rank"] for c in charted), default=None)
     details = {"count": len(charted), "top_rank": top_rank, "charted": charted}
 
-    today = date.today().isoformat()
+    # 행 날짜는 KST 다. 러너가 UTC 라 date.today() 를 쓰면 09:00 KST 전에 도는 아침 실행이 전날 행을 덮어썼다(2026-10-16 전수 검사 4).
+    today = today_kst().isoformat()
     client.table("indicator_values").upsert(
         {
             "indicator_id": indicator_id,

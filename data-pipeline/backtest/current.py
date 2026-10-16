@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from common.indicator import usable_from  # noqa: E402
 from config.indicator_thresholds import INDICATOR_THRESHOLDS as T  # noqa: E402
 from config.indicator_weights import INDICATOR_WEIGHTS as W  # noqa: E402
 from scripts.calculate_score import (  # noqa: E402
@@ -68,15 +69,26 @@ high_gap = pd.Series({
 })
 _b = ser("buffett_index")
 buffett = kospi * float((_b[_b.index.intersection(kospi.index)] / kospi[_b.index.intersection(kospi.index)]).median())
-_ccsi = ser("consumer_sentiment_index").reindex(
-    ser("consumer_sentiment_index").index.union(IDX)).ffill().reindex(IDX)
+
+
+def released(slug: str) -> pd.Series:
+    """월간 공표 지표(CCSI · 기업 체감 경기)를 공표된 날(usable_from)에 놓고 영업일로 이어 붙인다.
+
+    행 날짜(그달 1일)에 놓으면 공표 3주쯤 전부터 그 값을 쓴다(2026-10-16 전수 검사 4). 이어 붙이지 않으면
+    월 1일이 영업일인 날에만 값이 들어간다(기업 체감 경기가 309영업일 중 8일).
+    """
+    s = pd.Series({pd.Timestamp(usable_from(slug, v)): float(v["raw_value"]) for v in by[slug].values()}).sort_index()
+    return s.reindex(s.index.union(IDX)).ffill().reindex(IDX)
+
+
+_ccsi = released("consumer_sentiment_index")
 lead = pd.Series({
     d: percentile_from_anchors(float(high_gap[d]), KOSPI_DD_PCTILE_ANCHORS)
        - percentile_from_anchors(float(_ccsi[d]), CCSI_PCTILE_ANCHORS)
     for d in IDX if d in high_gap.index and not pd.isna(_ccsi[d])
 })
 
-RAW = {"kospi_high_gap": high_gap, "buffett_index": buffett}
+RAW = {"kospi_high_gap": high_gap, "buffett_index": buffett, "business_outlook": released("business_outlook").dropna()}
 SHORT = ["individual_net_buy", "dcinside_post_count", "turnover_concentration",
          "news_sentiment", "brokerage_app_rank", "youtube_finance_search_views",
          "bestseller_finance_ratio", "github_trading_bot_repos"]

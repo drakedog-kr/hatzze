@@ -34,6 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.indicator import usable_from  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from config.indicator_thresholds import INDICATOR_THRESHOLDS  # noqa: E402
 from config.indicator_weights import INDICATOR_WEIGHTS  # noqa: E402
@@ -109,7 +110,7 @@ def progress_by_date(slug: str, rows: list[dict]) -> dict[str, float]:
 def divergence_by_date(client, ids: dict[str, str]) -> dict[str, float]:
     """실물–증시 괴리: 날짜 → progress(= lead_progress(증시%ile − 실물%ile), 캡핑 전).
 
-    CCSI 는 월 1회라 그 달 이후의 모든 날짜에 '가장 최근 공표값'을 적용한다.
+    CCSI 는 월 1회라 공표된 날(usable_from — 행 날짜인 그달 1일이 아니다) 이후의 모든 날짜에 '가장 최근 공표값'을 적용한다.
     코스피 신고가 괴리율이 없는 날짜는 계산하지 않는다(그 지표를 그날 제외).
     """
     if CCSI_SLUG not in ids or "kospi_high_gap" not in ids:
@@ -119,7 +120,7 @@ def divergence_by_date(client, ids: dict[str, str]) -> dict[str, float]:
     if not ccsi_rows or not gap_rows:
         return {}
 
-    ccsi_sorted = sorted((r["date"], float(r["raw_value"])) for r in ccsi_rows)
+    ccsi_sorted = sorted((usable_from(CCSI_SLUG, r), float(r["raw_value"])) for r in ccsi_rows)
     out: dict[str, float] = {}
     for g in gap_rows:
         d = g["date"]

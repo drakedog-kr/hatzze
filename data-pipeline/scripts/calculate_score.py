@@ -261,6 +261,9 @@ def ccsi_real_strength(client) -> tuple[float, float] | None:
     강도 = CCSI가 역대에서 몇 %ile인가(높을수록 실물 심리 강함). 원값도 함께 주는 이유:
     카드 툴팁이 "CCSI 106.6 → 역대 68%ile" 처럼 실제 지수와 변환 근거를 같이 보여준다.
     CCSI 지표가 아직 없으면 None.
+
+    최신 행은 행 날짜(그달 1일)가 공표보다 이르지만 공표 전엔 그 행이 아예 없어서, 라이브는 미래를 안 본다.
+    지난 날짜로 다시 잴 땐 공표일부터 쓴다(common/indicator.usable_from).
     """
     ccsi_id = get_indicator_id_or_none(client, CCSI_SLUG)
     if ccsi_id is None:

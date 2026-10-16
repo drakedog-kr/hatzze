@@ -370,7 +370,7 @@ def backfill_daily_sentiment(client, indicator_id: str) -> None:
 
     rows_to_save = []
     for d, titles in combined_titles.items():
-        if d not in missing_dates:
+        if d not in missing_dates or not titles:
             continue
         result = compute_sentiment(titles)
         score = round(result["score"], 2)
@@ -401,6 +401,11 @@ def main() -> None:
         return
 
     titles, sample = collect_recent_titles()
+    if not titles:
+        # 표본이 0건이면 저장하지 않는다(LLM 분류 불가와 같은 처리). 0.0 을 정상 값으로 쓰면 사흘째엔 풀링값도 0.0 이 돼
+        # 과열도 75(초고온)로 읽힌다. 목록 파싱은 구조가 바뀌어도 예외 없이 0건이 된다(2026-10-16 전수 검사 4).
+        print("[WARNING] [DCInside] 오늘 표본이 0건이라 계산을 건너뜁니다 — 갤러리 목록 구조가 바뀌었는지 볼 것")
+        return
     result = compute_sentiment(titles)
     today = today_kst().isoformat()
 

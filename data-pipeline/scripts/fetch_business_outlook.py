@@ -10,7 +10,9 @@ ECOS 는 전망을 **전망하는 달**로 적는다 — 2026-09 조사(09-25 �
 
 행 날짜는 **조사한 달 1일**로 적는다(202610 전망 → 2026-09-01). CCSI 와 같은 규칙이고, 전망하는 달로 적으면
 월말 며칠 동안 미래 날짜 행이 생긴다. 전망하는 달은 details.month 에 남긴다. ⚠️ 조사한 달 1일엔 아직 공표 전이다
-(25일 무렵에 나온다) — 지난 점수를 이 행 날짜로 다시 계산하면 3주쯤 미리 본 셈이 된다.
+(25일 무렵에 나온다). 그래서 **처음 본 날**을 details.published 에 적고(ECOS 는 공표일을 안 준다), 지난 점수를 다시
+잴 때는 그날부터 쓴다(common/indicator.usable_from). 2026-10-16 전엔 행 날짜부터 써서 3주쯤 미리 봤다. 그 전에 쌓인
+행의 공표일은 조사한 달 25일로 추정한다.
 
 ## 왜 '1년 전 같은 달'과 견주나
 
@@ -40,7 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import ECOS_API_KEY  # noqa: E402
 from common.ecos_client import EcosUnavailableError, statistic_search  # noqa: E402
-from common.indicator import ensure_indicator, upsert_merged, write_preview  # noqa: E402
+from common.indicator import ensure_indicator, stamp_published, upsert_merged, write_preview  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
 ECOS_STAT_CODE = "512Y014"  # 기업경기조사(전망)
@@ -141,10 +143,11 @@ def main() -> None:
     if len(series) < MIN_MONTHS:
         raise RuntimeError(f"업황전망이 {len(series)}개월치뿐입니다(하한 {MIN_MONTHS}) — 잘린 응답으로 보고 저장하지 않습니다")
     rows = build_rows(series)
+    stamp_published(client, indicator_id, INDICATOR_SLUG, rows, today_kst().isoformat())
     last = rows[-1]["details"]
     print(
         f"[ECOS] 업황전망 {len(series)}개월치({series[0][0]}~{series[-1][0]}) → {len(rows)}개월 계산. "
-        f"최신 {last['month']} 전망 {last['bsi']:g} · 1년 전 {last['prev']:g} · {rows[-1]['raw_value']:+.1f}p"
+        f"최신 {last['month']} 전망 {last['bsi']:g} · 1년 전 {last['prev']:g} · {rows[-1]['raw_value']:+.1f}p · 공표 {last['published']}"
     )
     # 이번 달 전망은 지난달 말에 나온다. 그것도 없으면 공표가 멈춘 것이다.
     if series[-1][0] < today_kst().strftime("%Y-%m"):

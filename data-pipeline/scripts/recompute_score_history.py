@@ -7,10 +7,11 @@
 07-31 28 → 41 의 V자는 전부 눈금 유물이었다). 눈금을 바꿨으면 이 스크립트로 지난 행을 다시 쓴다.
 
 **어떻게 재나.** calculate_score.main() 의 계산을 날짜 d 마다 '그날까지의 최신 행'으로 그대로 재현한다.
-- 지표별 값: date <= d 인 행 중 가장 최근 것(라이브와 같은 규칙)
+- 지표별 값: date <= d 인 행 중 가장 최근 것(라이브와 같은 규칙). 단 월간 공표 지표(CCSI · 기업 체감 경기)는 행 날짜가
+  공표보다 3주쯤 이르니 공표일(usable_from) <= d 인 행만 본다 — 라이브도 공표 전엔 그 행이 없었다(common/indicator)
 - cumulative_average 기준선: date <= d 인 값만의 평균(그날 알 수 있던 것만 — 미래 값을 끌어오지 않는다)
 - relative_surge: 그 행 details 의 surge_pct · level_pct
-- 실물–증시 괴리: date <= d 인 CCSI · 코스피 신고가 괴리율
+- 실물–증시 괴리: 공표일 <= d 인 CCSI · date <= d 인 코스피 신고가 괴리율
 - 가중치 · 표시 앵커(SCORE_DISPLAY_ANCHORS) · 구간: 지금 코드 값
 ⚠️ backfill_scores.py 의 --daily-score 는 쓰지 말 것 — 표시 앵커를 안 거친 가중평균을 쓴다(2026-09-25 발견).
 
@@ -43,6 +44,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from common.indicator import usable_from  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from config.indicator_thresholds import INDICATOR_THRESHOLDS  # noqa: E402
@@ -69,12 +71,14 @@ def load_series(db, indicator_id: str) -> list[dict]:
         start += 1000
 
 
-def latest(rows: list[dict], d: str) -> dict | None:
+def latest(rows: list[dict], d: str, slug: str) -> dict | None:
+    """d 에 쓸 수 있던 가장 최근 행. usable_from 은 늘 행 날짜 이후라 날짜가 d 를 넘으면 더 볼 것이 없다."""
     best = None
     for r in rows:
         if r["date"] > d:
             break
-        best = r
+        if usable_from(slug, r) <= d:
+            best = r
     return best
 
 
@@ -82,7 +86,7 @@ def score_on(d: str, series: dict[str, list[dict]], weights_db: dict[str, float]
     items = []
     for slug in cs.INDICATOR_ORDER:
         rows = series.get(slug) or []
-        row = latest(rows, d)
+        row = latest(rows, d, slug)
         if row is None:
             continue
         cfg = INDICATOR_THRESHOLDS[slug]
@@ -107,8 +111,8 @@ def score_on(d: str, series: dict[str, list[dict]], weights_db: dict[str, float]
 
     by = {i["slug"]: i for i in items}
     sb = by.get("small_business_crisis_index")
-    c = latest(series.get(cs.CCSI_SLUG) or [], d)
-    g = latest(series.get("kospi_high_gap") or [], d)
+    c = latest(series.get(cs.CCSI_SLUG) or [], d, cs.CCSI_SLUG)
+    g = latest(series.get("kospi_high_gap") or [], d, "kospi_high_gap")
     if sb and by.get("kospi_high_gap") and c is not None and g is not None:
         real = cs.percentile_from_anchors(float(c["raw_value"]), cs.CCSI_PCTILE_ANCHORS)
         mkt = cs.percentile_from_anchors(float(g["raw_value"]), cs.KOSPI_DD_PCTILE_ANCHORS)
