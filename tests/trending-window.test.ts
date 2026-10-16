@@ -21,16 +21,17 @@ const TODAY = "2026-09-28T15:00:00.000Z"; // 2026-09-29 00:00 KST
 const YESTERDAY = "2026-09-27T15:00:00.000Z"; // 2026-09-28 00:00 KST
 
 describe("trendingTodayStartISO", () => {
-  it("아침 트렌딩 스텝이 도는 08시대부터는 오늘 0시 — 아침 저장분과 같은 시작점이다", () => {
-    assert.equal(trendingTodayStartISO(kst("2026-09-29 08:00")), TODAY);
+  it("아침 트렌딩 스텝이 도는 07시대부터는 오늘 0시 — 아침 저장분과 같은 시작점이다", () => {
+    assert.equal(trendingTodayStartISO(kst("2026-09-29 07:00")), TODAY);
+    assert.equal(trendingTodayStartISO(kst("2026-09-29 07:26")), TODAY);
     assert.equal(trendingTodayStartISO(kst("2026-09-29 08:26")), TODAY);
     assert.equal(trendingTodayStartISO(kst("2026-09-29 12:00")), TODAY);
     assert.equal(trendingTodayStartISO(kst("2026-09-29 18:10")), TODAY);
   });
 
-  it("그 전(자정~07:59)엔 어제 0시 — 어제 저녁 저장분과 같은 시작점이다", () => {
+  it("그 전(자정~06:59)엔 어제 0시 — 어제 저녁 저장분과 같은 시작점이다", () => {
     assert.equal(trendingTodayStartISO(kst("2026-09-29 00:31")), YESTERDAY);
-    assert.equal(trendingTodayStartISO(kst("2026-09-29 07:59")), YESTERDAY);
+    assert.equal(trendingTodayStartISO(kst("2026-09-29 06:59")), YESTERDAY);
   });
 });
 
@@ -43,14 +44,23 @@ describe("파이프라인과 같은 시각", () => {
     }
   });
 
-  it("아침 트렌딩 스텝 둘은 KRX 공표 대기 뒤라 그 시각 전에 저장하지 않는다", () => {
+  // 2026-10-16 부터 카더라 블록 중간의 KRX 08:00 대기를 걷고 트렌딩 앞에 07:00 대기를 둔다. 미장 트렌딩은
+  // 미장 갈래(scripts/kadera-us-chain.sh)가 뒤에서 돌리므로 그 스크립트 안의 같은 대기를 본다.
+  it("아침 국장 트렌딩은 '오늘' 기준 대기 뒤라 그 시각 전에 저장하지 않는다", () => {
     const wf = read(".github/workflows/daily-update.yml");
-    const gate = wf.match(/- name: KRX 공표\((\d\d):00 KST\) 대기 — 개장 전 값 전용/);
-    assert.ok(gate, "'개장 전 값 전용' KRX 대기 스텝이 없다");
+    const gate = wf.match(/- name: 트렌딩 '오늘' 기준\((\d\d):00 KST\) 대기\n(?:.*\n){0,3}?\s+run: bash scripts\/wait-until-kst\.sh (\d\d):00/);
+    assert.ok(gate, "트렌딩 앞 '오늘' 기준 대기 스텝이 없다");
+    assert.equal(gate[1], gate[2], "스텝 이름의 시각과 실제로 기다리는 시각이 다르다");
+    assert.ok(Number(gate[2]) >= FIRST_COLLECTION_HOUR_KST, `대기가 ${gate[2]}시까지뿐이다`);
+    const at = wf.indexOf("run: python data-pipeline/scripts/calculate_telegram_trending.py");
+    assert.ok(at > gate.index!, "국장 트렌딩이 '오늘' 기준 대기 앞에 있다");
+  });
+
+  it("아침 미장 트렌딩도 미장 갈래 안에서 같은 대기 뒤다", () => {
+    const sh = read("scripts/kadera-us-chain.sh");
+    const gate = sh.match(/bash scripts\/wait-until-kst\.sh (\d\d):00/);
+    assert.ok(gate, "미장 갈래에 '오늘' 기준 대기가 없다");
     assert.ok(Number(gate[1]) >= FIRST_COLLECTION_HOUR_KST, `대기가 ${gate[1]}시까지뿐이다`);
-    for (const script of ["calculate_telegram_trending.py", "calculate_us_trending.py"]) {
-      const at = wf.indexOf(`run: python data-pipeline/scripts/${script}`);
-      assert.ok(at > gate.index!, `${script} 가 KRX 대기 앞에 있다`);
-    }
+    assert.ok(sh.indexOf("calculate_us_trending.py") > gate.index!, "미장 트렌딩이 대기 앞에 있다");
   });
 });

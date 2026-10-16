@@ -49,8 +49,8 @@ TREND_W_REPLIES = 1.5
 STORE_N = 36                 # 화면이 6건씩 세 번 펼친다
 STOCK_TAGS_PER_MESSAGE = 3
 # ⚠️ 국내(calculate_telegram_trending.py)·lib/trending-window.ts 와 같은 값이어야 한다 — 거기
-#    주석 참고(아침 트렌딩 스텝이 'KRX 공표(08:00 KST) 대기' 뒤라 08시다).
-FIRST_COLLECTION_HOUR_KST = 8
+#    주석 참고(아침 미장 트렌딩은 scripts/kadera-us-chain.sh 의 07:00 대기 뒤라 07시다).
+FIRST_COLLECTION_HOUR_KST = 7
 
 WINDOWS: list[tuple[str, int | None]] = [("today", None), ("w7", 7), ("w30", 30)]
 

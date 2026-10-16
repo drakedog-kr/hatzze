@@ -2,9 +2,9 @@
 미장 창 자르기(calculate_us_trending.in_window).
 
 화면 사본(lib/trending-window.ts 의 trendingTodayStartISO)이 tests/trending-window.test.ts 에서
-**같은 예제로 같은 값**을 확인한다. 아침 트렌딩 스텝은 'KRX 공표(08:00 KST) 대기' 뒤라 08시대에
-도는데, 그때 '어제 0시'를 저장하면 국장 화면은 저장 목록을 버리고 느린 길로 뽑고 미장 화면은
-어제 글을 '오늘'로 싣는다.
+**같은 예제로 같은 값**을 확인한다. 아침 트렌딩 스텝은 '트렌딩 '오늘' 기준(07:00 KST) 대기' 뒤라
+07시대에 도는데(2026-10-16 전엔 KRX 08:00 대기 뒤 08시대), 그때 '어제 0시'를 저장하면 국장 화면은
+저장 목록을 버리고 느린 길로 뽑고 미장 화면은 어제 글을 '오늘'로 싣는다.
 """
 from datetime import datetime, timedelta, timezone
 
@@ -20,9 +20,10 @@ def _at(hour, minute):
     return datetime(2026, 9, 29, hour, minute, tzinfo=KST)
 
 
-def test_morning_run_after_krx_gate_stores_today():
+def test_morning_run_after_trending_gate_stores_today():
     for mod in (KR, US):
-        assert mod.window_start(None, _at(8, 0)) == TODAY, mod.__name__
+        assert mod.window_start(None, _at(7, 0)) == TODAY, mod.__name__
+        assert mod.window_start(None, _at(7, 26)) == TODAY, mod.__name__
         assert mod.window_start(None, _at(8, 26)) == TODAY, mod.__name__
 
 
@@ -35,7 +36,7 @@ def test_before_flip_hour_is_yesterday():
     # 손으로 새벽에 돌린 실행 — 화면도 그 시각엔 어제 0시를 기대한다.
     for mod in (KR, US):
         assert mod.window_start(None, _at(0, 31)) == YESTERDAY, mod.__name__
-        assert mod.window_start(None, _at(7, 59)) == YESTERDAY, mod.__name__
+        assert mod.window_start(None, _at(6, 59)) == YESTERDAY, mod.__name__
 
 
 def test_utc_clock_reads_as_kst():

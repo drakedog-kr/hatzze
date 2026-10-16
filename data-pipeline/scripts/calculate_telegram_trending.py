@@ -68,10 +68,11 @@ TEXT_CHUNK = 50
 TAG_ID_CHUNK = 50
 
 # '오늘' 창이 어제 0시에서 오늘 0시로 넘어가는 시각(KST). 발사(06:30)가 아니라 아침 트렌딩
-# 스텝이 도는 시각에 맞춘다 — 그 스텝은 'KRX 공표(08:00 KST) 대기' 뒤라 늘 08시 이후다.
+# 스텝이 도는 시각에 맞춘다 — 그 스텝은 '트렌딩 '오늘' 기준(07:00 KST) 대기' 뒤라 늘 07시 이후다
+# (2026-10-16 에 8 → 7. 카더라 블록 중간의 KRX 08:00 대기를 걷었다 — daily-update.yml).
 # ⚠️ lib/trending-window.ts 의 FIRST_COLLECTION_HOUR_KST 와 같은 값이어야 한다
 #    (tests/trending-window.test.ts 가 대조한다).
-FIRST_COLLECTION_HOUR_KST = 8
+FIRST_COLLECTION_HOUR_KST = 7
 
 # 화면 탭과 일대일. (저장 키, 창 길이) — 'today' 는 아래에서 따로 계산한다.
 WINDOWS: list[tuple[str, int | None]] = [("today", None), ("w7", 7), ("w30", 30)]
