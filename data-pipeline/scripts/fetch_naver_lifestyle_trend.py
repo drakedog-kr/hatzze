@@ -147,7 +147,7 @@ def main() -> None:
         upsert_all(client, indicator_id, data_points)
         print(f"[Supabase] indicator_values upsert 완료: {len(data_points)}건")
 
-        # 카드가 'pt' 대신 '평소 대비 N배'를 보여줄 수 있게 30일 평균 대비 배수를
+        # 카드가 'pt' 대신 '평소 대비 N배'를 보여줄 수 있게 60일 평균 대비 배수를
         # details에 채운다.
         updated = store_vs_average_details(client, indicator_id)
         print(f"[Supabase] 평소 대비 배수 details 저장 완료: {updated}건")
