@@ -115,6 +115,22 @@ describe("순서 규칙(scripts/kadera-us-chain.sh 머리 주석)", () => {
     assert.equal(update[mark].if, "always()", "수거가 실패해도 표시는 남겨야 미장 센티먼트가 90분을 헛기다리지 않는다");
   });
 
+  it("④ 미장 총평은 '시장 전체 분위기 판정' 표시 뒤다 — [전체] 낙관도를 그 표에서 읽는다", () => {
+    assert.ok(chain.indexOf("wait market_done") >= 0, "미장 갈래가 분위기 판정 표시를 기다리지 않는다");
+    assert.ok(chain.indexOf("wait market_done") < chain.indexOf("generate_us_telegram_narratives.py"));
+    const market = idx(update, (s) => s.id === "telegram_market", "시장 전체 분위기 판정");
+    const mark = idx(update, (s) => s.body.includes("bg-step.sh mark market_done"), "분위기 판정 끝 표시");
+    assert.ok(market < mark);
+    assert.equal(update[mark].if, "always()", "판정이 실패해도 표시는 남겨야 미장 총평이 120분을 헛기다리지 않는다");
+  });
+
+  it("미장 갈래의 LLM 동시 호출은 워크플로 기본보다 낮다 — 국장 쪽과 겹쳐 도는 동안 구독 한도 안쪽에 둔다", () => {
+    const rest = update.find((s) => s.body.includes("bg-step.sh start us_rest"))!;
+    const n = Number(rest.body.match(/LLM_WORKERS: "(\d+)"/)?.[1]);
+    const base = Number(wf.match(/\n {2}LLM_WORKERS: "(\d+)"/)?.[1]);
+    assert.ok(n > 0 && base > 0 && n < base, `미장 ${n} · 기본 ${base}`);
+  });
+
   it("국장 스텝이 미장 결과를 읽기 전에 그 결과를 기다린다", () => {
     const at = (id: string) => idx(update, (s) => s.id === id, id);
     // 국장 트렌딩 · 센티먼트 · 총평의 '미장 글 빼기'

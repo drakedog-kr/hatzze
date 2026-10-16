@@ -15,7 +15,10 @@ set -uo pipefail
 timeout_min="${1:?분}"; shift
 [ $# -gt 0 ] || { echo "기다릴 잡이 없습니다" >&2; exit 2; }
 deadline=$(( $(date +%s) + timeout_min * 60 ))
-url="/repos/${GITHUB_REPOSITORY:?}/actions/runs/${GITHUB_RUN_ID:?}/attempts/${GITHUB_RUN_ATTEMPT:-1}/jobs?per_page=100"
+# filter=latest — 잡마다 가장 최근 실행분을 준다. 실패한 잡만 다시 돌린 실행에서도 다시 안 돈 잡(이미 끝난 미리보기 ·
+#   내부자)을 끝난 것으로 읽게 하려는 것이다. 시도 번호로 묻는 주소(/attempts/N/jobs)는 그 시도의 잡만 줄 수 있어
+#   그 경우 30분을 헛기다린다.
+url="/repos/${GITHUB_REPOSITORY:?}/actions/runs/${GITHUB_RUN_ID:?}/jobs?filter=latest&per_page=100"
 
 done_one() {  # "잡" 또는 "잡::스텝 앞부분" 이 끝났나
   local job="${1%%::*}" step=""

@@ -603,10 +603,14 @@ jobs:
       # 미장 갈래 나머지(일별 집계 → 트렌딩 → 테마 → 동시 언급 → 센티먼트 → 총평 → 테마 요약)를 뒤에서 시작한다.
       # 국장 추출이 끝난 뒤여야 한다(미장 일별 집계가 국장 태그를 읽는다 — scripts/kadera-us-chain.sh 규칙 ①).
       # 국장 추출 결과를 넘긴다 — 동시 언급은 두 추출이 다 성공해야 돈다(아래 '종목 추출이 실패한 날' 규칙 ②).
+      # ⚠️ LLM 동시 호출을 4로 줄인다(워크플로 기본 6). 미장 총평 · 테마 요약이 국장 쪽 분위기 판정 · 총평과 겹쳐 돈다 —
+      #    구독 경로에서 검증된 동시 호출은 8이고(common/llm_parallel 머리 주석), 겹치는 동안 8+4=12 안쪽으로 묶는다.
+      #    구독 호출이 실패하면 API 로 넘어가며 Opus 문장이 Haiku 로 바뀐다(common/llm_client API_FALLBACK_MODEL).
       - name: (텔레그램) 미장 갈래 나머지 — 뒤에서 시작
         continue-on-error: true
         env:
           KR_EXTRACT: ${{ steps.telegram_extract.outcome }}
+          LLM_WORKERS: "4"
         run: bash scripts/bg-step.sh start us_rest -- bash scripts/kadera-us-chain.sh rest
 
       - name: (텔레그램) 종목 일별 집계
@@ -803,6 +807,13 @@ jobs:
         id: telegram_market
         continue-on-error: true
         run: python data-pipeline/scripts/analyze_telegram_market.py
+
+      # 미장 총평도 이 표(telegram_message_market · telegram_market_sentiment_daily)로 [전체] 낙관도를 쓴다(위 '총평 두 단계
+      # 보다 앞이다'). 뒤에서 도는 미장 갈래가 이 표시를 기다렸다가 미장 총평을 쓴다(scripts/kadera-us-chain.sh ④).
+      - name: 미장 갈래에 '분위기 판정 끝' 알리기
+        if: always()
+        continue-on-error: true
+        run: bash scripts/bg-step.sh mark market_done
 
       # 급부상 카드의 **한 줄** 요약(국장·미장 한 번에). 아래 두 단계의 긴 요약과 다른 글이라
       # 따로 돈다 — 까닭은 스크립트 머리 주석에(프롬프트가 1/4 이라 호출값이 1/3 이다).

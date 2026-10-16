@@ -15,6 +15,9 @@
 #   ② 동시 언급은 미장 총평보다 **앞**이다 — generate_us_telegram_narratives 가 telegram_us_comention 을 읽는다.
 #   ③ 미장 센티먼트는 분류 '수거' 스텝 **뒤**다(API 키 경로에서만 뜻이 있다) — update 잡이 그 스텝 뒤에
 #      `analyze_collect` 표시를 남기고, 여기서 그 표시를 기다린다.
+#   ④ 미장 총평은 '시장 전체 분위기 판정' **뒤**다 — [전체] 낙관도를 telegram_message_market ·
+#      telegram_market_sentiment_daily 에서 읽는다. 앞에 두면 문장은 어제 표로, 화면의 큰 숫자는 오늘 표로 세어
+#      둘이 갈린다(update 잡 그 스텝 주석). update 잡이 그 스텝 뒤에 `market_done` 표시를 남긴다.
 #   그리고 거꾸로, update 잡의 국장 스텝이 미장 결과를 읽는 자리(국장 트렌딩의 '미장 글 빼기' · 급부상 한 줄의 미장 센티먼트 ·
 #   등락 이유의 미장 일별)는 그 앞에 같은 id 의 기다리기 스텝이 있다.
 #
@@ -60,6 +63,8 @@ case "${1:-}" in
     # 규칙 ③ — 표시가 안 오면(수거 스텝이 안 돌았으면) 90분 뒤 그냥 간다. 구독 경로에선 수거할 것이 없다.
     "${BG[@]}" wait analyze_collect --quiet --soft --timeout 90
     step telegram_us_sentiment "$us" -- python data-pipeline/scripts/calculate_us_telegram_sentiment.py
+    # 규칙 ④ — 표시가 안 오면 120분 뒤 그냥 간다(그날 판정 스텝이 안 돈 것이라 기다려도 같은 표다).
+    "${BG[@]}" wait market_done --quiet --soft --timeout 120
     step telegram_us_narratives "$us" -- python data-pipeline/scripts/generate_us_telegram_narratives.py
     step telegram_us_theme_briefs "$us" -- python data-pipeline/scripts/generate_us_theme_briefs.py
     ;;
