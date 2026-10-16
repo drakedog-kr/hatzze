@@ -2,12 +2,92 @@
 
 import { formatIndicatorValue, formatSampleCount, sentimentTone, shortDate } from "@/lib/format";
 import { C, MONO, R } from "../ui";
-import { overheatColor, Shell, TitleRow, Big, Foot, HeatBar, HeatFill, HeatScale, AreaChart, SplitStats, RefChart, RefRows } from "./parts";
+import { overheatColor, Shell, TitleRow, Big, Foot, HeatFill, HeatScale, AreaChart, SplitStats, RefChart, RefRows } from "./parts";
 import type { Pick } from "./parts";
 import { CARD_NAME } from "./Hero";
 import type { IconName } from "@/lib/icon-names";
 
 // ── 소셜 지표 카드들 ──────────────────────────────────────────────
+
+// '평소 대비 N배' — 절대 건수가 없는 네이버 검색지수(0~100 상대지수)를 직관적으로
+// 보여준다. ratio = 현재 / 최근 30일 평균. 가운데 눈금(1배=평소)을 기준으로
+// 오른쪽으로 넘으면 평소보다 활발(과열 방향).
+/**
+ * 1배(평소) 축 위에서 값이 갖는 색.
+ *
+ * 이 축은 양극이다 — 가운데가 평소이고 오른쪽이 '많다', 왼쪽이 '적다'. 그래서 색을
+ * 카드의 과열도(v.color)에서 가져오면 안 된다. 외식 검색 1.3배는 평소보다 **많은데**
+ * 그 지표의 과열도가 아직 상온이라 파랑으로 떴다 — 막대는 오른쪽으로 뻗는데 색은
+ * 차갑다고 말하는 꼴이었다(2026-08-03).
+ * 축이 스스로 말하게 둔다: 1배 위는 빨강, 아래는 파랑, 정확히 1배면 중립.
+ * (이 말과 달리 부르는 쪽이 한동안 v.color 를 넘겼다. 2026-10-16 부터 vsAvgColor 를 넘긴다.)
+ */
+function VsAvg({ ratio, knob, showScale = true }: { ratio: number; knob: string; showScale?: boolean }) {
+  // **1배를 축 한가운데에 못박는다.** 예전엔 0~2배를 0~100%로 폈는데(1배가 가운데인 건
+  // 같지만) 축이 넓어 1.0배와 1.3배가 15%p 차이로 붙어 보였다. ±0.5배를 양 끝으로 두면
+  // 같은 차이가 30%p 로 벌어진다. 검색 지수는 1배 근처에서 노는 값이라 이쪽이 맞다.
+  // 평소(nearUsual)면 노브를 1배 눈금에 바로 둔다 — 큰 글 · 화살표는 '평소'인데 노브만 8~11px 왼쪽이라 '조금 적음'으로 읽혔다(2026-10-05 점검).
+  const pos = nearUsual(ratio) ? 50 : Math.max(0, Math.min(100, 50 + (ratio - 1) * 100));
+  // 채움을 **가운데에서 뻗어 나가게** 한다. 왼쪽 끝에서부터 채우면 1.0배(평소)도 절반이
+  // 차 있어 "꽤 많다"로 읽힌다. 가운데 기준이면 평소는 채움이 없고, 채운 길이가 곧
+  // '평소에서 얼마나 벗어났나'다 — 두 줄을 위아래로 놓았을 때 방향이 바로 갈린다.
+  const fillLeft = Math.min(50, pos);
+  const fillWidth = Math.abs(pos - 50);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+      <div style={{ position: "relative", height: 12 }}>
+        <div style={{ height: "100%", borderRadius: R.pill, background: C.track }} />
+        <span
+          style={{
+            position: "absolute",
+            left: `${fillLeft}%`,
+            top: 0,
+            height: 12,
+            width: `${fillWidth}%`,
+            background: knob,
+            borderRadius: R.pill,
+          }}
+        />
+        {/* 1배 눈금. 채움이 없는 줄(평소 수준)에서도 축의 기준이 어디인지 보여야 한다. */}
+        <span
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: -3,
+            height: 18,
+            width: 1.5,
+            background: C.marker,
+            transform: "translateX(-50%)",
+          }}
+        />
+        {/* 노브는 흰 속을 둔 테두리 알약이다. 꽉 찬 점으로 두면 채움과 같은 색이라
+            채움 끝에서 사라진다. clamp 로 양 끝에서도 트랙 밖으로 안 나간다. */}
+        <span
+          style={{
+            position: "absolute",
+            left: `clamp(7px, ${pos}%, 100% - 7px)`,
+            top: -4,
+            transform: "translateX(-50%)",
+            width: 14,
+            height: 18,
+            borderRadius: 6,
+            background: C.card,
+            border: `3px solid ${knob}`,
+            boxSizing: "border-box",
+          }}
+        />
+      </div>
+      {showScale && (
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          {/* 눈금 라벨은 --c-sub 이상으로. faint 는 장식용 선에만 쓴다(대비 규칙). */}
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub }}>적음</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub2 }}>평소(1배)</span>
+          <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub }}>많음</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // 실물–증시 괴리 — 실물 강도 / 증시 강세를 각자 역대 백분위로 매겨 나란히 둔다.
 // 괴리는 둘의 '곱'이 아니라 '차이'(lead = 증시%ile − 실물%ile)다.
@@ -85,8 +165,17 @@ export function CardDivergence({ v }: { v: Pick }) {
 // 세 카드(초보 검색 · 유튜브 · 여윳돈)가 이 한 경계를 쓴다. 따로 가르면 0.98 이 '1.0배 ↓'로 떴다(2026-10-04 점검).
 const nearUsual = (x: number) => Math.abs(x - 1) < 0.05;
 
+// '평소 대비 N배'의 색 — **많으면 빨강, 적으면 파랑, 평소(nearUsual)면 무채색**. 초보 검색 · 여윳돈 카드의 숫자 ·
+// 화살표 · 막대가 이 한 함수를 쓴다(2026-10-16 운영자 판단). 막대가 '많음' 쪽으로 뻗으면 빨강이어야 한다.
+// 예전엔 셋 다 과열도 온도색이었는데, 배수(최근 30일 평균 대비)와 과열도(1년 범위 눈금)는 잣대가 달라
+// 30일 바닥에서 두 배로 뛴 날(2.0배 · 과열도 18 저온)에 막대가 '많음' 끝까지 뻗은 채 파랗게 섰다.
+// 오름 · 내림 토큰(--t-up · --t-down)은 라이트 · 다크 대비를 잰 값이다(app/styles/v2.css).
+const VS_UP = `var(--t-up, ${C.hot})`;
+const VS_DOWN = `var(--t-down, ${C.cold})`;
+const vsAvgColor = (x: number | null, flat: string) => (x === null || nearUsual(x) ? flat : x > 1 ? VS_UP : VS_DOWN);
+
 // 초보검색 / 깃헙 봇 / 베스트셀러 — 모양이 둘로 갈린다.
-//  · details.vs_avg 가 있으면(네이버 검색지수) '평소 대비 N배' 큰 숫자 + 과열도 막대
+//  · details.vs_avg 가 있으면(네이버 검색지수) '평소 대비 N배' 눈금
 //  · 없으면 값 + 초고온 기준선까지의 진행 막대
 // 목업이 스파크라인을 걷어냈다. 30일 선은 "언제 뛰었나"를 말하는데, 이 셋의 질문은
 // "지금 얼마나 뜨거운가" 하나뿐이라 기준선까지의 거리가 그 답을 그대로 그린다.
@@ -103,18 +192,16 @@ export function CardTrend({ v, icon }: { v: Pick; icon: IconName }) {
       {vsAvg !== null ? (
         <>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            {/* 배수는 **검정**이다. 온도색은 과열도 값에만 칠한다. 배수는 최근 30일 평균 대비이고 과열도는
-                지난 1년 최고점 대비라 잣대가 다르다 — 30일 바닥에서 두 배로 뛴 날(2.0배)이 과열도 18(저온)이라
-                파란 '2.0배 ↑'가 섰고, '내렸다'로 읽혔다(2026-10-16). 그 전엔 숫자는 온도색 · 화살표는 방향색이라
-                한 줄이 두 말을 했다(2026-08). 온도는 아래 과열도 막대가 이름표를 달고 말한다. */}
-            <strong className="hz-big" style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: C.ink, lineHeight: 1 }}>
+            {/* 화살표 · 막대 · 숫자가 **한 색**이어야 한다(예전엔 숫자만 온도색 · 화살표는 방향색이라 한 줄이 두 말을 했다).
+                그 한 색은 **방향**이다 — 많으면 빨강, 적으면 파랑(vsAvgColor · 2026-10-16). 온도색이던 땐 2.0배가 파랬다. */}
+            <strong className="hz-big" style={{ fontFamily: MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: vsAvgColor(vsAvg, C.ink), lineHeight: 1 }}>
               {vsAvg.toFixed(1)}
               <span className="hz-big-unit">배</span>
             </strong>
-            {arrow && <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: C.ink }}>{arrow}</span>}
+            {arrow && <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: vsAvgColor(vsAvg, C.ink) }}>{arrow}</span>}
             <span style={{ fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>평소 대비</span>
           </div>
-          <HeatBar v={v} />
+          <VsAvg ratio={vsAvg} knob={vsAvgColor(vsAvg, C.sub)} />
         </>
       ) : (
         <>
@@ -350,11 +437,11 @@ export function CardYoutube({ v }: { v: Pick }) {
 
 // 여윳돈이 향하는 곳 — 명품·수입차 + 오마카세·파인다이닝. 지표 둘이 한 카드에 들어가는
 // 유일한 카드다. 목업은 세로 구분선으로 반 가르지 않고 **두 줄을 위아래로** 쌓고,
-// 눈금 라벨(안심·과열)은 아래쪽 한 번만 적는다.
+// 눈금 라벨(적음·평소·많음)은 아래쪽 한 번만 적는다.
 function SubSpend({ v, label, showScale }: { v: Pick; label: string; showScale: boolean }) {
   const ratio = v.details?.vs_avg ?? null;
-  // 화살표는 숫자와 **같은 경계**를 써야 한다. 예전엔 화살표가 `ratio === 1` 로만 갈려서,
-  // 0.98배(화면엔 "1.0배")에 화살표만 ↓ 로 떴다 — 한 줄이 두 말을 했다.
+  // 화살표와 색이 **같은 경계**를 써야 한다. 예전엔 화살표가 `ratio === 1` 로만 갈려서,
+  // 0.98배(화면엔 "1.0배")가 색은 중립인데 화살표만 ↓ 로 떴다 — 한 줄이 두 말을 했다.
   const flat = ratio === null || nearUsual(ratio);
   const arrow = flat ? "" : (ratio as number) > 1 ? "↑" : "↓";
   return (
@@ -369,10 +456,10 @@ function SubSpend({ v, label, showScale }: { v: Pick; label: string; showScale: 
             fontFamily: MONO,
             fontSize: "var(--fs-13)",
             fontWeight: 600,
-            // 배수는 **검정**, 온도는 아래 과열도 막대 — 주식 초보 카드(CardTrend)와 같은 규칙이다(2026-10-16).
-            // 배수(30일 평균 대비)와 과열도(1년 범위 위 눈금)는 잣대가 달라, 배수를 온도색으로 칠하면
-            // '1.3배 ↑'가 파랗게 서는 날이 생긴다. 방향색으로 칠했을 땐 이 줄만 다른 카드와 규칙이 갈렸다(2026-08-04).
-            color: C.ink,
+            // 막대와 같은 색이어야 한다 — 숫자가 파랑인데 막대가 빨강이면 한 줄이 두 말을 한다.
+            // 그 "같은 색"은 **방향**이다(vsAvgColor · 2026-10-16). 2026-08-04 엔 온도로 맞췄는데, 그러면
+            // 막대가 '많음'으로 뻗어도 과열도가 낮은 날엔 파랬다. 초보 검색 카드와 같은 함수를 써서 두 카드가 함께 간다.
+            color: vsAvgColor(ratio, C.ink),
             whiteSpace: "nowrap",
           }}
         >
@@ -380,8 +467,7 @@ function SubSpend({ v, label, showScale }: { v: Pick; label: string; showScale: 
           {arrow && <span style={{ fontSize: "var(--fs-12)" }}> {arrow}</span>}
         </strong>
       </div>
-      {v.capped !== null && <HeatFill pct={v.capped} />}
-      {showScale && <HeatScale />}
+      {ratio !== null && <VsAvg ratio={ratio} knob={vsAvgColor(ratio, C.sub)} showScale={showScale} />}
     </div>
   );
 }
@@ -417,8 +503,8 @@ export function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick })
       <TitleRow icon="local_mall" name={CARD_NAME.luxury_consumption_index} desc="명품·외식 검색량으로 본 소비 심리" />
       {lead && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          {/* 큰 숫자도 배수라 검정이다 — 아래 두 줄과 같은 규칙(SubSpend 주석). */}
-          <strong className="hz-big" style={{ fontFamily: bothUsual ? undefined : MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: C.ink, lineHeight: 1, whiteSpace: "nowrap" }}>
+          {/* 큰 숫자도 배수라 방향색이다 — 아래 두 줄과 같은 규칙(vsAvgColor). '평소 수준'이면 무채색. */}
+          <strong className="hz-big" style={{ fontFamily: bothUsual ? undefined : MONO, fontSize: "var(--fs-20)", fontWeight: 700, letterSpacing: "-.03em", color: bothUsual ? C.ink : vsAvgColor(lead.r, C.ink), lineHeight: 1, whiteSpace: "nowrap" }}>
             {bothUsual ? "평소 수준" : (
               <>
                 {lead.r.toFixed(1)}
