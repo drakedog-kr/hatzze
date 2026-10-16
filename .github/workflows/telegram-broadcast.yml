@@ -103,6 +103,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      actions: read   # 미장 이유를 쓴 뒤 화면을 비우기 전에 데일리 파이프라인이 도는지 본다(scripts/pipeline-busy.sh)
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -230,6 +231,27 @@ jobs:
             || (github.event.inputs.send == 'true' && github.event.inputs.format == 'us_weekend')
           )
         run: python data-pipeline/scripts/generate_move_reasons.py --us-only --skip-catchup us
+
+      # 데일리 파이프라인이 아직 화면을 다 비우기 전이면 여기서는 비우지 않는다(scripts/pipeline-busy.sh · 2026-10-17).
+      # 그 사이 페이지를 비우면 반쯤 바뀐 DB 로 그려져 한 페이지 안이 따로 바뀐다. 그 실행의 finalize 가 이 값까지 같이 비운다.
+      - name: 데일리 파이프라인이 화면을 비우는 중인지 보기
+        id: busy
+        if: ${{ !cancelled() && steps.us_move_reasons.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if bash scripts/pipeline-busy.sh; then echo "busy=true" >> "$GITHUB_OUTPUT"; else echo "busy=false" >> "$GITHUB_OUTPUT"; fi
+
+      # 토요일 미장 이유가 화면에도 바로 보이게 그 표(telegram_us_stock_move_reason)를 읽는 화면을 비운다(2026-10-17 —
+      # 예전엔 화면 캐시가 끝나는 한 시간 뒤에 보였다. 이제 조회 사본이 시간으로 만료되지 않아 비우지 않으면 저녁 실행까지
+      # 안 보인다). 이 화면들의 다른 표는 아침 실행 뒤로 그대로라 페이지가 한꺼번에 바뀐다.
+      # ⚠️ 대괄호는 셸 글롭이라 따옴표를 벗기지 말 것.
+      - name: 미장 이유를 읽는 화면 비우고 데우기
+        if: ${{ !cancelled() && steps.us_move_reasons.outcome == 'success' && steps.busy.outputs.busy != 'true' }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /kadera/us '/theme/us/[theme]'
 
       - name: (텔레그램) 이번 주 미장 흐름 발송 (토요일 10:30)
         id: telegram_us_weekend

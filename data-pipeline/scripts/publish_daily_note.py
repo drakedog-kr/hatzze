@@ -297,27 +297,37 @@ def ping_indexnow(urls: list[str]) -> None:
             print(f"[indexnow] {ep} 접속 실패({e}) — 사이트맵으로 다음에 잡힙니다")
 
 
-def revalidate_site() -> None:
-    """화면 사본(ISR)을 비운다. 안 비우면 올린 글이 최대 한 시간 뒤에 보인다.
+# 데일리 노트 표(daily_note)를 읽는 화면만 비운다 — 목록 · 글(패턴) · RSS · 노트 사이트맵.
+REVALIDATE_BODY = {"paths": ["/daily", "/daily/rss.xml", "/sitemap-notes.xml"], "routes": ["/daily/[date]"]}
 
-    화면은 자료가 바뀔 때만 새로 그리도록 돼 있고(app/layout.tsx revalidate 3600), 그 신호가
-    이 호출이다 — 파이프라인 워크플로의 마지막 스텝과 같은 문을 두드린다. 값은 .env.local 의
-    REVALIDATE_SECRET(Vercel 환경변수와 같은 값). 없거나 실패해도 올린 글은 그대로고, 한 시간
-    안에 스스로 새로 그리므로 여기서는 알리기만 한다.
+
+def revalidate_site() -> None:
+    """데일리 노트를 읽는 화면만 비운다(REVALIDATE_BODY). 안 비우면 올린 글이 다음 파이프라인까지 안 보인다.
+
+    화면의 DB 조회 사본은 시간으로 만료되지 않고(lib/read-cache.ts · 2026-10-17) 비울 때만 새로 받는다. 예전엔 여기서
+    본문 없이 **전부** 비웠는데, 파이프라인이 도는 도중에 글을 올리면 모든 화면이 반쯤 바뀐 DB 로 그려졌다 — 카더라 표는
+    오늘 것인데 총평은 어제 것인 식으로 한 페이지 안이 따로 바뀐다. 그래서 이 표를 읽는 화면만 찍는다(그 화면들의
+    다른 값 — 점수 메타 · 종목 사전 — 은 파이프라인 도중에도 글과 따로 놀지 않는다). 값은 .env.local 의
+    REVALIDATE_SECRET(Vercel 환경변수와 같은 값). 없거나 실패해도 올린 글은 그대로라 여기서는 알리기만 한다.
     """
     secret = os.environ.get("REVALIDATE_SECRET", "").strip()
     if not secret:
-        print("[revalidate] REVALIDATE_SECRET 이 없어 화면 사본을 못 비웁니다 — 한 시간 안에 스스로 새로 그립니다")
+        print("[revalidate] REVALIDATE_SECRET 이 없어 화면 사본을 못 비웁니다 — 글은 다음 파이프라인 때 보입니다")
         return
-    req = urllib.request.Request(REVALIDATE_URL, method="POST", headers={"Authorization": f"Bearer {secret}"})
+    req = urllib.request.Request(
+        REVALIDATE_URL,
+        method="POST",
+        data=json.dumps(REVALIDATE_BODY).encode("utf-8"),
+        headers={"Authorization": f"Bearer {secret}", "Content-Type": "application/json"},
+    )
     try:
         with urllib.request.urlopen(req, timeout=20) as res:
             body = json.loads(res.read().decode("utf-8") or "{}")
-        print(f"[revalidate] 화면 사본을 비웠습니다 — {body.get('revalidated', '')}")
+        print(f"[revalidate] 화면 사본을 비웠습니다 — {body.get('revalidated', '')} {body.get('routes', '')}")
     except urllib.error.HTTPError as e:
-        print(f"[revalidate] 화면 사본 비우기가 {e.code} 로 끝났습니다 — 한 시간 안에 스스로 새로 그립니다")
+        print(f"[revalidate] 화면 사본 비우기가 {e.code} 로 끝났습니다 — 글은 다음 파이프라인 때 보입니다")
     except (urllib.error.URLError, TimeoutError, OSError) as e:
-        print(f"[revalidate] 접속 실패({e}) — 한 시간 안에 스스로 새로 그립니다")
+        print(f"[revalidate] 접속 실패({e}) — 글은 다음 파이프라인 때 보입니다")
 
 
 if __name__ == "__main__":

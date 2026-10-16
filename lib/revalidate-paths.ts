@@ -20,7 +20,31 @@ export const MAX_PATH_LEN = 1024;
  * `revalidatePath(pattern, "page")` 로 불러 **그 꼴의 화면 전부**를 비운다(next 16 docs/…/revalidatePath.md).
  * 둘 다 비었으면 "루트 레이아웃 아래 전부"다.
  */
-export type ParsedPaths = { paths: string[]; routes: string[] } | { reason: string };
+export type ParsedPaths = { paths: string[]; routes: string[]; except?: string[] } | { reason: string };
+
+/**
+ * 루트 레이아웃 바로 아래에서 라우트를 만드는 자리(2026-10-17). `except` 를 준 '전부 비우기'가 이 목록을 하나씩
+ * 비운다 — `revalidatePath("/", "layout")` 하나로는 빼고 싶은 화면까지 같이 비워진다. 아침 마지막 비우기가
+ * 미리보기를 뺀다(06:31 에 페이지째 바뀐 화면이 첫 줄 칩만 08시대에 또 바뀌지 않게 — daily-update.yml finalize).
+ * ⚠️ 새 최상위 화면을 만들면 여기에 더할 것. tests/revalidate-paths.test.ts 가 app/ 폴더와 맞대 본다.
+ */
+export const TOP_SEGMENTS = [
+  "/", "/api", "/changelog", "/daily", "/disclaimer", "/dividend", "/etf", "/insider", "/kadera", "/mdd",
+  "/opengraph-image", "/preview", "/privacy", "/robots.txt", "/sitemap.xml", "/sitemap-insider.xml",
+  "/sitemap-notes.xml", "/sitemap-pages.xml", "/sitemap-stocks.xml", "/stock", "/terms", "/theme",
+] as const;
+
+/** 최상위 자리 하나를 비우는 법. 홈은 그 페이지만(레이아웃이면 전부다), 파일 라우트는 그 경로, 나머지는 그 아래 전부. */
+export function segmentTarget(seg: string): { path: string; type?: "page" | "layout" } {
+  if (seg === "/") return { path: "/", type: "page" };
+  if (seg === "/robots.txt" || seg === "/sitemap.xml") return { path: seg };
+  return { path: seg, type: "layout" };
+}
+
+/** `except` 를 뺀 전부 — 비울 자리 목록. */
+export function allExceptTargets(except: readonly string[]): { path: string; type?: "page" | "layout" }[] {
+  return TOP_SEGMENTS.filter((s) => !except.includes(s)).map(segmentTarget);
+}
 
 /** 라우트 패턴 한 칸. 글자 칸(`theme`, `us`) 이거나 동적 칸(`[theme]`)이다. `[...slug]` · `[[...slug]]` 는 이 저장소에 없어 안 받는다. */
 const ROUTE_SEGMENT = /^(?:[A-Za-z0-9_.-]+|\[[A-Za-z0-9_]+\])$/;
@@ -35,6 +59,18 @@ const ROUTE_SEGMENT = /^(?:[A-Za-z0-9_.-]+|\[[A-Za-z0-9_]+\])$/;
 export function parseRevalidatePaths(body: unknown): ParsedPaths {
   if (body === null || body === undefined) return { paths: [], routes: [] };
   if (typeof body !== "object" || Array.isArray(body)) return { reason: "본문은 객체여야 합니다" };
+  const ex = (body as { except?: unknown }).except;
+  if (ex !== undefined) {
+    // '이것만 빼고 전부' — 경로 · 패턴과 같이 오면 뜻이 겹친다.
+    if ((body as { paths?: unknown }).paths !== undefined || (body as { routes?: unknown }).routes !== undefined) {
+      return { reason: "except 는 paths · routes 와 같이 쓸 수 없습니다" };
+    }
+    if (!Array.isArray(ex) || ex.length === 0) return { reason: "except 는 비어 있지 않은 배열이어야 합니다" };
+    for (const e of ex) {
+      if (typeof e !== "string" || !(TOP_SEGMENTS as readonly string[]).includes(e)) return { reason: `최상위 자리가 아닙니다: ${String(e)}` };
+    }
+    return { paths: [], routes: [], except: ex as string[] };
+  }
   const routes = parseRoutes((body as { routes?: unknown }).routes);
   if ("reason" in routes) return routes;
   const raw = (body as { paths?: unknown }).paths;

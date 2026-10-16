@@ -147,9 +147,9 @@ describe("순서 규칙(scripts/kadera-us-chain.sh 머리 주석)", () => {
 });
 
 describe("아침은 화면을 한 번에 바꾼다(finalize)", () => {
-  // 지금처럼 따로 바뀌는 것: 저녁에만 도는 '지금 값' 미리보기 다시 비우기 · 배당 화면(/dividend 만).
-  // 내부자 잡 · 국장 미리보기 잡(kr_preview, 06:30 넘어 /preview · / 를 비운다)은 따로 둔다.
-  const DIVIDEND_AM = "배당 화면만 먼저 비우고 데우기 (아침 · /dividend 만)";
+  // 지금처럼 따로 바뀌는 것: 저녁에만 도는 '지금 값' 미리보기 다시 비우기 · 배당 화면(/dividend 만 · 카더라 집계 뒤).
+  // 내부자 잡 · 국장 미리보기 잡(kr_preview, 아침 06:30 넘어 /preview 만 비운다)은 따로 둔다.
+  const DIVIDEND_AM = "배당 화면만 먼저 비우고 데우기";
   const EXCEPT = new Set(["미리보기 화면 다시 비우고 데우기 (지금 값 반영)", DIVIDEND_AM]);
 
   it("update · 배당 잡의 화면 비우기는 아침엔 돌지 않는다", () => {
@@ -159,12 +159,12 @@ describe("아침은 화면을 한 번에 바꾼다(finalize)", () => {
     }
   });
 
-  it("아침 배당 화면 비우기는 /dividend 하나만 — 종목 화면(/stock)은 카더라를 같이 그려 한 번에 바뀐다", () => {
+  it("배당 화면 비우기는 /dividend 하나만 — 종목 화면(/stock)은 카더라를 같이 그려 한 번에 바뀐다", () => {
     const am = dividend.find((s) => s.name === DIVIDEND_AM);
-    assert.ok(am, "아침 /dividend 비우기 스텝이 없다");
-    assert.equal(am.if, "${{ !cancelled() && github.event.inputs.slot == 'morning' }}");
+    assert.ok(am, "/dividend 비우기 스텝이 없다");
+    assert.equal(am.if, "${{ !cancelled() }}");
     assert.match(am.body, /run: bash scripts\/revalidate\.sh \/dividend\n/);
-    assert.ok(!am.body.includes("/stock"), "아침에 종목 화면까지 먼저 비운다");
+    for (const s of dividend) assert.ok(!(s.body.includes("revalidate.sh") && s.body.includes("/stock")), `${s.name} 이 종목 화면을 먼저 비운다`);
   });
 
   it("미리보기 '지금 값' 다시 비우기는 저녁에만 도는 스텝의 결과를 본다", () => {
@@ -266,10 +266,11 @@ describe("국장 미리보기는 따로 잡에서 06:30 넘어 핀허브 종가�
     assert.match(pv[fetchAt].body, /continue-on-error: true/);
   });
 
-  it("받은 뒤 미리보기 · 홈을 바로 비운다", () => {
-    const rv = idx(pv, (s) => s.name === "미리보기 화면·홈 먼저 비우고 데우기", "미리보기 화면 비우기");
+  it("받은 뒤 아침에만 미리보기 화면만 비운다 — 홈은 칩까지 나머지와 함께 finalize 에서(2026-10-17)", () => {
+    const rv = idx(pv, (s) => s.name === "미리보기 화면만 먼저 비우고 데우기", "미리보기 화면 비우기");
     assert.ok(rv > fetchAt);
-    assert.match(pv[rv].body, /run: bash scripts\/revalidate\.sh \/preview \/\n/);
+    assert.match(pv[rv].body, /run: bash scripts\/revalidate\.sh \/preview\n/);
+    assert.match(pv[rv].if ?? "", /github\.event\.inputs\.slot == 'morning'/);
   });
 
   it("실패 알림이 이 잡에 있다 — 스텝이 continue-on-error 라 없으면 조용히 어제 자료가 나간다", () => {
@@ -325,4 +326,92 @@ describe("guard 가 '이미 보냈다'를 찾는 이름은 실제 발송 스텝 
     const q = guard.match(/\[\.jobs\[\]\.steps\[\] \| select\(\.name \| contains\(\\"\$step\\"\)\) \| select\(\.conclusion == \\"success\\"\)\]/g) ?? [];
     assert.equal(q.length, 2, "발송 확인 조회가 두 곳이 아니다");
   });
+});
+
+describe("한 페이지 안이 따로따로 바뀌지 않는다(2026-10-17)", () => {
+  // 화면의 DB 조회 사본은 라우트마다 따로이고 시간으로 만료되지 않는다(lib/read-cache.ts). 그래서 페이지는 비울 때만
+  // 한꺼번에 바뀌고, 비우는 자리마다 '그 페이지가 읽는 값이 그 뒤에 더 바뀌지 않는가'만 지키면 된다.
+  const finalize = steps(job("finalize"));
+  const insider = steps(job("insider"));
+  const reval = (list: Step[], path: string) =>
+    idx(list, (s) => new RegExp(`run: bash scripts/revalidate\\.sh[^\\n]* ${path.replace(/[/[\]]/g, "\\$&")}( |\\n)`).test(s.body), `${path} 비우기`);
+
+  it("아침 finalize 는 미리보기를 빼고 비운다 — 06:31 에 페이지째 바뀐 미리보기의 첫 줄 칩만 또 바뀌지 않게", () => {
+    const f = idx(finalize, (s) => s.id === "revalidate_all", "finalize 비우기");
+    assert.match(finalize[f].body, /if \[ "\$SLOT" = morning \]; then\n\s+bash scripts\/revalidate\.sh --all-except \/preview\n\s+else\n\s+bash scripts\/revalidate\.sh\n/);
+    assert.match(finalize[f].body, /REVALIDATE_STRICT: "1"/);
+  });
+
+  it("finalize 비우기가 끝내 실패하면 알린다 — 시간으로 저절로 새로워지는 길이 없다", () => {
+    const al = idx(finalize, (s) => s.name.startsWith("Alert on 화면 비우기 failure"), "비우기 실패 알림");
+    assert.equal(finalize[al].if, "${{ always() && steps.revalidate_all.outcome == 'failure' }}");
+    assert.match(job("finalize"), /\n {6}issues: write/);
+  });
+
+  it("코스피 · 코스닥 종가(야후)는 update 잡의 어떤 화면 비우기보다 앞이다 — 지수 칸만 나중에 바뀌지 않게", () => {
+    const hi = idx(update, (s) => s.id === "kospi_high_gap", "코스피 종가");
+    const kq = idx(update, (s) => s.id === "kosdaq_ratio", "코스닥 종가");
+    const first = idx(update, (s) => s.body.includes("scripts/revalidate.sh"), "첫 비우기");
+    assert.ok(hi < first && kq < first, `종가 ${hi} · ${kq} · 첫 비우기 ${first}`);
+    assert.ok(hi < kq, "코스닥 괴리는 코스피 종가를 읽는다");
+  });
+
+  it("저녁 미리보기 다시 비우기는 미장 카더라 비우기 뒤다 — 첫 줄 급부상 칩이 이 실행 값이 된 뒤", () => {
+    const rewarm = idx(update, (s) => s.name === "미리보기 화면 다시 비우고 데우기 (지금 값 반영)", "미리보기 다시 비우기");
+    assert.ok(rewarm > reval(update, "/kadera/us"));
+    assert.ok(rewarm > idx(update, (s) => s.id === "kr_overnight", "개장 전 지금 값"));
+    assert.ok(rewarm > idx(update, (s) => s.id === "telegram_surging_oneliners", "급부상 한 줄"));
+  });
+
+  it("카더라 · 미장 카더라 · 테마 · 홈 비우기는 제 화면이 읽는 마지막 스텝 뒤다", () => {
+    const at = (id: string) => idx(update, (s) => s.id === id, id);
+    assert.ok(reval(update, "/kadera") > at("telegram_narratives"));
+    assert.ok(reval(update, "/kadera") > at("telegram_us_sentiment"));
+    assert.ok(reval(update, "/kadera/us") > at("telegram_us_narratives"));
+    assert.ok(reval(update, "/kadera/us") > at("telegram_move_reasons"));
+    assert.ok(reval(update, "/theme") > at("telegram_theme_briefs"));
+    assert.ok(reval(update, "/theme") > at("telegram_us_theme_briefs"));
+    const home = reval(update, "/");
+    assert.ok(home > at("calculate_score"));
+    assert.ok(home > idx(update, (s) => s.name.startsWith("Generate daily AI summary"), "히어로 요약"));
+  });
+
+  it("배당 화면은 카더라 일별 집계(국장 · 미장)가 끝난 뒤 비운다 — 맨 위 칩 순서가 그 표를 쓴다", () => {
+    const w = idx(dividend, (s) => s.body.includes('wait-for-job-step.sh 120 "update::(텔레그램) 종목 일별 집계" "update::(텔레그램) 미국 종목·채널 일별 집계"'), "카더라 집계 대기");
+    assert.ok(w < reval(dividend, "/dividend"));
+  });
+
+  it("배당 잡은 테마 상세를 먼저 비우지 않는다 — 등락률만 먼저 바뀌고 테마 요약은 나중에 바뀌었다", () => {
+    for (const s of dividend) assert.ok(!(s.body.includes("revalidate.sh") && s.body.includes("/theme")), s.name);
+  });
+
+  it("내부자 화면은 미장 일별 집계가 끝난 뒤 비운다 — 언급 수를 같이 그린다", () => {
+    const w = idx(insider, (s) => s.body.includes('wait-for-job-step.sh 150 "update::(텔레그램) 미국 종목·채널 일별 집계"'), "미장 집계 대기");
+    assert.ok(w < reval(insider, "/insider"));
+    assert.match(job("insider"), /\n {6}actions: read/);
+  });
+
+  it("기다리는 대상 스텝 이름이 update 잡에 있다 — 이름이 바뀌면 30분 · 두 시간을 헛기다린다", () => {
+    for (const name of ["(텔레그램) 종목 일별 집계", "(텔레그램) 미국 종목·채널 일별 집계"]) {
+      assert.equal(update.filter((s) => s.name.startsWith(name)).length, 1, name);
+    }
+  });
+});
+
+describe("손으로 돌리는 재실행도 파이프라인 도중엔 화면을 안 비운다(2026-10-17)", () => {
+  for (const f of ["narratives-rerun", "surging-oneliners-rerun", "move-reasons-rerun", "telegram-broadcast"]) {
+    it(f, () => {
+      const y = read(`.github/workflows/${f}.yml`);
+      const all = steps(y);
+      const busy = idx(all, (s) => s.id === "busy", "파이프라인 확인");
+      assert.match(all[busy].body, /bash scripts\/pipeline-busy\.sh/);
+      const revals = all.filter((s) => s.body.includes("scripts/revalidate.sh"));
+      assert.ok(revals.length >= 1, "비우기 스텝이 없다");
+      for (const s of revals) {
+        assert.ok(all.indexOf(s) > busy, `${s.name} 이 확인보다 앞이다`);
+        assert.match(s.if ?? "", /steps\.busy\.outputs\.busy != 'true'/, s.name);
+      }
+      assert.match(y, /\n {6}actions: read/);
+    });
+  }
 });
