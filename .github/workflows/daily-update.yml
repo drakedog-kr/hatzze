@@ -2178,6 +2178,18 @@ jobs:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: bash scripts/revalidate.sh /dividend '/stock/[code]'
 
+      # ⭐ 아침에도 /dividend 만은 지금처럼 이 잡 끝에 따로 바꾼다(2026-10-16). 아침 화면을 KRX 08:00 자료까지 합쳐
+      #    한 번에 바꾸면(finalize) 이 화면은 느린 날 08:26~08:30 → 08:51 로 늦어진다. 이 화면은 배당 표가 주인공이고
+      #    카더라는 맨 위 칩 여덟의 순서(최근 30일 채널 언급 합 — lib/dividend.ts getTrends)에만 쓴다. 예전에도 이 시각엔
+      #    그날 아침 언급이 이미 표에 있었으니 지금과 같은 화면이 같은 시각에 나간다.
+      # ⛔ /stock/[code] 는 빼서 finalize 의 한 번에 둔다 — 종목 화면은 카더라 관심 추이 · 흐름 요약을 같이 그린다.
+      - name: 배당 화면만 먼저 비우고 데우기 (아침 · /dividend 만)
+        if: ${{ !cancelled() && github.event.inputs.slot == 'morning' }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /dividend
+
       # ── 배당주 수집 전용 알림 ────────────────────────────────────────────
       # /dividend 는 죽어도 카드가 그대로 뜨고 히어로 툴팁의 '기준' 날짜만 안 움직인다 —
       # 서학개미·내부자와 같은 조용한 낡음이다. 그래서 여기서 알려야 한다.

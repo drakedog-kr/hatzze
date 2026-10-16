@@ -144,14 +144,24 @@ describe("순서 규칙(scripts/kadera-us-chain.sh 머리 주석)", () => {
 });
 
 describe("아침은 화면을 한 번에 바꾼다(finalize)", () => {
-  // 지금처럼 따로 바뀌는 것: 국장 미리보기(06:33) · 저녁에만 도는 '지금 값' 미리보기 다시 비우기. 내부자 잡은 따로 둔다.
-  const EXCEPT = new Set(["미리보기 화면·홈 먼저 비우고 데우기", "미리보기 화면 다시 비우고 데우기 (지금 값 반영)"]);
+  // 지금처럼 따로 바뀌는 것: 국장 미리보기(06:33) · 저녁에만 도는 '지금 값' 미리보기 다시 비우기 · 배당 화면(/dividend 만).
+  // 내부자 잡은 따로 둔다.
+  const DIVIDEND_AM = "배당 화면만 먼저 비우고 데우기 (아침 · /dividend 만)";
+  const EXCEPT = new Set(["미리보기 화면·홈 먼저 비우고 데우기", "미리보기 화면 다시 비우고 데우기 (지금 값 반영)", DIVIDEND_AM]);
 
   it("update · 배당 잡의 화면 비우기는 아침엔 돌지 않는다", () => {
     for (const s of [...update, ...dividend]) {
       if (!s.body.includes("scripts/revalidate.sh") || EXCEPT.has(s.name)) continue;
       assert.match(s.if ?? "", /github\.event\.inputs\.slot != 'morning'/, `${s.name} 이 아침에도 화면을 비운다`);
     }
+  });
+
+  it("아침 배당 화면 비우기는 /dividend 하나만 — 종목 화면(/stock)은 카더라를 같이 그려 한 번에 바뀐다", () => {
+    const am = dividend.find((s) => s.name === DIVIDEND_AM);
+    assert.ok(am, "아침 /dividend 비우기 스텝이 없다");
+    assert.equal(am.if, "${{ !cancelled() && github.event.inputs.slot == 'morning' }}");
+    assert.match(am.body, /run: bash scripts\/revalidate\.sh \/dividend\n/);
+    assert.ok(!am.body.includes("/stock"), "아침에 종목 화면까지 먼저 비운다");
   });
 
   it("미리보기 '지금 값' 다시 비우기는 저녁에만 도는 스텝의 결과를 본다", () => {
