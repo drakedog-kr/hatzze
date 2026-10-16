@@ -147,10 +147,10 @@ describe("순서 규칙(scripts/kadera-us-chain.sh 머리 주석)", () => {
 });
 
 describe("아침은 화면을 한 번에 바꾼다(finalize)", () => {
-  // 지금처럼 따로 바뀌는 것: 국장 미리보기(06:33) · 저녁에만 도는 '지금 값' 미리보기 다시 비우기 · 배당 화면(/dividend 만).
-  // 내부자 잡은 따로 둔다.
+  // 지금처럼 따로 바뀌는 것: 저녁에만 도는 '지금 값' 미리보기 다시 비우기 · 배당 화면(/dividend 만).
+  // 내부자 잡 · 국장 미리보기 잡(kr_preview, 06:30 넘어 /preview · / 를 비운다)은 따로 둔다.
   const DIVIDEND_AM = "배당 화면만 먼저 비우고 데우기 (아침 · /dividend 만)";
-  const EXCEPT = new Set(["미리보기 화면·홈 먼저 비우고 데우기", "미리보기 화면 다시 비우고 데우기 (지금 값 반영)", DIVIDEND_AM]);
+  const EXCEPT = new Set(["미리보기 화면 다시 비우고 데우기 (지금 값 반영)", DIVIDEND_AM]);
 
   it("update · 배당 잡의 화면 비우기는 아침엔 돌지 않는다", () => {
     for (const s of [...update, ...dividend]) {
@@ -240,5 +240,52 @@ describe("요약표", () => {
     const outs = s.body.match(/outcomes=\((.+)\)\n/)![1].match(/"[^"]*"/g)!;
     assert.equal(names.length, outs.length);
     assert.ok(!s.body.includes("telegram_morning"), "다른 잡으로 옮긴 스텝을 가리킨다");
+  });
+});
+
+describe("국장 미리보기는 따로 잡에서 06:30 넘어 핀허브 종가를 받는다(2026-10-17)", () => {
+  // 아침 발사는 06:10 인데 미장 종가는 예전처럼 06:30 넘어 받는다. update 잡 맨 앞에서 기다리면 카더라가 20분을 같이 잔다.
+  const pv = steps(job("kr_preview"));
+  const fetchAt = idx(pv, (s) => s.id === "kr_preview", "국장 미리보기");
+
+  it("update 잡엔 미리보기가 없다 — 있으면 06:10 에 마감 13분 뒤(겨울) 종가를 받는다", () => {
+    assert.ok(!update.some((s) => s.body.includes("fetch_kr_preview.py")), "update 잡에 미리보기 스텝이 남았다");
+    assert.ok(!update.some((s) => s.body.includes("steps.kr_preview.")), "update 잡이 없는 스텝 결과를 읽는다(늘 빈 값)");
+  });
+
+  it("아침엔 06:30 KST 까지 기다린 뒤 받는다 — 05:00~06:30 에 시작했을 때만", () => {
+    const w = pv.findIndex((s) => s.body.includes("bash scripts/wait-until-kst.sh 06:30"));
+    assert.ok(w >= 0 && w < fetchAt, "미리보기 앞에 06:30 대기가 없다");
+    assert.equal(pv[w].if, "github.event.inputs.slot == 'morning'");
+    assert.match(pv[w].body, /\[ "\$now" -ge 500 \] && \[ "\$now" -lt 630 \]/);
+  });
+
+  it("잡은 평일 저녁에도 뜨고 스텝만 건너뛴다 — 배당 잡이 이 잡 끝을 기다린다", () => {
+    assert.match(job("kr_preview"), /\n {4}if: \$\{\{ !cancelled\(\) && needs\.guard\.outputs\.skip != 'true' \}\}\n/);
+    assert.match(pv[fetchAt].body, /github\.event\.inputs\.broadcast == 'morning'/);
+    assert.match(pv[fetchAt].body, /continue-on-error: true/);
+  });
+
+  it("받은 뒤 미리보기 · 홈을 바로 비운다", () => {
+    const rv = idx(pv, (s) => s.name === "미리보기 화면·홈 먼저 비우고 데우기", "미리보기 화면 비우기");
+    assert.ok(rv > fetchAt);
+    assert.match(pv[rv].body, /run: bash scripts\/revalidate\.sh \/preview \/\n/);
+  });
+
+  it("실패 알림이 이 잡에 있다 — 스텝이 continue-on-error 라 없으면 조용히 어제 자료가 나간다", () => {
+    const al = idx(pv, (s) => s.name.startsWith("Alert on 미리보기 failure"), "미리보기 실패 알림");
+    assert.ok(al > fetchAt);
+    assert.equal(pv[al].if, "${{ !cancelled() && steps.kr_preview.outcome == 'failure' }}");
+    assert.ok(pv[al].body.includes('title="⚠️ 데일리 파이프라인 실패"'));
+    assert.match(pv[al].body, /\n {10}exit 1\n/);
+  });
+
+  it("배당 잡의 미국 배당주(핀허브)는 이 잡 끝을 기다린다 — 06:10 발사면 06:33 까지라 상한은 넉넉히", () => {
+    const wait = idx(dividend, (s) => s.body.includes("scripts/wait-for-job-step.sh"), "핀허브 대기");
+    const us = idx(dividend, (s) => s.name.startsWith("Fetch 미국 배당주"), "미국 배당주");
+    assert.ok(wait < us);
+    const m = dividend[wait].body.match(/wait-for-job-step\.sh (\d+) kr_preview\n/);
+    assert.ok(m, "kr_preview 잡을 기다리지 않는다");
+    assert.ok(Number(m[1]) >= 40, `상한 ${m[1]}분 — 06:13 쯤 와서 06:33 까지 기다린다`);
   });
 });
