@@ -480,17 +480,20 @@ jobs:
       # ⚠️ 사본만 비우는 게 아니라 그 아래 조회 캐시(1시간)도 같이 비운다. 2026-09-22 저녁에
       #    사본은 21:02 에 새로 그려졌는데 조회가 캐시에서 읽혀 아침 글이 그대로 나갔다.
       #    경로를 찍어 부를 때 두 겹이 같이 비워지는 건 프로덕션 빌드로 확인했다.
-      # ⚠️ 주말 저녁에는 위 스텝이 돌긴 하되 스크립트가 시각을 보고 스스로 건너뛴다.
-      #    그때 여기도 한 번 도는데, 같은 값으로 한 장 다시 그리는 것뿐이라 둔다.
-      # ⭐ 홈(/)도 같이 비운다. 홈 히어로 바닥 '간밤 미장' 칩(평일 06:30~10:00)이 이 표를 읽는데, 홈을 비우는
-      #    자리는 히어로 요약 뒤(아침 08:41~09:26, 2026-09-24~27 실측)뿐이라 그때까지 칩이 안 섰다 — 평일 8시
-      #    방문 봉우리를 놓친다. 이 시각 홈이 읽는 다른 표(점수·지표·카더라)는 쓰이는 중이 아니다.
-      - name: 미리보기 화면·홈 먼저 비우고 데우기
-        if: ${{ !cancelled() && steps.kr_preview.outcome == 'success' }}
+      # ⭐ **한 페이지 안이 따로따로 바뀌지 않게**(2026-10-17). 화면의 DB 조회 사본은 라우트마다 따로이고 시간으로
+      #    만료되지 않는다(lib/read-cache.ts) — 페이지는 여기처럼 비울 때만 한꺼번에 바뀐다. 그래서
+      #    · 홈(/)은 여기서 안 비운다. 예전엔 '밤사이 미장' 칩만 06:31 에 먼저 서고 점수 · 카더라는 08시대에 바뀌었다.
+      #      이제 칩도 나머지와 함께 finalize 에서 바뀐다(2026-10-17 결정).
+      #    · 미리보기는 아침에 여기서 **한 번만** 바뀐다. 첫 줄의 급부상 칩 · 지수 칸은 이 시각 값(전날 저녁 카더라 ·
+      #      전날 종가)으로 같이 그려지고, 아침 finalize 는 미리보기를 빼고 비운다(--all-except /preview). 저녁엔
+      #      update 잡이 미장 카더라 뒤에서 한 번 비운다('미리보기 화면 다시 비우고 데우기').
+      #    · 저녁(주말)엔 위 스텝이 돌아도 스크립트가 스스로 건너뛰어 값이 그대로라 여기서 안 비운다.
+      - name: 미리보기 화면만 먼저 비우고 데우기
+        if: ${{ !cancelled() && steps.kr_preview.outcome == 'success' && github.event.inputs.slot == 'morning' }}
         continue-on-error: true
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
-        run: bash scripts/revalidate.sh /preview /
+        run: bash scripts/revalidate.sh /preview
 
       # 예전엔 update 잡 'Summarize results' 표의 맨 앞 줄이었다. 잡을 떼며 요약 · 실패 알림도 같이 옮겼다.
       # ⚠️ 위 스텝은 continue-on-error 라 실패해도 잡이 흐른다. 여기서 안 알리면 **아무도 모른 채** 화면이 어제
@@ -584,6 +587,22 @@ jobs:
         if: github.event.inputs.slot == 'morning'
         continue-on-error: true
         run: bash scripts/bg-step.sh start kr_overnight_am -- bash -c 'bash scripts/wait-until-kst.sh 08:00 && python data-pipeline/scripts/fetch_kr_overnight.py'
+
+      # ── 코스피 · 코스닥 종가(야후) — 카더라 블록 **앞**(2026-10-17) ─────────────────
+      # 이 둘이 `kospi_close_raw` · `kosdaq_close_raw`(그날 지수 종가)를 쓴다. 카더라 · 미장 카더라 · 미리보기 · 홈 첫 줄의
+      # 지수 칸이 그 값을 읽는데(lib/data.ts getKrIndexCloses), 예전 자리(지표 블록 · KRX 08:00 게이트 뒤)면 저녁에
+      # 카더라 화면을 먼저 비울 때 지수 칸만 어제 종가였다가 맨 끝에 또 바뀌었다 — 한 페이지 안이 따로 바뀐다.
+      # 둘 다 야후만 읽어 KRX 게이트와 상관없다(저녁 17:10 은 야후 종가 하한 16:00 뒤). 아침엔 어제 종가가 이미
+      # 있어 새로 쓸 날이 없다. 52주 고점 괴리 · 코스닥 괴리 지표도 같이 쓰는데 그걸 읽는 홈 · 점수는 더 뒤다.
+      - name: Fetch KOSPI 52-week-high gap
+        id: kospi_high_gap
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kospi_high_gap.py
+
+      - name: Fetch KOSDAQ-vs-KOSPI ratio
+        id: kosdaq_ratio
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kosdaq_ratio.py
 
       # ── 카더라 리포트(텔레그램) 파이프라인 ──────────────────────────────
       # 위 지표 파이프라인과 독립적이며, 자기들끼리는 순서 의존이 있다:
@@ -814,17 +833,6 @@ jobs:
         if: github.event.inputs.slot != 'morning'
         run: python data-pipeline/scripts/fetch_kr_overnight.py
 
-      # ⭐ 미리보기 화면을 **한 번 더** 비운다. 그 화면이 읽는 게 둘인데 쓰이는 시각이
-      #    멀다 — 쌍 표는 아침 06:30 넘어(kr_preview 잡), 개장 전 지금 값은 KRX 게이트
-      #    뒤인 여기서다. 앞에서 한 번만 비우면 지금 값 카드가 지난 실행 것으로 굳는다.
-      # ⚠️ 이 화면만 이 표를 읽는다(app/preview/page.tsx 의 getOvernightLive).
-      - name: 미리보기 화면 다시 비우고 데우기 (지금 값 반영)
-        if: ${{ !cancelled() && steps.kr_overnight.outcome == 'success' }}
-        continue-on-error: true
-        env:
-          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
-        run: bash scripts/revalidate.sh /preview
-
       # ⭐ **짝이 있는 스텝은 국장이 먼저, 미장이 뒤다**(2026-09-28). 여기 트렌딩·테마와 아래
       #    총평이 미장 먼저였는데, 미장 카더라를 처음 들일 때 국장 짝 바로 앞에 끼워 넣은 자리가
       #    남은 것이었다(의존이 있어서가 아니다). 추출·일별 집계·센티먼트·급부상 한 줄·등락 까닭·
@@ -1023,6 +1031,9 @@ jobs:
       #    버리고 다시 그려, 하루 두 번이던 전량 재생성이 네 번이 된다. 그래서 경로를
       #    찍어 부른다 — 경로를 주면 그 경로가 쓴 데이터 캐시도 같이 비워진다.
       # ⚠️ 맨 끝(finalize 잡)의 전체 비우기는 그대로 둔다. 지표는 그때 비워져야 한다.
+      # ⭐ 한 페이지 안이 따로 바뀌지 않게(2026-10-17): 여기서 비운 뒤 이 화면이 읽는 값이 더 바뀌면 안 된다. 이
+      #    화면의 표(로컬 프로덕션 빌드로 잰 조회 목록)는 전부 이 앞에서 끝나고, 첫 줄 지수 칸은 카더라 블록 앞
+      #    야후 종가 스텝이 쓴다. 남는 건 메타데이터(공유 카드 그림 주소)의 점수뿐이라 본문엔 안 보인다.
       - name: 국장 카더라 화면만 먼저 비우고 데우기
         if: ${{ !cancelled() && github.event.inputs.slot != 'morning' }}
         continue-on-error: true
@@ -1048,6 +1059,19 @@ jobs:
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: bash scripts/revalidate.sh /kadera/us
+
+      # ⭐ 저녁 미리보기를 여기서 **한 번** 비운다(2026-10-17 에 '개장 전 지금 값' 바로 뒤에서 옮겼다). 이 화면은
+      #    쌍 표(아침 kr_preview) · 개장 전 지금 값(저녁 'kr_overnight') · 첫 줄 급부상 칩(국장 · 미장 카더라) · 지수 칸을
+      #    같이 그린다. 지금 값 바로 뒤에서 비우면 급부상 칩이 아직 지난 실행 것이라, 미장 카더라까지 끝난 뒤
+      #    finalize 에서 칩만 또 바뀌었다 — 한 페이지 안이 따로 바뀐다. 여기면 넷 다 이 실행 값이다(지수 칸은
+      #    카더라 블록 앞 야후 종가 스텝).
+      # ⚠️ 아침엔 안 돈다(kr_overnight 가 저녁 스텝이다). 아침 미리보기는 kr_preview 잡에서 한 번만 바뀐다.
+      - name: 미리보기 화면 다시 비우고 데우기 (지금 값 반영)
+        if: ${{ !cancelled() && steps.kr_overnight.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: bash scripts/revalidate.sh /preview
 
       # 테마 리포트(/theme/[테마])의 '요즘 무슨 얘기' · 함께 언급된 테마 · 발췌. 테마 26개에 Haiku 한 번씩.
       # 기준일을 telegram_sentiment_daily 에서 집으므로 센티먼트 집계 뒤여야 한다(위 급부상 한 줄과 같은 이유).
@@ -1124,11 +1148,6 @@ jobs:
         if: github.event.inputs.slot == 'morning'
         continue-on-error: true
         run: bash scripts/bg-step.sh wait kr_overnight_am
-
-      - name: Fetch KOSPI 52-week-high gap
-        id: kospi_high_gap
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_kospi_high_gap.py
 
       - name: Fetch Buffett index
         id: buffett_index
@@ -1213,11 +1232,6 @@ jobs:
         id: gold_ratio
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_gold_ratio.py
-
-      - name: Fetch KOSDAQ-vs-KOSPI ratio
-        id: kosdaq_ratio
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_kosdaq_ratio.py
 
       - name: Fetch USD/KRW volatility
         id: usdkrw_volatility
@@ -1808,6 +1822,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      actions: read   # 화면을 비우기 전에 update 잡의 미장 일별 집계를 기다린다(scripts/wait-for-job-step.sh)
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -1904,6 +1919,16 @@ jobs:
       #    상세 셋(종목·투자자·전체보기)뿐이다(lib/insider-data.ts · lib/insider-detail.ts). 상세는 패턴이라 데우지 않는다.
       #    종목 상세는 주소가 두 꼴이다 — 기본 기간(/insider/stock/NVDA)과 다른 기간(/insider/stock/NVDA/1y). 패턴은
       #    그 꼴의 화면만 비우므로(revalidatePath(…, "page")) 둘 다 적는다(lib/insider-range.ts).
+      # ⭐ 한 페이지 안이 따로 바뀌지 않게(2026-10-17): 내부자 화면은 미장 카더라 언급 수(telegram_us_stock_daily)를 같이
+      #    그린다. 그 표가 이 실행 값이 된 뒤(update 잡 '미국 종목·채널 일별 집계')에 비워야 언급 수만 finalize 에서 또
+      #    바뀌지 않는다. 못 읽거나 시간이 다 되면 기다리지 않고 비운다.
+      - name: 미장 일별 집계가 끝날 때까지 대기 (내부자 화면의 언급 수)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/wait-for-job-step.sh 150 "update::(텔레그램) 미국 종목·채널 일별 집계"
+
       # ⚠️ 대괄호는 셸 글롭이라 따옴표를 벗기지 말 것.
       - name: 내부자 리포트 화면만 먼저 비우고 데우기
         if: ${{ !cancelled() }}
@@ -2091,15 +2116,9 @@ jobs:
           n=$(sed -n 's/^\[KRX\] 확정 등락률 채움 \([0-9]*\)행.*/\1/p' /tmp/move_reason_rates.log | tail -1)
           echo "filled=${n:-0}" >> "$GITHUB_OUTPUT"
 
-      # 채운 줄이 있으면 그 줄을 읽는 테마 상세만 바로 비운다 — 안 비우면 finalize 의 전체 비우기(update 잡 끝, 아침 09시대)까지
-      # 옛 사본('종가 전')이 나간다. 종목 화면은 아래 '배당 화면만 먼저 비우고 데우기'가 같이 비운다.
-      # ⚠️ 대괄호는 셸 글롭이라 따옴표를 벗기지 말 것.
-      - name: 테마 상세만 먼저 비우기 (등락 이유 등락률)
-        if: ${{ !cancelled() && github.event.inputs.slot != 'morning' && steps.move_reason_rates.outputs.filled != '' && steps.move_reason_rates.outputs.filled != '0' }}
-        continue-on-error: true
-        env:
-          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
-        run: bash scripts/revalidate.sh '/theme/[theme]'
+      # ⛔ 채운 줄을 읽는 테마 상세를 여기서 먼저 비우던 스텝을 걷었다(2026-10-17). 이 시각 테마 상세의 테마 요약 ·
+      #    카더라 표는 아직 지난 실행 것이라, 등락률만 먼저 바뀌고 나머지는 update 잡의 '테마 리포트 화면만 먼저
+      #    비우고 데우기'에서 또 바뀌었다 — 한 페이지 안이 따로 바뀐다. 이제 그 스텝 · finalize 에서 한꺼번에 바뀐다.
 
       # ⚠️ 날짜별 증분이 아니라 **매일 스냅숏 전량**(15페이지·7만 행)이다. 금융위 API 는
       #    기준일 다음 영업일 13시 뒤에 갱신되므로 아침 실행은 이틀 전 스냅숏, 저녁 실행이
@@ -2158,26 +2177,22 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_seohak_etf.py
 
-      # ⭐ 배당 표가 다 바뀐 직후 **이 화면들만** 먼저 비운다(PR #543 의 규칙 — 자료가 쓰인 직후에 그 화면만).
-      #    한 잡이던 때는 배당이 맨 끝이라 잡 끝 전체 비우기가 이 몫을 했다. 떼고 나니 배당은 update 보다 한두 시간
-      #    먼저 끝나서, 여기서 안 비우면 그동안 옛 사본이 나간다(finalize 의 전체 비우기는 update 끝을 기다린다).
-      #    종목 화면(/stock/[code])의 배당 카드도 같은 표(lib/dividend.ts)를 읽어 패턴으로 같이 비운다 — 패턴은
-      #    데우지 않는다(주소가 수천이라 다음 방문자가 그린다).
-      # ⚠️ 대괄호는 셸 글롭이라 따옴표를 벗기지 말 것.
-      - name: 배당 화면만 먼저 비우고 데우기
-        if: ${{ !cancelled() && github.event.inputs.slot != 'morning' }}
+      # ⭐ 배당 표가 다 바뀐 뒤 **/dividend 만** 먼저 비운다(PR #543 의 규칙 — 자료가 쓰인 직후에 그 화면만). 아침 ·
+      #    저녁 같다. 떼고 나니 배당은 update 보다 한두 시간 먼저 끝나서, 여기서 안 비우면 그동안 옛 사본이 나간다.
+      # ⭐ 한 페이지 안이 따로 바뀌지 않게(2026-10-17): 이 화면은 맨 위 칩 여덟의 순서에 카더라(최근 30일 채널 언급 합 —
+      #    lib/dividend.ts getTrends, 국장 · 미장 일별 집계 표)를 쓴다. 그 표가 이 실행 값이 된 뒤에 비워야 칩 순서가
+      #    finalize 에서 또 바뀌지 않는다 — 아침엔 이미 끝나 있어 대기 0분, 저녁엔 이 잡이 먼저 끝나 그 집계를 기다린다.
+      #    못 읽거나 시간이 다 되면 기다리지 않고 비운다(그때는 finalize 가 칩만 다시 바꾼다).
+      # ⛔ /stock/[code] 는 여기서 안 비운다 — 종목 화면은 카더라 관심 추이 · 흐름 요약을 같이 그려 finalize 의 한 번에 둔다.
+      - name: 카더라 일별 집계가 끝날 때까지 대기 (배당 화면 칩 순서)
+        if: ${{ !cancelled() }}
         continue-on-error: true
         env:
-          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
-        run: bash scripts/revalidate.sh /dividend '/stock/[code]'
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/wait-for-job-step.sh 120 "update::(텔레그램) 종목 일별 집계" "update::(텔레그램) 미국 종목·채널 일별 집계"
 
-      # ⭐ 아침에도 /dividend 만은 지금처럼 이 잡 끝에 따로 바꾼다(2026-10-16). 아침 화면을 KRX 08:00 자료까지 합쳐
-      #    한 번에 바꾸면(finalize) 이 화면은 느린 날 08:26~08:30 → 08:51 로 늦어진다. 이 화면은 배당 표가 주인공이고
-      #    카더라는 맨 위 칩 여덟의 순서(최근 30일 채널 언급 합 — lib/dividend.ts getTrends)에만 쓴다. 예전에도 이 시각엔
-      #    그날 아침 언급이 이미 표에 있었으니 지금과 같은 화면이 같은 시각에 나간다.
-      # ⛔ /stock/[code] 는 빼서 finalize 의 한 번에 둔다 — 종목 화면은 카더라 관심 추이 · 흐름 요약을 같이 그린다.
-      - name: 배당 화면만 먼저 비우고 데우기 (아침 · /dividend 만)
-        if: ${{ !cancelled() && github.event.inputs.slot == 'morning' }}
+      - name: 배당 화면만 먼저 비우고 데우기
+        if: ${{ !cancelled() }}
         continue-on-error: true
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
@@ -2328,24 +2343,57 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      issues: write   # 화면 비우기가 끝내 실패하면 알림 이슈를 연다
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
       # 화면 사본(ISR)을 비운다. 세 잡(update·insider·dividend)이 표를 다 바꾼 뒤에 불러야 새 값이 바로 보인다.
-      # 안 부르면 루트 레이아웃의 revalidate(3600초 · 카더라 1800)가 안전장치라 최대 한 시간
-      # 뒤에 스스로 새로 그리는데, 그 사이 아무도 안 온 화면은 다음 첫 방문자가 옛 사본을 받는다.
-      # 2026-09-19 부터 시계 주기가 5분→1시간이라 이 스텝이 새 자료를 바로 보이게 하는 본선이다.
+      # 2026-10-17 부터 화면의 DB 조회 사본은 시간으로 만료되지 않는다(lib/read-cache.ts — 한 페이지 안이 따로 바뀌지
+      # 않게). 화면 사본은 레이아웃 · 화면 주기대로 다시 그려져도 DB 값은 이 비우기 전까지 그대로라, 이 스텝이 새 자료를
+      # 보이게 하는 **유일한** 길이다(중간 자리에서 먼저 비운 화면 말고).
       #
       # `if: always()` — 일부 스텝이 실패했어도 나머지가 쓴 값은 화면에 나가야 한다.
       # 시크릿이 없으면 건너뛴다(같은 값을 Vercel 환경변수 REVALIDATE_SECRET 에도 둔다).
-      # 이 스텝이 실패해도 잡을 붉게 만들지 않는다 — 안전장치가 있고, 실패의 뜻은
-      # "최대 한 시간 늦게 보인다"뿐이다.
+      # ⚠️ 2026-10-17 부터 화면의 DB 조회 사본은 시간으로 만료되지 않는다(lib/read-cache.ts — 한 페이지 안이 따로 바뀌지
+      #    않게). 여기가 실패하면 화면이 **다음 실행까지** 옛 값이라, 다시 해 보고(REVALIDATE_STRICT) 그래도 안 되면
+      #    잡을 붉게 끝내고 알린다.
+      # ⭐ 아침엔 미리보기를 뺀다. 미리보기는 06:31 에 kr_preview 잡에서 페이지째 바뀌었다 — 여기서 또 비우면 첫 줄
+      #    급부상 칩만 오늘 아침 카더라로 바뀐다.
       - name: 화면 캐시 비우고 다시 데우기
+        id: revalidate_all
         if: always()
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
-        run: bash scripts/revalidate.sh
+          REVALIDATE_STRICT: "1"
+          SLOT: ${{ github.event.inputs.slot }}
+        run: |
+          if [ "$SLOT" = morning ]; then
+            bash scripts/revalidate.sh --all-except /preview
+          else
+            bash scripts/revalidate.sh
+          fi
+
+      - name: Alert on 화면 비우기 failure (open/update GitHub issue)
+        if: ${{ always() && steps.revalidate_all.outcome == 'failure' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          title="⚠️ 데일리 파이프라인 실패"
+          note=$(printf '화면 비우기(finalize)가 세 번 다 실패했습니다.\n\n- 시각(UTC): %s\n- 로그/요약: %s\n\n화면은 다음 실행까지 옛 값입니다(시간으로 저절로 새로워지지 않습니다). 바로 바꾸려면 REVALIDATE_SECRET 이 맞는지 보고 scripts/revalidate.sh 를 손으로 부르십시오.' \
+            "$(date -u '+%Y-%m-%d %H:%M')" "$run_url")
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$note"
+            echo "기존 알림 이슈 #$existing 에 코멘트 추가"
+          else
+            number=$(gh issue create --title "$title" --body "$note" | sed 's#.*/##')
+            echo "새 알림 이슈 #$number 생성"
+          fi
+          # ⚠️ 담당자 지정이 실패해도 이슈는 남긴다(update 잡 알림과 같은 규칙).
+          gh issue edit "${number:-$existing}" --add-assignee "${{ github.repository_owner }}" >/dev/null \
+            || echo "담당자 지정에 실패했습니다 — 이슈는 열려 있습니다"
 
   # ── 개장 전 요약 발송 (평일 아침) ────────────────────────────────────
   # ⭐ 2026-10-16 에 update 잡 카더라 블록 중간에서 여기로 옮겼다. 아침 화면은 KRX 08:00 자료까지 합쳐 finalize 에서
@@ -2359,7 +2407,7 @@ jobs:
   #     ⚠️ 다만 08:55 KST 를 넘기지 않게 줄인다. 이 글은 09:00 개장 전에 닿아야 뜻이 서는데(예전 자리 주석 — 끝에 두면
   #        08:44~09:40 에 도착해 셋이 개장 뒤였다), 화면을 한 번에 바꾸는 시각이 느린 날 08:50 안팎이다(09-26~10-16
   #        21회를 새 구조로 다시 짜 본 값 08:09~08:51). 이미 08:55 를 지났으면 기다리지 않고 바로 보낸다.
-  # ⚠️ finalize 가 실패해도 돈다(always) — 화면 비우기가 실패해도 1시간 안에 스스로 새로 그려진다(finalize 주석).
+  # ⚠️ finalize 가 실패해도 돈다(always) — 글은 그대로 나간다. 화면 비우기 실패는 finalize 가 다시 해 보고 알린다.
   morning_post:
     needs: [guard, update, finalize]
     if: >-
@@ -2512,7 +2560,7 @@ jobs:
   #   5분'이다. 예전엔 update 잡 맨 끝(브리핑 비우기 뒤)에서 5분을 자고 보내, 종목 상세 · ETF 같은 나머지 화면은
   #   finalize 가 글보다 1~2분 늦게 비웠고 그 5분만큼 finalize 도 늦었다. 이 저장소는 public 이라 Actions 분이
   #   무료여서 러너를 5분 재우는 비용은 없다.
-  # ⚠️ finalize 가 실패해도 돈다(always) — 화면 비우기가 실패해도 1시간 안에 스스로 새로 그려진다(finalize 주석).
+  # ⚠️ finalize 가 실패해도 돈다(always) — 글은 그대로 나간다. 화면 비우기 실패는 finalize 가 다시 해 보고 알린다.
   evening_post:
     needs: [guard, update, finalize]
     if: >-

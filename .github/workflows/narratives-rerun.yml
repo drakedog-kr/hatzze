@@ -41,6 +41,7 @@ jobs:
     timeout-minutes: 40
     permissions:
       contents: read
+      actions: read   # 화면을 비우기 전에 데일리 파이프라인이 도는지 본다(scripts/pipeline-busy.sh)
     env:
       # 저장을 끄면 생성기마다 --no-save 를 붙인다.
       NO_SAVE: ${{ github.event.inputs.save == 'false' && '--no-save' || '' }}
@@ -104,8 +105,18 @@ jobs:
         if: ${{ !cancelled() && github.event.inputs.what == 'summary' }}
         run: python data-pipeline/scripts/generate_daily_summary.py $NO_SAVE
 
+      # 데일리 파이프라인이 아직 화면을 다 비우기 전이면 여기서는 비우지 않는다(scripts/pipeline-busy.sh · 2026-10-17).
+      # 그 사이 페이지를 비우면 반쯤 바뀐 DB 로 그려져 한 페이지 안이 따로 바뀐다. 그 실행의 finalize 가 이 값까지 같이 비운다.
+      - name: 데일리 파이프라인이 화면을 비우는 중인지 보기
+        id: busy
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if bash scripts/pipeline-busy.sh; then echo "busy=true" >> "$GITHUB_OUTPUT"; else echo "busy=false" >> "$GITHUB_OUTPUT"; fi
+
       - name: 시장 브리핑 화면 비우고 데우기
-        if: ${{ !cancelled() && github.event.inputs.save != 'false' && github.event.inputs.what == 'summary' }}
+        if: ${{ !cancelled() && github.event.inputs.save != 'false' && github.event.inputs.what == 'summary' && steps.busy.outputs.busy != 'true' }}
         continue-on-error: true
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
@@ -113,21 +124,21 @@ jobs:
 
       # 새 문장이 바로 보이게 화면을 비우고 데운다(daily-update.yml 의 같은 자리와 같다).
       - name: 카더라 · 종목 화면 비우고 데우기
-        if: ${{ !cancelled() && github.event.inputs.save != 'false' && (github.event.inputs.what == 'narratives' || github.event.inputs.what == 'both') }}
+        if: ${{ !cancelled() && github.event.inputs.save != 'false' && (github.event.inputs.what == 'narratives' || github.event.inputs.what == 'both') && steps.busy.outputs.busy != 'true' }}
         continue-on-error: true
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: bash scripts/revalidate.sh /kadera /kadera/us '/stock/[code]'
 
       - name: 카더라 화면 비우고 데우기
-        if: ${{ !cancelled() && github.event.inputs.save != 'false' && github.event.inputs.what == 'brief' }}
+        if: ${{ !cancelled() && github.event.inputs.save != 'false' && github.event.inputs.what == 'brief' && steps.busy.outputs.busy != 'true' }}
         continue-on-error: true
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: bash scripts/revalidate.sh /kadera /kadera/us
 
       - name: 테마 화면 비우고 데우기
-        if: ${{ !cancelled() && github.event.inputs.save != 'false' && github.event.inputs.what != 'narratives' && github.event.inputs.what != 'summary' && github.event.inputs.what != 'brief' }}
+        if: ${{ !cancelled() && github.event.inputs.save != 'false' && github.event.inputs.what != 'narratives' && github.event.inputs.what != 'summary' && github.event.inputs.what != 'brief' && steps.busy.outputs.busy != 'true' }}
         continue-on-error: true
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}

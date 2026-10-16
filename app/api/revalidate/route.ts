@@ -1,18 +1,16 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
-import { parseRevalidatePaths } from "@/lib/revalidate-paths";
+import { allExceptTargets, parseRevalidatePaths } from "@/lib/revalidate-paths";
 
 /**
  * 화면 사본(ISR)을 비운다. 파이프라인이 자료를 쓰고 나서 부른다
  * (.github/workflows/daily-update.yml 이 scripts/revalidate.sh 로 일곱 자리에서).
  *
- * 왜 필요한가: 루트 레이아웃의 `revalidate`(3600초 · 카더라 1800 · 미리보기 600)만으로는
- * 파이프라인이 07:00 에 새 값을 써도 최대 한 시간 동안 옛 사본이 나가고, 그 사이 아무도
- * 안 온 화면은 **다음 첫 방문자가 옛 사본을 받는다**(만료 뒤 첫 요청은 옛것을 주고 뒤에서
- * 새로 그린다). 여기서 비우면 비운 뒤 첫 방문자가 새로 그린 화면을 받고, 그다음부터는
- * 다시 캐시다. 시계 주기를 5분에서 1시간으로 늘리면서(2026-09-19) 이 호출이 안전장치가
- * 아니라 본선이 됐다 — 시크릿이 비어 있으면 자료가 최대 한 시간 늦게 보인다.
+ * 왜 필요한가: 화면의 DB 조회 사본은 라우트마다 따로이고 시간으로 만료되지 않는다(lib/read-cache.ts · 2026-10-17 —
+ * 파이프라인 도중에 한 페이지 안이 따로따로 바뀌지 않게). 화면 사본(ISR)은 레이아웃 · 화면 주기대로 다시 그려져도
+ * DB 값은 그대로라, 이 호출이 새 자료를 보이게 하는 **유일한** 길이다. 비운 라우트만 다음 방문 때 DB 를 다시 읽는다
+ * — 다른 라우트는 같은 조회라도 제 사본을 쓴다. 시크릿이 비어 있으면 화면의 DB 값이 안 바뀐다.
  *
  * `revalidatePath("/", "layout")` 은 루트 레이아웃 아래 전부다 — 화면의 사본과, 그 화면이
  * 쓴 fetch 데이터 캐시(Supabase 조회 3600초 · 동적 화면과 API 몫까지) 둘 다 비운다.
@@ -38,6 +36,13 @@ import { parseRevalidatePaths } from "@/lib/revalidate-paths";
  *    프로덕션 빌드로 쟀다(2026-09-22) — 원천 값을 바꿔도 캐시가 살아 있는 동안은 옛 값이
  *    나오는 화면을 만들어 두고, 그 경로만 찍어 부르니 곧바로 새 값이 나왔다. 다른 경로를
  *    찍었을 때는 그대로였다. 그래서 태그를 따로 달 필요가 없고, 범위도 실제로 좁다.
+ *
+ * ## 이것만 빼고 전부 — `except`(2026-10-17)
+ *
+ *     {"except": ["/preview"]}
+ *
+ * 최상위 자리(TOP_SEGMENTS)를 하나씩 비우고 찍은 것만 남긴다. 아침 마지막 비우기가 미리보기를 뺀다 — 06:31 에
+ * 페이지째 바뀐 미리보기가 08시대에 첫 줄 칩만 또 바뀌면 한 페이지 안이 따로 바뀐다.
  *
  * ## 동적 구간은 `routes` 로 찍는다
  *
@@ -79,6 +84,14 @@ export async function POST(req: Request) {
   const parsed = parseRevalidatePaths(body);
   if ("reason" in parsed) {
     return NextResponse.json({ ok: false, reason: parsed.reason }, { status: 400 });
+  }
+  if (parsed.except) {
+    // 이것만 빼고 전부 — 최상위 자리를 하나씩 비운다(lib/revalidate-paths.ts TOP_SEGMENTS).
+    for (const t of allExceptTargets(parsed.except)) {
+      if (t.type) revalidatePath(t.path, t.type);
+      else revalidatePath(t.path);
+    }
+    return NextResponse.json({ ok: true, revalidated: "all", except: parsed.except, at: new Date().toISOString() });
   }
   if (parsed.paths.length === 0 && parsed.routes.length === 0) {
     revalidatePath("/", "layout");

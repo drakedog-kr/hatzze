@@ -1,11 +1,15 @@
 import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+// ⚠️ Next 내부 모듈이다(공개 API 아님). 지금 그리는 라우트 이름을 읽는 데만 쓴다 — 아래 '페이지마다 따로' 절.
+//    Next 판을 올리면 tests/read-cache.test.ts 가 이 경로를, 타입 검사가 `route` 가 살아 있는지 본다.
+import { workAsyncStorage } from "next/dist/server/app-render/work-async-storage.external";
 
 import { clearLoadFailure, noteLoadFailure } from "@/lib/load-state";
+import { READ_CACHE_REVALIDATE, readCacheInit } from "@/lib/read-cache";
 
 /**
- * 조회 응답을 Next 데이터 캐시에 두는 시간(초).
+ * 조회 응답을 Next 데이터 캐시에 어떻게 두나. 값과 요청 init 은 lib/read-cache.ts(순수 함수라 `npm test` 로 본다).
  *
  * ## 왜 캐시하나
  *
@@ -25,33 +29,46 @@ import { clearLoadFailure, noteLoadFailure } from "@/lib/load-state";
  *   - 응답이 JSON 텍스트라 값의 꼴을 안 따진다.
  * 야후·FRED 조회가 이미 같은 방식이다(lib/yahoo-quote.ts · lib/usd-krw.ts).
  *
- * ## 무엇이 달라지나
+ * ## 한 페이지 안이 따로따로 바뀌지 않게 — 시간으로 만료하지 않는다(2026-10-17)
  *
- * 이 캐시만 보면 파이프라인이 끝난 뒤 최대 한 시간까지 옛 값이 보일 수 있다. 실제로는 화면
- * 사본(ISR · app/layout.tsx revalidate)이 그 위에 있고, 파이프라인이 /api/revalidate 로
- * 둘을 함께 비우므로 자료 쪽 지연은 그 호출에 달렸다. 화면의 '최종 업데이트' 시각은
- * 자료에서 나오므로 보이는 값과 어긋나지 않는다. 캐시 기한이 지나면 **먼저 옛 값을 주고
- * 뒤에서 새로 받는다**(Next 데이터 캐시의 stale-while-revalidate) — 기한이 지난 첫 방문자가
- * 느려지지 않는다.
+ * 예전엔 3600초였다. 그러면 파이프라인이 도는 도중(아침 06:10~08:30 · 저녁 17:10~20:00)에 기한이 지난
+ * 조회가 **그 순간의 DB** 로 다시 받아졌다. 카더라 표는 오늘 것인데 총평 · 점수는 어제 것인 페이지가
+ * 그렇게 나왔다. 그래서 기한을 두지 않는다(`false` — Next 문서의 '무기한'). 조회 사본은 파이프라인이
+ * /api/revalidate 로 그 페이지를 비울 때만 새로 받아진다. 화면 사본(ISR)은 레이아웃 · 화면의 revalidate
+ * 대로 다시 그려지지만 DB 값은 이 사본을 그대로 쓰니, 그사이 바뀌는 건 시세(야후 · 하이퍼리퀴드 fetch)뿐이다.
+ * ⚠️ 그래서 시간이 지나 저절로 새로워지는 안전장치가 없다. 파이프라인의 마지막 비우기(finalize)가
+ *    실패하면 다시 시도하고 알림을 연다(daily-update.yml finalize 잡).
  *
- * ⚠️ GET·HEAD 만 붙인다. RPC(POST)는 그대로 매번 부른다. 2MB 를 넘는 응답은 Next 가
- *    담지 않는다(PostgREST 한 쪽은 1,000행이라 거기 닿는 조회는 없다).
+ * ## 페이지마다 따로 — 조회 키에 라우트를 넣는다(2026-10-17)
+ *
+ * 홈 · 카더라 · 테마 · MDD · 탑바 티커가 같은 조회(급부상 종목 · 테마 순위 · 미리보기)를 쓴다. 키가
+ * 같으면 사본도 하나라, 카더라 화면을 먼저 비워 다시 그리면 그 공용 사본이 새 값으로 바뀌고 홈이 다음에
+ * 다시 그려질 때 그걸 집어 간다 — 홈 안에서 급부상만 새 값, 점수 · 브리핑은 옛 값이 된다. 그래서 요청
+ * 머리에 지금 그리는 라우트(`/kadera` · `/stock/[code]` …)를 붙여 **라우트마다 제 사본**을 갖게 한다.
+ * revalidatePath 는 그 라우트의 사본만 낡았다고 표시하므로(docs/…/how-revalidation-works.md 의 soft tags),
+ * 한 페이지는 파이프라인이 그 페이지를 비울 때 **한꺼번에** 바뀐다. PostgREST 는 모르는 머리를 무시한다.
+ * ⚠️ 라우트를 못 읽으면(빌드 밖 · 스크립트) 머리 없이 보낸다 — 그때는 예전처럼 공용 사본이다.
+ *
+ * ⚠️ GET·HEAD 만 붙인다. RPC(POST)는 그대로 매번 부른다(지금 화면에 RPC 는 없다 — 2026-10-17 확인).
+ *    2MB 를 넘는 응답은 Next 가 담지 않는다(PostgREST 한 쪽은 1,000행이라 거기 닿는 조회는 없다).
  * ⚠️ 이 상수를 0 으로 두면 캐시가 통째로 꺼진다 — 파이프라인 직후 확인이 급할 때의 탈출구.
  *
- * ## 이 값이 화면 사본(ISR)의 주기도 정한다
+ * ## 화면 사본(ISR)의 주기
  *
  * Next 는 프리렌더되는 라우트 안의 fetch 들 중 **가장 짧은 revalidate 를 그 라우트의 ISR
- * 주기로 쓴다**(docs/incremental-static-regeneration.md). 300 이던 때는 루트 레이아웃이 뭐라
- * 적혀 있든 모든 화면이 5분마다 다시 그려졌다(빌드 매니페스트로 확인, 2026-09-19). 그래서
- * 레이아웃의 1시간과 같은 3600 이다 — 더 짧게 두려면 그 화면이 5분마다 다시 그려져도 되는지
- * 먼저 볼 것(app/layout.tsx 의 셈). 자료는 파이프라인이 끝날 때 /api/revalidate 가 비우므로
- * 이 기한은 그 호출이 안 왔을 때의 상한이고, 동적 화면(/mdd)과 API 도 그 호출로
- * 같이 비워진다(revalidatePath("/", "layout") 은 그 아래 fetch 데이터 캐시까지 비운다).
+ * 주기로 쓴다**(docs/incremental-static-regeneration.md). 이 조회가 300 이던 때는 모든 화면이 5분마다
+ * 다시 그려졌다(2026-09-19). 무기한은 그 셈에서 빠지므로 주기는 레이아웃 · 화면 · 시세 fetch 가 정한다.
+ * 비우기는 동적 화면(/mdd)과 API 까지 미친다(revalidatePath 가 그 아래 fetch 데이터 캐시까지 비운다).
  */
-export const READ_CACHE_SECONDS = 3600;
 
-/** Next 의 fetch 확장(next.revalidate)까지 받는 init 타입(lib/yahoo-quote.ts 와 같은 꼴). */
-type FetchInit = RequestInit & { next?: { revalidate?: number } };
+/** 지금 그리는 라우트(`/kadera` · `/stock/[code]` · `/api/ticker`). 렌더 밖이면 undefined. */
+export function currentRoute(): string | undefined {
+  try {
+    return workAsyncStorage.getStore()?.route;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * 조회 실패를 이번 렌더의 목록에 적는다(lib/load-state.ts 의 noteLoadFailure).
@@ -89,9 +106,8 @@ function noteIfFailed(input: RequestInfo | URL, method: string, res: Promise<Res
 /** supabase-js 에 넘기는 fetch. 읽기 요청에만 데이터 캐시를 걸고(위 주석), 실패는 적어 둔다. */
 function cachedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const method = (init?.method ?? "GET").toUpperCase();
-  if (READ_CACHE_SECONDS <= 0 || (method !== "GET" && method !== "HEAD")) return noteIfFailed(input, method, fetch(input, init));
-  const withCache: FetchInit = { ...init, next: { revalidate: READ_CACHE_SECONDS } };
-  return noteIfFailed(input, method, fetch(input, withCache));
+  if (READ_CACHE_REVALIDATE === 0 || (method !== "GET" && method !== "HEAD")) return noteIfFailed(input, method, fetch(input, init));
+  return noteIfFailed(input, method, fetch(input, readCacheInit(init, currentRoute())));
 }
 
 let client: SupabaseClient | null = null;

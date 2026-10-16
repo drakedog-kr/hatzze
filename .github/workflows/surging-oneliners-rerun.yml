@@ -30,6 +30,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      actions: read   # 화면을 비우기 전에 데일리 파이프라인이 도는지 본다(scripts/pipeline-busy.sh)
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -66,9 +67,19 @@ jobs:
           esac
           python data-pipeline/scripts/generate_surging_oneliners.py $flag
 
+      # 데일리 파이프라인이 아직 화면을 다 비우기 전이면 여기서는 비우지 않는다(scripts/pipeline-busy.sh · 2026-10-17).
+      # 그 사이 페이지를 비우면 반쯤 바뀐 DB 로 그려져 한 페이지 안이 따로 바뀐다. 그 실행의 finalize 가 이 값까지 같이 비운다.
+      - name: 데일리 파이프라인이 화면을 비우는 중인지 보기
+        id: busy
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if bash scripts/pipeline-busy.sh; then echo "busy=true" >> "$GITHUB_OUTPUT"; else echo "busy=false" >> "$GITHUB_OUTPUT"; fi
+
       # 새 문장이 바로 보이게 카더라 두 화면만 비우고 데운다(daily-update.yml 의 같은 자리와 같다).
       - name: 카더라 화면 비우고 데우기
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.busy.outputs.busy != 'true' }}
         continue-on-error: true
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}

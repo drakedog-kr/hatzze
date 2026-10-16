@@ -88,9 +88,10 @@ export async function generateMetadata(): Promise<Metadata> {
  * ⚠️ 실패한 조회가 든 렌더는 사본에 담기면 안 된다. 페이지가 자료를 다 받은 뒤
  *    assertLoaded 로 던진다(lib/load-state.ts). 던지면 마지막 성공본이 남는다.
  * ⚠️ 라우트 안의 fetch 중 **가장 짧은 revalidate 도 그 라우트의 주기가 된다**(Next 문서).
- *    Supabase 조회의 데이터 캐시(lib/supabase-server.ts READ_CACHE_SECONDS)가 300 이던 때는
- *    이 값이 뭐든 모든 화면이 5분이었다 — 그래서 그쪽도 3600 이고, 시세 fetch 는 화면마다
- *    제 주기(카더라 1800 · 미리보기 600 · 데일리 노트 600)로 맞춰 둔다.
+ *    Supabase 조회의 데이터 캐시(lib/read-cache.ts READ_CACHE_REVALIDATE)가 300 이던 때는
+ *    이 값이 뭐든 모든 화면이 5분이었다. 2026-10-17 부터 그 조회는 무기한(파이프라인이 비울 때만)이라
+ *    이 셈에서 빠지고, 시세 fetch 는 화면마다 제 주기(카더라 1800 · 미리보기 600 · 데일리 노트 600)로 맞춰 둔다.
+ *    다시 그려도 DB 값은 조회 사본 그대로라 한 페이지 안이 따로 바뀌지 않는다.
  */
 export const revalidate = 3600;
 
