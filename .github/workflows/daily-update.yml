@@ -404,12 +404,16 @@ jobs:
     permissions:
       contents: read
       issues: write
-    # 아침 개장 전 요약 발송(morning_post 잡)이 읽는다. 발송이 화면을 한 번에 바꾼 뒤(finalize)로 옮겨 가며
-    # 이 잡의 스텝 결과를 잡 출력으로 넘긴다(2026-10-16).
+    # 개장 전 요약(morning_post) · 저녁 마감 리포트(evening_post) 잡이 읽는다. 발송이 화면을 다 바꾼 뒤(finalize)로
+    # 옮겨 가며 이 잡의 스텝 결과를 잡 출력으로 넘긴다(2026-10-16).
     outputs:
       coverage: ${{ steps.telegram_coverage.outcome }}
       us_extract: ${{ steps.telegram_us_extract.outcome }}
       weekday: ${{ steps.broadcast_when.outputs.weekday }}
+      # 저녁 마감 리포트(evening_post 잡)가 읽는다 — 아래 '채널 발송' 주석 [4] · [4-1].
+      freshness: ${{ steps.check_freshness.outcome }}
+      score: ${{ steps.calculate_score.outcome }}
+      kr_extract: ${{ steps.telegram_extract.outcome }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -1241,7 +1245,7 @@ jobs:
       # ⭐ **시장 브리핑 화면만 바로 비운다.** 히어로 요약이 이 화면의 마지막 조각이라
       #    여기서부터 / 는 보여 줄 게 다 갖춰져 있다. 맨 끝까지 기다리면 뒤에 남은 발송·배당
       #    30분이 그대로 화면 지연이 된다(2026-09-21 실측: 자료 20:31 · 화면 21:02).
-      # ⭐ 발송 **앞**에 둔다. 마감 리포트를 보고 들어오는 사람이 새 화면을 받아야 한다.
+      # ⭐ 마감 리포트는 이제 finalize 뒤 evening_post 잡에서 나간다 — 이 비우기와 finalize 의 전체 비우기가 다 끝난 뒤다.
       # ⚠️ 여기서 전체를 비우면 안 된다. 다른 잡(배당·내부자)이 아직 쓰는 중일 수 있어 쓰다 만 값으로
       #    사본이 떠 버린다. 그래서 / 만 찍는다(finalize 잡의 전체 비우기가 나머지를 맡는다).
       - name: 브리핑 화면만 먼저 비우고 데우기
@@ -1252,103 +1256,8 @@ jobs:
         run: bash scripts/revalidate.sh /
 
       # ── 채널 발송 ────────────────────────────────────────────────────────
-      # 유일하게 밖으로 나가는 스텝이다. 구독자 전원에게 한 번 나간 숫자는 되돌릴 수
-      # 없으므로 조건이 셋이고, 셋 다 이유가 다르다.
-      #
-      # [1] 하루 한 번만 — 저녁 슬롯에서만(`30 9 * * *` 백업 또는 `broadcast=evening` 입력)
-      #   이 워크플로는 하루 두 번 돈다(아침 = KRX 종가 확보, 오후 = 아침 실패 만회).
-      #   그냥 끝에 붙이면 같은 내용이 두 번 나간다. 오후 실행만 고른 이유는 그게 장
-      #   마감(15:30 KST) 뒤이고, 아침이 실패했어도 오후가 만회한 뒤라 가장 온전한
-      #   데이터를 들고 있기 때문이다. 아침에 보내면 '오늘의 온도'가 장이 열리기도 전
-      #   값이 된다. 대가는 하나 — 오후 실행이 통째로 실패한 날은 그날 발송이 없다.
-      #   그건 의도한 것이다(안 보내는 것 < 틀린 걸 보내는 것).
-      #
-      # [2] 재실행에서는 안 보냄 — `github.run_attempt == 1`
-      #   예약 실행을 'Re-run all jobs' 로 다시 돌리면 event.schedule 이 그대로라
-      #   [1]만으로는 두 번째 발송을 못 막는다. 재실행은 대개 앞 스텝이 실패해서 하는
-      #   것이고, 그때 이미 발송된 글이 한 번 더 나가면 안 된다. 재실행 뒤에 정말
-      #   보내야 하면 아래 [3] 수동 실행을 쓴다.
-      #
-      # ⚠️ 아래 조건과 guard 의 크론 표에는 **지금 없는 크론**(`30 21`·`30 8`)이 남아 있다.
-      #   2026-08-29 에 주 시계를 Vercel 로 옮기며 뺐지만, 일부러 지우지 않았다. 나중에 그
-      #   발화를 되살릴 때 여기를 같이 안 고치면 브리핑이 조용히 안 나간다 — 죽은 항목을
-      #   두는 값이 그 함정보다 싸다. 지금은 어차피 참이 될 수 없다.
-      #
-      # [3] 수동 실행은 명시적 opt-in — `github.event.inputs.broadcast == 'morning'|'evening'`
-      #   기본값이 `none` 이라 손으로 돌리는 실행은 기본적으로 조용하다. 보내려면 목록에서
-      #   포맷을 골라야 한다. [2]에 막힌 날의 탈출구이기도 하다.
-      #
-      #   ⚠️ **A 와 B 를 한 스위치로 묶지 말 것.** 아침에 켜면 마감 리포트가, 저녁에 켜면
-      #   어제 브리핑이 나간다. 시각이 아니라 **사람이 고른 포맷**이 무엇을 보낼지 정해야
-      #   한다. 예전 불리언이 B 에만 걸려 있어서 아침에 켜면 마감 리포트가 나갔다.
-      #
-      #   ⚠️ **`inputs.broadcast` 로 줄이지 말 것.** 함정이 둘이다. (a) `inputs` 컨텍스트는
-      #   workflow_dispatch/workflow_call 에서만 채워져서, 예약 실행에서 이걸 읽는 건
-      #   보장된 동작이 아니다. (b) `github.event.inputs.*` 는 **문자열**로 온다 — 예약
-      #   실행에서는 값이 없어 빈 문자열이지만, 값이 있는 수동 실행에서 `'none'` 은 빈
-      #   문자열이 아니라 조건식에서 **참**이 된다. 즉 이름만 쓰면 늘 발송된다.
-      #   `== 'morning'`·`== 'evening'` 처럼 **값을 비교**해야 둘 다 막힌다.
-      #
-      # [4] 낡은 값 차단 — check_freshness / calculate_score 결과
-      #   두 스텝 다 continue-on-error 라 실패해도 잡이 계속 흐른다. 그래서 outcome 을
-      #   직접 본다. 자료가 정체됐거나(check_freshness) 점수 계산이 죽었으면
-      #   (calculate_score) 화면엔 어제 값이 남는데, 그걸 방송하면 회수가 안 된다.
-      #   스크립트 안에도 같은 취지의 게이트가 하나 더 있다(daily_score 행 날짜 검사) —
-      #   워크플로 밖에서 손으로 돌릴 때를 막기 위해서다.
-      # [4-1] 국장 종목 추출 결과 — 저녁 글만(2026-10-08 결정, 위 '종목 추출' 주석 ③)
-      #   이 글은 오늘 발췌의 국내 종목 줄에 그날 등락을 달고, '오늘 처음 회자된 종목'·등락 이유를
-      #   종목 일별에서 집는다. 추출이 죽으면 셋 다 아침치 태그로 만들어져 얇게 나간다(10-08 저녁).
-      #   막힌 날은 국장 집계 알림을 보고 손으로 다시 돌리면 늦게라도 온전한 글이 나간다
-      #   (force=true · broadcast=evening). 화면은 그사이 아침 판에 머문다(위 ②).
-      # [5] 요일 판정 — 아래 네 발송 스텝이 공유한다.
-      #   **KST 기준으로 센다.** 러너는 UTC 라 `date +%u` 를 그냥 쓰면 요일이 밀릴 수
-      #   있다(오후 실행 19:50 KST = 10:50 UTC 라 지금은 같은 날이지만, 큐 지연이 커지면
-      #   경계에 걸린다). TZ 를 박아 두면 그 걱정이 없다.
-      #
-      #   GitHub 표현식에서 숫자 비교를 하려 들지 말고 여기서 참/거짓을 만들어 넘긴다 —
-      #   outputs 는 늘 문자열이라 `<= 5` 같은 비교가 조용히 어긋날 수 있다.
-      # ── 발송 두 건 ────────────────────────────────────────────────────────
-      # 이 워크플로가 보내는 건 파이프라인에 붙는 둘뿐이다.
-      #
-      #   월~금 아침  개장 전 요약 — **위 카더라 블록 중간**(미국 종목 집계 뒤)에서 나간다
-      #   월~금 저녁  저녁 브리핑 — 온도를 실어서 여기(점수 계산 뒤)에 남는다
-      #
-      # 나머지 둘(C 관심 이동·D 주간 결산)은 오후 2시에 나가므로 파이프라인과 시각이
-      # 맞지 않는다. 별도 워크플로로 뺐다 — .github/workflows/telegram-broadcast.yml.
-      #
-      # 주말에는 이 워크플로가 아무것도 안 보낸다. 시장이 닫혀 있어 온도가 금요일 값
-      # 그대로이고, 같은 숫자를 주말에 반복해 보내면 뮤트로 가는 지름길이다.
-      # (C 는 토요일에 나간다 — 재료가 시장 숫자가 아니라 카더라 채널 메시지라 주말에도
-      #  새 이야기가 쌓인다. telegram-broadcast.yml 의 '발송 요일 판정' 주석 참고.)
-      #
-      # 위 [1]~[4] 게이트는 두 스텝에 똑같이 걸린다([4-1] 은 저녁 글만 — 개장 전 요약은 미국 종목
-      # 추출을 본다. 그 스텝 주석). --ignore-staleness 는 **절대**
-      # 여기 넣지 않는다 — 그걸 켜면 낡은 값 차단이 통째로 사라진다.
-      #
-      # [5] 완료 후 5분 — `sleep 300`
-      #   요청받은 사항이다. 발송 스텝이 파이프라인 **안**에 있어서 엄밀히는 '완료 직전'이지만,
-      #   여기 오기까지 자료 수집·점수 계산·카더라 집계가 전부 끝나 있고 뒤에 남은 건
-      #   결과 집계·알림뿐이다. 배당주(이 발송이 안 읽는 표들)는 2026-09-25 에 별도 잡으로 뺐고,
-      #   20~27분이면 끝나 이 발송보다 먼저 끝난다.
-      #   즉 실질적으로 '완료 후'가 맞다. 이 저장소는 public 이라
-      #   Actions 분이 무료여서 러너를 5분 재우는 비용은 없다.
-      - name: (텔레그램) B 마감 리포트 발송 (평일 저녁)
-        id: telegram_broadcast
-        continue-on-error: true
-        if: >-
-          steps.check_freshness.outcome == 'success'
-          && steps.calculate_score.outcome == 'success'
-          && steps.telegram_extract.outcome == 'success'
-          && github.run_attempt == '1'
-          && (
-            ((github.event.schedule == '30 8 * * *' || github.event.schedule == '30 9 * * *') && steps.broadcast_when.outputs.weekday == 'true')
-            || github.event.inputs.broadcast == 'evening'
-          )
-        run: |
-          sleep 300   # 파이프라인 완료 후 5분(위 [5] 참고)
-          python data-pipeline/scripts/send_telegram_broadcast.py --send --format evening2
-
-
+      # ⭐ 2026-10-16 에 저녁 마감 리포트를 이 자리에서 **evening_post 잡**(맨 끝, finalize 뒤)으로 옮겼다. 아침 개장 전
+      #    요약(morning_post)과 같은 꼴이다. 발송 조건 [1]~[5] 의 설명도 그 잡 머리로 옮겼다.
 
       # ⚠️ 국장 미리보기(`kr_preview`)를 이 목록 맨 앞에 넣어 뒀다. 그 스텝은
       #    continue-on-error 라 실패해도 잡이 흐르는데, 여기에 안 들어 있으면 **아무도
@@ -1357,8 +1266,8 @@ jobs:
       - name: Summarize results
         if: always()
         run: |
-          names=("fetch_kr_preview.py" "fetch_kr_overnight.py" "fetch_kospi_high_gap.py" "fetch_buffett_index.py" "fetch_consumer_sentiment.py" "fetch_business_outlook.py" "fetch_turnover_concentration.py" "fetch_naver_trend.py" "fetch_naver_luxury_car_trend.py" "fetch_naver_lifestyle_trend.py" "fetch_dcinside_stock.py" "fetch_kospi_volume.py" "fetch_vkospi.py" "fetch_put_call_ratio.py" "fetch_news_sentiment.py" "fetch_gold_ratio.py" "fetch_kosdaq_ratio.py" "fetch_usdkrw_volatility.py" "fetch_leverage_etf_volume.py" "fetch_leverage_inverse.py" "fetch_bestseller_ratio.py" "fetch_youtube_finance_search.py" "fetch_youtube_shorts.py" "fetch_asia_relative_strength.py" "fetch_upbit_speculation.py" "fetch_github_trading_repos.py" "fetch_brokerage_app_rank.py" "fetch_foreign_sell_at_high.py" "fetch_limit_up_breadth.py" "fetch_investor_deposit.py" "fetch_credit_loan.py" "fetch_market_actions.py" "calculate_score.py" "check_freshness.py" "fetch_kr_overnight.py (아침)" "broadcast(저녁 브리핑)")
-          outcomes=("${{ steps.kr_preview.outcome }}" "${{ steps.kr_overnight.outcome }}" "${{ steps.kospi_high_gap.outcome }}" "${{ steps.buffett_index.outcome }}" "${{ steps.consumer_sentiment.outcome }}" "${{ steps.business_outlook.outcome }}" "${{ steps.turnover_concentration.outcome }}" "${{ steps.naver_trend.outcome }}" "${{ steps.naver_luxury_car_trend.outcome }}" "${{ steps.naver_lifestyle_trend.outcome }}" "${{ steps.dcinside.outcome }}" "${{ steps.kospi_volume.outcome }}" "${{ steps.vkospi.outcome }}" "${{ steps.put_call_ratio.outcome }}" "${{ steps.news_sentiment.outcome }}" "${{ steps.gold_ratio.outcome }}" "${{ steps.kosdaq_ratio.outcome }}" "${{ steps.usdkrw_volatility.outcome }}" "${{ steps.leverage_etf.outcome }}" "${{ steps.leverage_inverse.outcome }}" "${{ steps.bestseller_ratio.outcome }}" "${{ steps.youtube_finance_search.outcome }}" "${{ steps.youtube_shorts.outcome }}" "${{ steps.asia_relative_strength.outcome }}" "${{ steps.upbit_speculation.outcome }}" "${{ steps.github_trading_repos.outcome }}" "${{ steps.brokerage_app_rank.outcome }}" "${{ steps.foreign_sell_at_high.outcome }}" "${{ steps.limit_up_breadth.outcome }}" "${{ steps.investor_deposit.outcome }}" "${{ steps.credit_loan.outcome }}" "${{ steps.market_actions.outcome }}" "${{ steps.calculate_score.outcome }}" "${{ steps.check_freshness.outcome }}" "${{ steps.kr_overnight_am.outcome }}" "${{ steps.telegram_broadcast.outcome }}")
+          names=("fetch_kr_preview.py" "fetch_kr_overnight.py" "fetch_kospi_high_gap.py" "fetch_buffett_index.py" "fetch_consumer_sentiment.py" "fetch_business_outlook.py" "fetch_turnover_concentration.py" "fetch_naver_trend.py" "fetch_naver_luxury_car_trend.py" "fetch_naver_lifestyle_trend.py" "fetch_dcinside_stock.py" "fetch_kospi_volume.py" "fetch_vkospi.py" "fetch_put_call_ratio.py" "fetch_news_sentiment.py" "fetch_gold_ratio.py" "fetch_kosdaq_ratio.py" "fetch_usdkrw_volatility.py" "fetch_leverage_etf_volume.py" "fetch_leverage_inverse.py" "fetch_bestseller_ratio.py" "fetch_youtube_finance_search.py" "fetch_youtube_shorts.py" "fetch_asia_relative_strength.py" "fetch_upbit_speculation.py" "fetch_github_trading_repos.py" "fetch_brokerage_app_rank.py" "fetch_foreign_sell_at_high.py" "fetch_limit_up_breadth.py" "fetch_investor_deposit.py" "fetch_credit_loan.py" "fetch_market_actions.py" "calculate_score.py" "check_freshness.py" "fetch_kr_overnight.py (아침)")
+          outcomes=("${{ steps.kr_preview.outcome }}" "${{ steps.kr_overnight.outcome }}" "${{ steps.kospi_high_gap.outcome }}" "${{ steps.buffett_index.outcome }}" "${{ steps.consumer_sentiment.outcome }}" "${{ steps.business_outlook.outcome }}" "${{ steps.turnover_concentration.outcome }}" "${{ steps.naver_trend.outcome }}" "${{ steps.naver_luxury_car_trend.outcome }}" "${{ steps.naver_lifestyle_trend.outcome }}" "${{ steps.dcinside.outcome }}" "${{ steps.kospi_volume.outcome }}" "${{ steps.vkospi.outcome }}" "${{ steps.put_call_ratio.outcome }}" "${{ steps.news_sentiment.outcome }}" "${{ steps.gold_ratio.outcome }}" "${{ steps.kosdaq_ratio.outcome }}" "${{ steps.usdkrw_volatility.outcome }}" "${{ steps.leverage_etf.outcome }}" "${{ steps.leverage_inverse.outcome }}" "${{ steps.bestseller_ratio.outcome }}" "${{ steps.youtube_finance_search.outcome }}" "${{ steps.youtube_shorts.outcome }}" "${{ steps.asia_relative_strength.outcome }}" "${{ steps.upbit_speculation.outcome }}" "${{ steps.github_trading_repos.outcome }}" "${{ steps.brokerage_app_rank.outcome }}" "${{ steps.foreign_sell_at_high.outcome }}" "${{ steps.limit_up_breadth.outcome }}" "${{ steps.investor_deposit.outcome }}" "${{ steps.credit_loan.outcome }}" "${{ steps.market_actions.outcome }}" "${{ steps.calculate_score.outcome }}" "${{ steps.check_freshness.outcome }}" "${{ steps.kr_overnight_am.outcome }}")
 
           {
             echo "## Daily update summary"
@@ -2363,8 +2272,8 @@ jobs:
   # 조건은 예전 스텝 그대로다.
   #   · 수집 커버리지 검사 성공 — 이 글의 재료가 텔레그램이다(스크립트 안에도 짝 게이트 telegram_staleness_problems 가 있다).
   #   · 미국 종목 추출 성공 — 밤사이 발췌의 미국 종목 줄에 간밤 세션 등락을 단다(2026-10-08 결정).
-  #   · 첫 시도에서만 · 평일 예약 실행이거나 손으로 broadcast=morning 을 골랐을 때(update 잡 'B 마감 리포트' 주석 [1]~[3]).
-  #   · 5분 대기 — '완료 후 5분'(요청받은 사항, 'B 마감 리포트' 주석 [5]). 이제 말 그대로 화면을 다 바꾼 뒤 5분이다.
+  #   · 첫 시도에서만 · 평일 예약 실행이거나 손으로 broadcast=morning 을 골랐을 때(evening_post 잡 머리 주석 [1]~[3]).
+  #   · 5분 대기 — '완료 후 5분'(요청받은 사항, evening_post 잡 머리 주석 [5]). 이제 말 그대로 화면을 다 바꾼 뒤 5분이다.
   #     ⚠️ 다만 08:55 KST 를 넘기지 않게 줄인다. 이 글은 09:00 개장 전에 닿아야 뜻이 서는데(예전 자리 주석 — 끝에 두면
   #        08:44~09:40 에 도착해 셋이 개장 뒤였다), 화면을 한 번에 바꾸는 시각이 느린 날 08:50 안팎이다(09-26~10-16
   #        21회를 새 구조로 다시 짜 본 값 08:09~08:51). 이미 08:55 를 지났으면 기다리지 않고 바로 보낸다.
@@ -2430,6 +2339,150 @@ jobs:
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           title="⚠️ 데일리 파이프라인 실패"
           note=$(printf '개장 전 요약 발송이 실패했습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: broadcast(개장 전 요약)\n- 로그/요약: %s\n\n이 글은 다시 보내지 않으면 그날 나가지 않습니다. 보내야 하면 Run workflow 에서 broadcast=morning · force=true 로 손으로 돌리십시오.' \
+            "$(date -u '+%Y-%m-%d %H:%M')" "$run_url")
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$note"
+            echo "기존 알림 이슈 #$existing 에 코멘트 추가"
+          else
+            number=$(gh issue create --title "$title" --body "$note" | sed 's#.*/##')
+            echo "새 알림 이슈 #$number 생성"
+          fi
+          gh issue edit "${number:-$existing}" --add-assignee "${{ github.repository_owner }}" >/dev/null \
+            || echo "담당자 지정에 실패했습니다 — 이슈는 열려 있습니다"
+
+  # ── 채널 발송 ────────────────────────────────────────────────────────
+  # 유일하게 밖으로 나가는 스텝이다. 구독자 전원에게 한 번 나간 숫자는 되돌릴 수
+  # 없으므로 조건이 셋이고, 셋 다 이유가 다르다.
+  #
+  # [1] 하루 한 번만 — 저녁 슬롯에서만(`30 9 * * *` 백업 또는 `broadcast=evening` 입력)
+  #   이 워크플로는 하루 두 번 돈다(아침 = KRX 종가 확보, 오후 = 아침 실패 만회).
+  #   그냥 끝에 붙이면 같은 내용이 두 번 나간다. 오후 실행만 고른 이유는 그게 장
+  #   마감(15:30 KST) 뒤이고, 아침이 실패했어도 오후가 만회한 뒤라 가장 온전한
+  #   데이터를 들고 있기 때문이다. 아침에 보내면 '오늘의 온도'가 장이 열리기도 전
+  #   값이 된다. 대가는 하나 — 오후 실행이 통째로 실패한 날은 그날 발송이 없다.
+  #   그건 의도한 것이다(안 보내는 것 < 틀린 걸 보내는 것).
+  #
+  # [2] 재실행에서는 안 보냄 — `github.run_attempt == 1`
+  #   예약 실행을 'Re-run all jobs' 로 다시 돌리면 event.schedule 이 그대로라
+  #   [1]만으로는 두 번째 발송을 못 막는다. 재실행은 대개 앞 스텝이 실패해서 하는
+  #   것이고, 그때 이미 발송된 글이 한 번 더 나가면 안 된다. 재실행 뒤에 정말
+  #   보내야 하면 아래 [3] 수동 실행을 쓴다.
+  #
+  # ⚠️ 아래 조건과 guard 의 크론 표에는 **지금 없는 크론**(`30 21`·`30 8`)이 남아 있다.
+  #   2026-08-29 에 주 시계를 Vercel 로 옮기며 뺐지만, 일부러 지우지 않았다. 나중에 그
+  #   발화를 되살릴 때 여기를 같이 안 고치면 브리핑이 조용히 안 나간다 — 죽은 항목을
+  #   두는 값이 그 함정보다 싸다. 지금은 어차피 참이 될 수 없다.
+  #
+  # [3] 수동 실행은 명시적 opt-in — `github.event.inputs.broadcast == 'morning'|'evening'`
+  #   기본값이 `none` 이라 손으로 돌리는 실행은 기본적으로 조용하다. 보내려면 목록에서
+  #   포맷을 골라야 한다. [2]에 막힌 날의 탈출구이기도 하다.
+  #
+  #   ⚠️ **A 와 B 를 한 스위치로 묶지 말 것.** 아침에 켜면 마감 리포트가, 저녁에 켜면
+  #   어제 브리핑이 나간다. 시각이 아니라 **사람이 고른 포맷**이 무엇을 보낼지 정해야
+  #   한다. 예전 불리언이 B 에만 걸려 있어서 아침에 켜면 마감 리포트가 나갔다.
+  #
+  #   ⚠️ **`inputs.broadcast` 로 줄이지 말 것.** 함정이 둘이다. (a) `inputs` 컨텍스트는
+  #   workflow_dispatch/workflow_call 에서만 채워져서, 예약 실행에서 이걸 읽는 건
+  #   보장된 동작이 아니다. (b) `github.event.inputs.*` 는 **문자열**로 온다 — 예약
+  #   실행에서는 값이 없어 빈 문자열이지만, 값이 있는 수동 실행에서 `'none'` 은 빈
+  #   문자열이 아니라 조건식에서 **참**이 된다. 즉 이름만 쓰면 늘 발송된다.
+  #   `== 'morning'`·`== 'evening'` 처럼 **값을 비교**해야 둘 다 막힌다.
+  #
+  # [4] 낡은 값 차단 — check_freshness / calculate_score 결과
+  #   두 스텝 다 continue-on-error 라 실패해도 잡이 계속 흐른다. 그래서 outcome 을
+  #   직접 본다(update 잡 출력 freshness · score 로 넘겨받는다). 자료가 정체됐거나(check_freshness) 점수 계산이 죽었으면
+  #   (calculate_score) 화면엔 어제 값이 남는데, 그걸 방송하면 회수가 안 된다.
+  #   스크립트 안에도 같은 취지의 게이트가 하나 더 있다(daily_score 행 날짜 검사) —
+  #   워크플로 밖에서 손으로 돌릴 때를 막기 위해서다.
+  # [4-1] 국장 종목 추출 결과 — 저녁 글만(2026-10-08 결정, 위 '종목 추출' 주석 ③)
+  #   이 글은 오늘 발췌의 국내 종목 줄에 그날 등락을 달고, '오늘 처음 회자된 종목'·등락 이유를
+  #   종목 일별에서 집는다. 추출이 죽으면 셋 다 아침치 태그로 만들어져 얇게 나간다(10-08 저녁).
+  #   막힌 날은 국장 집계 알림을 보고 손으로 다시 돌리면 늦게라도 온전한 글이 나간다
+  #   (force=true · broadcast=evening). 화면은 그사이 아침 판에 머문다(위 ②).
+  # [5] 요일 판정 — 아래 네 발송 스텝이 공유한다.
+  #   **KST 기준으로 센다.** 러너는 UTC 라 `date +%u` 를 그냥 쓰면 요일이 밀릴 수
+  #   있다(오후 실행 19:50 KST = 10:50 UTC 라 지금은 같은 날이지만, 큐 지연이 커지면
+  #   경계에 걸린다). TZ 를 박아 두면 그 걱정이 없다.
+  #
+  #   GitHub 표현식에서 숫자 비교를 하려 들지 말고 여기서 참/거짓을 만들어 넘긴다 —
+  #   outputs 는 늘 문자열이라 `<= 5` 같은 비교가 조용히 어긋날 수 있다.
+  # ── 발송 두 건 ────────────────────────────────────────────────────────
+  # 이 워크플로가 보내는 건 파이프라인에 붙는 둘뿐이다.
+  #
+  #   월~금 아침  개장 전 요약 — morning_post 잡(finalize 뒤 · 08:55 상한)
+  #   월~금 저녁  저녁 브리핑 — 이 잡(finalize 뒤). 온도를 실으므로 점수 계산 뒤여야 한다
+  #
+  # 나머지 둘(C 관심 이동·D 주간 결산)은 오후 2시에 나가므로 파이프라인과 시각이
+  # 맞지 않는다. 별도 워크플로로 뺐다 — .github/workflows/telegram-broadcast.yml.
+  #
+  # 주말에는 이 워크플로가 아무것도 안 보낸다. 시장이 닫혀 있어 온도가 금요일 값
+  # 그대로이고, 같은 숫자를 주말에 반복해 보내면 뮤트로 가는 지름길이다.
+  # (C 는 토요일에 나간다 — 재료가 시장 숫자가 아니라 카더라 채널 메시지라 주말에도
+  #  새 이야기가 쌓인다. telegram-broadcast.yml 의 '발송 요일 판정' 주석 참고.)
+  #
+  # 위 [1]~[4] 게이트는 두 발송(이 잡 · morning_post)에 똑같이 걸린다([4-1] 은 저녁 글만 — 개장 전 요약은 미국 종목
+  # 추출을 본다. 그 스텝 주석). --ignore-staleness 는 **절대**
+  # 여기 넣지 않는다 — 그걸 켜면 낡은 값 차단이 통째로 사라진다.
+  #
+  # [5] 완료 후 5분 — `sleep 300`
+  #   요청받은 사항이다. 2026-10-16 부터 이 잡은 finalize(전체 화면 비우기) 뒤에 돌아 말 그대로 '화면을 다 바꾼 뒤
+  #   5분'이다. 예전엔 update 잡 맨 끝(브리핑 비우기 뒤)에서 5분을 자고 보내, 종목 상세 · ETF 같은 나머지 화면은
+  #   finalize 가 글보다 1~2분 늦게 비웠고 그 5분만큼 finalize 도 늦었다. 이 저장소는 public 이라 Actions 분이
+  #   무료여서 러너를 5분 재우는 비용은 없다.
+  # ⚠️ finalize 가 실패해도 돈다(always) — 화면 비우기가 실패해도 1시간 안에 스스로 새로 그려진다(finalize 주석).
+  evening_post:
+    needs: [guard, update, finalize]
+    if: >-
+      always()
+      && needs.guard.outputs.skip != 'true'
+      && needs.update.outputs.freshness == 'success'
+      && needs.update.outputs.score == 'success'
+      && needs.update.outputs.kr_extract == 'success'
+      && github.run_attempt == '1'
+      && (
+        ((github.event.schedule == '30 8 * * *' || github.event.schedule == '30 9 * * *') && needs.update.outputs.weekday == 'true')
+        || github.event.inputs.broadcast == 'evening'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r data-pipeline/requirements.txt
+
+      # 글의 갈래 문장을 LLM 이 쓴다(구독 경로). update 잡과 같은 설치다.
+      - name: Install Claude Code CLI (LLM 구독 경로)
+        continue-on-error: true
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/claude" --version
+
+      - name: (텔레그램) B 마감 리포트 발송 (평일 저녁)
+        id: telegram_broadcast
+        run: |
+          sleep 300   # 화면을 다 바꾼 뒤 5분(위 [5])
+          python data-pipeline/scripts/send_telegram_broadcast.py --send --format evening2
+
+      # 예전엔 update 잡 'Summarize results' 표의 한 줄이었다. 잡을 떼며 실패 알림도 같이 옮겼다 — 같은 제목의 이슈에 붙는다.
+      - name: Alert on failure (open/update GitHub issue)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          title="⚠️ 데일리 파이프라인 실패"
+          note=$(printf '저녁 마감 리포트 발송이 실패했습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: broadcast(저녁 브리핑)\n- 로그/요약: %s\n\n이 글은 다시 보내지 않으면 그날 나가지 않습니다. 보내야 하면 Run workflow 에서 broadcast=evening · force=true 로 손으로 돌리십시오.' \
             "$(date -u '+%Y-%m-%d %H:%M')" "$run_url")
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
