@@ -146,7 +146,13 @@ def pooled_sentiment_details(
       - pos_count/neg_count/neu_count/total_count : **풀링 합산** — 카드가 읽어 비율을 그린다.
         raw_value 와 같은 표본을 가리켜 카드-점수가 어긋나지 않는다.
       - pos_count_1d/… : 오늘치 원자 — 다음 실행의 풀링 재료(위 _daily_atom 참고).
+
+    표본이 0건인 날의 원자는 건너뛰고 pool_days 에도 세지 않는다. 빈 날을 세면 카드가 '3일 합산'이라 적는데 실제론
+    이틀치이고, 사흘이 다 비면 0.0 이 정상 값처럼 저장된다(디시 0.0 = 과열도 75 초고온, 2026-10-16 전수 검사 4).
+    오늘 표본이 0건이면 부르지 말 것 — 수집기가 그날 저장을 건너뛴다.
     """
+    if not int(today["total"]):
+        raise ValueError("오늘 감성 표본이 0건입니다 — 풀링하지 않습니다(0.0 을 정상 값으로 저장하지 않게)")
     prior = (
         client.table("indicator_values")
         .select("date,details")
@@ -159,14 +165,14 @@ def pooled_sentiment_details(
     atoms = [(int(today["positive"]), int(today["negative"]), int(today["neutral"]), int(today["total"]))]
     for row in prior.data:
         atom = _daily_atom(row.get("details"))
-        if atom is not None:
+        if atom is not None and atom[3] > 0:
             atoms.append(atom)
 
     pos = sum(a[0] for a in atoms)
     neg = sum(a[1] for a in atoms)
     neu = sum(a[2] for a in atoms)
     total = sum(a[3] for a in atoms)
-    score = round((pos - neg) / total * 100, 2) if total else 0.0
+    score = round((pos - neg) / total * 100, 2)
 
     details = {
         "pos_count": pos,

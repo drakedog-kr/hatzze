@@ -45,6 +45,65 @@ def ensure_indicator(client, meta: dict) -> str:
     return client.table("indicators").insert(meta).execute().data[0]["id"]
 
 
+# ── 월간 공표 지표의 공표일 ──────────────────────────────────────────────────────────────────
+# CCSI 와 기업 체감 경기는 행 날짜가 공표보다 이르다. CCSI 는 M월 값을 M-01 행에 적고 그달 하순에 낸다(2026-07~09 행이
+# 처음 생긴 날 07-28 · 08-25 · 09-23). 기업 체감 경기는 조사한 달 1일 행에 적고 그달 25일 무렵에 낸다. 라이브 점수는
+# 최신 행만 써서 상관없다(공표 전엔 행이 없다). 지난 날짜로 다시 잴 때(recompute_score_history · backfill_scores ·
+# backtest/current.py) 행 날짜부터 쓰면 3주쯤 미래를 본다(2026-10-16 전수 검사 4). 그래서 그 셋은 usable_from 부터 쓴다.
+#
+# ECOS 는 공표일을 안 준다(StatisticSearch · StatisticItemList 에 그런 칸이 없다, 2026-10-16 확인). 그래서 수집기가 **처음
+# 본 날**을 details.published 에 적는다(stamp_published). 그 전에 쌓인 행은 publish_fallback 의 추정으로 둔다.
+MONTHLY_RELEASE_SLUGS = ("consumer_sentiment_index", "business_outlook")
+
+
+def publish_fallback(slug: str, row_date: str) -> str:
+    """공표일을 모르는 행의 추정 — 기업 체감 경기는 조사한 달 25일, CCSI 는 다음 달 1일(그달 하순 공표보다 며칠 늦게)."""
+    if slug == "business_outlook":
+        return f"{row_date[:7]}-25"
+    y, m = int(row_date[:4]), int(row_date[5:7])
+    return f"{y + m // 12:04d}-{m % 12 + 1:02d}-01"
+
+
+def usable_from(slug: str, row: dict) -> str:
+    """이 행의 값을 쓸 수 있게 된 첫날(YYYY-MM-DD). 월간 공표 지표 말고는 행 날짜 그대로다. 늘 행 날짜 이후다."""
+    if slug not in MONTHLY_RELEASE_SLUGS:
+        return row["date"]
+    return (row.get("details") or {}).get("published") or publish_fallback(slug, row["date"])
+
+
+def published_dates(slug: str, stored: dict[str, dict], dates: list[str], today: str) -> dict[str, str]:
+    """행 날짜마다 적을 공표일. stored 는 이미 저장된 행(날짜 → details).
+
+    이미 저장된 행은 적힌 published 를 그대로 두고(없으면 추정), 기록이 있는데 이 행만 없으면 오늘 처음 나온 것이라
+    today 를 적는다. 기록이 통째로 비었으면(처음 채우기 · 미리보기) 전부 추정이다 — 오늘을 적으면 지난 기록 전체가
+    오늘 나온 것이 된다.
+    """
+    out = {}
+    for d in dates:
+        if d in stored:
+            out[d] = stored[d].get("published") or publish_fallback(slug, d)
+        else:
+            out[d] = today if stored else publish_fallback(slug, d)
+    return out
+
+
+def stamp_published(client, indicator_id: str, slug: str, rows: list[dict], today: str) -> None:
+    """rows 의 details 에 published 를 얹는다(제자리). client 가 없으면(미리보기) 전부 추정."""
+    stored = {}
+    if client is not None:
+        from common.supabase_client import load_keyset
+
+        stored = {
+            r["date"]: (r.get("details") or {})
+            for r in load_keyset(
+                client, "indicator_values", "id,date,details", narrow=lambda q: q.eq("indicator_id", indicator_id)
+            )
+        }
+    pub = published_dates(slug, stored, [r["date"] for r in rows], today)
+    for r in rows:
+        r.setdefault("details", {})["published"] = pub[r["date"]]
+
+
 def upsert_merged(client, indicator_id: str, rows: list[dict], series_keys: tuple[str, ...]) -> int:
     """전 기록을 다시 쓰되 details 는 기존 키와 병합한다.
 

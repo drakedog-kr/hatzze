@@ -14,6 +14,10 @@ CCSI 는 한국은행이 매달 약 2,500가구를 조사해 내는 '소비자�
 번만 바뀐다 — 파이프라인은 매일 돌지만 같은 달엔 같은 값을 덮어쓸 뿐이라 멱등이다.
 실물 경제 자체가 천천히 변하니 '느린 실물 축'으로는 오히려 맞다.
 
+**행 날짜는 공표일이 아니다.** M월 값을 M-01 행에 적는데 공표는 그달 하순이다. 그래서 처음 본 날을
+details.published 에 적고, 지난 점수를 다시 잴 때는 그날부터 쓴다(common/indicator.usable_from).
+그 전에 쌓인 행은 다음 달 1일부터 쓴다.
+
 실행:
     cd data-pipeline && source .venv/bin/activate
     python scripts/fetch_consumer_sentiment.py
@@ -28,8 +32,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.ecos_client import EcosUnavailableError, statistic_search  # noqa: E402
-from common.indicator import ensure_indicator  # noqa: E402
+from common.indicator import ensure_indicator, stamp_published, upsert_merged  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
+from common.timeutil import today_kst  # noqa: E402
 
 # 소비자동향조사, 월간. 항목 FME = '소비자심리지수'(종합 CCSI). 2026-07 실측 확인.
 ECOS_STAT_CODE = "511Y002"
@@ -57,7 +62,7 @@ def month_str(d: date) -> str:
 
 def fetch_ccsi() -> list[tuple[str, float]]:
     """(YYYY-MM-01, CCSI) 리스트. TIME(YYYYMM)을 그 달 1일 날짜로 저장한다."""
-    today = date.today()
+    today = today_kst()
     start_year = today.year - (2 if today.month <= LOOKBACK_MONTHS % 12 else 1) - 1
     rows = statistic_search(
         ECOS_STAT_CODE,
@@ -98,12 +103,14 @@ def main() -> None:
         print("[ECOS] CCSI 데이터를 받지 못했습니다.")
         sys.exit(1)
 
-    rows = [{"indicator_id": indicator_id, "date": d, "raw_value": v} for d, v in series]
-    client.table("indicator_values").upsert(rows, on_conflict="indicator_id,date").execute()
+    rows = [{"date": d, "raw_value": v, "details": {}} for d, v in series]
+    stamp_published(client, indicator_id, INDICATOR_SLUG, rows, today_kst().isoformat())
+    # details 는 병합한다 — published 말고 다른 키가 생겨도 안 날아가게(common/indicator.upsert_merged 머리말).
+    upsert_merged(client, indicator_id, rows, ())
 
     latest_date, latest_val = series[-1]
     tone = "평균 이상(낙관)" if latest_val >= 100 else "평균 이하(위축)"
-    print(f"[ECOS] CCSI {len(rows)}개월치 저장. 최신: {latest_date[:7]} = {latest_val} ({tone})")
+    print(f"[ECOS] CCSI {len(rows)}개월치 저장. 최신: {latest_date[:7]} = {latest_val} ({tone}) · 공표 {rows[-1]['details']['published']}")
 
 
 if __name__ == "__main__":

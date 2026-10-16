@@ -20,7 +20,7 @@ common/krx_client.py의 공통 재시도 헬퍼(krx_get)로 동일하게 대응�
 from __future__ import annotations
 
 import sys
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -29,6 +29,7 @@ from common.ecos_client import EcosUnavailableError, statistic_search  # noqa: E
 from common.krx_client import krx_get  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
+from common.timeutil import today_kst  # noqa: E402
 
 KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/idx/kospi_dd_trd"
 TARGET_INDEX_NAME = "코스피"
@@ -88,7 +89,7 @@ def fetch_kospi_market_cap(bas_dd: str) -> float | None:
 
 
 def fetch_latest_market_cap() -> tuple[str, float]:
-    day = date.today()
+    day = today_kst()
     for _ in range(MARKET_CAP_LOOKBACK_DAYS):
         market_cap = fetch_kospi_market_cap(day.strftime("%Y%m%d"))
         if market_cap is not None:
@@ -101,7 +102,7 @@ def fetch_latest_market_cap() -> tuple[str, float]:
 
 
 def fetch_annualized_gdp() -> tuple[str, float]:
-    end_year = date.today().year
+    end_year = today_kst().year
     start_year = end_year - 3
     valid_rows = statistic_search(
         ECOS_STAT_CODE, ECOS_CYCLE, f"{start_year}Q1", f"{end_year}Q4", ECOS_ITEM_CODE
@@ -148,7 +149,8 @@ def main() -> None:
     buffett_index = market_cap_krw / annualized_gdp_krw * 100
     print(f"[계산] 버핏지수 = 시가총액 / 연환산GDP x 100 = {buffett_index:.2f}%")
 
-    today = date.today().isoformat()
+    # 행 날짜는 KST 다. 러너가 UTC 라 date.today() 를 쓰면 09:00 KST 전에 도는 아침 실행이 전날 행을 덮어썼다(2026-10-16 전수 검사 4).
+    today = today_kst().isoformat()
 
     client.table("indicator_values").upsert(
         {"indicator_id": raw_id, "date": today, "raw_value": market_cap_krw},
