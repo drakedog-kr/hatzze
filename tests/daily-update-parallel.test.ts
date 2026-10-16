@@ -211,6 +211,28 @@ describe("아침 개장 전 요약은 화면을 바꾼 뒤에 나간다", () => 
   });
 });
 
+describe("저녁 마감 리포트도 화면을 다 바꾼 뒤에 나간다", () => {
+  const post = job("evening_post");
+
+  it("finalize 를 기다리고, update 의 출력으로 예전 조건을 그대로 건다", () => {
+    assert.match(post, /needs: \[guard, update, finalize\]/);
+    for (const k of ["freshness", "score", "kr_extract", "weekday"]) assert.match(post, new RegExp(`needs\\.update\\.outputs\\.${k} == '(success|true)'`));
+    assert.match(post, /github\.run_attempt == '1'/);
+    assert.match(post, /github\.event\.inputs\.broadcast == 'evening'/);
+    assert.match(post, /sleep 300/);
+  });
+
+  it("update 잡에는 저녁 마감 리포트 발송이 남지 않는다 — 두 번 나가면 안 된다", () => {
+    assert.ok(!update.some((s) => s.body.includes("--format evening2")));
+    assert.equal((wf.match(/--format evening2/g) ?? []).length, 1);
+  });
+
+  it("발송 스텝 이름을 그대로 둔다 — guard 가 앞 실행의 '이미 발송함'을 이 이름으로 찾는다", () => {
+    assert.match(post, /- name: \(텔레그램\) B 마감 리포트 발송 \(평일 저녁\)/);
+    assert.match(job("guard"), /step="B 마감 리포트"/);
+  });
+});
+
 describe("요약표", () => {
   it("Summarize results 의 이름과 결과 배열 길이가 같다", () => {
     const s = update.find((x) => x.name === "Summarize results")!;
