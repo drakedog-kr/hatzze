@@ -31,15 +31,15 @@ Progress는 두 가지 버전을 함께 다룬다:
   설명하는 가중 평균)는 이 캡핑된 값들로 계산한다.
 
 기준선이 전부 고정값이 되면서 "히스토리가 부족해 기준선을 못 정하는" 경우는
-youtube_finance_search_views를 빼면 더 이상 없다. 유일하게 남는 예외 상황은
+cumulative_average 지표(아래)를 빼면 더 이상 없다. 유일하게 남는 예외 상황은
 "이 지표에 값이 아예 한 건도 없는" 경우(예: 새 지표를 막 추가했는데 fetch
 스크립트가 아직 한 번도 안 돈 경우)뿐이고, 이때는 그 지표만 daily_score
 가중 평균에서 완전히 제외한다(no_value, 아래 설명).
 
-youtube_finance_search_views는 유일하게 고정 기준선을 쓰지 않는 지표다.
-나머지 지표들은 INDICATOR_THRESHOLDS의 고정값을 기준선으로 삼지만, 이 지표는
-"오늘 값을 포함한 지금까지의 전체 평균"을 매일 다시 계산해 그날의 기준선으로
-쓴다(compute_threshold의 "cumulative_average" 분기). 표본이 1개(오늘 하루)뿐이면
+cumulative_average 지표는 고정 기준선을 쓰지 않는다. youtube_finance_search_views 는
+"오늘 값을 포함한 지금까지의 전체 평균", window 가 있는 지표(youtube_stock_shorts 30 · 네이버 검색지수 셋
+naver_search_trend · luxury_consumption_index · fine_dining_search_index 90 — 2026-10-16)는 "오늘 포함 최근 N개
+평균"을 매일 다시 계산해 그날의 기준선으로 쓴다(compute_threshold의 "cumulative_average" 분기). 표본이 1개(오늘 하루)뿐이면
 평균=오늘 값이 되어 progress가 100%로 나오는데, 이는 데이터 부족으로 판단을
 보류하는 게 아니라 의도된 동작이다 — 데이터가 쌓일수록 평균이 더 많은 날짜를
 반영하며 비교 기준이 자연스럽게 안정되기 때문이다.
@@ -308,13 +308,13 @@ def compute_threshold(client, indicator_id: str, config: dict) -> float:
     if config["kind"] == "fixed":
         return config["threshold"]
 
-    # cumulative_average (youtube_finance_search_views 전용): 오늘 값을 포함해
+    # cumulative_average (유튜브 조회수 · 쇼츠 · 네이버 검색지수 셋): 오늘 값을 포함해
     # 지금까지 쌓인 전체 값의 평균을 매일 다시 계산해 그날의 기준선으로 삼는다.
     # 데이터가 1건(오늘)뿐이면 평균=오늘 값이라 progress가 항상 100%로 나오는데,
     # 이건 "판단을 보류"하는 게 아니라 의도된 결과다 — 데이터가 쌓일수록 평균이
     # 더 많은 날짜를 반영하며 자연스럽게 비교 기준이 안정된다. get_latest_value가
     # 이미 성공했다는 건 최소 1건은 있다는 뜻이라 표본이 몇 개든 그냥 계산한다.
-    # window 가 있으면 최근 그만큼만 평균한다(주식 쇼츠 — '평소' = 최근 30일).
+    # window 가 있으면 최근 그만큼만 평균한다(주식 쇼츠 30 · 네이버 검색지수 셋 90 — '평소' = 최근 N일).
     values = get_all_values(client, indicator_id, config.get("window"))
     return statistics.mean(values)
 
@@ -334,7 +334,7 @@ def compute_progress(slug: str, current: float, threshold: float, config: dict) 
         floor = config["floor"]
         return (current - floor) / (threshold - floor) * 100
     if "surge_map" in config:
-        # cumulative_average(youtube): threshold=평균이라 current/threshold*100은 평균=100(정상)이
+        # cumulative_average(유튜브 · 쇼츠 · 네이버 셋): threshold=평균이라 current/threshold*100은 평균=100(정상)이
         # 돼 과열 척도로 안 맞는다. 평균 대비 급증(%)을 0~100 과열도로 매핑한다 — 평균(급증 0%)이
         # floor~ceil의 중앙(=상온), ceil에서 초고온. surge_map = {floor, ceil}(급증 % 단위).
         sm = config["surge_map"]
