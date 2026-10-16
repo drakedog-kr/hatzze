@@ -34,8 +34,9 @@ from scripts.calculate_score import (  # noqa: E402
 )
 
 pd.set_option("display.width", 330)
-PEAKS = ["2025-11-03", "2026-02-26", "2026-06-22"]
-TROUGHS = ["2025-11-24", "2026-03-31", "2026-07-20"]
+# 정답지 — 2026-10-16 전수 검사 4 에 맞춤. 저점 07-20 은 중간 반등점이었고 실제 바닥은 07-30(검사 3 이 recal2 에서 고친 것)이다.
+PEAKS = ["2025-11-03", "2026-02-26", "2026-06-22", "2026-09-23"]
+TROUGHS = ["2025-11-24", "2026-03-31", "2026-07-30"]
 # calculate_score.main 안의 지역 상수와 같은 값(괴리 지수 lead 매핑)
 LEAD_FLOOR, LEAD_CEIL = -75.0, 45.0
 
@@ -100,7 +101,10 @@ for slug, cfg in T.items():
             p = (p.clip(0, 100) * (1 - lw)).add(level * lw, fill_value=np.nan).dropna()
         prog[slug] = p.clip(0, 100)
     elif cfg["kind"] == "cumulative_average":
-        run = vals.expanding().mean()
+        # 운영 compute_threshold 와 같게: window 가 있으면 오늘 포함 최근 N개 평균(쇼츠 30 · 네이버 셋 90), 없으면 전체 누적 평균(유튜브 조회수).
+        # ⚠️ 네이버 셋의 덤프 값은 1년보다 오래된 행이 행마다 다른 날 정규화라(데이터랩 재정규화) 그 구간의 배수는 조금 흔들린다.
+        w = cfg.get("window")
+        run = vals.rolling(w, min_periods=1).mean() if w else vals.expanding().mean()
         prog[slug] = pd.Series(
             {d: cap_progress(compute_progress(slug, float(vals[d]), float(run[d]), cfg)) for d in vals.index})
     else:
