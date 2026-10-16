@@ -289,3 +289,40 @@ describe("국장 미리보기는 따로 잡에서 06:30 넘어 핀허브 종가�
     assert.ok(Number(m[1]) >= 40, `상한 ${m[1]}분 — 06:13 쯤 와서 06:33 까지 기다린다`);
   });
 });
+
+describe("guard 가 '이미 보냈다'를 찾는 이름은 실제 발송 스텝 이름이다(2026-10-17)", () => {
+  // 2026-09-10 에 아침 발송 스텝 이름을 'A 어제 브리핑 발송'에서 바꾸며 guard 를 안 고쳐, 아침은 한 달 넘게 한 번도 안 맞았다.
+  // 그동안 실패로 끝난 아침 실행을 손으로 다시 돌리면 같은 개장 전 요약이 두 번 나갈 수 있었다.
+  const guard = job("guard");
+  const sendOf = (j: string) => {
+    const s = steps(job(j)).filter((x) => /send_telegram_broadcast\.py --send/.test(x.body));
+    assert.equal(s.length, 1, `${j} 잡의 발송 스텝이 하나가 아니다`);
+    return s[0];
+  };
+  const names = (re: RegExp) => [...guard.matchAll(re)].map((m) => m[1]);
+
+  it("아침 이름은 개장 전 요약 발송 스텝에, 저녁 이름은 마감 리포트 발송 스텝에 들어 있다", () => {
+    const morning = sendOf("morning_post");
+    const evening = sendOf("evening_post");
+    assert.match(morning.body, /--format morning2\n/);
+    assert.match(evening.body, /--format evening2\n/);
+    const am = names(/(?:morning|"21:30")\) +step="([^"]+)"/g);
+    const pm = names(/\*\) +step="([^"]+)"/g);
+    assert.equal(am.length, 2, `아침 이름 ${am.length}곳`);
+    assert.equal(pm.length, 2, `저녁 이름 ${pm.length}곳`);
+    for (const n of am) assert.ok(morning.name.includes(n), `'${n}' 이 '${morning.name}' 에 없다`);
+    for (const n of pm) assert.ok(evening.name.includes(n), `'${n}' 이 '${evening.name}' 에 없다`);
+  });
+
+  it("찾는 이름은 워크플로에서 그 발송 스텝 하나에만 걸린다", () => {
+    const all = [...wf.matchAll(/\n {6}- name: (.+)\n/g)].map((m) => m[1].trim());
+    for (const n of new Set(names(/step="([^"]+)"/g))) {
+      assert.equal(all.filter((s) => s.includes(n)).length, 1, `'${n}' 이 걸리는 스텝 수`);
+    }
+  });
+
+  it("발송 스텝이 따로 잡에 있어도 찾는다 — 실행의 모든 잡 스텝을 훑는다", () => {
+    const q = guard.match(/\[\.jobs\[\]\.steps\[\] \| select\(\.name \| contains\(\\"\$step\\"\)\) \| select\(\.conclusion == \\"success\\"\)\]/g) ?? [];
+    assert.equal(q.length, 2, "발송 확인 조회가 두 곳이 아니다");
+  });
+});
