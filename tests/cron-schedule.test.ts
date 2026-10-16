@@ -116,38 +116,38 @@ describe("이미 돌았나(sinceIso + hasRunSince) — 실제 시각으로 재�
   const evening = mainPipelineCrons.find((c) => CRON_TO_JOB[c.schedule].inputs(new Date()).slot === "evening")!;
   const mFire = CRON_TO_JOB[morning.schedule].fireUtc;
   const eFire = CRON_TO_JOB[evening.schedule].fireUtc;
-  // 2026-09-23(수) KST 아침 06:30 = 09-22 21:30Z, 저녁 17:10 = 09-23 08:10Z.
+  // 2026-09-23(수) KST 아침 06:10 = 09-22 21:10Z, 저녁 17:10 = 09-23 08:10Z.
   const at = (iso: string) => new Date(iso);
   const run = (created_at: string) => ({ created_at, html_url: `run@${created_at}` });
 
   it("아침: 전날 저녁 실행만 있으면 던진다", () => {
-    const since = sinceIso(mFire, at("2026-09-22T21:30:00Z"));
-    assert.equal(hasRunSince([run("2026-09-22T08:10:04Z"), run("2026-09-21T21:30:03Z")], since).covered, false);
+    const since = sinceIso(mFire, at("2026-09-22T21:10:00Z"));
+    assert.equal(hasRunSince([run("2026-09-22T08:10:04Z"), run("2026-09-21T21:10:03Z")], since).covered, false);
   });
 
   it("아침: 크론이 1초 일찍 와도 던진다", () => {
-    const since = sinceIso(mFire, at("2026-09-22T21:29:59Z"));
+    const since = sinceIso(mFire, at("2026-09-22T21:09:59Z"));
     assert.equal(hasRunSince([run("2026-09-22T08:10:04Z")], since).covered, false);
   });
 
   it("아침: 같은 크론이 두 번 오면 두 번째는 안 던진다", () => {
-    const since = sinceIso(mFire, at("2026-09-22T21:30:09Z"));
-    assert.equal(hasRunSince([run("2026-09-22T21:30:04Z"), run("2026-09-22T08:10:04Z")], since).covered, true);
+    const since = sinceIso(mFire, at("2026-09-22T21:10:09Z"));
+    assert.equal(hasRunSince([run("2026-09-22T21:10:04Z"), run("2026-09-22T08:10:04Z")], since).covered, true);
   });
 
   it("저녁: 그날 아침 실행만 있으면 던진다", () => {
     const since = sinceIso(eFire, at("2026-09-23T08:10:00Z"));
-    assert.equal(hasRunSince([run("2026-09-22T21:30:04Z")], since).covered, false);
+    assert.equal(hasRunSince([run("2026-09-22T21:10:04Z")], since).covered, false);
   });
 
   it("저녁: 크론이 1초 일찍 와도 던진다", () => {
     const since = sinceIso(eFire, at("2026-09-23T08:09:59Z"));
-    assert.equal(hasRunSince([run("2026-09-22T21:30:04Z")], since).covered, false);
+    assert.equal(hasRunSince([run("2026-09-22T21:10:04Z")], since).covered, false);
   });
 
   it("저녁: 같은 크론이 두 번 오면 두 번째는 안 던진다", () => {
     const since = sinceIso(eFire, at("2026-09-23T08:10:09Z"));
-    assert.equal(hasRunSince([run("2026-09-23T08:10:03Z"), run("2026-09-22T21:30:04Z")], since).covered, true);
+    assert.equal(hasRunSince([run("2026-09-23T08:10:03Z"), run("2026-09-22T21:10:04Z")], since).covered, true);
   });
 
   it("왜 경계를 앞에 두나 — 경계가 발사와 같으면 1초 이른 호출이 전날로 물러난다", () => {
@@ -178,15 +178,20 @@ describe("만회 크론 — 본 발화가 못 던진 몫을 한 번 더 본다(a
   });
 
   it("본 발화가 던졌으면(돌고 있어도) 만회는 안 던지고, 아무것도 없으면 던진다", () => {
-    // 2026-09-23(수) KST 아침: 본 발화 21:30Z, 만회 21:50Z.
+    // 2026-09-23(수) KST 아침: 본 발화 21:10Z, 만회 21:30Z.
     const up = pipelineCrons.find((c) => CRON_TO_JOB[c.schedule].catchUp && slotOf(c) === "morning")!;
-    const since = sinceIso(CRON_TO_JOB[up.schedule].fireUtc, new Date("2026-09-22T21:50:00Z"));
-    assert.equal(hasRunSince([run("2026-09-22T21:30:04Z")], since).covered, true);
+    const since = sinceIso(CRON_TO_JOB[up.schedule].fireUtc, new Date("2026-09-22T21:30:00Z"));
+    assert.equal(hasRunSince([run("2026-09-22T21:10:04Z")], since).covered, true);
     assert.equal(hasRunSince([run("2026-09-22T08:10:04Z")], since).covered, false);
   });
 
   it("아침 만회도 KRX 공표 게이트(08:00 KST = 23:00Z) 전에 던진다 — 늦으면 개장 전 브리핑이 밀린다", () => {
     for (const c of pipelineCrons.filter((x) => slotOf(x) === "morning")) assert.ok(fireMin(c.schedule) < 23 * 60, c.schedule);
+  });
+
+  it("아침 발화는 06:00 KST(21:00Z) 뒤다 — 더 당기면 아침 카더라 글 마감이 같이 일러진다", () => {
+    // 겨울엔 미장 마감(06:00 KST) 직후 시황 글이 아침 화면에서 빠진다(lib/cron-schedule.ts 발사 주석).
+    for (const c of pipelineCrons.filter((x) => slotOf(x) === "morning")) assert.ok(fireMin(c.schedule) >= 21 * 60 + 10, c.schedule);
   });
 
   it("발송·사전 스캔에는 만회가 없다 — 알림이 '손으로 돌려야 한다'고 말한다", () => {

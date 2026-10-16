@@ -237,6 +237,44 @@ def day_window(d: date, now: datetime) -> tuple[datetime, datetime]:
     return lo, max(lo, min(at(d, DAY_TO_HOUR), now))
 
 
+# ─── 창: 이 실행이 처음 모은 글(2026-10-17) ─────────────────────────────────────
+#
+# 아침 글은 **아침 실행이 처음 모은 글**, 저녁 글은 **저녁 실행이 처음 모은 글**을 다룬다. 글이 올라온 시각으로 자르던
+# 시계 창(어제 18시 ~ 오늘 7시 · 7시 ~ 18시)은 실행이 글을 모으는 시각(아침 06:2x · 저녁 17:2x)과 어긋나, 그 사이에 올라온
+# 글이 어느 글에도 안 들어갔다 — 아침 수집 뒤 ~ 07:00 · 저녁 수집 뒤 ~ 18:00. 10-16 실측: 05~08시 글 941건 중 644건을
+# 저녁 실행이 처음 모았고, 그중 06:45~07:00 글은 두 글 다 빠졌다. 처음 모은 시각(collected_at — 수집이 upsert 해도 처음
+# 값이 남는다, fetch_telegram.py 머리말)으로 나누면 두 글이 빈틈도 겹침도 없이 이어진다.
+#
+#   아침 실행의 몫  collected_at [d 04:00, d 12:00)
+#   저녁 실행의 몫  collected_at [d 12:00, d+1 04:00)
+#
+# 글이 올라온 시각은 전날 12:00 부터만 본다 — 새로 들인 채널의 옛 글(처음 모은 시각만 오늘)이 섞이지 않게.
+# 창의 처음 · 끝([창] 줄 · 아침 과제 문구의 시각)은 바로 앞 실행이 모은 마지막 글 · 이 실행이 모은 마지막 글의 시각이다.
+# ⚠️ 이 실행의 몫이 MIN_WINDOW_MSGS 보다 적으면(수집 실패 · 12시 넘어 손으로 돌린 아침 실행) 그날 시계 창으로 물러난다.
+COLLECT_SPLIT_HOURS = (4, 12)
+POSTED_FROM_HOUR = 12
+
+
+@dataclass
+class RunWindow:
+    """한 실행의 몫. posted 는 넉넉한 게시 시각 범위, collected 는 이 실행이 처음 모은 시각 범위."""
+    posted: tuple[datetime, datetime]
+    collected: tuple[datetime, datetime]
+    prev_collected: tuple[datetime, datetime]   # 바로 앞 실행의 몫 — 창의 처음을 거기서 읽는다
+    clock: tuple[datetime, datetime]            # 몫이 비었을 때 물러날 시계 창(예전 창)
+
+
+def run_window(d: date, slot: str, now: datetime) -> RunWindow:
+    """d 의 아침(slot='morning') · 저녁(그 밖) 실행 몫. 아침 몫의 바로 앞은 전날 저녁 몫, 저녁 몫의 바로 앞은 그날 아침 몫."""
+    m0, m1 = COLLECT_SPLIT_HOURS
+    prev_day, next_day = d - timedelta(days=1), d + timedelta(days=1)
+    if slot == "morning":
+        collected, prev, clock = (at(d, m0), at(d, m1)), (at(prev_day, m1), at(d, m0)), night_window(d)
+    else:
+        collected, prev, clock = (at(d, m1), at(next_day, m0)), (at(d, m0), at(d, m1)), day_window(d, now)
+    return RunWindow((at(prev_day, POSTED_FROM_HOUR), min(collected[1], now)), collected, prev, clock)
+
+
 def monday_of(d: date) -> date:
     return d - timedelta(days=d.weekday())
 
@@ -286,16 +324,21 @@ def morning_head(R: Render, lo: datetime, hi: datetime) -> list[str]:
 # ─── 재료: 메시지 ─────────────────────────────────────────────────────────────
 
 
-def window_messages(db, lo: datetime, hi: datetime, min_forwards: int | None = None) -> list[dict]:
+def window_messages(
+    db, lo: datetime, hi: datetime, min_forwards: int | None = None, collected: tuple[datetime, datetime] | None = None,
+) -> list[dict]:
     """창 안 메시지. 키셋 페이징(필터+OFFSET 조합은 8초 천장에 걸린다 — 1판 주석 참고).
 
     **며칠짜리 창은 하루씩 끊어 읽는다.** 엿새 범위에 forwards 필터를 걸고 한 번에 넘기면
     페이지마다 훑는 행이 늘어 statement timeout(8초)에 걸렸다(2026-09-10, 동시 실행 8개에서
     수요일·일요일 글 둘 다). 하루 단위면 한 statement 가 보는 행이 1/6 이다.
+    `collected` 를 주면 그 범위에 **처음 모은** 글만 — 실행 몫 창(run_window)이 쓴다.
     """
     def fetch(a: datetime, b: datetime) -> list[dict]:
         def narrow(q):
             q = q.gte("posted_at", a.isoformat()).lt("posted_at", b.isoformat())
+            if collected:
+                q = q.gte("collected_at", collected[0].isoformat()).lt("collected_at", collected[1].isoformat())
             if min_forwards:
                 q = q.gte("forwards", min_forwards)
             return q
@@ -435,15 +478,60 @@ def load_material(db, lo: datetime, hi: datetime, n: int, multi: bool = False, u
     return Material(picked, kr_names, us_names, (lo, hi), len(rows))
 
 
-def load_material_with_fallback(db, window_of: Callable[[int], tuple[datetime, datetime]], n: int) -> Material:
+def _posted(r: dict) -> datetime:
+    return datetime.fromisoformat(str(r["posted_at"]).replace("Z", "+00:00")).astimezone(KST)
+
+
+def last_posted_at(db, posted: tuple[datetime, datetime], collected: tuple[datetime, datetime]) -> datetime | None:
+    """collected 범위에 처음 모은 글 가운데 가장 늦게 올라온 글의 시각 — 그 실행이 모은 마지막 글. 못 읽으면 None."""
+    try:
+        rows = execute_with_retry(
+            db.table("telegram_messages")
+            .select("posted_at")
+            .gte("posted_at", posted[0].isoformat())
+            .lt("posted_at", posted[1].isoformat())
+            .gte("collected_at", collected[0].isoformat())
+            .lt("collected_at", collected[1].isoformat())
+            .order("posted_at", desc=True)
+            .limit(1)
+        ).data
+    except Exception as e:  # noqa: BLE001 — 창의 처음을 못 읽어도 글은 나가야 한다
+        print(f"[안내] 앞 실행의 마지막 글 시각을 못 읽었습니다({type(e).__name__}). 이번 몫의 첫 글 시각을 씁니다.")
+        return None
+    return _posted(rows[0]) if rows else None
+
+
+def load_material_run(db, w: RunWindow, n: int) -> Material:
+    """실행 몫 창의 발췌 묶음. 창의 처음은 앞 실행이 모은 마지막 글, 끝은 이 실행이 모은 마지막 글의 시각이다."""
+    rows = window_messages(db, w.posted[0], w.posted[1], collected=w.collected)
+    picked = pick_excerpts(rows, n)
+    kr_names, us_names = tag_stocks(db, picked)
+    if not rows:
+        return Material(picked, kr_names, us_names, w.clock, 0)
+    times = [_posted(r) for r in rows]
+    lo = last_posted_at(db, (w.posted[0] - timedelta(days=1), w.collected[0]), w.prev_collected) or min(times)
+    return Material(picked, kr_names, us_names, (lo, max(times)), len(rows))
+
+
+def load_material_with_fallback(db, window_of: Callable[[int], "RunWindow | tuple[datetime, datetime]"], n: int) -> Material:
     """창이 비면(수집 실패·손으로 돌린 새벽) 자료가 있는 날까지 하루씩 물러난다.
 
     1판 load_night_messages 와 같은 이유다 — "요약하지 못했습니다"만 내보내느니 있는 밤을
     쓰고, 화면에 창의 날짜를 그대로 적어 어느 밤인지 숨기지 않는다.
+    실행 몫 창(RunWindow)이 얇으면 먼저 그날 시계 창으로 본다 — 수집이 12시를 넘겨 몫이 다른 쪽으로 간 날
+    (늦게 손으로 돌린 아침 실행)에도 그날 글을 쓴다. 그것도 얇으면 하루 물러난다.
     """
     mat = None
     for back in range(0, FALLBACK_DAYS + 1):
-        lo, hi = window_of(back)
+        w = window_of(back)
+        if isinstance(w, RunWindow):
+            mat = load_material_run(db, w, n)
+            if mat.total >= MIN_WINDOW_MSGS:
+                return mat
+            print(f"[안내] 이번 실행이 처음 모은 글이 {mat.total}건뿐이라 시계 창({span_label(*w.clock)})으로 봅니다.")
+            lo, hi = w.clock
+        else:
+            lo, hi = w
         mat = load_material(db, lo, hi, n)
         if mat.total >= MIN_WINDOW_MSGS:
             return mat
@@ -954,10 +1042,11 @@ DIGEST_FORMAT = """\
 - 대괄호 라벨([갈래] 같은 것)은 출력하지 마세요."""
 
 TASKS = {
-    # 시각은 상수에서 받는다 — 글자로 박아 두면 경계를 옮길 때 글만 옛 시각을 말한다.
-    "morning2": f"""\
+    # 시각은 창에서 받는다(compose_sections 가 lo_h · hi_h 를 채운다) — 실행 몫 창의 처음 · 끝이 실행마다 다르고,
+    # 글자로 박아 두면 경계를 옮길 때 글만 옛 시각을 말한다.
+    "morning2": """\
 [이번 글 — 밤사이 채널 요약]
-어젯밤 {NIGHT_FROM_HOUR}시부터 오늘 아침 {NIGHT_TO_HOUR}시까지 채널에 오간 이야기를 {{n}} 갈래로 정리합니다. 개장 전에
+어젯밤 {lo_h}시부터 오늘 아침 {hi_h}시까지 채널에 오간 이야기를 {n} 갈래로 정리합니다. 개장 전에
 읽는 글입니다. 미국 시장이 열려 있던 시간이라 미국 종목·지표 이야기가 많습니다. 그
 이야기에 국내 종목이 엮여 있으면(공급사·같은 업종) 종목 줄에 함께 적으세요.""",
     "evening2": """\
@@ -1235,7 +1324,9 @@ def compose_sections(
     """
     if client is None:
         return []
-    task = TASKS[fmt].format(n=SECTIONS.get(fmt, "세")) + note
+    # 아침 과제의 시각은 창에서(TASKS 주석). 재료 없이 부르면 시계 창의 시각.
+    lo_h, hi_h = (mat.window[0].hour, mat.window[1].hour) if mat is not None else (NIGHT_FROM_HOUR, NIGHT_TO_HOUR)
+    task = TASKS[fmt].format(n=SECTIONS.get(fmt, "세"), lo_h=lo_h, hi_h=hi_h) + note
     try:
         resp = client.messages.create(
             model=model,
@@ -1503,7 +1594,7 @@ def previous_post_lines(rows: list[dict], R: Render) -> list[str]:
 
 
 def build_morning2(db, llm, model: str, R: Render, as_of: date, now: datetime, store: bool) -> str:
-    mat = load_material_with_fallback(db, lambda back: night_window(as_of - timedelta(days=back)), EXCERPTS_DAY)
+    mat = load_material_with_fallback(db, lambda back: run_window(as_of - timedelta(days=back), "morning", now), EXCERPTS_DAY)
     if not mat.excerpts:
         print("[skip] 밤사이 메시지가 없어 아침 글을 만들 수 없습니다.")
         return ""
@@ -1542,12 +1633,13 @@ def build_evening2(db, llm, model: str, R: Render, as_of: date, now: datetime, s
         # 마감이 없는 날이다. 온도도 전 거래일 값 그대로라 보내면 '마감 기준'이 거짓이 된다(머리말 '휴장일').
         print(f"[skip] {as_of} 은 KRX 휴장일이라 저녁 글을 보내지 않습니다.")
         return ""
-    mat = load_material_with_fallback(db, lambda back: day_window(as_of - timedelta(days=back), now), EXCERPTS_DAY)
+    mat = load_material_with_fallback(db, lambda back: run_window(as_of - timedelta(days=back), "evening", now), EXCERPTS_DAY)
     if not mat.excerpts:
         print("[skip] 오늘 메시지가 없어 저녁 글을 만들 수 없습니다.")
         return ""
     lo, hi = mat.window
-    day = lo.date()
+    # 날짜는 창의 끝에서 — 실행 몫 창의 처음은 아침 실행이 모은 마지막 글이라, 아침 수집이 죽은 날엔 전날 저녁이다.
+    day = hi.date()
     kr_d, kr_reasons = load_kr_reasons(db, day)
     faces = load_new_faces(db, day + timedelta(days=1))
     events = load_events(db, day + timedelta(days=1), day + timedelta(days=1), "KR")

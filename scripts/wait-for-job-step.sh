@@ -2,11 +2,11 @@
 #
 # 같은 실행의 다른 잡(또는 그 잡의 스텝)이 끝날 때까지 기다린다.
 #   bash scripts/wait-for-job-step.sh 분 "잡" ["잡::스텝 이름 앞부분"]…
-#   예) bash scripts/wait-for-job-step.sh 20 "update::국장 미리보기" insider
+#   예) bash scripts/wait-for-job-step.sh 45 kr_preview
 #
 # daily-update.yml 의 배당 잡이 핀허브를 쓰기 전에 부른다(2026-10-16). 핀허브 무료는 분당 60건이라, 국장 미리보기
-# (70종목)·내부자 리포트의 애널리스트 컨센서스와 같은 분에 겹치면 한쪽이 429 로 막힌다. 미리보기는 막히면 그날 카드가
-# 반쪽이 된다(fetch_kr_preview.py 머리말).
+# (70종목 남짓)와 같은 분에 겹치면 한쪽이 429 로 막힌다. 미리보기는 막히면 그날 카드가 반쪽이 된다(fetch_kr_preview.py 머리말).
+# 2026-10-17 부터 미리보기는 kr_preview 잡이라 잡 끝을 기다린다(아침엔 06:30 까지 기다렸다 돈다).
 #
 # ⚠️ 못 읽으면(권한 · 깃헙 장애) 시간이 다 될 때까지 기다리다 **그냥 지나간다** — 겹칠 위험만 남고 배당 수집은 돈다.
 #    잡에 `actions: read` 권한과 GH_TOKEN 이 있어야 한다.
