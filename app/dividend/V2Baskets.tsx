@@ -212,12 +212,15 @@ export function BasketBoard({
                     title={`${l.stock.name} 내 종목에 담기`}
                   >
                     <span className="v2-dv-bk-rank">{i + 1}</span>
-                    <StockLogo code={l.stock.code} name={l.stock.name} market={l.stock.market} size={22} lazy />
-                    {/* 이름 위 · 고른 까닭(15년 넘게 · 70년 연속 늘림) 아래 두 줄, 주 수는 줄 오른쪽 끝(2026-10-04). 까닭이 주 수 바로 앞에
-                        오른쪽 정렬로 붙어 있을 땐 '15년 넘게 5주'가 한 덩어리로 읽혔다. */}
-                    <span className="v2-dv-bk-stx">
-                      <span className="v2-dv-bk-stn">{l.stock.name}</span>
-                      {meta(l.stock) && <span className="v2-dv-bk-stm">{meta(l.stock)}</span>}
+                    {/* 로고 · 이름은 한 칸(표의 종목 칸 꼴) — 칸을 따로 두면 순위 · 로고 · 이름 시작선이 옆 표들과 6~10px 어긋났다(2026-10-15 점검). */}
+                    <span className="v2-td-stock">
+                      <StockLogo code={l.stock.code} name={l.stock.name} market={l.stock.market} size={22} lazy />
+                      {/* 이름 위 · 고른 까닭(15년 넘게 · 70년 연속 늘림) 아래 두 줄, 주 수는 줄 오른쪽 끝(2026-10-04). 까닭이 주 수 바로 앞에
+                          오른쪽 정렬로 붙어 있을 땐 '15년 넘게 5주'가 한 덩어리로 읽혔다. */}
+                      <span className="v2-dv-bk-stx">
+                        <span className="v2-dv-bk-stn">{l.stock.name}</span>
+                        {meta(l.stock) && <span className="v2-dv-bk-stm">{meta(l.stock)}</span>}
+                      </span>
                     </span>
                     <span className="v2-dv-bk-sts">{l.shares.toLocaleString("ko-KR")}주</span>
                   </button>

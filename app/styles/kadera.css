@@ -317,10 +317,11 @@
 .hz-tm-tile.is-lg .hz-tm-val { font-size: var(--fs-13); }
 .hz-tm-tile.is-sm .hz-tm-in { padding: 5px 7px; }
 .hz-tm-tile.is-sm .hz-tm-name { font-size: var(--fs-11); font-weight: 700; }
-/* 가늘고 긴 칸: 글자를 한 자씩 세로로. keep-all 을 풀어야 낱말 안에서 끊긴다. */
+/* 가늘고 긴 칸: 글자를 한 자씩 세로로. break-all 이면 칸이 넉넉할 때도 낱말 가운데를 끊어('소비재·유 / 통', 1280 미장 지도 · 2026-10-15 점검)
+   keep-all 로 낱말을 지키고 overflow-wrap: anywhere 로 들지 않는 낱말만 한 자씩 끊는다 — 가운뎃점 뒤 끊을 자리(Treemap.tsx)가 먼저 쓰인다. */
 .hz-tm-tile.is-tall .hz-tm-in { padding: 5px 4px; align-items: center; }
 /* 세로쓰기는 한 자가 한 줄이라 두 줄 제한을 풀어야 한다(풀지 않으면 두 자만 선다). 높이가 모자란 칸은 아래 ③ 이 통째로 뺀다. */
-.hz-tm-tile.is-tall .hz-tm-name { display: block; font-size: var(--fs-11); font-weight: 700; word-break: break-all; text-align: center; line-height: 1.2; }
+.hz-tm-tile.is-tall .hz-tm-name { display: block; font-size: var(--fs-11); font-weight: 700; word-break: keep-all; overflow-wrap: anywhere; text-align: center; line-height: 1.2; }
 /* 글자 단계는 **칸 자신의 크기**가 마무리한다. 서버는 폭·높이를 %로만 알고 2:1 · 900px 을 셈의 바탕으로 두는데,
    실제 칸은 화면마다 다른 px 이 된다 — 768px 에서 미장 칸 여덟이 이름을 5~22px 잘라 먹었고(2026-09-22 실측),
    320px 에서는 38px 칸에 "소프트웨어"가 세 줄로 들어찼다. 칸을 직접 재서 세 단으로 접는다.
