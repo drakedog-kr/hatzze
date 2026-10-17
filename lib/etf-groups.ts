@@ -111,3 +111,13 @@ export function etfPickTest(key: string): (g: EtfGroup) => boolean {
   return (g) => g === key;
 }
 export const ETF_PICK_KEYS: string[] = [ETF_ALL, ETF_NOCASH, ...ETF_GROUPS];
+
+/**
+ * 배수 상품(레버리지 · 인버스)인지 — 유형과 따로 이름 · 분류로 본다. 유형 판정은 원자재 · 채권을 먼저 보므로 '팔라듐선물인버스'는 원자재,
+ * '국채30년레버리지'는 채권으로 가서 ETF 히어로 '수익률 상위' 1 · 2위에 섰다(2026-10-15 점검). 롱숏(코스닥150롱코스피200숏)은 배수 상품이 아니라 둔다.
+ */
+const MULTIPLE_NAME = /레버리지|인버스|\b[23]X\b/i;
+const MULTIPLE_CATEGORY = new Set(["파생상품/레버리지", "파생상품/인버스"]);
+export function isMultipleEtf(name: string, category?: string | null): boolean {
+  return MULTIPLE_NAME.test(name) || (category != null && MULTIPLE_CATEGORY.has(category));
+}
