@@ -151,14 +151,20 @@ def member_name(first: str, last: str) -> str:
     return " ".join(out)
 
 
-def to_iso(mdy: str) -> str | None:
-    """`4/15/2026` → `2026-04-15`.
+def to_iso(mdy: str | None) -> str | None:
+    """`4/15/2026` → `2026-04-15`. 비었거나(None · 빈 문자열) 꼴이 다르면 None.
 
     ⚠️ **0 을 채워야 한다.** 하원 색인은 월·일을 안 채워서 준다(`4/15/2026`). 안 채우면
     `2026-4-15` 가 되는데, Postgres 는 이걸 날짜로 잘 파싱하지만 **파이썬 문자열 비교가
     깨진다** — `"2026-8-13" >= "2026-08-10"` 이 참이 되어 증분 기준선이 무력해진다.
     실제로 그 탓에 매번 105건을 다시 읽고 있었다.
+
+    ⚠️ **None 을 받는다.** 거래일이 신고일보다 늦은 PDF 오기는 main 이 거래일을 None 으로 비운 뒤
+    여기로 넘긴다. 예전엔 ValueError 만 잡아 `None.split` 의 AttributeError 로 스크립트가 통째로
+    죽었다 — 2026-10-17 토요일 전량 읽기에서 PINS(20034099) 한 줄에 377건 저장이 다 날아갔다(#753).
     """
+    if not mdy:
+        return None
     try:
         m, d, y = mdy.split("/")
         return f"{y}-{m.zfill(2)}-{d.zfill(2)}"
