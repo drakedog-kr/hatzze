@@ -227,8 +227,8 @@ def png_sharpness(body: bytes) -> float | None:
         im = Image.open(io.BytesIO(body)).convert("RGBA")
         bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
         bg.alpha_composite(im)
-        px = bg.convert("RGB").resize((SIZE, SIZE))
-        return sharpness(list(px.getdata()), SIZE)
+        raw = bg.convert("RGB").resize((SIZE, SIZE)).tobytes()  # getdata 는 Pillow 14 에서 빠진다(12 에서 경고)
+        return sharpness([tuple(raw[i : i + 3]) for i in range(0, len(raw), 3)], SIZE)
     except Exception:  # noqa: BLE001 — 깨진 그림은 재지 않는다
         return None
 
