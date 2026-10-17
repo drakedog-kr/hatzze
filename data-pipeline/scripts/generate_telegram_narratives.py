@@ -1328,6 +1328,24 @@ def schedule_lines(picked: list[str], span: str) -> list[str]:
 # 덧붙인다. 매칭이 이미 앞쪽이면(55.1%) 발췌는 예전과 한 글자도 다르지 않다.
 # 종목별로 본문을 받아 볼 후보 수. 이 중 공백뿐인 것을 버리고 앞에서 3건을 쓴다.
 STOCK_EXCERPT_CANDIDATES = 10
+# 종목 흐름 요약 발췌의 차례 — 시장 전체를 말한 글(telegram_message_market 이 국내 · 미국 어느 쪽이든 시장 글로 본 것)은 뒤로,
+# 그 종목 이름이 앞쪽(EXCERPT_NAME_HEAD 자 안)에 나온 글을 먼저, 그 안에서 퍼진 순(reach). 퍼진 순 하나로 고르던 때
+# 미장 마이크론이 사흘 연속 '국내 증시 … 미국 AI 이슈' 시황 글로 요약됐고(10-15 미장 발췌 36건 중 12건이 시장 글),
+# 국장도 '시황 글에도 이름이 올랐다' 꼴이 나왔다(2026-10-15 점검). 시장 글뿐이면 예전처럼 그것으로 채운다.
+EXCERPT_NAME_HEAD = 120
+
+
+def excerpt_order_key(is_market: bool, text: str | None, needle: str | None, spread: float) -> tuple:
+    """발췌 후보의 차례 열쇠(작을수록 앞) — 시장 글 아님 → 이름이 앞쪽 → 퍼짐."""
+    pos = (text or "").find(needle) if needle else -1
+    return (is_market, not 0 <= pos < EXCERPT_NAME_HEAD, -spread)
+
+
+def market_message_keys(db, since: str) -> set[tuple[str, int]]:
+    """`since`(KST 날짜)부터 시장 전체를 말한 글의 (채널, 메시지 번호). 표가 없거나 실패하면 빈 집합(예전 차례)."""
+    return {(r["channel_handle"], r["message_id"]) for r in load_market_messages(db, since)}
+
+
 EXCERPT_CHARS = 180
 EXCERPT_HEAD = 90
 # 줄인 자리 표시. **STOCK_SYSTEM 이 이 기호를 글자 그대로 설명한다**(그쪽이 위에 있어
@@ -1916,6 +1934,26 @@ def flow_days(rows: list[dict], latest: str) -> list[str]:
     return sorted(days)
 
 
+def us_sessions(db, days: list[str]) -> dict[str, dict]:
+    """KST 날짜 → 그날 아침까지 끝난 직전 미국장(kr_preview_day 의 us_session · spx_dp). 못 읽으면 빈 사전(머리에 안 붙인다)."""
+    if not days:
+        return {}
+    try:
+        rows = db.table("kr_preview_day").select("date,us_session,spx_dp").in_("date", days).execute().data or []
+    except Exception as exc:  # noqa: BLE001 — 표가 없거나 일시 장애면 예전 머리 그대로
+        print(f"[시장 흐름] 직전 미국장 날짜를 못 읽어 머리에 안 붙입니다: {type(exc).__name__}: {exc}")
+        return {}
+    return {r["date"]: r for r in rows if r.get("us_session")}
+
+
+def us_session_note(session: dict | None) -> str:
+    """미장 날짜 머리 뒤에 붙일 사실 한 줄 — ' · 직전 미국장 10-14(수) S&P500 -1.11%'. 없으면 빈 문자열."""
+    if not session:
+        return ""
+    move = f" S&P500 {session['spx_dp']:+.2f}%" if session.get("spx_dp") is not None else ""
+    return f" · 직전 미국장 {md_with_weekday(session['us_session'])}{move}"
+
+
 def flow_block(db, rows: list[dict], latest: str, market: str) -> list[str]:
     """[시장 흐름] 블록 — 날마다 도달 상위 시장 글 몇 건, 오래된 날부터. 재료가 없으면 빈 목록(둘째 대목을 안 쓴다).
 
@@ -1935,6 +1973,9 @@ def flow_block(db, rows: list[dict], latest: str, market: str) -> list[str]:
     if not cands:
         return []
     attach_texts(db, cands)
+    # 미장은 한국 날짜 머리만 주면 모델이 그날 글이 다룬 미국장 요일을 하루 늦게 적었다 — 10-16 · 17 총평이 수요일장 CPI 하락을
+    # '목요일'로, 목요일 반등을 '금요일'로 썼다(2026-10-15 점검). 머리에 그날 아침까지 끝난 미국장을 사실로 붙인다.
+    sessions = us_sessions(db, days) if market == "us" else {}
     seen: set[str] = set()
     body_lines: list[str] = []
     for d in days:
@@ -1949,15 +1990,20 @@ def flow_block(db, rows: list[dict], latest: str, market: str) -> list[str]:
             if len(picked) >= FLOW_PER_DAY:
                 break
         if picked:
-            body_lines += [md_with_weekday(d) + (" · 오늘" if d == latest else "")] + picked
+            body_lines += [md_with_weekday(d) + (" · 오늘" if d == latest else "") + us_session_note(sessions.get(d))] + picked
     if not body_lines:
         return []
     span = "오늘" if days == [latest] else f"{days[0][5:]}~{days[-1][5:]}"
+    us_foot = (
+        ["  ※ 날짜 머리는 글을 올린 한국 날짜입니다. 그날 글이 다루는 미국장은 '직전 미국장'의 요일입니다."]
+        if market == "us" and any("직전 미국장" in ln for ln in body_lines) else []
+    )
     return [
         "",
         f"[{span} {FLOW_BLOCK_HEAD}] 증시 전체를 말한 글 가운데 날마다 조회·확산 상위 {FLOW_PER_DAY}건 (오래된 날부터)",
         *body_lines,
         "  ※ [기사]는 보도된 사실이고 [리서치]·[채널 의견]은 글쓴이의 풀이입니다.",
+        *us_foot,
     ]
 
 
@@ -2193,8 +2239,12 @@ def build_stock_digests(
     codes: list[str] | None = None,
     msgs: list[dict] | None = None,
     end: str | None = None,
+    market_keys: set[tuple[str, int]] | None = None,
 ) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]]]:
     """([(종목코드, 종목명, digest)], [(종목코드, 종목명)]).
+
+    `market_keys` 는 시장 전체를 말한 글(market_message_keys) — 발췌 차례에서 뒤로 민다(EXCERPT_NAME_HEAD 주석).
+    안 주면 여기서 읽는다.
 
     `msgs` 는 load_messages_since(db, since) 결과. main 은 총평과 나눠 쓰려고 미리 읽어
     넘기고, 안 주면(급부상 한 줄 요약 경로) 여기서 읽는다.
@@ -2315,6 +2365,8 @@ def build_stock_digests(
     if msgs is None:
         msgs = load_messages_since(db, since)
     msgs = {(m["channel_handle"], m["message_id"]): m for m in msgs}
+    if market_keys is None:
+        market_keys = market_message_keys(db, since)
     # 증권사 화자 행(config.HOUSE_METHOD 주석)은 그 증권사의 요약 재료가 아니다. 글은 다른 종목 재료로 남는다.
     # 태그 · 분석은 글에 붙여 받은 것을 쓴다(tags_from_messages) — 창 밖 글의 태그는 아래에서 어차피 버렸다.
     mentions = [m for m in tags_from_messages(db, msgs) if not is_house(m)]
@@ -2356,16 +2408,15 @@ def build_stock_digests(
                 # (실측: "낙관 톤이 64%를 차지했습니다"). 톤의 방향만 알면 충분하다.
                 lines.append(f"[언급 톤] {tone_label(o)}")
 
-        # 가장 널리 퍼진 메시지 3건을 근거로 준다 — '왜 화제였는지'를 지어내지 않도록.
-        keys.sort(
-            key=lambda k: (msgs[k].get("views") or 0) + (msgs[k].get("forwards") or 0) * 3,
-            reverse=True,
-        )
+        # 널리 퍼진 메시지 3건을 근거로 준다 — '왜 화제였는지'를 지어내지 않도록. 시장 전체를 말한 글은 뒤로(EXCERPT_NAME_HEAD 주석).
+        keys.sort(key=lambda k: (k in market_keys, -reach(msgs[k])))
         # 본문은 여기서, 이긴 것만 받는다(load_messages_since 주석 참고). 3건이 아니라
         # 넉넉히 부르는 이유는 공백뿐인 본문이 섞일 수 있어서다.
         head = [msgs[k] for k in keys[:STOCK_EXCERPT_CANDIDATES]]
         attach_texts(db, head)
         keys = [k for k in keys[:STOCK_EXCERPT_CANDIDATES] if (msgs[k].get("text") or "").strip()]
+        # 본문이 붙은 뒤 이름 자리까지 보고 다시 세운다(조회는 늘지 않는다).
+        keys.sort(key=lambda k: excerpt_order_key(k in market_keys, msgs[k].get("text"), needle_of.get(k + (code,)), reach(msgs[k])))
         if keys:
             lines.append("")
             lines.append("[대표 메시지 발췌]")

@@ -85,8 +85,11 @@ def build_us_theme_bundle(
         for t in others - {theme}:
             related[t] += 1
 
-    # 널리 퍼진 글부터(views + forwards×3). 국장과 같은 잣대.
-    items.sort(key=lambda m: (m.get("views") or 0) + (m.get("forwards") or 0) * 3, reverse=True)
+    # 목록 글이 아닌 것부터, 그 안에서 널리 퍼진 글부터(views + forwards×3). 국장과 같은 잣대(TB.list_post · TB.pick_excerpts).
+    items.sort(key=lambda m: (
+        TB.list_post(len({x["ticker"] for x in m["mentions"]})),
+        -((m.get("views") or 0) + (m.get("forwards") or 0) * 3),
+    ))
 
     def needle_for(m: dict) -> str | None:
         # 발췌를 자를 때 쓸 '본문에 적힌 표기'. 이 테마 종목 중 첫 언급의 것.
@@ -95,19 +98,7 @@ def build_us_theme_bundle(
                 return x["match_text"]
         return None
 
-    seen: set[str] = set()
-    picked: list[dict] = []
-    for m in items[: TB.EXCERPT_CANDIDATES]:
-        text = (m.get("text") or "").strip()
-        if not text:
-            continue
-        dk = TB.dedupe_key(text)
-        if not dk or dk in seen:
-            continue
-        seen.add(dk)
-        picked.append(m)
-        if len(picked) >= max(TB.EXCERPTS_DIGEST, TB.EXCERPTS_SHOWN):
-            break
+    picked: list[dict] = TB.pick_excerpts(items[: TB.EXCERPT_CANDIDATES], lambda m: m.get("text"), max(TB.EXCERPTS_DIGEST, TB.EXCERPTS_SHOWN))
 
     excerpts = []
     for m in picked[: TB.EXCERPTS_SHOWN]:
@@ -192,7 +183,13 @@ def main() -> None:
     # ── 둘째 몫: 급부상 종목의 이유 ── digest 는 종목 요약과 같은 함수·같은 창.
     # 여유 후보까지 이유를 쓴다(국장 generate_theme_briefs.py · common/theme_risers.py RISER_SPARE 와 같은 까닭).
     risers = us_theme_risers(db, latest, RISER_MAX + RISER_SPARE)
-    riser_digests, _ = US.build_stock_digests(latest, msgs, name_of, tickers=[r["code"] for r in risers]) if risers else ([], [])
+    riser_digests, _ = (
+        US.build_stock_digests(
+            latest, msgs, name_of, tickers=[r["code"] for r in risers],
+            market_keys=US.market_message_keys(db, min(m["date"] for m in msgs)) if msgs else None,
+        )
+        if risers else ([], [])
+    )
     digest_of = {t: d for t, _n, d in riser_digests}
     riser_of = {r["theme"]: r for r in risers}
     print(f"[급부상] {len(risers)}테마 · " + " · ".join(f"{r['theme']}:{r['name']}" for r in risers[:8]) + (" …" if len(risers) > 8 else ""))
@@ -209,7 +206,7 @@ def main() -> None:
         for x in {x["ticker"]: x for x in m["mentions"]}.values():
             if x["ticker"] in wanted:
                 pool[x["ticker"]].append((m, x.get("match_text")))
-    blocks = TB.talk_blocks(pool, sorted(wanted))
+    blocks = TB.talk_blocks(pool, sorted(wanted), tags_of=lambda msg: len({x["ticker"] for x in msg["mentions"]}))
 
     if dry_run:
         for theme in targets:
@@ -273,7 +270,7 @@ def main() -> None:
         r = riser_of.get(theme)
         if r is not None:
             # 화면이 국장과 같은 타입으로 읽는다 — code 에 티커, market 은 늘 "US"(lib/us-theme-page.ts).
-            row["riser"] = {"code": r["code"], "name": r["name"], "market": "US", "recent": r["recent"], "prior": r["prior"], "ratio": r["ratio"],
+            row["riser"] = {"code": r["code"], "name": r["name"], "market": "US", "recent": r["recent"], "prior": r["prior"], "ratio": r["ratio"], "score": round(r["score"], 4),
                             "reason": TB.write_riser_reason(ask_with, US_RISER_SYSTEM, digest_of.get(r["code"]), r["name"])}
             print(f"  [{theme} · {r['name']}] {row['riser']['reason'] or '(이유 없음)'}")
         items = [(t, name_of.get(t, t), blocks[t]) for t in hot_of.get(theme, []) if t in blocks]

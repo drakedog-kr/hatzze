@@ -22,6 +22,7 @@ import { isLoadFailed } from "./load-state";
 import { RISER_FALLBACK_DAYS, risersWithFallback, type RiserRow, type ThemeRiser } from "./theme-risers";
 import { quoteChangeRate } from "./krx-gap";
 import { fetchYahooQuote } from "./yahoo-quote";
+import { reasonContradictsMove } from "./move-sign";
 
 /**
  * 테마 실주소 화면(`/theme/반도체`)과 테마 목록(`/theme`)이 쓰는 자료.
@@ -420,7 +421,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
 
   type ThemeDailyRow = { date: string; share_pct: number | string; rank: number | null; mention_count: number | null };
   type StockDailyRow = { id: number; date: string; stock_code: string; mention_count: number | null; channel_count: number | null; weighted_score: number | string | null };
-  type ReasonRow = { date: string; stock_code: string; reason: string | null; change_rate: number | string | null; close_price: number | string | null; channel_count: number | null };
+  type ReasonRow = { date: string; stock_code: string; reason: string | null; quoted_change_rate: number | string | null; change_rate: number | string | null; close_price: number | string | null; channel_count: number | null };
 
   let stockDailyFailed = false;
   const [themeDaily, stockDaily, reasonRows, events, rotation, briefRow, meta, dayTotals] = await Promise.all([
@@ -436,7 +437,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
     codes.length
       ? db
           .from("telegram_stock_move_reason")
-          .select("date,stock_code,reason,change_rate,close_price,channel_count")
+          .select("date,stock_code,reason,quoted_change_rate,change_rate,close_price,channel_count")
           .in("stock_code", codes)
           .gte("date", first)
           .lte("date", baseDate)
@@ -474,10 +475,12 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
   if (briefRow.error) console.error(`[getThemePage] ${theme} 요약을 못 읽었습니다`, briefRow.error);
 
   // ── 까닭 이력 ──
+  const quotedOf = new Map<string, number | null>();
   const reasons: ThemeReasonRow[] = [];
   for (const r of (reasonRows.data ?? []) as ReasonRow[]) {
     const m = byCode.get(r.stock_code);
     if (!m || !r.reason) continue;
+    quotedOf.set(`${r.date}|${r.stock_code}`, r.quoted_change_rate == null ? null : Number(r.quoted_change_rate));
     reasons.push({
       ...m,
       date: r.date,
@@ -488,6 +491,11 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
     });
   }
   await fillTodayRates(reasons);
+  // 표기 등락과 문장 방향이 함께 실제 등락(확정값 · 오늘 줄은 야후)과 반대인 줄은 뺀다 — 그 이유는 반대쪽 글에서 왔다(lib/move-sign.ts).
+  for (let i = reasons.length - 1; i >= 0; i--) {
+    const r = reasons[i];
+    if (reasonContradictsMove(r.reason, quotedOf.get(`${r.date}|${r.code}`), r.changeRate)) reasons.splice(i, 1);
+  }
   const reasonDates = new Set(reasons.map((r) => r.date));
 
   // ── 추이 ── 언급이 0인 날은 표에 행이 없다. 빈 날을 0으로 메워야 막대 개수가 늘 같다.

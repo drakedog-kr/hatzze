@@ -1308,8 +1308,9 @@
   /* 손잡이 — 폰 여백(18px) 안에 12px. 과녁은 세로로 길게(36px)지만 점은 데스크톱처럼 세 줄만(padding + content-box). */
   .dv-tgrip { width: 12px; height: 36px; margin-left: -17px; padding: 7.5px 0; background-size: 6px 7px; background-clip: content-box; }
   .dv-trow-drag { margin: 0 -6px 0 -18px; padding-left: 18px; padding-right: 6px; }
-  /* 줄의 계좌 알약 — 21px 은 손가락엔 작다. 폰에선 28px 로(2026-09-17 검사). */
-  .dv-tacct { padding: 5px 18px 5px 8px; width: 96px; font-size: var(--fs-12); background-position: right 6px center; }
+  /* 줄의 계좌 알약 — 21px 은 손가락엔 작다. 폰에선 28px 로(2026-09-17 검사).
+     글자는 위 입력칸들처럼 16px — 그 아래면 iOS 사파리가 누를 때 화면을 확대한다(2026-10-15 점검). 폭은 가장 긴 "비과세저축"이 드는 만큼. */
+  .dv-tacct { padding: 3px 16px 3px 8px; width: 108px; font-size: var(--fs-16); background-position: right 5px center; }
 }
 @media (max-width: 560px) {
   .dv-body { padding: 12px 18px 18px; }

@@ -76,6 +76,8 @@ from config.us_stock_extraction import is_house  # noqa: E402
 # 두 화면이 같아야 하고, 손으로 베끼면 한쪽만 고쳤을 때 조용히 갈린다.
 from generate_telegram_narratives import (  # noqa: E402
     BRIEF_MAX_TOKENS,
+    excerpt_order_key,
+    market_message_keys,
     BRIEF_NEWS_LEN,
     BRIEF_RETRIES,
     BRIEF_SCHEDULE_LEN,
@@ -192,8 +194,8 @@ US_BRIEF_NEWS_COMMON = BRIEF_NEWS_COMMON + _US_EXTRA.replace(_US_TARGET_OLD, _US
 BRIEF_TONE_SYSTEM = US_COMMON + f"""
 
 [이번 대목 — 전체 분위기]
-여기는 **한국 주식 텔레그램 채널들이 미국 종목을 두고 나눈 이야기**입니다. 미국 시장
-자체의 분위기가 아니라, 한국 채널의 미국 이야기가 어느 쪽인지를 씁니다.
+여기는 **한국 주식 텔레그램 채널들이 미국 증시를 두고 나눈 이야기**입니다. [전체]에 적힌 글이 어느 쪽인지를
+씁니다. 미국 지수가 실제로 어떻게 움직였는지가 아니라, 그 글들의 분위기입니다.
 **오늘 하루** 그 분위기가 어느 쪽인지를 먼저 쓰고, 그게 이 기간의 다른 날과 어떻게 다른지를 붙여
 **한두 문장**으로 쓰세요. [오늘 하루]가 주인공이고 [전체]·[낙관도 추이]는 견주는 배경입니다.
 
@@ -471,21 +473,23 @@ def build_brief_digest(db, latest: str, msgs: list[dict], name_of: dict[str, str
         head["negative"] += r["negative_count"]
         head["total"] += r["message_count"]
     use_market = head["total"] > 0 and head["positive"] + head["negative"] > 0
+    # 머리 줄 · [전체] 줄 · 첫 대목 지시문이 같은 대상을 말하게 한다 — [전체]는 미국 증시 전체를 말한 글로 세는데 머리가
+    # '미국 종목을 두고 나눈 이야기'라, 8일 첫 문단이 모두 '한국 채널의 미국 종목 이야기'로 시작했다(2026-10-15 점검, 국장은 09-29).
     if use_market:
-        head_days, sent = m_days, m_win
+        head_days, sent, what = m_days, m_win, "미국 증시 전체를 말한 글"
     else:
-        head, head_days = agg, sent_days
+        head, head_days, what = agg, sent_days, "미국 종목을 말한 글"
 
     opt = optimism(head["positive"], head["negative"])
     if opt is None:
         return None
 
     lines = [
-        "이 데이터는 **한국 주식 텔레그램 채널들이 미국 종목을 두고 나눈 이야기**입니다.",
+        "이 데이터는 **한국 주식 텔레그램 채널들이 미국 증시를 두고 나눈 이야기**입니다.",
         "",
-        f"[전체] 최근 {len(head_days)}일({head_days[0][5:]}~{head_days[-1][5:]}, 오늘 포함) · 낙관도 {opt}% · {tone_label(opt)} "
-        f"(낙관 : 비관 = {opt} : {100 - opt})",
-        f"  ※ 낙관도는 중립을 뺀 값입니다. {'미국 증시 전체를 말한 글' if use_market else '전체'}의 "
+        f"[전체] 최근 {len(head_days)}일({head_days[0][5:]}~{head_days[-1][5:]}, 오늘 포함) {what} {head['total']}건 · "
+        f"낙관도 {opt}% · {tone_label(opt)} (낙관 : 비관 = {opt} : {100 - opt})",
+        f"  ※ 낙관도는 중립을 뺀 값입니다. {'이 글들' if use_market else '전체'}의 "
         f"{head['neutral'] * 100 // head['total']}%가 중립이라 제외했습니다.",
     ]
 
@@ -635,6 +639,7 @@ def build_stock_digests(
     msgs: list[dict],
     name_of: dict[str, str],
     tickers: list[str] | None = None,
+    market_keys: set[tuple[str, int]] | None = None,
 ) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]]]:
     """(티커, 이름, digest) 목록과 '반드시 요약이 있어야 하는' 목록.
 
@@ -649,6 +654,8 @@ def build_stock_digests(
     window_dates(기준일 포함)다 — 테마 급부상(common/us_theme_risers)이 기준일을 넣어 센다.
     메시지는 두 창을 다 덮게 받아 넘길 것(main 참고)."""
     since, end = window_dates(latest) if tickers is not None else card_window(latest)
+    # 시장 전체를 말한 글(국장 짝 market_message_keys). 부르는 쪽이 db 로 읽어 넘긴다 — 안 주면 예전 차례(조회 순)다.
+    market_keys = market_keys or set()
 
     def by_ticker_in(until: str) -> dict[str, list[dict]]:
         out: dict[str, list[dict]] = defaultdict(list)
@@ -695,13 +702,19 @@ def build_stock_digests(
         name = name_of.get(ticker, ticker)
         by_day = Counter(m["date"] for m in items)
         chans = len({m["channel_handle"] for m in items})
-        top = sorted(excerpt_pool[ticker], key=lambda m: -(m.get("views") or 0))[:STOCK_EXCERPTS]
+        # 시장 전체를 말한 글은 뒤로, 이름이 앞쪽인 글을 먼저, 그 안에서 조회 순(국장 짝 excerpt_order_key 주석).
+        top = sorted(
+            excerpt_pool[ticker],
+            key=lambda m: excerpt_order_key(
+                (m["channel_handle"], m["message_id"]) in market_keys, m.get("text"), m.get("match_text"), m.get("views") or 0,
+            ),
+        )[:STOCK_EXCERPTS]
         lines = [
             f"[종목] {name} ({ticker}) · 미국 상장",
             f"[최근 {WINDOW_DAYS}일] 언급 {len(items)}회 · {chans}개 채널",
             "[일별] " + " · ".join(f"{d[5:]} {by_day[d]}회" for d in sorted(by_day)) + (f" · 직전 {WINDOW_DAYS}일 합 {prev_count[ticker]}회" if covered else ""),
             "",
-            f"[대표 메시지 발췌] 조회수 상위 {len(top)}건",
+            f"[대표 메시지 발췌] {len(top)}건",
         ]
         for m in top:
             lines.append(f"- {excerpt(m['text'], m.get('match_text'))}")
@@ -748,7 +761,10 @@ def main() -> None:
     print(f"[재료] 창 안 미국 언급 메시지 {len([m for m in msgs if since <= m['date'] <= end]):,}건")
 
     brief_digest = None if stocks_only else build_brief_digest(db, latest, msgs, name_of)
-    stock_digests, required = ([], []) if brief_only else build_stock_digests(latest, msgs, name_of)
+    stock_digests, required = (
+        ([], []) if brief_only
+        else build_stock_digests(latest, msgs, name_of, market_keys=market_message_keys(db, min(m["date"] for m in msgs)) if msgs else None)
+    )
 
     if dry_run:
         print("─" * 60)

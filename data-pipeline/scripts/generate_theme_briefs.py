@@ -111,6 +111,32 @@ RELATED_KEEP = 5
 # 글은 "같이 화제였다"가 아니라 "같은 날 목록에 있었다"라, 그런 글로 세면 반도체의 이웃이 늘
 # 전선·바이오·지주가 된다(2026-09-19 dry-run 실측: 상위 다섯이 전부 정리 글 몫이었다).
 RELATED_MAX_TAGS = 6
+# 발췌는 '목록 글'(종목이 RELATED_MAX_TAGS 넘게 태그된 시황 · 일정표 · 순위 정리)을 뒤로 세운다. 조회수만 보던 때 10-15 국장
+# 26테마 발췌 260건 중 120건(46%)이 목록 글이었고, 요약이 '목록에 올랐다' · '목록에서도 이름이 올랐다'를 옮겼다
+# (8일 요약 206건 중 88건 · 2026-10-15 점검). 짧은 감상 한 줄(EXCERPT_MIN_CHARS 아래)은 목록 글보다도 뒤로 미룬다 —
+# 목록 글을 밀어내고 앞에 서면 재료가 더 얇아진다. 미장(generate_us_theme_briefs.py)도 같은 잣대를 쓴다.
+EXCERPT_MIN_CHARS = 40
+
+
+def list_post(n_tags: int) -> bool:
+    """종목이 RELATED_MAX_TAGS 넘게 태그된 '목록 글'인가."""
+    return n_tags > RELATED_MAX_TAGS
+
+
+def pick_excerpts(cands: list, text_of, need: int) -> list:
+    """후보(이미 차례대로)에서 발췌 need 개 — 같은 글(복붙)은 한 번만, 짧은 글은 모자랄 때만 뒤에 채운다."""
+    seen: set[str] = set()
+    long_, short = [], []
+    for c in cands:
+        text = (text_of(c) or "").strip()
+        if not text:
+            continue
+        dk = dedupe_key(text)
+        if not dk or dk in seen:
+            continue
+        seen.add(dk)
+        (long_ if len(text) >= EXCERPT_MIN_CHARS else short).append(c)
+    return (long_ + short)[:need]
 
 # 매수·매도 표현(EXTRA_BANNED)·시세 낱말(PRICE_WORDS)은 종목 흐름 요약과 함께 쓴다 — common/stock_framing.py.
 
@@ -419,13 +445,19 @@ def talk_pick(candidates: list[str], digest: str, name: str = "") -> str | None:
     return min(in_ok or candidates, key=lambda t: abs(len(t) - mid))
 
 
-def talk_blocks(pool: dict[str, list[tuple[dict, str | None]]], order: list[str], attach=None) -> dict[str, str]:
+def talk_blocks(
+    pool: dict[str, list[tuple[dict, str | None]]], order: list[str], attach=None, tags_of=None,
+) -> dict[str, str]:
     """종목마다 발췌 블록("- 발췌" 줄들). pool[코드] = [(글, 본문에 적힌 표기)] — 창 안에서 그 종목이 태그된 글.
 
-    널리 퍼진 글부터(종목 요약과 같은 잣대) 같은 글(복붙)은 한 번만. `attach` 는 본문이 없는 글에 본문을 붙이는
-    함수다 — 국장 글은 본문 없이 받아 이긴 것만 붙이고(KR.attach_texts), 미장 글은 본문째 온다(None).
+    목록 글이 아닌 것부터(tags_of 가 글의 태그 종목 수를 준다 · list_post), 그 안에서 널리 퍼진 글부터(종목 요약과 같은 잣대),
+    같은 글(복붙)은 한 번만. `attach` 는 본문이 없는 글에 본문을 붙이는 함수다 — 국장 글은 본문 없이 받아 이긴 것만
+    붙이고(KR.attach_texts), 미장 글은 본문째 온다(None).
     """
-    heads = {c: sorted(pool.get(c, []), key=lambda x: -KR.reach(x[0]))[:TALK_CANDIDATES] for c in order}
+    def rank(x: tuple[dict, str | None]) -> tuple:
+        return (list_post(tags_of(x[0])) if tags_of else False, -KR.reach(x[0]))
+
+    heads = {c: sorted(pool.get(c, []), key=rank)[:TALK_CANDIDATES] for c in order}
     if attach:
         need = list({id(m): m for items in heads.values() for m, _ in items if "text" not in m}.values())
         if need:
@@ -601,25 +633,17 @@ def build_theme_bundle(
         for t in others - {theme}:
             related[t] += 1
 
-    # 널리 퍼진 글부터. 종목 요약과 같은 잣대(views + forwards×3).
-    keys.sort(key=lambda k: (msgs[k].get("views") or 0) + (msgs[k].get("forwards") or 0) * 3, reverse=True)
+    # 목록 글이 아닌 것부터, 그 안에서 널리 퍼진 글부터. 퍼짐은 종목 요약과 같은 잣대(views + forwards×3).
+    keys.sort(key=lambda k: (
+        list_post(len({t["stock_code"] for t in tags_by_key[k]})),
+        -((msgs[k].get("views") or 0) + (msgs[k].get("forwards") or 0) * 3),
+    ))
     head = [msgs[k] for k in keys[:EXCERPT_CANDIDATES]]
     KR.attach_texts(db, head)
 
-    seen: set[str] = set()
-    picked: list[tuple[tuple, dict]] = []
-    for k in keys[:EXCERPT_CANDIDATES]:
-        m = msgs[k]
-        text = (m.get("text") or "").strip()
-        if not text:
-            continue
-        dk = dedupe_key(text)
-        if not dk or dk in seen:
-            continue
-        seen.add(dk)
-        picked.append((k, m))
-        if len(picked) >= max(EXCERPTS_DIGEST, EXCERPTS_SHOWN):
-            break
+    picked: list[tuple[tuple, dict]] = [
+        (k, msgs[k]) for k in pick_excerpts(keys[:EXCERPT_CANDIDATES], lambda k: msgs[k].get("text"), max(EXCERPTS_DIGEST, EXCERPTS_SHOWN))
+    ]
 
     def needle_for(k: tuple) -> str | None:
         # 발췌를 자를 때 쓸 '본문에 적힌 표기'. 이 테마 종목 중 첫 태그의 것.
@@ -840,7 +864,10 @@ def main() -> None:
         if c in wanted and k in talk_msgs and not is_house(m) and (k, c) not in seen_tag:
             seen_tag.add((k, c))
             pool[c].append((talk_msgs[k], m.get("match_text")))
-    blocks = talk_blocks(pool, sorted(wanted), attach=lambda rows: KR.attach_texts(db, rows))
+    blocks = talk_blocks(
+        pool, sorted(wanted), attach=lambda rows: KR.attach_texts(db, rows),
+        tags_of=lambda msg: len({t["stock_code"] for t in tags_by_key.get((msg["channel_handle"], msg["message_id"]), [])}),
+    )
 
     if dry_run:
         for theme in targets:
@@ -885,7 +912,7 @@ def main() -> None:
         r = riser_of.get(theme)
         if r is None:
             return None
-        out = {"code": r["code"], "name": r["name"], "market": market_of.get(r["code"]), "recent": r["recent"], "prior": r["prior"], "ratio": r["ratio"], "reason": None}
+        out = {"code": r["code"], "name": r["name"], "market": market_of.get(r["code"]), "recent": r["recent"], "prior": r["prior"], "ratio": r["ratio"], "score": round(r["score"], 4), "reason": None}
         out["reason"] = write_riser_reason(ask_with, RISER_SYSTEM, digest_of.get(r["code"]), r["name"])
         return out
 

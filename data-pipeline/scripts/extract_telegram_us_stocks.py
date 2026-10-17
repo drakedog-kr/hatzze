@@ -55,6 +55,8 @@ from common.supabase_client import execute_with_retry, get_client  # noqa: E402
 from config.us_stock_extraction import (  # noqa: E402
     HOUSE_METHOD,
     NAME_EXCLUDE,
+    COMPANY_ONLY,
+    NEGATIVE_BEFORE,
     NEGATIVE_CONTEXT,
     RESEARCH_HOUSES,
     US_NAMES,
@@ -72,6 +74,14 @@ from extract_telegram_stocks import (  # noqa: E402
 )
 
 NEG_RE = {name: re.compile(pat) for name, pat in NEGATIVE_CONTEXT.items()}
+NEG_BEFORE_RE = {name: re.compile(pat) for name, pat in NEGATIVE_BEFORE.items()}
+COMPANY_RE = {name: (re.compile(after), re.compile(nearby)) for name, (after, nearby) in COMPANY_ONLY.items()}
+
+
+def company_context(text: str, end: int, key: str) -> bool:
+    """COMPANY_ONLY 표기 한 자리가 회사로 다뤄졌나 — 바로 뒤 '(티커)' · 제 등락 표기 · 같은 글의 회사 문맥 낱말."""
+    after, nearby = COMPANY_RE[key]
+    return bool(after.match(text, end) or own_move_after(text, end) or nearby.search(text))
 
 
 def treated_as_stock(text: str, end: int, ticker: str) -> bool:
@@ -128,6 +138,11 @@ def extract(
         # 제품명·기술명으로도 쓰이는 자리는 뒤 문맥으로 가른다.
         neg = NEG_RE.get(key)
         if neg and neg.match(text, m.end()):
+            continue
+        before = NEG_BEFORE_RE.get(key)
+        if before and before.search(text, max(0, m.start() - 24), m.start()):
+            continue
+        if key in COMPANY_RE and not company_context(text, m.end(), key):
             continue
         ticker = match_to_ticker[key]
         # 리서치를 내는 은행은 주식으로 다뤄진 자리만 센다. 한 글에 발행처 자리와 주가 자리가

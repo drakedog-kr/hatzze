@@ -7,6 +7,7 @@ import type { IssueKeyword, SentimentPoint, ThemeRotation } from "@/lib/telegram
 
 import { AiMark, Icon } from "../ui";
 import { V2Hint, type HintSpec } from "../V2Hint";
+import { cardEvents } from "@/lib/event-noise";
 
 /**
  * v2 국장 카더라의 부품 — '모듈' 한 장과 오른쪽 칸의 모듈 셋(2026-10-02 3차).
@@ -483,10 +484,8 @@ export function dayPill(date: string, today: string): string {
  * 줄은 그 종목 화면으로 간다(표의 줄과 같은 동작) — 국내는 종목 페이지, 미장은 내부자 리포트 종목 화면(stockHref).
  */
 export function EventsModule({ events, today, failed, limit = 5 }: { events: UpcomingEvent[]; today: string; failed: boolean; limit?: number }) {
-  const next = events
-    .filter((e) => e.date >= today)
-    .sort((a, b) => a.date.localeCompare(b.date) || b.channels - a.channels)
-    .slice(0, limit);
+  // 잡음 공시를 빼고 날짜당 몇 줄로 자른다(lib/event-noise.ts) — 평일엔 그날 공시 알림이 카드를 다 채워 앞날 일정이 안 보였다.
+  const next = cardEvents(events, today, limit);
   return (
     <Module id="events" title="다가오는 일정">
       {failed ? (

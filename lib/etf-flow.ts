@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 
-import { ETF_GROUPS, ETF_PICK_KEYS, etfGroup, etfPickTest, type EtfGroup } from "@/lib/etf-groups";
+import { ETF_GROUPS, ETF_PICK_KEYS, etfGroup, etfPickTest, isMultipleEtf, type EtfGroup } from "@/lib/etf-groups";
 import { etfSortCmp } from "@/lib/etf-sort";
 import { LOAD_FAILED, type MaybeFailed } from "@/lib/load-state";
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -53,6 +53,7 @@ export const TABLE_ROWS = ETF_PICK_KEYS.length;
  */
 const TOP_RETURN_ROWS = 5;
 const UNRANKED: EtfGroup[] = ["레버리지", "인버스", "단일종목"];
+
 /** 날짜별 막대의 거래일 수 — 뷰의 20거래일과 같다. */
 const WINDOW = 20;
 /** 거래일마다 있는 ETF — 날짜 스무 개를 이 종목의 행에서 뽑는다. */
@@ -607,7 +608,11 @@ export const getEtfFlowBoard = cache(async (): Promise<MaybeFailed<EtfFlowBoard 
     ),
     periods,
     topReturns: all
-      .flatMap((a) => (UNRANKED.includes(a.row.group) || a.row.p.m?.r == null ? [] : [{ code: a.row.code, name: a.row.name, r: a.row.p.m.r }]))
+      .flatMap((a) =>
+        UNRANKED.includes(a.row.group) || isMultipleEtf(a.row.name, category.get(a.row.code)) || a.row.p.m?.r == null
+          ? []
+          : [{ code: a.row.code, name: a.row.name, r: a.row.p.m.r }],
+      )
       .sort((x, y) => y.r - x.r)
       .slice(0, TOP_RETURN_ROWS),
     universe: all.map((a) => ({ code: a.row.code, name: a.row.name, group: a.row.group, netAsset: a.row.netAsset, tradeValue: a.tradeValue, m: a.row.m })),

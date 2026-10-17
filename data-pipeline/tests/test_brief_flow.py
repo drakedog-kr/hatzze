@@ -120,3 +120,44 @@ def test_brief_order_puts_flow_second():
     # 홈 여론 줄(generate_daily_summary.brief_story)이 둘째 문단을 시장 흐름으로 읽는다.
     assert KR.BRIEF_ORDER[:3] == ("tone", "flow", "news")
     assert set(KR.BRIEF_ORDER) == set(KR.BRIEF_SENTENCE_CAP)
+
+
+# ── 2026-10-15 점검: 미장 날짜 머리에 직전 미국장 ─────────────────────────────
+# 한국 날짜 머리만 주면 10-16 · 17 미장 총평이 수요일장 CPI 하락을 '목요일'로, 목요일 반등을 '금요일'로 적었다.
+
+
+def test_us_session_note():
+    assert KR.us_session_note({"us_session": "2026-10-14", "spx_dp": -1.11}) == " · 직전 미국장 10-14(수) S&P500 -1.11%"
+    assert KR.us_session_note({"us_session": "2026-10-15", "spx_dp": None}) == " · 직전 미국장 10-15(목)"
+    assert KR.us_session_note(None) == ""
+
+
+class _Q:
+    def __init__(self, data):
+        self.data = data
+
+    def select(self, *_):
+        return self
+
+    def in_(self, _col, vals):
+        self.data = [r for r in self.data if r["date"] in vals]
+        return self
+
+    def execute(self):
+        return self
+
+
+class _DB:
+    def __init__(self, data):
+        self._data = data
+
+    def table(self, _name):
+        return _Q(list(self._data))
+
+
+def test_us_sessions_reads_and_survives_failure():
+    db = _DB([{"date": "2026-10-15", "us_session": "2026-10-14", "spx_dp": -1.11}, {"date": "2026-10-18", "us_session": None, "spx_dp": None}])
+    got = KR.us_sessions(db, ["2026-10-15", "2026-10-18"])
+    assert list(got) == ["2026-10-15"]
+    assert KR.us_sessions(object(), ["2026-10-15"]) == {}  # 표를 못 읽으면 머리에 안 붙인다
+    assert KR.us_sessions(db, []) == {}

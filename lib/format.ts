@@ -264,18 +264,29 @@ export function sentimentTone(optimismPct: number): {
  * ⚠️ `을(를)` 로 때우고 있었다. 그 표기는 서식 문서에나 쓰는 것이라 검색 결과와 공유
  *    카드에 "엔비디아을(를) 월가 거물 …" 로 그대로 나갔다(2026-08-25 확인).
  * ⚠️ 이름이 로마자로 끝나는 종목이 있다(스페이스X, 티커 폴백). 한글 받침 규칙만으로는
- *    못 고르므로 로마자·숫자는 **한국어 음독의 끝소리**로 표를 둔다(X→엑스라 받침 있음,
- *    Y→와이라 없음). 표에 없는 글자는 받침 없음으로 본다 — 틀려도 "를"이라 덜 어색하다.
+ *    못 고르므로 로마자·숫자는 **한국어로 읽은 끝 글자의 받침**으로 표를 둔다(L→엘 · M→엠 · N→엔 · R→알만
+ *    받침이 있다. C→씨 · F→에프 · S→에스 · X→엑스 · Z→제트는 없다). 표에 없는 글자는 받침 없음으로 본다.
+ *    예전 표는 C · F · S · X · Z 를 받침 있음으로 둬 "스페이스X을" · "KCC이"가 검색 설명과 공유 카드에 나갔다(2026-10-15 점검).
+ * ⚠️ 글자로 읽지 않고 낱말로 읽는 이름은 끝 글자 표가 틀린다(NAVER → 네이버). 국내 종목 이름 중 로마자로 끝나는 151개를
+ *    끝소리로 하나씩 대조해 어긋난 넷만 WORD_READ 에 둔다(2026-10-18).
  *
  * ⚠️ **여기가 유일한 정의다.** 원래는 내부자 종목 상세 안에만 있었는데, 종목 실주소
  *    화면도 같은 판정이 필요해졌다. 사본을 두면 한쪽만 고쳐져 두 화면이 같은 종목에
  *    다른 조사를 붙인다.
  */
 const FINAL_CONSONANT: Record<string, boolean> = {
-  // 로마자: 한국어로 읽었을 때 끝소리가 자음인 것만 true
-  c: true, f: true, l: true, m: true, n: true, r: true, s: true, x: true, z: true,
+  // 로마자: 한국어로 읽은 글자 이름의 끝 글자에 받침이 있는 것만 true(엘 · 엠 · 엔 · 알)
+  l: true, m: true, n: true, r: true,
   // 숫자: 영·일·삼·육·칠·팔
   "0": true, "1": true, "3": true, "6": true, "7": true, "8": true,
+};
+
+/** 낱말로 읽는 이름 — 대문자로 견준다. 끝 글자 표와 받침이 갈리는 것만. */
+const WORD_READ: Record<string, boolean> = {
+  NAVER: false, // 네이버
+  SIMPAC: true, // 심팩
+  "LS ELECTRIC": true, // 엘에스 일렉트릭
+  SOOP: true, // 숲
 };
 
 export function hasFinal(word: string): boolean {
@@ -284,6 +295,8 @@ export function hasFinal(word: string): boolean {
   const code = ch.charCodeAt(0);
   // 한글 음절(가~힣)이면 종성 인덱스로 판정한다.
   if (code >= 0xac00 && code <= 0xd7a3) return (code - 0xac00) % 28 !== 0;
+  const whole = WORD_READ[word.trim().toUpperCase()];
+  if (whole !== undefined) return whole;
   return FINAL_CONSONANT[ch.toLowerCase()] ?? false;
 }
 
