@@ -89,8 +89,7 @@ def _thin_day(monkeypatch):
     monkeypatch.setattr(M, "load_keyset", lambda db, t, cols, narrow=None: [
         {"id": i, "stock_code": f"00{i:04d}", "mention_count": 9, "channel_count": 4, "weighted_score": 10} for i in range(6)
     ])
-    monkeypatch.setattr(M, "load_day_messages", lambda db, d: {})
-    monkeypatch.setattr(M, "load_all_keyset", lambda db, t, cols: [])
+    monkeypatch.setattr(M, "load_day_messages", lambda db, d, mentions=None, key=None: {})
     monkeypatch.setattr(M, "attach_texts", lambda db, rows: None)
 
 

@@ -61,7 +61,7 @@ from common.broadcast_content import banned_hits  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE_SHORT  # noqa: E402
 from common.stock_framing import EXTRA_BANNED, PRICE_WORDS, has_trade_framing, trend_hits  # noqa: E402
-from common.supabase_client import get_client, load_all, load_all_keyset  # noqa: E402
+from common.supabase_client import get_client, load_all  # noqa: E402
 from common.text_check import fix_glued_josa_latin, glued_names, is_clean, leak_free, problems, prompt_leaks  # noqa: E402
 from common.timeutil import KST  # noqa: E402
 from config.stock_extraction import is_house  # noqa: E402
@@ -800,7 +800,9 @@ def main() -> None:
     msgs = {(m["channel_handle"], m["message_id"]): m for m in msgs_list if KR.posted_since(m["posted_at"], since)}
     print(f"[재료] 메시지 {len(msgs):,}건 (기간 {since}~{latest})")
 
-    mentions = load_all_keyset(db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code,match_text,method")
+    # 태그는 글에 붙여 받은 것(KR.tags_from_messages) — 표 전체를 따로 읽지 않는다. 아래 두 곳(테마 재료 · 도는 얘기 풀)이 쓰는 글은
+    # 모두 msgs_list 안이라 결과가 같다.
+    mentions = KR.tags_from_messages(db, {(m["channel_handle"], m["message_id"]): m for m in msgs_list})
     tags_by_key: dict[tuple, list[dict]] = defaultdict(list)
     for m in mentions:
         k = (m["channel_handle"], m["message_id"])

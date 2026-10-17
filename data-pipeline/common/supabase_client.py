@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timezone
 
 import httpx  # supabase(postgrest)가 쓰는 HTTP 클라이언트. 전송 예외 타입만 빌려 온다.
+from postgrest.exceptions import APIError
 from supabase import Client, create_client
 
 from .config import SUPABASE_SECRET_KEY, SUPABASE_URL
@@ -35,6 +36,11 @@ def execute_with_retry(q):
     커진다. 같은 이유로 이건 **재현되지 않는다** — 같은 조회를 로컬에서 완주시켜도
     멀쩡하고 직전 8회 실행 로그에도 없었다. "다시 돌리니 되던데"로 닫을 종류가 아니다.
 
+    **앞단 게이트웨이의 5xx 도 다시 던진다**(2026-10-15). 그날 저녁 Supabase 디스크가 자동으로 늘어난 직후
+    키셋 읽기 두 번이 Cloudflare `502: Bad gateway`(HTML 본문)로 죽어 카더라 센티먼트 집계와 시장 판정 집계가
+    멈췄다(#734 · #735). postgrest 는 GET 503 · 520 만 다시 던지고, 그 밖의 코드는 `APIError` 로 올린다. 게이트웨이
+    코드(GATEWAY_CODES)만 받고 PostgREST 자체 오류(문자열 코드 '57014' 등)는 그대로 올린다 — 질의가 틀린 것이다.
+
     ⚠️ **읽기 전용이다.** insert·upsert 에 그대로 쓰면 안 된다. 요청은 닿았는데 응답만
     못 받은 경우 다시 던지면 같은 행이 두 번 들어간다. 조회는 몇 번을 던져도 결과가
     같아서(키셋 페이지는 `key > last` 라 이전 페이지와 무관하다) 안전하다.
@@ -42,16 +48,31 @@ def execute_with_retry(q):
     for attempt in range(TRANSPORT_RETRIES + 1):
         try:
             return q.execute()
-        except httpx.TransportError as exc:
+        except (httpx.TransportError, APIError) as exc:
+            if isinstance(exc, APIError) and not is_gateway_error(exc):
+                raise
             if attempt == TRANSPORT_RETRIES:
                 raise
             delay = TRANSPORT_BACKOFF[attempt]
+            what = "게이트웨이가 5xx 를 돌려줘" if isinstance(exc, APIError) else "연결이 끊겨"
             print(
-                f"[재시도] 연결이 끊겨 {delay}초 뒤 같은 페이지를 다시 받습니다 "
-                f"({attempt + 1}/{TRANSPORT_RETRIES}) — {type(exc).__name__}: {exc}",
+                f"[재시도] {what} {delay}초 뒤 같은 페이지를 다시 받습니다 "
+                f"({attempt + 1}/{TRANSPORT_RETRIES}) — {type(exc).__name__}: {str(exc)[:200]}",
                 flush=True,
             )
             time.sleep(delay)
+
+
+# 다시 던질 게이트웨이 응답 코드 — 502 · 503 · 504 와 Cloudflare 520~524. postgrest 의 APIError 는 HTML 본문을 못 읽으면
+# 응답 코드를 정수로 code 에 담는다(10-15 로그: {'message': 'JSON could not be generated', 'code': 502, …}).
+GATEWAY_CODES = frozenset({502, 503, 504, 520, 521, 522, 523, 524})
+
+
+def is_gateway_error(exc: APIError) -> bool:
+    try:
+        return int(getattr(exc, "code", None)) in GATEWAY_CODES
+    except (TypeError, ValueError):
+        return False
 
 
 def replace_rows(

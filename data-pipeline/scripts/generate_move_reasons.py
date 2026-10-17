@@ -76,7 +76,6 @@ from common.quoted_move import quoted_move, quoted_moves  # noqa: E402
 from common.supabase_client import (  # noqa: E402
     get_client,
     load_all,
-    load_all_keyset,
     load_keyset,
     load_window_keyset,
 )
@@ -247,8 +246,13 @@ def kst_day(posted_at: str) -> str:
     return datetime.fromisoformat(posted_at.replace("Z", "+00:00")).astimezone(KST).date().isoformat()
 
 
-def load_day_messages(db, day: str) -> dict[tuple, dict]:
-    """그날(KST) 본문 있는 메시지. 본문은 안 받는다(넓은 행 수천 건은 8초 벽에 걸린다)."""
+def load_day_messages(db, day: str, mentions: str | None = None, key: str | None = None) -> dict[tuple, dict]:
+    """그날(KST) 본문 있는 메시지. 본문은 안 받는다(넓은 행 수천 건은 8초 벽에 걸린다).
+
+    `mentions`(태그 표 이름)와 `key`(stock_code · ticker)를 주면 그 글의 태그를 붙여 받는다(PostgREST 임베드). 태그 표 전체를
+    키셋으로 따로 읽던 때(국장 30만 행 · 미장 수만 행) 실행마다 몇 분이 들었다(2026-10-15 점검 pipeline-02). 미장 총평의
+    load_us_messages 가 같은 꼴로 받는다.
+    """
     # ⚠️ 위 경계(lt)는 걸지 않는다 — 걸었더니 첫 페이지가 statement timeout(57014)에 걸렸다
     #    (2026-09-06 실측). 그때는 id 순 키셋이었다 — 조건이 하나 더 붙자 계획이 기본키
     #    걷기로 넘어간 것으로 보인다(플랜은 못 봤다). 지금은 (posted_at, id) 복합 키셋이라
@@ -257,10 +261,13 @@ def load_day_messages(db, day: str) -> dict[tuple, dict]:
     #    generate_telegram_narratives.load_messages_since 와 같은 모양 — 그쪽이 2026-09-15
     #    저녁에 이 모양 그대로 죽었고, 여기는 4분 앞서 돌아 우연히 살았다.
     since_utc = f"{(date.fromisoformat(day) - timedelta(days=1)).isoformat()}T00:00:00Z"
+    cols = "id,channel_handle,message_id,posted_at,views,forwards"
+    if mentions:
+        cols += f",{mentions}(id,{key},match_text,method)"
     rows = load_window_keyset(
         db,
         "telegram_messages",
-        "id,channel_handle,message_id,posted_at,views,forwards",
+        cols,
         since_utc,
         narrow=lambda q: q.not_.is_("text", "null"),
     )
@@ -598,20 +605,24 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
 
     # 2) 그날 메시지(본문 없이). 두 시장이 같은 코퍼스라 이 조회는 한 번이면 되지만, 시장마다
     #    한 번씩 부르는 편이 호출부가 단순하다(키셋이라 몇 초다).
-    msgs = load_day_messages(db, day)
+    msgs = load_day_messages(db, day, cfg["mentions"], key)
     print(f"[{tag} {day}] 본문 있는 메시지 {len(msgs):,}건")
 
-    # 3) 종목 ↔ 메시지 연결. 표 전체를 키셋으로 읽는다(집계 스크립트와 같은 길 —
-    #    날짜로 좁히는 서버 조인은 8초 벽에 걸린다, 2026-09-06 실측).
+    # 3) 종목 ↔ 메시지 연결 — 위에서 글에 붙여 받은 태그. 태그 id 순으로 돈다(표 전체를 id 순 키셋으로 읽던 때와 같은 차례라,
+    #    표기 등락 · 발췌 고르기의 동률이 예전과 같게 갈린다). 예전 '날짜로 좁히는 서버 조인은 8초 벽'(2026-09-06)은 id 순
+    #    키셋 때 일이고, 지금 글 읽기는 (posted_at, id) 키셋이다(load_window_keyset 주석).
     cset = set(cands0)
     by_code: dict[str, list[tuple[tuple, str]]] = defaultdict(list)
-    for m in load_all_keyset(db, cfg["mentions"], f"id,channel_handle,message_id,{key},match_text,method"):
-        mk = (m["channel_handle"], m["message_id"])
+    tags = sorted(
+        ((t["id"], mk, t) for mk, m in msgs.items() for t in (m.get(cfg["mentions"]) or [])),
+        key=lambda x: x[0],
+    )
+    for _id, mk, m in tags:
         # 화자 행은 그 회사 언급이 아니다 — 미장은 은행(config.RESEARCH_HOUSES 주석), 국장은 증권사
         # (config.stock_extraction HOUSE_METHOD 주석).
         if is_house(m):
             continue
-        if m[key] in cset and mk in msgs:
+        if m[key] in cset:
             by_code[m[key]].append((mk, m.get("match_text") or ""))
 
     # 4) 본문. 후보 종목의 그날 메시지만(수천 건) 50개씩 받는다.

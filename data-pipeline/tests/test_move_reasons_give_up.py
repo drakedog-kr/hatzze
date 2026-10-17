@@ -101,19 +101,18 @@ DAY = "2026-09-26"
 
 
 def _run(monkeypatch, client, earlier):
+    # 태그는 글에 붙여 받는다(load_day_messages 의 임베드 — 태그 표를 따로 읽지 않는다).
     msgs = {
-        ("a", 1): {"channel_handle": "a", "message_id": 1, "views": 100, "text": "엔비디아 +8.2% 실적 가이던스 상향 기대에 급등"},
-        ("b", 2): {"channel_handle": "b", "message_id": 2, "views": 90, "text": "테슬라 +7.5% 로보택시 확대 발표로 강세"},
+        ("a", 1): {"channel_handle": "a", "message_id": 1, "views": 100, "text": "엔비디아 +8.2% 실적 가이던스 상향 기대에 급등",
+                   "telegram_message_us_stocks": [{"id": 1, "ticker": "NVDA", "match_text": "엔비디아", "method": "name"}]},
+        ("b", 2): {"channel_handle": "b", "message_id": 2, "views": 90, "text": "테슬라 +7.5% 로보택시 확대 발표로 강세",
+                   "telegram_message_us_stocks": [{"id": 2, "ticker": "TSLA", "match_text": "테슬라", "method": "name"}]},
     }
     monkeypatch.setattr(M, "load_keyset", lambda db, t, cols, narrow=None: [
         {"id": 1, "ticker": "NVDA", "mention_count": 30, "channel_count": 8, "weighted_score": 50},
         {"id": 2, "ticker": "TSLA", "mention_count": 20, "channel_count": 6, "weighted_score": 40},
     ])
-    monkeypatch.setattr(M, "load_day_messages", lambda db, d: msgs)
-    monkeypatch.setattr(M, "load_all_keyset", lambda db, t, cols: [
-        {"id": 1, "channel_handle": "a", "message_id": 1, "ticker": "NVDA", "match_text": "엔비디아", "method": "name"},
-        {"id": 2, "channel_handle": "b", "message_id": 2, "ticker": "TSLA", "match_text": "테슬라", "method": "name"},
-    ])
+    monkeypatch.setattr(M, "load_day_messages", lambda db, d, mentions=None, key=None: msgs)
     monkeypatch.setattr(M, "attach_texts", lambda db, rows: None)
     monkeypatch.setattr(M, "load_all", lambda db, t, cols, order_by=None: [
         {"ticker": "NVDA", "name_ko": "엔비디아"}, {"ticker": "TSLA", "name_ko": "테슬라"},
