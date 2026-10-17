@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 
-import { LOGO_CACHE, LOGO_TICKER_RE, isLogoSize, logoVerdict } from "@/lib/stock-logo";
+import { LOGO_CACHE, LOGO_TICKER_RE, isLogoSize, krLogoCode, logoUpstreamPath, logoVerdict, type LogoSourceRow } from "@/lib/stock-logo";
+import { getSupabaseAdmin } from "@/lib/supabase-server";
 
 /**
  * 종목 로고를 logo.dev 에서 받아 캐시 가능한 그림으로 준다. 왜 브라우저 직결을 걷어냈는지는
@@ -15,9 +16,12 @@ import { LOGO_CACHE, LOGO_TICKER_RE, isLogoSize, logoVerdict } from "@/lib/stock
  *
  * 무료 한도를 넘긴 동안(429)은 15분짜리 빈 그림으로 바꿔 준다. 그동안 방문마다 logo.dev 를 두 번씩
  * 두드리던 것이 CDN 에서 멈추고, 화면은 머리글자 배지가 즉시 뜬다.
+ *
+ * 국장 종목은 파이프라인이 판정해 둔 길(티커 · 홈페이지 도메인 · 없음)로 묻는다(lib/stock-logo.ts logoUpstreamPath ·
+ * 2026-10-18). 판정표 조회도 다른 화면 조회처럼 데이터 캐시에 담겨, CDN 이 빈 때에도 DB 를 매번 치지 않는다.
  */
 
-const UPSTREAM = "https://img.logo.dev/ticker/";
+const UPSTREAM = "https://img.logo.dev/";
 const REVALIDATE_SEC = 86400;
 
 export async function GET(req: NextRequest, ctx: RouteContext<"/api/logo/[ticker]">) {
@@ -32,10 +36,13 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/logo/[ticker
   const key = process.env.LOGO_DEV_KEY ?? process.env.NEXT_PUBLIC_LOGO_DEV_KEY;
   if (!key) return reply("error");
 
+  const path = logoUpstreamPath(ticker, await logoSource(ticker));
+  if (path === null) return reply("missing");
+
   let upstream: Response;
   try {
     // fallback=404: 기본 폴백은 티커 숫자로 만든 레터마크("4")라 우리 머리글자 배지보다 못하다.
-    upstream = await fetch(`${UPSTREAM}${ticker}?token=${key}&size=${size}&format=webp&fallback=404`, {
+    upstream = await fetch(`${UPSTREAM}${path}?token=${key}&size=${size}&format=webp&fallback=404`, {
       next: { revalidate: REVALIDATE_SEC },
       signal: AbortSignal.timeout(5000),
     });
@@ -49,6 +56,26 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/logo/[ticker
   return new Response(await upstream.arrayBuffer(), {
     headers: { "Content-Type": type ?? "image/webp", "Cache-Control": LOGO_CACHE.ok },
   });
+}
+
+/**
+ * 국장 종목의 판정 행(stock_logo_source). 미국 종목 · 표가 없을 때(마이그레이션 103 전) · 조회 실패는 null —
+ * 그때는 예전처럼 티커로 묻는다. 로고 하나 때문에 그림을 못 주는 일은 없게 한다.
+ */
+async function logoSource(ticker: string): Promise<LogoSourceRow> {
+  const code = krLogoCode(ticker);
+  if (!code) return null;
+  try {
+    const { data, error } = await getSupabaseAdmin().from("stock_logo_source").select("source,domain").eq("code", code).maybeSingle();
+    // PGRST205 = 표가 없다(마이그레이션 103 전). 그땐 예전 길이 정답이라 로그를 남기지 않는다.
+    if (error) {
+      if (error.code !== "PGRST205") console.error(`[api/logo] ${code} 로고 판정을 못 읽었습니다 — 티커로 묻습니다`, error);
+      return null;
+    }
+    return (data as LogoSourceRow) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**

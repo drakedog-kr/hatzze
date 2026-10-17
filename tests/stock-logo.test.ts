@@ -10,7 +10,9 @@ import {
   LOGO_SIZES,
   LOGO_TICKER_RE,
   isLogoSize,
+  krLogoCode,
   logoSize,
+  logoUpstreamPath,
   logoTicker,
   logoVerdict,
   stockLogoPath,
@@ -81,9 +83,33 @@ describe("logoVerdict", () => {
   });
   it("error 만 짧게 캐시한다 — 한도가 풀리면 곧 로고가 돌아와야 한다", () => {
     const secs = (cc: string) => Number(/max-age=(\d+)/.exec(cc)![1]);
+    const cdn = (cc: string) => /s-maxage=(\d+)/.exec(cc)![1];
     assert.equal(secs(LOGO_CACHE.error) <= 900, true);
     assert.equal(secs(LOGO_CACHE.ok) >= 86400, true);
-    assert.equal(LOGO_CACHE.missing, LOGO_CACHE.ok);
+    // 없는 로고는 브라우저에 하루만(파이프라인이 길을 찾으면 다음 날 보이게) · CDN 은 그림과 같다.
+    assert.equal(secs(LOGO_CACHE.missing), 86400);
+    assert.equal(cdn(LOGO_CACHE.missing), cdn(LOGO_CACHE.ok));
     for (const cc of Object.values(LOGO_CACHE)) assert.match(cc, /^public, /);
+  });
+});
+
+describe("국장 로고 판정(krLogoCode · logoUpstreamPath)", () => {
+  it("국장 티커만 종목코드를 준다", () => {
+    assert.equal(krLogoCode("058470.KQ"), "058470");
+    assert.equal(krLogoCode("005930.KS"), "005930");
+    assert.equal(krLogoCode("0035S0.KQ"), "0035S0");
+    assert.equal(krLogoCode("NVDA"), null);
+    assert.equal(krLogoCode("BRK.B"), null);
+  });
+  it("판정대로 묻는다 — 없으면 티커, 도메인이면 도메인, none 이면 묻지 않는다", () => {
+    assert.equal(logoUpstreamPath("005930.KS", null), "ticker/005930.KS");
+    assert.equal(logoUpstreamPath("005930.KS", { source: "ticker", domain: "samsung.com" }), "ticker/005930.KS");
+    assert.equal(logoUpstreamPath("169330.KQ", { source: "domain", domain: "embrain.com" }), "embrain.com");
+    assert.equal(logoUpstreamPath("037350.KQ", { source: "none", domain: "sungdokorea.com" }), null);
+    assert.equal(logoUpstreamPath("NVDA", null), "ticker/NVDA");
+  });
+  it("도메인 꼴이 아니면 티커로 돌아간다 — 표 값이 주소를 흔들지 못하게", () => {
+    assert.equal(logoUpstreamPath("169330.KQ", { source: "domain", domain: "evil.com/x?token=" }), "ticker/169330.KQ");
+    assert.equal(logoUpstreamPath("169330.KQ", { source: "domain", domain: null }), "ticker/169330.KQ");
   });
 });

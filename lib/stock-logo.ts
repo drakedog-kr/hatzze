@@ -67,7 +67,9 @@ export type LogoVerdict = "ok" | "missing" | "error";
 
 export const LOGO_CACHE: Record<LogoVerdict, string> = {
   ok: "public, max-age=604800, s-maxage=86400, stale-while-revalidate=86400",
-  missing: "public, max-age=604800, s-maxage=86400, stale-while-revalidate=86400",
+  // 없는 로고는 브라우저에 하루만 — 파이프라인이 나중에 길(홈페이지 도메인)을 찾으면 다음 날 보여야 한다(2026-10-18).
+  // 일주일이면 재방문자는 로고가 생긴 뒤에도 일주일 내내 배지를 봤다. CDN 은 그림과 같다.
+  missing: "public, max-age=86400, s-maxage=86400, stale-while-revalidate=86400",
   error: "public, max-age=900, s-maxage=900",
 };
 
@@ -76,4 +78,29 @@ export function logoVerdict(status: number, contentType: string | null): LogoVer
   if (status !== 200) return "error";
   // 200 인데 그림이 아니면(오류 페이지 HTML 등) 그림으로 내지 않는다.
   return contentType?.startsWith("image/") ? "ok" : "error";
+}
+
+/**
+ * 국장 종목은 logo.dev 에 어떤 길로 물을지 파이프라인이 미리 판정해 둔다(`stock_logo_source` · 마이그레이션 103 ·
+ * data-pipeline/scripts/refresh_stock_logo_sources.py). 티커로는 코스닥의 21% 만 나와서(코스피 82% · 2026-10-18 표본),
+ * 티커로 없는 종목은 회사 홈페이지 도메인으로 묻는다. 판정이 none 이면 묻지 않고 배지다.
+ */
+export type LogoSourceRow = { source: string; domain: string | null } | null;
+
+/** 로고 티커가 국장 종목이면 종목코드('058470.KQ' → '058470'), 아니면 null(미국은 판정표가 없다). */
+export function krLogoCode(ticker: string): string | null {
+  const m = /^([0-9A-Z]{6})\.(KS|KQ)$/.exec(ticker);
+  return m ? m[1] : null;
+}
+
+const LOGO_DOMAIN_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
+
+/**
+ * logo.dev 에 물을 경로 — 'ticker/005930.KS' 또는 'embrain.com'. 판정이 none 이면 null(묻지 않는다).
+ * 판정표에 없거나 못 읽었으면 예전처럼 티커로 묻는다 — 표가 비어도 화면은 지금과 같다.
+ */
+export function logoUpstreamPath(ticker: string, row: LogoSourceRow): string | null {
+  if (row?.source === "none") return null;
+  if (row?.source === "domain" && row.domain && LOGO_DOMAIN_RE.test(row.domain)) return row.domain;
+  return `ticker/${ticker}`;
 }
