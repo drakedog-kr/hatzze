@@ -80,6 +80,7 @@ from common.supabase_client import (  # noqa: E402
     load_keyset,
     load_window_keyset,
 )
+from common.stock_framing import trade_hits  # noqa: E402
 from common.text_check import problems, prompt_leaks  # noqa: E402
 from common.timeutil import KRX_HOLIDAY_YEARS, KRX_HOLIDAYS, KST, today_kst  # noqa: E402
 from config.us_stock_extraction import RESEARCH_HOUSES, is_house  # noqa: E402
@@ -363,6 +364,11 @@ def clean_reason(text: str, name: str, digest: str) -> tuple[str | None, str]:
     bad = problems(t, digest) + prompt_leaks(t)
     if bad:
         return None, "검수: " + " · ".join(bad)
+    # 증권사 투자의견 · 최선호 · 매매 신호는 공개 화면에서 그 종목을 사라는 말이 된다. 지시문이 막아도 7일 15줄이 나갔다
+    # (국장 이유 3 · 미장 이유 5 등, 2026-10-15 점검). 걸리면 다시 묻고 끝내 걸리면 버린다(아래 ask).
+    framing = trade_hits(t)
+    if framing:
+        return None, "매수·매도로 읽히는 말: " + " · ".join(framing)
     return t, ""
 
 
