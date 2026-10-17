@@ -217,7 +217,7 @@ async function themeMembers(theme: string): Promise<MemberRow[] | null> {
 
 /**
  * **오늘 날짜의 까닭 줄**에만 야후 등락률 · 지금가를 채운다. 까닭은 저녁에 만들어지는데 KRX 종가는 이튿날 낮에야 와서
- * (generate_move_reasons.fill_krx) 오늘 줄은 하루 동안 등락률이 비어 있었다. 데일리 노트가 오늘 글에만 야후를
+ * (generate_move_reasons.fill_krx) 오늘 줄은 하루 동안 등락률이 비어 있었다. 데일리 노트가 오늘 글에 야후를
  * 보는 규칙(lib/daily-note.ts getNoteStocks)을 그대로 따른다:
  *   - 오늘(KST)이고 change_rate 가 비어 있는 줄만. 어제 줄은 안 본다 — 야후의 등락률은 늘 '지금 세션'이라
  *     이튿날 장이 열리면 어제 줄에 오늘 값이 앉는다. 어제 줄은 이튿날 08:00 KRX 공표 뒤 배당 잡이 종가 이력으로

@@ -131,7 +131,25 @@ export async function fetchDailyHistory(
   );
 }
 
-async function fetchBars(url: string, withVolume: boolean, asOf: number, symbol: string): Promise<Bar[] | null> {
+/**
+ * 그 날짜(KST) 전까지의 일봉 — 데일리 노트 '언급된 종목'이 글 날짜의 미국 시세를 집는다(lib/daily-note.ts usQuoteOn).
+ * 기간 끝은 그 날짜 15:00 KST(06:00 UTC)라 미국은 그 날짜의 뉴욕장이 열리기 전, 곧 전날 장까지만 들어온다.
+ * 주소가 글 날짜로 고정돼 같은 글은 늘 같은 주소다 — 지난 글의 봉은 다시 안 바뀌니 호출부가 캐시를 길게 준다.
+ */
+export async function fetchDailyBarsBeforeKstDate(symbol: string, kstDate: string, days: number, revalidate: number): Promise<Bar[] | null> {
+  const end = Math.floor(Date.parse(`${kstDate}T06:00:00Z`) / 1000);
+  const nowBucket = Math.floor(Date.now() / 1000 / BUCKET_SEC) * BUCKET_SEC;
+  return fetchBars(
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}` + `?period1=${end - days * 86_400}&period2=${end}&interval=1d`,
+    false,
+    // 마지막 세션 덧붙이기(appendLastSession)는 기간 끝 시각으로 가른다 — 지난 기간엔 지금 세션의 값이 붙지 않는다.
+    Math.min(nowBucket, end),
+    symbol,
+    revalidate,
+  );
+}
+
+async function fetchBars(url: string, withVolume: boolean, asOf: number, symbol: string, revalidate = 1800): Promise<Bar[] | null> {
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
@@ -141,7 +159,7 @@ async function fetchBars(url: string, withVolume: boolean, asOf: number, symbol:
       // ⚠️ 900 이면 안 된다 — 카더라 '왜 올랐나'가 이 함수를 쓰는데, 라우트 안의 가장 짧은
       //    fetch revalidate 가 그 라우트의 ISR 주기가 돼서 /kadera 사본이 15분마다 다시
       //    그려진다(빌드 매니페스트로 확인, 2026-09-19). app/kadera/page.tsx 의 1800 과 맞춘다.
-      next: { revalidate: 1800 },
+      next: { revalidate },
     });
     if (!res.ok) return null;
 

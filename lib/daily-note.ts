@@ -2,11 +2,11 @@ import "server-only";
 
 import { cache } from "react";
 
-import { isKstWeekday } from "./cron-schedule";
 import { getDevOverrides } from "./dev-overrides";
 import { getSupabaseServer } from "./supabase-server";
-import { yahooSymbol } from "./yahoo-history";
+import { fetchDailyBarsBeforeKstDate, yahooSymbol } from "./yahoo-history";
 import { quoteChangeRate } from "./krx-gap";
+import { liveUsIsNoteSession, shiftDate, takeLiveKr, usCloseBefore } from "./note-quote-day";
 import { changeRateOf, dateInZone, fetchYahooQuote } from "./yahoo-quote";
 
 /**
@@ -277,8 +277,8 @@ export type KrStockQuote = {
   name: string;
   market: string | null;
   /**
-   * 종가(원). 글 날짜가 오늘이고 KRX 가 아직 그날 값을 안 줬으면 야후 실시간(카더라 카드와
-   * 같은 소스), 그 밖에는 `stocks` 표의 **최근** KRX 값 — 글 날짜의 값이 아니다.
+   * 종가(원) — 글 날짜 이하 마지막 거래일의 KRX 종가(`stock_price_daily`). 오늘 · 어제 글이고 KRX 가 아직 그 거래일 값을
+   * 안 줬으면 야후 실시간(카더라 카드와 같은 소스). 지난 글은 그날 값에 고정된다(lib/note-quote-day.ts).
    */
   price: number | null;
   changeRate: number | null;
@@ -287,7 +287,7 @@ export type KrStockQuote = {
 export type UsStockQuote = {
   ticker: string;
   name: string;
-  /** 야후 최근 시세(달러)와 등락률 · 그 미국 세션 날짜(뉴욕). 못 받으면 null — 줄은 이름만 선다. */
+  /** 글 날짜(KST) 전날 이하 마지막 뉴욕장의 종가(달러)와 등락률 · 그 세션 날짜(뉴욕). 못 받으면 null — 줄은 이름만 선다. */
   price: number | null;
   changeRate: number | null;
   priceDate: string | null;
@@ -303,7 +303,7 @@ function todayKst(now: Date): string {
 
 /**
  * 야후 실시간 — 카더라 카드(lib/telegram-data stockQuote)와 같은 심볼 규칙. 캐시는 10분으로
- * 따로 둔다(카더라는 30분): 이 값이 /daily 와 오늘 노트 사본의 주기가 되는데(가장 짧은 fetch 가
+ * 따로 둔다(카더라는 30분): 이 값이 /daily 와 오늘 · 어제 노트 사본의 주기가 되는데(가장 짧은 fetch 가
  * 라우트 주기 — lib/supabase-server.ts) 노트 페이지는 100KB 안팎이라 10분마다 다시 그려도 값이
  * 미미하고, 오늘 글의 종목 카드는 당일가라 짧을수록 낫다.
  * 등락률을 못 내면 null 을 줘 호출부가 KRX 저장값을 그대로 쓰게 한다.
@@ -319,34 +319,41 @@ async function liveQuote(code: string, market: string | null): Promise<{ price: 
 }
 
 /**
- * 미국 종목 시세 — 야후(카더라 · 테마 화면의 usQuotes 와 같은 원천). 미국 종가는 매일 받아 두는 표가 없어 글마다 야후를 본다.
- * 오늘 글은 10분, 지난 글은 하루 캐시 — 이 값이 노트 사본의 주기가 되므로(liveQuote 주석) 지난 글이 30분마다 다시
- * 그려지지 않게 길게 둔다. 크롤러가 지난 글을 훑어도 같은 티커는 캐시를 타 바깥 요청이 티커 수를 넘지 않는다.
- * ⚠️ 값은 늘 **가장 최근 미국장**이다 — 글이 다룬 장(글 날 전날 뉴욕)이 아닐 수 있고, 화면 머리엔 장 날짜를 안 적는다
- *    (app/daily/NoteView.tsx NoteStocksModule 의 ⛔ 주석).
+ * 미국 종목 시세 — 글 날짜(KST) 전날 이하 마지막 뉴욕장의 종가와 등락률(lib/note-quote-day.ts). 미국 종가는 매일 받아 두는 표가
+ * 없어 야후를 본다(카더라 · 테마 화면의 usQuotes 와 같은 원천).
+ *   - 오늘 글: 현재가의 세션이 글 날짜보다 앞이면(한국 낮 · 저녁, 뉴욕장이 열리기 전) 그게 그 장이다. 일봉 맨 끝 봉은 비어 올 때가
+ *     있어(lib/yahoo-history appendLastSession) 현재가를 먼저 본다.
+ *   - 그 밖: 글 날짜로 끊은 일봉(fetchDailyBarsBeforeKstDate)에서 고른다. 주소가 글마다 고정이라 지난 글은 하루 캐시를 탄다 —
+ *     크롤러가 지난 글을 훑어도 (글, 티커)마다 하루 한 번이다. 오늘 · 어제 글은 봉이 아직 정리 중일 수 있어 10분.
  */
-async function usQuote(ticker: string, live: boolean): Promise<{ price: number; changeRate: number | null; date: string | null } | null> {
-  const q = await fetchYahooQuote(yahooSymbol(ticker, "US"), { next: { revalidate: live ? 600 : 86400 } });
-  return q ? { price: q.price, changeRate: changeRateOf(q), date: q.marketTime != null ? dateInZone(q.marketTime, "America/New_York") : null } : null;
+async function usQuoteOn(ticker: string, noteDate: string, today: string): Promise<{ price: number; changeRate: number | null; date: string } | null> {
+  const symbol = yahooSymbol(ticker, "US");
+  if (noteDate === today) {
+    const q = await fetchYahooQuote(symbol, { next: { revalidate: 600 } });
+    const session = q?.marketTime != null ? dateInZone(q.marketTime, "America/New_York") : null;
+    const changeRate = q ? changeRateOf(q) : null;
+    if (q && liveUsIsNoteSession(session, noteDate) && changeRate != null) return { price: q.price, changeRate, date: session ?? noteDate };
+  }
+  const bars = await fetchDailyBarsBeforeKstDate(symbol, noteDate, 15, noteDate >= shiftDate(today, -1) ? 600 : 86400);
+  return bars ? usCloseBefore(bars, noteDate) : null;
 }
 
 /**
- * 언급된 종목의 이름과 시세. 국내는 `stocks` 표의 종가·등락률(KRX, 종목 실주소 화면과 같은
- * 열), 미국은 `us_stocks` 의 한글 이름과 야후 최근 시세(usQuote — 2026-10-08 운영자 요청 "해외 종목에도 가격 및 등락 %").
+ * 언급된 종목의 이름과 **글 날짜의** 시세. 글마다 그 글을 올린 날의 최신 시세가 남는다 — 지난 글을 나중에 열어도 그날 값이다
+ * (2026-10-17 운영자 "데일리노트는 항상 발행하는 날의 최신 시세를 넣어야 해", 규칙은 lib/note-quote-day.ts).
+ *   - 국내: `stock_price_daily`(KRX 일별 종가) 에서 글 날짜 이하 마지막 거래일. 이름 · 시장은 `stocks`.
+ *   - 미국: `us_stocks` 의 한글 이름과 글 날짜 전날 이하 마지막 뉴욕장(usQuoteOn).
+ * 예전엔 국내가 `stocks` 표의 가장 최근 값이라 지난 글이 날마다 바뀌었고, 토요일 글은 야후를 안 불러(평일 조건) 발행 시각에
+ * 표에 있던 목요일 값이 날짜 없이 섰다(10월 17일 글 SK하이닉스 −11.06%, 실제 금요일 +0.79%).
  *
- * ## 오늘 글만 야후를 본다
+ * ## 오늘 · 어제 글만 국내 야후를 본다
  *
- * KRX Open API 는 그날 종가를 다음 날 아침에야 준다. 그래서 저녁에 올린 글을 열면
- * `stocks` 표는 전날 값이다(2026-09-08 저녁 실측: 23시에도 KRX 최신 기준일이 09-07).
- * 카더라 카드는 같은 자리를 야후 실시간으로 먼저 채우고 KRX 로 폴백하니, 여기도 **글 날짜가
- * 오늘(KST 평일)이고 KRX 가 그날 값에 못 미친 종목만** 야후를 본다.
+ * KRX Open API 는 그날 종가를 다음 날 아침에야 준다(이력 표는 08시 뒤 배당 잡이 채운다). 그래서 저녁에 올린 글이나 그 이튿날
+ * 새벽에 연 어제 글은 이력 표에 그 거래일이 아직 없다. 그때만 야후 실시간을 보고, 야후 세션이 글 날짜 이하이면서 저장값보다
+ * 새 거래일일 때만 바꾼다(takeLiveKr) — 다음 날 장이 열린 뒤의 어제 글엔 오늘 시세가 앉지 않는다.
  *
- * ⛔ 지난 글은 야후를 부르지 않는다(종목 실주소 화면 머리말의 같은 규칙). 크롤러가 지난 글을
- *    훑으면 편마다 바깥 요청이 붙는다 — 이 조건이 그걸 막는다. 오늘 글 한 편 × 언급 종목 수가
- *    상한이고, 야후 응답은 카더라와 같은 600초 캐시를 탄다.
- * ⚠️ 야후 값에는 기준일이 없다. 평일에만 부르므로 글 날짜를 기준일로 적는다 — 평일 휴장일
- *    (공휴일)엔 전 영업일 종가가 그날 날짜로 보일 수 있다. 다음 날 아침 KRX 가 따라오면
- *    조건이 풀려 KRX 값으로 돌아간다.
+ * ⛔ 그보다 지난 글은 국내 야후를 부르지 않는다(종목 실주소 화면 머리말의 같은 규칙). 크롤러가 지난 글을 훑으면 편마다 바깥
+ *    요청이 붙는다. 오늘 · 어제 글 × 언급 종목 수가 상한이고, 야후 응답은 카더라와 같은 600초 캐시를 탄다.
  *
  * 순서는 글에 나온 차례(refs)를 그대로 지킨다. 못 읽으면 빈 목록 — 카드 하나가 빠질 뿐
  * 글은 그대로 보여야 한다.
@@ -355,32 +362,51 @@ export async function getNoteStocks(refs: NoteStockRefs, noteDate: string): Prom
   if (!refs.kr.length && !refs.us.length) return EMPTY_STOCKS;
   try {
     const db = getSupabaseServer();
-    const [kr, us] = await Promise.all([
+    const [kr, us, days] = await Promise.all([
       refs.kr.length
         ? db.from("stocks").select("code,name,market,close_price,change_rate,price_date").in("code", refs.kr)
         : Promise.resolve({ data: [], error: null }),
       refs.us.length ? db.from("us_stocks").select("ticker,name_ko").in("ticker", refs.us) : Promise.resolve({ data: [], error: null }),
+      // 글 날짜 이하 두 주 — 긴 연휴(추석)에도 마지막 거래일이 들어온다. 종목 수 × 거래일 10개 안팎이라 1,000행 상한에 안 닿는다.
+      refs.kr.length
+        ? db
+            .from("stock_price_daily")
+            .select("code,date,close,change_rate")
+            .in("code", refs.kr)
+            .gte("date", shiftDate(noteDate, -14))
+            .lte("date", noteDate)
+            .order("date", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
     ]);
     if (kr.error) throw kr.error;
     if (us.error) throw us.error;
+    if (days.error) throw days.error;
     type KrRow = { code: string; name: string; market: string | null; close_price: number | null; change_rate: number | null; price_date: string | null };
     type UsRow = { ticker: string; name_ko: string | null };
+    type DayRow = { code: string; date: string; close: number; change_rate: number | null };
     const krBy = new Map(((kr.data as KrRow[] | null) ?? []).map((r) => [r.code, r]));
     const usBy = new Map(((us.data as UsRow[] | null) ?? []).map((r) => [r.ticker, r]));
-    const now = new Date();
-    const liveDay = noteDate === todayKst(now) && isKstWeekday(now);
+    // 날짜 내림차순이라 종목마다 처음 만나는 줄이 글 날짜 이하 마지막 거래일이다.
+    const dayBy = new Map<string, DayRow>();
+    for (const d of (days.data as DayRow[] | null) ?? []) if (!dayBy.has(d.code)) dayBy.set(d.code, d);
+    const today = todayKst(new Date());
+    const recent = noteDate >= shiftDate(today, -1);
     const krQuotes = await Promise.all(
       refs.kr.flatMap((code) => {
         const r = krBy.get(code);
         if (!r) return [];
-        const stored: KrStockQuote = { code, name: r.name, market: r.market, price: r.close_price, changeRate: r.change_rate, priceDate: r.price_date };
-        if (!liveDay || (r.price_date != null && r.price_date >= noteDate)) return [Promise.resolve(stored)];
+        const d = dayBy.get(code);
+        const base = { code, name: r.name, market: r.market };
+        // 이력에 없으면(새 상장 · 이력 표 시작 전) `stocks` 의 최근 종가가 글 날짜 이하일 때만 쓴다 — 글 날짜 뒤의 시세를 앉히지 않는다.
+        const stored: KrStockQuote = d
+          ? { ...base, price: d.close, changeRate: d.change_rate, priceDate: d.date }
+          : r.price_date != null && r.price_date <= noteDate
+            ? { ...base, price: r.close_price, changeRate: r.change_rate, priceDate: r.price_date }
+            : { ...base, price: null, changeRate: null, priceDate: null };
+        if (!recent || (stored.priceDate != null && stored.priceDate >= noteDate)) return [Promise.resolve(stored)];
         return [
           liveQuote(code, r.market).then((q) =>
-            // 야후 값이 저장값보다 새 거래일일 때만 바꾼다 — 같은 날이면 KRX 저장값이 원본이다.
-            !q || (q.date != null && r.price_date != null && q.date <= r.price_date)
-              ? stored
-              : { ...stored, price: q.price, changeRate: q.changeRate, priceDate: q.date ?? noteDate },
+            q && takeLiveKr(q.date, stored.priceDate, noteDate) ? { ...stored, price: q.price, changeRate: q.changeRate, priceDate: q.date ?? noteDate } : stored,
           ),
         ];
       }),
@@ -390,7 +416,7 @@ export async function getNoteStocks(refs: NoteStockRefs, noteDate: string): Prom
         const r = usBy.get(ticker);
         if (!r) return [];
         return [
-          usQuote(ticker, noteDate === todayKst(now)).then(
+          usQuoteOn(ticker, noteDate, today).then(
             (q): UsStockQuote => ({ ticker, name: r.name_ko || ticker, price: q?.price ?? null, changeRate: q?.changeRate ?? null, priceDate: q?.date ?? null }),
           ),
         ];
