@@ -2450,9 +2450,11 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-pv-band > .v2-mod { display: flex; flex-direction: column; }
 /* 둘째 줄 모듈들이 줄 트랙을 나눠 쓴다(subgrid, is-sub — page.tsx 가 밤사이 · 해외 값 · 브리핑이 다 세 줄인 날만 건다).
    브리핑 줄은 글 키를 따르고 두 표는 남는 높이를 고르게 받아, 가로선이 1,440 에서 2~5px · 1,920 에서 12px 어긋났다(2026-10-15 점검).
-   트랙 = 모듈 머리 · 표 머리 30 · 세 줄. 브리핑 첫 줄은 표 머리 + 첫 줄에 걸친다. 1,100 아래는 브리핑이 판 폭 한 줄로 내려가 짝이 없다. */
+   트랙 = 모듈 머리 · 표 머리 30 · 세 줄. 브리핑 첫 줄은 표 머리 + 첫 줄에 걸친다. 1,100 아래는 브리핑이 판 폭 한 줄로 내려가 짝이 없다.
+   세 줄은 같은 키(1fr — 높이가 정해지지 않은 띠라 가장 큰 줄에 맞춰진다). auto 일 땐 브리핑 '국장' 줄이 두 줄로 접히는 날 가운데 줄만
+   커져 1,920 에서 52 · 65 · 53px 이었다(2026-10-18). */
 @container kd (min-width: 1100px) {
-  .v2-pv-band.is-sub { grid-template-rows: auto 30px repeat(3, auto); row-gap: 0; }
+  .v2-pv-band.is-sub { grid-template-rows: auto 30px repeat(3, 1fr); row-gap: 0; }
   .v2-pv-band.is-sub > .v2-mod { grid-row: 1 / span 5; display: grid; grid-template-rows: subgrid; row-gap: 0; }
   .v2-pv-band.is-sub :is(.v2-pv-ixt, .v2-pv-perp) { grid-row: 2 / span 4; display: grid; grid-template-rows: subgrid; row-gap: 0; }
   .v2-pv-band.is-sub :is(.v2-pv-ixt ol, .v2-pv-perp .v2-tbody) { grid-row: 2 / span 3; display: grid; grid-template-rows: subgrid; row-gap: 0; }
