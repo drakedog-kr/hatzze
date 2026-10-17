@@ -1443,6 +1443,34 @@ def posted_since(posted_at: str, since: str) -> bool:
     return kst_date(posted_at) >= since
 
 
+# load_messages_since 가 글에 붙여 받는 두 표. 붙은 칸이 있으면 tags_from_messages · analysis_from_messages 가 그것을 쓰고,
+# 없으면(시험 재료 · 다른 길로 받은 글) 예전처럼 표 전체를 읽는다 — 결과는 같다(창 밖 태그는 어차피 버렸다).
+MSG_EMBED_TAGS = "telegram_message_stocks"
+MSG_EMBED_ANALYSIS = "telegram_message_analysis"
+
+
+def tags_from_messages(db, msgs: dict[tuple, dict]) -> list[dict]:
+    """글들의 종목 태그 [{id, channel_handle, message_id, stock_code, match_text, method}] — 태그 id 순(표를 id 순 키셋으로 읽던
+    때와 같은 차례라 동률이 예전과 같게 갈린다)."""
+    if msgs and all(MSG_EMBED_TAGS in m for m in msgs.values()):
+        rows = [
+            {**t, "channel_handle": k[0], "message_id": k[1]}
+            for k, m in msgs.items() for t in (m.get(MSG_EMBED_TAGS) or [])
+        ]
+        return sorted(rows, key=lambda r: r["id"])
+    return load_all_keyset(db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code,match_text,method")
+
+
+def analysis_from_messages(db, msgs: dict[tuple, dict]) -> dict[tuple, str]:
+    """글 → 감성 분석 라벨. 붙은 칸이 있으면 그것, 없으면 표 전체."""
+    if msgs and all(MSG_EMBED_ANALYSIS in m for m in msgs.values()):
+        return {k: m[MSG_EMBED_ANALYSIS]["sentiment"] for k, m in msgs.items() if m.get(MSG_EMBED_ANALYSIS)}
+    return {
+        (a["channel_handle"], a["message_id"]): a["sentiment"]
+        for a in load_all_keyset(db, "telegram_message_analysis", "id,channel_handle,message_id,sentiment")
+    }
+
+
 def load_messages_since(db, since_date: str) -> list[dict]:
     """posted_at 이 since_date(KST) 이후인 메시지만 페이지를 이어 받는다.
 
@@ -1486,7 +1514,9 @@ def load_messages_since(db, since_date: str) -> list[dict]:
     return load_window_keyset(
         db,
         "telegram_messages",
-        "id,channel_handle,message_id,posted_at,views,forwards",
+        # 태그 · 감성 분석은 글에 붙여 받는다(PostgREST 임베드) — 두 표를 통째로(각 30만 행대) 따로 읽던 것을 대신한다
+        # (2026-10-15 점검 pipeline-02 · build_stock_digests · generate_theme_briefs.py 가 쓴다, MSG_EMBED_* 주석).
+        f"id,channel_handle,message_id,posted_at,views,forwards,{MSG_EMBED_TAGS}(id,stock_code,match_text,method),{MSG_EMBED_ANALYSIS}(sentiment)",
         since_utc,
         narrow=lambda q: q.not_.is_("text", "null"),
     )
@@ -2320,14 +2350,7 @@ def build_stock_digests(
     required = [(code, name_of.get(code, code)) for code, _ in top]
     required += [(c, name_of.get(c, c)) for c, _m in weekly if c not in have]
 
-    # 증권사 화자 행(config.HOUSE_METHOD 주석)은 그 증권사의 요약 재료가 아니다. 글은 다른 종목 재료로 남는다.
-    mentions = [
-        m
-        for m in load_all_keyset(
-            db, "telegram_message_stocks", "id,channel_handle,message_id,stock_code,match_text,method"
-        )
-        if not is_house(m)
-    ]
+
     # 발췌에 쓸 본문. **창 안만 받는다** — 아래에서 어차피 posted_at >= since 로 거르는데,
     # load_all 로 받으면 그 창 밖 10만여 건의 본문까지 받아 놓고 버리게 된다.
     #
@@ -2344,12 +2367,10 @@ def build_stock_digests(
     msgs = {(m["channel_handle"], m["message_id"]): m for m in msgs}
     if market_keys is None:
         market_keys = market_message_keys(db, since)
-    analysis = {
-        (a["channel_handle"], a["message_id"]): a["sentiment"]
-        for a in load_all_keyset(
-            db, "telegram_message_analysis", "id,channel_handle,message_id,sentiment"
-        )
-    }
+    # 증권사 화자 행(config.HOUSE_METHOD 주석)은 그 증권사의 요약 재료가 아니다. 글은 다른 종목 재료로 남는다.
+    # 태그 · 분석은 글에 붙여 받은 것을 쓴다(tags_from_messages) — 창 밖 글의 태그는 아래에서 어차피 버렸다.
+    mentions = [m for m in tags_from_messages(db, msgs) if not is_house(m)]
+    analysis = analysis_from_messages(db, msgs)
 
     by_code: dict[str, list[tuple]] = defaultdict(list)
     # 발췌를 자를 때 쓸 '본문에 적힌 표기'. 메시지 키에 종목까지 묶어야 한다 — 한 메시지가

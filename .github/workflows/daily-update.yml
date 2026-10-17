@@ -881,11 +881,18 @@ jobs:
         continue-on-error: true
         run: bash scripts/bg-step.sh mark analyze_collect
 
+      # 실패하면 60초 뒤 한 번 더(위 '종목 추출' ①과 같은 꼴). 2026-10-15 저녁 Supabase 디스크 자동 확장 직후 게이트웨이 502 한 번에
+      # 이 스텝이 죽고 총평이 아침 집계로 써졌다(#734). 스크립트 안 재시도(execute_with_retry, 1·3·8초)가 못 넘는 긴 끊김을 받는다.
+      # 집계를 갈아 끼우는 스크립트라 두 번 돌려도 표가 안 망가진다.
       - name: (텔레그램) 센티먼트·화제어 집계
         id: telegram_sentiment
         continue-on-error: true
         if: steps.telegram_extract.outcome == 'success'
-        run: python data-pipeline/scripts/calculate_telegram_sentiment.py
+        run: |
+          if python data-pipeline/scripts/calculate_telegram_sentiment.py; then exit 0; fi
+          echo "센티먼트·화제어 집계가 실패해 60초 뒤 한 번 더 돌립니다"
+          sleep 60
+          python data-pipeline/scripts/calculate_telegram_sentiment.py
 
       # ⚠️ **미장 센티먼트는 분류 수거 뒤여야 한다.** 입력이 `telegram_message_analysis` 라, 그날 분류를 수거하는
       #    telegram_analyze_collect **뒤에** 와야 오늘치를 센다. 앞에 두면 조용히 어제 분류로 오늘 카드를 그린다.
@@ -896,10 +903,16 @@ jobs:
       # ⭐ **총평 두 단계보다 앞이다.** 총평의 [전체] 낙관도가 이 표를 읽는다. 뒤에 두면 문장은 어제 표로,
       #    옆 큰 숫자는 오늘 표로 세어 둘이 갈린다.
       # 표가 없으면(마이그레이션 전) 안내만 찍고 성공으로 끝난다 — 화면·총평은 전체 글 기준으로 돈다.
+      # 실패하면 60초 뒤 한 번 더(위 센티먼트 집계와 같은 이유 · #735). 판정은 아직 안 한 글만 묻기라(label_new) 두 번째는 남은 것과
+      # 집계만 다시 한다 — LLM 을 처음부터 다시 부르지 않는다.
       - name: (텔레그램) 시장 전체 분위기 판정 + 집계
         id: telegram_market
         continue-on-error: true
-        run: python data-pipeline/scripts/analyze_telegram_market.py
+        run: |
+          if python data-pipeline/scripts/analyze_telegram_market.py; then exit 0; fi
+          echo "시장 분위기 판정 · 집계가 실패해 60초 뒤 한 번 더 돌립니다"
+          sleep 60
+          python data-pipeline/scripts/analyze_telegram_market.py
 
       # 미장 총평도 이 표(telegram_message_market · telegram_market_sentiment_daily)로 [전체] 낙관도를 쓴다(위 '총평 두 단계
       # 보다 앞이다'). 뒤에서 도는 미장 갈래가 이 표시를 기다렸다가 미장 총평을 쓴다(scripts/kadera-us-chain.sh ④).
