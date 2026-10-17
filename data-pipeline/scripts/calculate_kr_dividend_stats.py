@@ -88,6 +88,8 @@ PAGE = 1000
 PAY_LAG_FALLBACK_DAYS = 100  # 지급일이 비었을 때 기준일에 더하는 날수(실측 중앙값 103)
 TWIN_DAYS = 45  # 기준일이 1년에서 이만큼 안쪽으로 떨어져 있으면 같은 차례(분기 간격 91일의 절반)
 UNDECLARED_DAYS = 90  # 기준일이 이만큼 안쪽인 '금액 미정' 행만 1년 전 같은 차례로 채운다(그보다 오래 0 이면 취소 · 자료 누락)
+# 배당 바스켓이 담는 수익률 상한(lib/dividend.ts MAX_YIELD 와 같은 값). 견줄 배당 해가 없는 종목의 특별 판정에 쓴다.
+BASKET_MAX_YIELD = 12.0
 YEAR_END_PAY_LAST_MONTH = 4  # 12월 결산 회사의 결산 배당은 이 달까지 지급된다(머리말)
 
 
@@ -279,10 +281,25 @@ def summarize(code: str, recs: list[dict], today: date, close: float | None) -> 
     # 전전해 배당이 없으면(지난해 배당을 시작) 지난해 합과 견주되, **12개월 안 한 번 받은 금액**이 그 두 배를 넘을 때만 —
     # 12개월 합으로 견주면 결산 17원에 중간배당 23원을 새로 더한 회사(유니테크노)까지 걸린다. 인피니트헬스케어(지난해 100원 ·
     # 10/12 특별 820원)는 예전엔 늘 안 걸려 8.62% 를 평범한 수익률로 냈다.
+    # 직전 두 해가 다 0이면(오래 쉬다 다시 준 회사) 배당이 있던 가장 최근 해와 같은 두 배 규칙으로 견주고, 견줄 해가 없으면
+    # 수익률이 바스켓 상한(BASKET_MAX_YIELD)을 넘을 때만 켠다 — 예전엔 늘 안 걸려 진흥기업우B 94.57%(2019~2025 무배당 뒤 5,750원) ·
+    # 예림당 23.90%(2014년 150원 뒤 662원)가 평범한 수익률로 섰다(2026-10-15 점검). '두 해 0이면 모두 켬'은 첫 정기배당을, '액면 100% 이상'은
+    # 액면 100원 종목을 잘못 건다.
     prev_fy = annual.get(last_year - 1, 0)
     last_fy = annual.get(last_year, 0)
     big = max((amt for _, _, amt in picked), default=0)
-    unusual = (prev_fy > 0 and ttm_dps > 2 * prev_fy) or (prev_fy == 0 and last_fy > 0 and big > 2 * last_fy)
+    if ttm_dps <= 0:
+        unusual = False
+    elif prev_fy > 0:
+        unusual = ttm_dps > 2 * prev_fy
+    elif last_fy > 0:
+        unusual = big > 2 * last_fy
+    else:
+        paid_before = [yy for yy, v in annual.items() if yy < last_year - 1 and v > 0]
+        if paid_before:
+            unusual = ttm_dps > 2 * annual[max(paid_before)]
+        else:
+            unusual = bool(close) and ttm_dps / close * 100 > BASKET_MAX_YIELD
 
     return {
         "code": code,
