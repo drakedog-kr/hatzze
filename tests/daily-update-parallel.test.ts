@@ -172,16 +172,21 @@ describe("아침도 페이지마다 자료가 다 쓰이면 바로 바뀐다(202
     assert.ok(m[2].includes("'/theme/[theme]'"), m[2]);
   });
 
-  it("아침 국장 카더라 · 국장 테마 상세는 KRX 게이트 뒤, 배당 잡의 등락률 채우기를 기다린 뒤에만 비운다", () => {
-    const gate = idx(update, (s) => s.name === "KRX 공표(08:00 KST) 대기", "KRX 게이트");
-    const bg = idx(update, (s) => s.name.startsWith("국장 카더라 · 테마 상세 비우기 (아침 · KRX 등락률 뒤) — 뒤에서 시작"), "아침 국장 카더라 비우기");
-    assert.ok(bg > gate && bg > kr());
-    assert.equal(update[bg].if, "${{ !cancelled() && github.event.inputs.slot == 'morning' }}");
-    assert.match(update[bg].body, /WAIT_STRICT: "1"/);
-    assert.match(update[bg].body, /wait-for-job-step\.sh 30 "dividend::등락 이유 등락률 채우기" && bash scripts\/revalidate\.sh \/kadera "\/theme\/\[theme\]"/);
+  it("아침 국장 카더라 · 국장 테마 상세는 어제 등락률이 빈 줄이 있으면 배당 잡의 KRX 채우기를 기다린 뒤에 비운다", () => {
+    const at = (id: string) => idx(update, (s) => s.id === id, id);
+    const kbg = idx(update, (s) => s.name.startsWith("국장 카더라 비우기 (아침 · KRX 등락률 뒤) — 뒤에서 시작"), "아침 국장 카더라");
+    const tbg = idx(update, (s) => s.name.startsWith("국장 테마 상세 비우기 (아침 · KRX 등락률 뒤) — 뒤에서 시작"), "아침 국장 테마 상세");
+    assert.ok(kbg > kr() && kbg > at("telegram_narratives"), "국장 카더라는 총평 뒤");
+    assert.ok(tbg > at("telegram_theme_briefs") && tbg > at("telegram_us_theme_briefs"), "국장 테마 상세는 테마 요약 뒤");
+    for (const [i, name, path] of [[kbg, "kadera_after_krx", "/kadera"], [tbg, "theme_after_krx", '"/theme/\\[theme\\]"']] as const) {
+      const s = update[i];
+      assert.equal(s.if, "${{ !cancelled() && github.event.inputs.slot == 'morning' }}");
+      assert.match(s.body, /WAIT_STRICT: "1"/);
+      assert.match(s.body, new RegExp(`bg-step\\.sh start ${name} -- bash -c 'if python data-pipeline/scripts/move_reason_rates_pending\\.py; then bash scripts/wait-for-job-step\\.sh 90 "dividend::등락 이유 등락률 채우기" \\|\\| exit 1; fi; bash scripts/revalidate\\.sh ${path}'`));
+      const res = idx(update, (x) => x.id === name, `${name} 결과`);
+      assert.ok(res > i && res < idx(update, (x) => x.name === "브리핑 화면만 먼저 비우고 데우기", "브리핑"));
+    }
     assert.equal(dividend.filter((s) => s.name.startsWith("등락 이유 등락률 채우기")).length, 1, "기다리는 스텝 이름이 배당 잡에 하나여야 한다");
-    const res = idx(update, (s) => s.body.includes("bg-step.sh wait kadera_after_krx"), "결과 찍기");
-    assert.ok(res > bg);
     assert.match(job("update"), /\n {6}actions: read/);
   });
 
