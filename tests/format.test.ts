@@ -102,13 +102,29 @@ describe("hasFinal 과 조사", () => {
     assert.equal(hasFinal("현대차"), false);
     assert.equal(hasFinal("셀트리온"), true);
   });
-  it("로마자·숫자는 한국어 음독의 끝소리 표로 가른다(X→엑스 있음, Y→와이 없음, 표에 없으면 없음)", () => {
-    assert.equal(hasFinal("스페이스X"), true);
+  it("로마자·숫자는 읽은 글자 이름의 끝 받침으로 가른다(L · M · N · R 만 있음, 표에 없으면 없음)", () => {
+    // 엑스 · 씨 · 에스 · 에프 · 제트는 받침이 없다 — 예전 표는 '스페이스X을' · 'KCC이'를 냈다(2026-10-15 점검).
+    assert.equal(hasFinal("스페이스X"), false);
+    assert.equal(hasFinal("KCC"), false);
+    assert.equal(hasFinal("GS"), false);
+    assert.equal(hasFinal("F&F"), false);
     assert.equal(hasFinal("Y"), false);
     assert.equal(hasFinal("NVDA"), false);
     assert.equal(hasFinal("AAPL"), true);
+    assert.equal(hasFinal("HMM"), true);
+    assert.equal(hasFinal("NHN"), true);
+    assert.equal(hasFinal("DSR"), true);
     assert.equal(hasFinal("KODEX 200"), true);
     assert.equal(hasFinal("Q"), false);
+  });
+  it("낱말로 읽는 이름은 예외 표를 먼저 본다", () => {
+    assert.equal(hasFinal("NAVER"), false);
+    assert.equal(hasFinal("SIMPAC"), true);
+    assert.equal(hasFinal("LS ELECTRIC"), true);
+    assert.equal(hasFinal("LS"), false);
+    assert.equal(hasFinal("SOOP"), true);
+    assert.equal(withSubjectParticle("NAVER"), "NAVER가");
+    assert.equal(withObjectParticle("스페이스X"), "스페이스X를");
   });
   it("조사 셋이 같은 판정을 쓴다", () => {
     assert.equal(withObjectParticle("삼성전자"), "삼성전자를");
