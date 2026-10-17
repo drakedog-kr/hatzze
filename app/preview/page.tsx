@@ -383,17 +383,8 @@ function PerpRow({ r }: { r: OvernightRow }) {
  * ⭐ 겹친 곳 줄 — 여러 미국 종목에 동시에 걸린 국내 종목. 표에선 묶음마다 흩어져 안 보인다(대한항공이 부킹홀딩스 ·
  *    사우스웨스트 · 보잉 세 곳에서 같이 밀린 날). 이 줄이 화면에서 유일하게 그걸 말한다.
  */
-function BriefModule({
-  when,
-  usHoliday,
-  moverCount,
-  movers,
-}: {
-  when: string;
-  usHoliday: string | null;
-  moverCount: number;
-  movers: PreviewMover[];
-}) {
+/** 브리핑 이름표 줄의 재료 — 줄 수를 페이지(둘째 줄 트랙 나눠 쓰기 판정)와 BriefModule 이 같이 쓴다. */
+function briefFacts(movers: PreviewMover[]) {
   const biggest = movers.reduce<PreviewMover | null>((a, m) => (!a || Math.abs(m.dp) > Math.abs(a.dp) ? m : a), null);
   const strongest = movers
     .flatMap((m) => m.links.map((l) => ({ m, l })))
@@ -408,6 +399,28 @@ function BriefModule({
   const crowded = [...linkCount.entries()].sort((a, b) => b[1] - a[1])[0];
   const crowdedWith = crowded ? movers.filter((m) => m.links.some((l) => l.stock === crowded[0])).map((m) => m.usName) : [];
   const crowdedCode = crowded ? movers.flatMap((m) => m.links).find((l) => l.stock === crowded[0])?.code : undefined;
+  return { biggest, strongest, crowded, crowdedWith, crowdedCode };
+}
+
+/** 브리핑 이름표 줄 수 — 휴장 · 조용한 밤은 문단 하나라 0. */
+function briefRowCount(usHoliday: string | null, moverCount: number, movers: PreviewMover[]): number {
+  if (usHoliday || moverCount === 0) return 0;
+  const { biggest, strongest, crowded } = briefFacts(movers);
+  return [biggest, strongest, crowded && crowded[1] > 1].filter(Boolean).length;
+}
+
+function BriefModule({
+  when,
+  usHoliday,
+  moverCount,
+  movers,
+}: {
+  when: string;
+  usHoliday: string | null;
+  moverCount: number;
+  movers: PreviewMover[];
+}) {
+  const { biggest, strongest, crowded, crowdedWith, crowdedCode } = briefFacts(movers);
 
   return (
     <Module id="brief" title="오늘의 브리핑" className="v2-pv-briefmod">
@@ -663,6 +676,11 @@ export default async function PreviewPage() {
   // 날짜로 보이게(2026-10-15). 41일 중 16일이 국장이 쉬는 날이었다. 개장일엔 예전처럼 '국장 종목'.
   const krHead = nextOpen && date && nextOpen !== date ? `${sessionDay(nextOpen)} 국장` : "국장 종목";
   const hasOvernight = overnight.rows.length > 0;
+  const rowsShared =
+    !usHoliday &&
+    nightRows(spx, soxx, ewyPrem).length === 3 &&
+    briefRowCount(usHoliday, moverCount, movers) === 3 &&
+    (!hasOvernight || overnight.rows.length === 3);
 
   return (
     <div className="hz-tx v2-kd v2-pv">
@@ -680,7 +698,8 @@ export default async function PreviewPage() {
 
       {/* 둘째 줄 — 밤사이 뉴욕 | 해외에서 거래 중인 값 | 오늘의 브리핑. 해외 값이 없는 날(수집 실패 · 표 없음)은 그 모듈째 빼고 두 칸.
           ⚠️ 빈 모듈을 남기지 말 것 — 고장으로 읽힌다. */}
-      <div className={`v2-pv-band${hasOvernight ? "" : " is-pair"}`}>
+      {/* 셋(해외 값이 없는 날은 둘) 다 세 줄인 날만 줄 트랙을 나눠 쓴다(is-sub · v2.css) — 줄 수가 다르면 남는 트랙이 빈 자리가 된다. */}
+      <div className={`v2-pv-band${hasOvernight ? "" : " is-pair"}${rowsShared ? " is-sub" : ""}`}>
         <NightModule when={when} spx={spx} soxx={soxx} ewyPrem={ewyPrem} usHoliday={usHoliday} usSession={usSession} />
         {hasOvernight && <OvernightModule overnight={overnight} />}
         {hasOvernight && <PerpRefresh />}
