@@ -175,9 +175,30 @@ export const usNameMap = cache(async (): Promise<Map<string, string>> => {
  * 위아래 경계를 **둘 다** 쿼리에 건다. 하한만 걸면 경계일이 양쪽 다 들어와
  * N 일이 N+1 일이 된다(usKaderaBaseDate 주석의 2,377 vs 1,550).
  */
-async function loadUsStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: string[] }> {
+/**
+ * 미장 급부상 카드 창의 끝날 — 파이프라인이 미장 한 줄 요약을 만든 뒤 telegram_us_surging_window 에 적은 값(마이그레이션 102).
+ * 국장 surgingWindowEnd(lib/telegram-data.ts)와 같은 규칙이다. 화면이 따로 판정하지 않는다 — 수집과 종목 집계 사이 틈에
+ * 오늘 행이 반쪽 하루라 순위가 흔들린다. 표가 없거나(102 전) 기준일 행이 없으면 예전처럼 전날 끝.
+ */
+export const usSurgingWindowEnd = cache(async (): Promise<string> => {
   const db = getSupabaseAdmin();
-  const window = windowBefore(await usKaderaBaseDate(), days);
+  const [base, { data, error }] = await Promise.all([
+    usKaderaBaseDate(),
+    db.from("telegram_us_surging_window").select("date,window_end").order("date", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const before = addDaysISO(base, -1);
+  // PGRST205 = 표가 없다(마이그레이션 102 전). 그땐 예전 규칙이 정답이라 로그를 남기지 않는다.
+  if (error && error.code !== "PGRST205") {
+    console.error("[usSurgingWindowEnd] 미장 급부상 창 끝날을 못 읽었습니다 — 전날 끝 창으로 그립니다", error);
+  }
+  if (!data || data.date !== base) return before;
+  return data.window_end === base ? base : before;
+});
+
+async function loadUsStockDaily(days: number, end?: string): Promise<{ rows: DailyRow[]; dates: string[] }> {
+  const db = getSupabaseAdmin();
+  // `end` 를 주면 그날로 끝나는 days 일이다(그날 포함). 급부상 카드만 쓴다(usSurgingWindowEnd).
+  const window = windowBefore(end ? addDaysISO(end, 1) : await usKaderaBaseDate(), days);
   // ⚠️ 정렬 키는 date 가 아니라 id 다. 하루에 종목 수백 행이 달려 date 는 유일하지 않고,
   //    유일하지 않은 키로 페이징하면 경계에서 행이 빠지거나 겹친다(fetchAllRows 주석 [2]).
   const rows = await fetchAllRows<DailyRow>("id", () =>
@@ -240,10 +261,12 @@ export async function getUsSurgingStocks(
   // 국장 짝(getSurgingStocks)과 같은 꼴이고, 기본값은 켜 둔 채라 기존 호출부는 그대로다.
   opts: { withQuotes?: boolean } = {},
 ): Promise<UsSurgingStock[]> {
-  const { rows, dates } = await loadUsStockDaily(14);
+  // 창의 끝날은 국장과 같은 판정(저녁 실행 뒤엔 오늘까지 · usSurgingWindowEnd). 아침 · 표가 없을 때는 예전처럼 전날 끝.
+  const end = await usSurgingWindowEnd();
+  const { rows, dates } = await loadUsStockDaily(14, end);
   if (!rows.length) return [];
 
-  // 안 끝난 오늘은 loadUsStockDaily 의 창(windowBefore)이 이미 뺐다. 여기서는 그 꼬리
+  // 창의 끝날은 usSurgingWindowEnd 가 정했다(아침엔 안 끝난 오늘을 빼고, 저녁 실행 뒤엔 오늘까지). 여기서는 그 꼬리
   // US_WINDOW_DAYS 칸을 '최근'으로 잡고 나머지를 비교군으로 둔다.
   // 평소는 앞 기간을 합쳐서, 최근은 날마다 평균해서 몫을 낸다 — 국장과 같은 셈법이다(lib/surging-score.ts).
   // 최근 언급 MIN_RECENT_MENTIONS(3)회 미만·배수 1 이하는 뺀다(3일에 두어 번 언급된 종목이 배수만 크게 받는 걸 막는다).
@@ -275,7 +298,7 @@ export async function getUsSurgingStocks(
   // 시세는 **고른 것만** 받는다. 후보 전부를 물으면 카드에 못 오를 종목까지 왕복한다.
   const [quotes, chOf] = await Promise.all([
     opts.withQuotes === false ? Promise.resolve(new Map<string, { price: number; changeRate: number | null }>()) : usQuotes(ranked.map((s) => s.ticker)),
-    breadthChannelsIfSameWindow("getUsSurgingStocks"),
+    breadthChannelsIfSameWindow("getUsSurgingStocks", end),
   ]);
   return ranked.map((s) => ({
     ...s,
@@ -301,8 +324,11 @@ export async function getUsSurgingStocks(
  * 파이프라인이 같은 창으로 세면(calculate_us_stock_daily.BREADTH_WINDOW_DAYS)
  * 저절로 합집합이 다시 쓰인다.
  */
-async function breadthChannelsIfSameWindow(where: string): Promise<Map<string, number> | null> {
+async function breadthChannelsIfSameWindow(where: string, cardEnd: string): Promise<Map<string, number> | null> {
   const breadth = await usStockBreadth();
+  // 끝날도 같아야 한다. 관심의 폭은 찍은 날의 전날까지 센다(calculate_us_stock_daily.save_breadth) — 저녁 실행 뒤 카드가
+  // 오늘까지 넘어간 날(usSurgingWindowEnd)은 창이 하루 어긋나 일별 최댓값으로 물러난다(모순은 없다).
+  if (breadth.asOf && cardEnd !== addDaysISO(breadth.asOf, -1)) return null;
   if (breadth.windowDays === US_WINDOW_DAYS) return new Map(breadth.rows.map((r) => [r.ticker, r.channelCount]));
   if (breadth.windowDays) {
     console.error(
@@ -967,7 +993,7 @@ export async function getUsStockReports(limit = 4): Promise<UsStockReport[]> {
   const chartDates = dates.slice(-US_CHART_DAYS);
   const [quotes, chOf] = await Promise.all([
     usQuotes(top.map(([t]) => t)),
-    breadthChannelsIfSameWindow("getUsStockReports"),
+    breadthChannelsIfSameWindow("getUsStockReports", addDaysISO(base, -1)),
   ]);
   return top.map(([ticker, a]) => ({
     ticker,

@@ -247,6 +247,10 @@ def kst_day(posted_at: str) -> str:
     return datetime.fromisoformat(posted_at.replace("Z", "+00:00")).astimezone(KST).date().isoformat()
 
 
+def kst_hour(posted_at: str) -> int:
+    return datetime.fromisoformat(posted_at.replace("Z", "+00:00")).astimezone(KST).hour
+
+
 def load_day_messages(db, day: str) -> dict[tuple, dict]:
     """그날(KST) 본문 있는 메시지. 본문은 안 받는다(넓은 행 수천 건은 8초 벽에 걸린다)."""
     # ⚠️ 위 경계(lt)는 걸지 않는다 — 걸었더니 첫 페이지가 statement timeout(57014)에 걸렸다
@@ -299,11 +303,32 @@ def spread_by_channel(ordered: list[tuple[dict, str]], limit: int) -> list[tuple
     return (first + rest)[:limit]
 
 
-def build_digest(name: str, code: str, picked: list[tuple[dict, str]]) -> str:
+def pick_quoted(vals: list[tuple[int, float]], open_hour: int | None) -> float | None:
+    """그날 글들의 등락 표기 [(올린 시각(KST 시), 값)]에서 그 종목의 표기 하나.
+
+    ① 장이 열리기 전(open_hour 전) 글은 뺀다 — 전날 장 정리라 어제 등락이다. 빼고 남는 게 없으면 다 쓴다.
+    ② 많이 적힌 부호 쪽에서 절댓값이 가장 큰 것(같은 수면 오름 쪽). 예전엔 그날 글 전체에서 절댓값 하나만 골라
+       전날 정리 글이나 목록 옆 종목 값 하나가 부호를 정했다 — 10-06~16 확정 등락 2% 이상 289줄 중 34줄이 반대였고,
+       ①②로 18줄이 됐다(2026-10-15 점검: S-Oil 표기 +26.5 는 목록 앞 LG화학 값, SK스퀘어 -12.91 은 07:21 전날 정리 글).
+    """
+    if not vals:
+        return None
+    xs = [v for h, v in vals if open_hour is None or h >= open_hour] or [v for _, v in vals]
+    up = sum(1 for v in xs if v > 0)
+    down = sum(1 for v in xs if v < 0)
+    side = [v for v in xs if (v > 0) == (up >= down)] or xs
+    return max(side, key=abs)
+
+
+def build_digest(name: str, code: str, picked: list[tuple[dict, str]], quoted: float | None = None) -> str:
     lines = [
         f"[종목] {name} ({code})",
         f"[오늘 채널에서 오간 말] {len(picked)}건 발췌",
     ]
+    if quoted is not None and quoted != 0:
+        # 방향을 사실로 준다 — 없으면 오른 날 '약세 우려', 내린 날 '수혜 기대'처럼 반대쪽 발췌를 이유로 옮겼다(2026-10-15 점검).
+        lines.insert(1, f"[등락 방향] 채널 글에 적힌 오늘 등락은 {'오름(+)' if quoted > 0 else '내림(−)'} 쪽입니다. "
+                        "그 방향으로 움직인 이유만 쓰고, 발췌에 그런 이유가 없으면 빈 문자열입니다.")
     for m, needle in picked:
         lines.append(f"- {KR.excerpt(m['text'], needle)}")
     lines += [
@@ -555,6 +580,8 @@ MARKETS = {
         "names": ("stocks", "code,name", "code", "name"),
         "fill_krx": True,
         "min_quoted": KR_MIN_QUOTED,
+        # 이 시각(KST) 전 글의 등락 표기는 전날 장 정리라 표기 등락을 정할 때 뺀다(pick_quoted). 미장은 장이 밤이라 두지 않는다.
+        "open_hour": 9,
         "weekdays_only": True,
         # 휴장은 휴장일 표가 정한다(KR_MIN_QUOTED 위 주석 '자료가 덜 찬 날').
         "krx_calendar": True,
@@ -626,12 +653,14 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
     quoted: dict[str, float | None] = {}
     move_msgs: dict[str, int] = {}
     for code, lst in by_code.items():
-        vals = []
+        vals: list[tuple[int, float]] = []
         for mk, needle in lst:
             v = quoted_move(msgs[mk].get("text") or "", needle, leading=code not in houses)
             if v is not None:
-                vals.append(v)
-        quoted[code] = max(vals, key=abs) if vals else None
+                posted = msgs[mk].get("posted_at")
+                # 시각을 모르는 글(시험 재료)은 장 중으로 본다.
+                vals.append((kst_hour(posted) if posted else 12, v))
+        quoted[code] = pick_quoted(vals, cfg.get("open_hour"))
         move_msgs[code] = len(vals)
 
     moved = sorted(
@@ -698,7 +727,7 @@ def run_market(db, client, cfg: dict, day: str, dry_run: bool) -> int:
             ordered.append((m, needle))
         picked = spread_by_channel(ordered, EXCERPTS)
         if picked:
-            digests.append((code, name_of.get(code, code), build_digest(name_of.get(code, code), code, picked)))
+            digests.append((code, name_of.get(code, code), build_digest(name_of.get(code, code), code, picked, quoted.get(code))))
 
     if dry_run:
         print(f"[{tag}] 후보 · 표기 · 언급 · 채널")

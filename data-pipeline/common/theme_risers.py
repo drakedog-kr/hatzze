@@ -15,7 +15,11 @@ RISER_*) 값을 바꾸면 거기도 맞춘다. 규칙:
           그날 합과 같고, 화면의 '평소 대비'(lib/theme-page.ts buildHotStocks)도 같은 분모를 쓴다.
   후보    최근 사흘 언급 ≥ RISER_MIN_MENTIONS(이건 절대 수 — 두세 번 스친 작은 종목을 거른다).
           앞 사흘 0회면 '새로 등장'(배수 없음). 배수 < RISER_MIN_RATIO(1.5) 는 '말이 는 종목'이 아니다(요동).
-  줄 세우기  새로 등장 > 배수 > 최근 언급 수. 테마마다 하나. 테마 사이도 같은 잣대로. 최대 RISER_MAX(10).
+  줄 세우기  평활 배수(score) > 최근 언급 수. 테마마다 하나. 테마 사이도 같은 잣대로. 최대 RISER_MAX(10).
+            score = ((최근 + 1) ÷ 최근 총량) ÷ ((앞 + 1) ÷ 앞 총량) — 양쪽에 언급 한 번씩을 더한 몫 배수.
+            예전엔 '새로 등장'이 배수를 늘 이겨, 앞 사흘이 주말 · 연휴면 열 줄 거의 다 새로 등장이었고(9/21~10/15 25일 중 10일),
+            10-15 2차전지는 에코프로머티 5회(새로 등장)가 엘앤에프 76회(앞 사흘 2회)를 이겼다(2026-10-15 점검).
+            '새로 등장' 꼬리표(ratio 없음)와 화면에 찍는 배수(ratio)는 그대로다 — 줄 세우는 열쇠만 score 다.
 
 ## 왜 몫으로 견주나 (2026-09-30)
 
@@ -52,10 +56,8 @@ RISER_SPARE = 3
 
 
 def _better(a: dict, b: dict) -> bool:
-    if (a["ratio"] is None) != (b["ratio"] is None):
-        return a["ratio"] is None
-    if a["ratio"] is not None and b["ratio"] is not None and a["ratio"] != b["ratio"]:
-        return a["ratio"] > b["ratio"]
+    if a["score"] != b["score"]:
+        return a["score"] > b["score"]
     return a["recent"] > b["recent"]
 
 
@@ -110,8 +112,9 @@ def pick_risers(
         ratio = None if a["prior"] == 0 else (a["recent"] / total["recent"]) / (a["prior"] / total["prior"])
         if ratio is not None and ratio < RISER_MIN_RATIO:
             continue
+        score = ((a["recent"] + 1) / total["recent"]) / ((a["prior"] + 1) / total["prior"])
         for theme in themes_of[c]:
-            cand = {"theme": theme, "code": c, "name": name_of.get(c, c), "recent": a["recent"], "prior": a["prior"], "ratio": ratio}
+            cand = {"theme": theme, "code": c, "name": name_of.get(c, c), "recent": a["recent"], "prior": a["prior"], "ratio": ratio, "score": score}
             cur = best.get(theme)
             if cur is None or _better(cand, cur):
                 best[theme] = cand

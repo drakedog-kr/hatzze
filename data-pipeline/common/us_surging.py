@@ -40,7 +40,7 @@ MIN_RECENT_MENTIONS = 3
 CARD_LIMIT = 10
 
 
-def load_us_stock_daily(db, base_date: str | None = None) -> tuple[list[dict], list[str]]:
+def load_us_stock_daily(db, base_date: str | None = None, end_date: str | None = None) -> tuple[list[dict], list[str]]:
     """최근 LOOKBACK_DAYS 일의 telegram_us_stock_daily 와 날짜 목록(오름차순).
 
     ⚠️⚠️ **`base_date` 를 주면 화면과 같은 창**이 된다 — 기준일(telegram_us_sentiment_daily 최신)을
@@ -53,8 +53,10 @@ def load_us_stock_daily(db, base_date: str | None = None) -> tuple[list[dict], l
     ⚠️ 종목 × 날짜라 14일치가 1,000행을 쉽게 넘는다. 페이징하지 않으면 PostgREST 가
     **에러 없이** 잘라서 최신 날짜가 통째로 빠진 채 '평소 대비'가 계산된다.
     """
-    if base_date:
-        end = date.fromisoformat(base_date) - timedelta(days=1)
+    if end_date or base_date:
+        # end_date 를 주면 그날로 끝나는 창이다(그날 포함) — 저녁 실행 뒤 창(common/surging.window_end_for ·
+        # 국장 load_stock_daily(end_date=) 와 같은 길 · 마이그레이션 102). 안 주면 기준일을 뺀 앞 창이다.
+        end = date.fromisoformat(end_date) if end_date else date.fromisoformat(base_date) - timedelta(days=1)
         since = (end - timedelta(days=LOOKBACK_DAYS - 1)).isoformat()
         until = end.isoformat()
     else:

@@ -68,6 +68,17 @@ describe("parseRisers", () => {
     assert.equal(out.length, RISER_MAX);
     assert.deepEqual(out.slice(0, 3).map((r) => r.theme), ["B", "C", "A"]);
   });
+  it("평활 배수(score)가 있는 행끼리는 그것으로 세운다 — 새로 등장이 늘 이기지 않는다(2026-10-15 점검)", () => {
+    const withScore = (code: string, ratio: number | null, recent: number, score: number) => ({ ...riser(code, ratio, code, recent), score });
+    const rows: RiserRow[] = [
+      row("2026-10-15", "A", withScore("에코프로머티", null, 5, 2.1)),
+      row("2026-10-15", "B", withScore("엘앤에프", 25.3, 76, 9.4)),
+      row("2026-10-15", "C", withScore("셋", 1.8, 12, 1.6)),
+    ];
+    const out = parseRisers(rows, () => true);
+    assert.deepEqual(out.map((r) => r.theme), ["B", "A", "C"]);
+    assert.equal(out[1].ratio, null); // 새로 등장 꼬리표는 그대로
+  });
 });
 
 describe("risersWithFallback — 그날 줄이 없으면 줄이 있던 가장 최근 날", () => {

@@ -273,7 +273,7 @@ def main() -> None:
         r = riser_of.get(theme)
         if r is not None:
             # 화면이 국장과 같은 타입으로 읽는다 — code 에 티커, market 은 늘 "US"(lib/us-theme-page.ts).
-            row["riser"] = {"code": r["code"], "name": r["name"], "market": "US", "recent": r["recent"], "prior": r["prior"], "ratio": r["ratio"],
+            row["riser"] = {"code": r["code"], "name": r["name"], "market": "US", "recent": r["recent"], "prior": r["prior"], "ratio": r["ratio"], "score": round(r["score"], 4),
                             "reason": TB.write_riser_reason(ask_with, US_RISER_SYSTEM, digest_of.get(r["code"]), r["name"])}
             print(f"  [{theme} · {r['name']}] {row['riser']['reason'] or '(이유 없음)'}")
         items = [(t, name_of.get(t, t), blocks[t]) for t in hot_of.get(theme, []) if t in blocks]

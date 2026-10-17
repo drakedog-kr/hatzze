@@ -6,6 +6,7 @@ import { LOAD_FAILED, type MaybeFailed } from "./load-state";
 import { byPeriodEnd, periodFloor, stillAhead, type DatePrecision } from "./event-period";
 import { dropAlreadyHappened, dropOutrankedByPast, groupEventRows, pastLookupCodes, type GroupedEvent } from "./event-group";
 import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
+import { reasonContradictsMove } from "./move-sign";
 
 /**
  * 카더라의 '급등 종목' 과 '다가오는 일정' 자료.
@@ -343,22 +344,27 @@ export type StockMoveReason = {
 export async function getStockMoveReason(code: string, base?: string): Promise<StockMoveReason | null> {
   const db = getSupabaseAdmin();
   const b = base ?? (await kaderaBaseDate());
-  const { data, error } = await db
+  const { data: rows, error } = await db
     .from("telegram_stock_move_reason")
-    .select("date,reason,mention_count,channel_count,change_rate")
+    .select("date,reason,mention_count,channel_count,change_rate,quoted_change_rate")
     .eq("stock_code", code)
     .gte("date", addDaysISO(b, -BOARD_STALE_DAYS))
     .lte("date", b)
     .not("reason", "is", null)
     .neq("reason", "")
     .order("date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(5);
   if (error) {
     console.error(`[getStockMoveReason] ${code} 까닭을 못 읽었습니다`, error);
     return null;
   }
-  if (!data || !String(data.reason ?? "").trim()) return null;
+  // 표기 등락과 문장 방향이 함께 확정 등락과 반대인 줄은 건너뛴다 — 그 이유는 반대쪽 글에서 왔다(lib/move-sign.ts). 그다음 날짜 줄이 선다.
+  const data = (rows ?? []).find(
+    (r) =>
+      String(r.reason ?? "").trim() &&
+      !reasonContradictsMove(String(r.reason), num(r.quoted_change_rate as number | string | null), num(r.change_rate as number | string | null)),
+  );
+  if (!data) return null;
   return {
     date: data.date as string,
     reason: String(data.reason).trim(),

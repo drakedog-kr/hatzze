@@ -238,18 +238,18 @@ def run_kr(db, client, dry_run: bool) -> int:
     return saved
 
 
-def save_window(db, latest: str, end: str) -> None:
+def save_window(db, latest: str, end: str, table: str = "telegram_surging_window") -> None:
     """화면이 읽을 창의 끝날을 적는다(머리 주석 '국장 창의 끝날'). 못 적어도 문장은 남긴다.
 
     못 적으면 화면은 전날 끝 창으로 그린다 — 오늘 문장이 붙은 종목이 카드에 안 올라올 뿐
-    틀린 숫자가 나가지는 않는다. 표가 없을 때(마이그레이션 086 전)도 같은 길이다.
+    틀린 숫자가 나가지는 않는다. 표가 없을 때(마이그레이션 086 · 미장 102 전)도 같은 길이다.
     """
     try:
-        db.table("telegram_surging_window").upsert(
+        db.table(table).upsert(
             {"date": latest, "window_end": end, "updated_at": datetime.now(timezone.utc).isoformat()},
             on_conflict="date",
         ).execute()
-        print(f"[Supabase] telegram_surging_window {latest} → 창 끝 {end}")
+        print(f"[Supabase] {table} {latest} → 창 끝 {end}")
     except Exception as exc:  # noqa: BLE001 — 문장은 이미 저장됐다. 이 한 줄 때문에 스텝을 죽이지 않는다
         print(f"[경고] 급부상 창 끝날을 못 적었습니다({type(exc).__name__}: {exc}). 화면은 전날 끝 창으로 그립니다.")
 
@@ -263,9 +263,11 @@ def run_us(db, client, dry_run: bool) -> int:
         print("[미장] telegram_us_sentiment_daily 가 비어 있습니다. 건너뜁니다.")
         return 0
     latest = rows[0]["date"]
-    # ⚠️ 화면과 같은 창으로 부른다 — 기준일을 뺀 앞 14일(load_us_stock_daily 주석). 벽시계 창이면
-    #    오늘까지 들어가 카드에 없는 종목의 문장을 만든다(2026-09-28 여섯 중 셋).
-    tickers = top_us_surging(db, CARDS, preloaded=load_us_stock_daily(db, base_date=latest))
+    # ⚠️ 화면과 같은 창으로 부른다(load_us_stock_daily 주석). 벽시계 창이면 카드에 없는 종목의 문장을 만든다
+    #    (2026-09-28 여섯 중 셋). 창의 끝날은 국장과 같은 판정이다 — 저녁 실행 뒤엔 기준일까지(window_end_for).
+    #    미장만 늘 기준일을 빼서 국장과 하루 어긋났다(2026-10-15 저녁 코어위브 누락 · 마이그레이션 102).
+    end = window_end_for(db, latest)
+    tickers = top_us_surging(db, CARDS, preloaded=load_us_stock_daily(db, end_date=end))
     if not tickers:
         print("[미장] 급부상 종목이 없습니다.")
         return 0
@@ -276,9 +278,12 @@ def run_us(db, client, dry_run: bool) -> int:
     }
     msgs = US.load_us_messages(db, since)
     digests, _ = US.build_stock_digests(latest, msgs, name_of, tickers=tickers)
-    print(f"[미장] 기준일 {latest} · 대상 "
+    print(f"[미장] 기준일 {latest} · 창 끝 {end}{'(오늘 포함)' if end == latest else ''} · 대상 "
           + " · ".join(f"{name_of.get(t, t)}({t})" for t in tickers))
-    return _generate(db, client, dry_run, "telegram_us_surging_oneliner", "ticker", latest, digests)
+    saved = _generate(db, client, dry_run, "telegram_us_surging_oneliner", "ticker", latest, digests)
+    if saved:
+        save_window(db, latest, end, table="telegram_us_surging_window")
+    return saved
 
 
 def _generate(db, client, dry_run: bool, table: str, key_col: str, latest: str, digests) -> int:
