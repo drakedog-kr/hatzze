@@ -146,17 +146,48 @@ describe("순서 규칙(scripts/kadera-us-chain.sh 머리 주석)", () => {
   });
 });
 
-describe("아침은 화면을 한 번에 바꾼다(finalize)", () => {
-  // 지금처럼 따로 바뀌는 것: 저녁에만 도는 '지금 값' 미리보기 다시 비우기 · 배당 화면(/dividend 만 · 카더라 집계 뒤).
-  // 내부자 잡 · 국장 미리보기 잡(kr_preview, 아침 06:30 넘어 /preview 만 비운다)은 따로 둔다.
+describe("아침도 페이지마다 자료가 다 쓰이면 바로 바뀐다(2026-10-18)", () => {
+  // 2026-10-16 엔 아침 화면을 finalize 에서 한 번에 바꿨다. 조회 사본이 라우트마다 따로가 된 뒤(#752) 아침도 저녁처럼
+  // 페이지마다 먼저 바꾼다. 다만 국장 카더라 · 국장 테마 상세는 08:00 KRX 등락률이 채워진 뒤다.
   const DIVIDEND_AM = "배당 화면만 먼저 비우고 데우기";
-  const EXCEPT = new Set(["미리보기 화면 다시 비우고 데우기 (지금 값 반영)", DIVIDEND_AM]);
+  const kr = () => idx(update, (s) => s.name === "국장 카더라 화면만 먼저 비우고 데우기", "국장 카더라 비우기");
 
-  it("update · 배당 잡의 화면 비우기는 아침엔 돌지 않는다", () => {
-    for (const s of [...update, ...dividend]) {
-      if (!s.body.includes("scripts/revalidate.sh") || EXCEPT.has(s.name)) continue;
-      assert.match(s.if ?? "", /github\.event\.inputs\.slot != 'morning'/, `${s.name} 이 아침에도 화면을 비운다`);
+  it("국장 카더라 비우기(총평 직후)는 저녁만 — 아침엔 '등락 이유' 칸의 KRX 등락률이 아직 없다", () => {
+    assert.match(update[kr()].if ?? "", /github\.event\.inputs\.slot != 'morning'/);
+  });
+
+  it("미장 카더라 · 테마 목록 · 홈 비우기는 아침에도 돈다", () => {
+    for (const name of ["미장 카더라 화면만 먼저 비우고 데우기", "테마 리포트 화면만 먼저 비우고 데우기", "브리핑 화면만 먼저 비우고 데우기"]) {
+      const s = update[idx(update, (x) => x.name === name, name)];
+      assert.equal(s.if, "${{ !cancelled() }}", name);
     }
+  });
+
+  it("아침 테마 리포트 비우기엔 국장 테마 상세가 없다 — 그 화면도 KRX 확정 종가를 읽는다", () => {
+    const s = update[idx(update, (x) => x.name === "테마 리포트 화면만 먼저 비우고 데우기", "테마 비우기")];
+    const m = s.body.match(/if \[ "\$SLOT" = morning \]; then\n\s+(bash scripts\/revalidate\.sh [^\n]+)\n\s+else\n\s+(bash scripts\/revalidate\.sh [^\n]+)\n/);
+    assert.ok(m, "아침 · 저녁 갈래가 없다");
+    assert.ok(!m[1].includes("'/theme/[theme]'"), m[1]);
+    assert.ok(m[1].includes("'/theme/us/[theme]'"), m[1]);
+    assert.ok(m[2].includes("'/theme/[theme]'"), m[2]);
+  });
+
+  it("아침 국장 카더라 · 국장 테마 상세는 KRX 게이트 뒤, 배당 잡의 등락률 채우기를 기다린 뒤에만 비운다", () => {
+    const gate = idx(update, (s) => s.name === "KRX 공표(08:00 KST) 대기", "KRX 게이트");
+    const bg = idx(update, (s) => s.name.startsWith("국장 카더라 · 테마 상세 비우기 (아침 · KRX 등락률 뒤) — 뒤에서 시작"), "아침 국장 카더라 비우기");
+    assert.ok(bg > gate && bg > kr());
+    assert.equal(update[bg].if, "${{ !cancelled() && github.event.inputs.slot == 'morning' }}");
+    assert.match(update[bg].body, /WAIT_STRICT: "1"/);
+    assert.match(update[bg].body, /wait-for-job-step\.sh 30 "dividend::등락 이유 등락률 채우기" && bash scripts\/revalidate\.sh \/kadera "\/theme\/\[theme\]"/);
+    assert.equal(dividend.filter((s) => s.name.startsWith("등락 이유 등락률 채우기")).length, 1, "기다리는 스텝 이름이 배당 잡에 하나여야 한다");
+    const res = idx(update, (s) => s.body.includes("bg-step.sh wait kadera_after_krx"), "결과 찍기");
+    assert.ok(res > bg);
+    assert.match(job("update"), /\n {6}actions: read/);
+  });
+
+  it("기다리기 스크립트는 WAIT_STRICT 면 시간이 다 됐을 때 1 로 끝난다 — 그래야 등락률 없이 비우지 않는다", () => {
+    const sh = read("scripts/wait-for-job-step.sh");
+    assert.match(sh, /if \[ -n "\$\{WAIT_STRICT:-\}" \]; then\n[^\n]*\n\s+exit 1\n/);
   });
 
   it("배당 화면 비우기는 /dividend 하나만 — 종목 화면(/stock)은 카더라를 같이 그려 한 번에 바뀐다", () => {
@@ -334,7 +365,7 @@ describe("한 페이지 안이 따로따로 바뀌지 않는다(2026-10-17)", ()
   const finalize = steps(job("finalize"));
   const insider = steps(job("insider"));
   const reval = (list: Step[], path: string) =>
-    idx(list, (s) => new RegExp(`run: bash scripts/revalidate\\.sh[^\\n]* ${path.replace(/[/[\]]/g, "\\$&")}( |\\n)`).test(s.body), `${path} 비우기`);
+    idx(list, (s) => new RegExp(`(run: |\\n\\s+)bash scripts/revalidate\\.sh[^\\n]* ${path.replace(/[/[\]]/g, "\\$&")}( |\\n)`).test(s.body), `${path} 비우기`);
 
   it("아침 finalize 는 미리보기를 빼고 비운다 — 06:31 에 페이지째 바뀐 미리보기의 첫 줄 칩만 또 바뀌지 않게", () => {
     const f = idx(finalize, (s) => s.id === "revalidate_all", "finalize 비우기");
