@@ -1006,6 +1006,10 @@ def test_rtx_gpu_is_not_raytheon(us_tagger, text):
         "RTX 26Q3 Preview: 상업용 항공 정비 수요",
         "AI 기반 공장을 짓는 Hadrian(RTX 프로그램 납기 준수율 98%)",
         "RTX Corp. 미 국방부와 패트리엇 미사일 계약",
+        "RTX 10월 21일 실적 발표 예정",
+        "방산주 RTX 20% 급등",
+        "RTX 2026년 가이던스 상향",
+        "RTX 계열사 프랫앤휘트니 엔진 결함 점검",
     ],
 )
 def test_raytheon_stays(us_tagger, text):

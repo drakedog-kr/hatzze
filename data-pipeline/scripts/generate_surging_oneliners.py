@@ -161,12 +161,13 @@ _QUOTE_PAIRS = {'"': '"', "'": "'", "\u201c": "\u201d", "\u2018": "\u2019"}
 
 
 def _strip_line(ln: str) -> str:
-    """줄 머리 꼬리표 · 목록 표지를 떼고, 따옴표는 **양끝이 짝일 때만** 벗긴다.
+    """줄 머리 꼬리표 · 목록 표지를 떼고, 따옴표는 **양끝이 짝이고 안쪽에 같은 따옴표가 없을 때만** 벗긴다.
 
     예전엔 앞뒤 따옴표를 따로 벗겨 `탱크데이' 이벤트 …` 처럼 안쪽 따옴표의 짝을 잃었다(2026-10-12 SBUX).
+    `"A" 와 "B"` 처럼 양끝이 서로 다른 짝인 줄도 그대로 둔다.
     """
     t = _LINE_HEAD.sub("", ln.strip()).strip()
-    while len(t) >= 2 and _QUOTE_PAIRS.get(t[0]) == t[-1]:
+    while len(t) >= 2 and _QUOTE_PAIRS.get(t[0]) == t[-1] and t[0] not in t[1:-1] and t[-1] not in t[1:-1]:
         t = t[1:-1].strip()
     return t
 

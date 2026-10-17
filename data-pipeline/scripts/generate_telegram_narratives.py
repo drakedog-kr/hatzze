@@ -1344,6 +1344,8 @@ def excerpt_order_key(is_market: bool, text: str | None, needle: str | None, spr
 def market_message_keys(db, since: str) -> set[tuple[str, int]]:
     """`since`(KST 날짜)부터 시장 전체를 말한 글의 (채널, 메시지 번호). 표가 없거나 실패하면 빈 집합(예전 차례)."""
     return {(r["channel_handle"], r["message_id"]) for r in load_market_messages(db, since)}
+
+
 EXCERPT_CHARS = 180
 EXCERPT_HEAD = 90
 # 줄인 자리 표시. **STOCK_SYSTEM 이 이 기호를 글자 그대로 설명한다**(그쪽이 위에 있어

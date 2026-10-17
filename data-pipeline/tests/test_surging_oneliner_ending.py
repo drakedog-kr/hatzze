@@ -47,3 +47,5 @@ def test_answer_line_strips_labels_and_unpaired_quotes():
     # 양끝이 짝인 따옴표만 벗긴다 — 안쪽 따옴표는 지킨다.
     assert G.answer_line("\"광통신 부품 수주 기대\"") == "광통신 부품 수주 기대"
     assert G.answer_line("'탱크데이' 이벤트 효과 기대 소식") == "'탱크데이' 이벤트 효과 기대 소식"
+    assert G.answer_line("\"블랙웰\" 수요와 \"루빈\"") == "\"블랙웰\" 수요와 \"루빈\""
+    assert G.answer_line("\u201c'탱크데이' 이벤트 효과 기대 소식\u201d") == "'탱크데이' 이벤트 효과 기대 소식"
