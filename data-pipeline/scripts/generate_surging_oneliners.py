@@ -53,7 +53,8 @@ from __future__ import annotations
 
 import re
 import sys
-from datetime import datetime, timezone
+from collections import defaultdict
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -67,7 +68,8 @@ from common.supabase_client import get_client, load_all  # noqa: E402
 from common.surging import load_stock_daily, top_surging, window_end_for  # noqa: E402
 from common.stock_framing import has_trade_framing  # noqa: E402
 from common.text_check import is_clean, prompt_leaks  # noqa: E402
-from common.us_surging import load_us_stock_daily, top_us_surging  # noqa: E402
+from common.us_surging import RECENT_MAX, load_us_stock_daily, top_us_surging  # noqa: E402
+from config.us_stock_extraction import is_house  # noqa: E402
 
 import generate_telegram_narratives as KR  # noqa: E402
 import generate_us_telegram_narratives as US  # noqa: E402
@@ -278,18 +280,19 @@ def run_kr(db, client, dry_run: bool) -> int:
     return saved
 
 
-def save_window(db, latest: str, end: str) -> None:
+def save_window(db, latest: str, end: str, table: str = "telegram_surging_window", extra: dict | None = None) -> None:
     """화면이 읽을 창의 끝날을 적는다(머리 주석 '국장 창의 끝날'). 못 적어도 문장은 남긴다.
 
     못 적으면 화면은 전날 끝 창으로 그린다 — 오늘 문장이 붙은 종목이 카드에 안 올라올 뿐
-    틀린 숫자가 나가지는 않는다. 표가 없을 때(마이그레이션 086 전)도 같은 길이다.
+    틀린 숫자가 나가지는 않는다. 표가 없을 때(마이그레이션 086 · 미장 102 전)도 같은 길이다.
+    `extra` 는 그 표에만 있는 칸(미장의 channels — us_card_channels).
     """
     try:
-        db.table("telegram_surging_window").upsert(
-            {"date": latest, "window_end": end, "updated_at": datetime.now(timezone.utc).isoformat()},
+        db.table(table).upsert(
+            {"date": latest, "window_end": end, "updated_at": datetime.now(timezone.utc).isoformat(), **(extra or {})},
             on_conflict="date",
         ).execute()
-        print(f"[Supabase] telegram_surging_window {latest} → 창 끝 {end}")
+        print(f"[Supabase] {table} {latest} → 창 끝 {end}")
     except Exception as exc:  # noqa: BLE001 — 문장은 이미 저장됐다. 이 한 줄 때문에 스텝을 죽이지 않는다
         print(f"[경고] 급부상 창 끝날을 못 적었습니다({type(exc).__name__}: {exc}). 화면은 전날 끝 창으로 그립니다.")
 
@@ -303,9 +306,11 @@ def run_us(db, client, dry_run: bool) -> int:
         print("[미장] telegram_us_sentiment_daily 가 비어 있습니다. 건너뜁니다.")
         return 0
     latest = rows[0]["date"]
-    # ⚠️ 화면과 같은 창으로 부른다 — 기준일을 뺀 앞 14일(load_us_stock_daily 주석). 벽시계 창이면
-    #    오늘까지 들어가 카드에 없는 종목의 문장을 만든다(2026-09-28 여섯 중 셋).
-    tickers = top_us_surging(db, CARDS, preloaded=load_us_stock_daily(db, base_date=latest))
+    # ⚠️ 화면과 같은 창으로 부른다(load_us_stock_daily 주석). 벽시계 창이면 카드에 없는 종목의 문장을 만든다
+    #    (2026-09-28 여섯 중 셋). 창의 끝날은 국장과 같은 판정이다 — 저녁 실행 뒤엔 기준일까지(window_end_for).
+    #    미장만 늘 기준일을 빼서 국장과 하루 어긋났다(2026-10-15 저녁 코어위브 누락 · 마이그레이션 102).
+    end = window_end_for(db, latest)
+    tickers = top_us_surging(db, CARDS, preloaded=load_us_stock_daily(db, end_date=end))
     if not tickers:
         print("[미장] 급부상 종목이 없습니다.")
         return 0
@@ -317,9 +322,36 @@ def run_us(db, client, dry_run: bool) -> int:
     msgs = US.load_us_messages(db, since)
     market_keys = KR.market_message_keys(db, min(m["date"] for m in msgs)) if msgs else None
     digests, _ = US.build_stock_digests(latest, msgs, name_of, tickers=tickers, market_keys=market_keys)
-    print(f"[미장] 기준일 {latest} · 대상 "
+    print(f"[미장] 기준일 {latest} · 창 끝 {end}{'(오늘 포함)' if end == latest else ''} · 대상 "
           + " · ".join(f"{name_of.get(t, t)}({t})" for t in tickers))
-    return _generate(db, client, dry_run, "telegram_us_surging_oneliner", "ticker", latest, digests)
+    saved = _generate(db, client, dry_run, "telegram_us_surging_oneliner", "ticker", latest, digests)
+    if saved:
+        # 저녁 창이면 카드 종목의 관심의 폭도 카드의 창으로 같이 적는다(us_card_channels). 아침 창은 관심의 폭 표와 창이 같아 비운다.
+        channels = us_card_channels(msgs, tickers, since, end) if end == latest else None
+        save_window(db, latest, end, table="telegram_us_surging_window", extra={"channels": channels})
+    return saved
+
+
+def us_card_channels(msgs: list[dict], tickers: list[str], since: str, end: str) -> dict[str, int] | None:
+    """미장 급부상 카드 종목의 '관심의 폭' {티커: 서로 다른 채널 수} — 카드의 창(end 로 끝나는 RECENT_MAX 일)에서.
+
+    화면의 채널 수는 관심의 폭 표(calculate_us_stock_daily.save_breadth)를 쓰는데, 그 표는 찍은 날의 전날에서 끝나는 창이다.
+    저녁 실행 뒤 카드 창은 기준일에서 끝나 둘이 갈리고, 화면은 일별 최댓값으로 물러나 채널 수가 아침보다 크게 작았다
+    (2026-10-18 머지 전 점검 · 국장은 마이그레이션 098 이 같은 일을 풀었다). 셈은 save_breadth 와 같다 — 은행 화자 행을 빼고
+    글의 KST 날짜로 창을 자른다. `msgs` 는 load_us_messages(db, since) 결과라, 창이 since 앞으로 나가면 못 센다(None).
+    """
+    first = (date.fromisoformat(end) - timedelta(days=RECENT_MAX - 1)).isoformat()
+    if first < since:
+        return None
+    want = set(tickers)
+    chans: dict[str, set[str]] = defaultdict(set)
+    for m in msgs:
+        if not first <= m["date"] <= end:
+            continue
+        for x in m["mentions"]:
+            if x["ticker"] in want and not is_house(x):
+                chans[x["ticker"]].add(m["channel_handle"])
+    return {t: len(chans[t]) for t in tickers if chans[t]}
 
 
 def _generate(db, client, dry_run: bool, table: str, key_col: str, latest: str, digests) -> int:

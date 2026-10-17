@@ -910,7 +910,7 @@ def main() -> None:
         r = riser_of.get(theme)
         if r is None:
             return None
-        out = {"code": r["code"], "name": r["name"], "market": market_of.get(r["code"]), "recent": r["recent"], "prior": r["prior"], "ratio": r["ratio"], "reason": None}
+        out = {"code": r["code"], "name": r["name"], "market": market_of.get(r["code"]), "recent": r["recent"], "prior": r["prior"], "ratio": r["ratio"], "score": round(r["score"], 4), "reason": None}
         out["reason"] = write_riser_reason(ask_with, RISER_SYSTEM, digest_of.get(r["code"]), r["name"])
         return out
 

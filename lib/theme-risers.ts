@@ -25,15 +25,20 @@ export type ThemeRiser = {
    * (recent / prior)과 다를 수 있다 — 주말이 낀 창은 총량이 작아서다. prior 가 0 이면 null(새로 등장).
    */
   ratio: number | null;
+  /**
+   * 줄 세우는 열쇠 — 양쪽에 언급 한 번씩을 더한 몫 배수(data-pipeline/common/theme_risers.py score). '새로 등장'도 값이 있다.
+   * 2026-10-18 전에 저장된 행은 없다(null) — 그때는 예전 규칙(새로 등장 > 배수 > 언급 수)으로 세운다.
+   */
+  score: number | null;
   /** 채널이 말한 까닭(LLM, 42~58자). 파이프라인이 못 썼으면 null. */
   reason: string | null;
 };
 
 /** 요약 행의 riser 칸(파이프라인이 쓴 그대로). code 는 국장이면 6자리 코드, 미장이면 티커. */
-export type RiserRow = { theme: string; date: string; riser: { code: string; name: string; market: string | null; recent: number; prior: number; ratio: number | null; reason: string | null } | null };
+export type RiserRow = { theme: string; date: string; riser: { code: string; name: string; market: string | null; recent: number; prior: number; ratio: number | null; score?: number | null; reason: string | null } | null };
 
 /**
- * 최신순 행에서 테마마다 첫 것만 골라 줄을 세운다(새로 등장 > 배수 > 언급 수, 최대 RISER_MAX). 미장도 같은 규칙.
+ * 최신순 행에서 테마마다 첫 것만 골라 줄을 세운다(평활 배수 score > 언급 수, 최대 RISER_MAX). 미장도 같은 규칙.
  *
  * ⚠️ riser 가 빈 행도 받아서 **그 테마의 최신 행으로 친다.** 파이프라인은 테마마다 하루 한 행을 쓰고 오늘 상위
  *    RISER_MAX 에 못 든 테마는 riser: null 이다. 그 행을 조회에서 빼거나 여기서 건너뛰면 어제 riser 가 최신이 돼,
@@ -57,11 +62,14 @@ export function parseRisers(rows: RiserRow[], known: (theme: string) => boolean,
       recent: Number(s.recent) || 0,
       prior: Number(s.prior) || 0,
       ratio: s.ratio == null ? null : Number(s.ratio),
+      score: s.score == null ? null : Number(s.score),
       reason: s.reason?.trim() || null,
     });
   }
   const better = (a: ThemeRiser, b: ThemeRiser) => {
-    // 새로 등장 > 배수 > 언급 수.
+    // 평활 배수(score) > 언급 수 — 파이프라인 pick_risers 와 같은 잣대. '새로 등장'이 배수를 늘 이기던 때 앞 사흘이 주말 · 연휴면
+    // 열 줄 거의 다 새로 등장이었다(2026-10-15 점검). score 가 없는 옛 행끼리는 예전 규칙(새로 등장 > 배수 > 언급 수).
+    if (a.score !== null && b.score !== null) return a.score !== b.score ? a.score > b.score : a.recent > b.recent;
     if ((a.ratio === null) !== (b.ratio === null)) return a.ratio === null;
     if (a.ratio !== null && b.ratio !== null && a.ratio !== b.ratio) return a.ratio > b.ratio;
     return a.recent > b.recent;

@@ -105,3 +105,25 @@ def test_limit_keeps_spare_candidates():
     assert len(pick_risers(rows, "stock_code", themes_of, names, recent)) == RISER_MAX
     assert len(pick_risers(rows, "stock_code", themes_of, names, recent, RISER_MAX + RISER_SPARE)) == RISER_MAX + RISER_SPARE
 
+
+
+def test_new_entry_no_longer_beats_large_ratio():
+    """'새로 등장'이 배수를 늘 이기던 꼴(10-15 2차전지: 에코프로머티 5회 새로 등장 > 엘앤에프 76회 · 앞 2회). 평활 배수로 세운다."""
+    themes_of = {"NEW": ["2차전지"], "BIG": ["2차전지"], "BASE": ["2차전지"]}
+    names = {"NEW": "새로", "BIG": "크게", "BASE": "바탕"}
+    days, recent = window_days("2026-10-15")
+    rows = []
+    for d in days:
+        r = d in recent
+        rows += [
+            {"date": d, "stock_code": "NEW", "mention_count": 2 if r else 0},
+            {"date": d, "stock_code": "BIG", "mention_count": 25 if r else (1 if d == days[0] else 0)},
+            {"date": d, "stock_code": "BASE", "mention_count": 40},
+        ]
+    got = pick_risers(rows, "stock_code", themes_of, names, recent)
+    assert [g["code"] for g in got] == ["BIG"]
+    assert got[0]["ratio"] is not None and got[0]["score"] > 0
+    # 새로 등장 꼬리표(ratio 없음)는 그대로 남는다.
+    only_new = [r for r in rows if r["stock_code"] != "BIG"]
+    got = pick_risers(only_new, "stock_code", themes_of, names, recent)
+    assert got[0]["code"] == "NEW" and got[0]["ratio"] is None
