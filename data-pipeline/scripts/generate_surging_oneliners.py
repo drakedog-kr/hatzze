@@ -65,6 +65,7 @@ from common.llm_parallel import ordered  # noqa: E402
 from common.prompt_style import PLAIN_PROSE_RULE_SHORT  # noqa: E402
 from common.supabase_client import get_client, load_all  # noqa: E402
 from common.surging import load_stock_daily, top_surging, window_end_for  # noqa: E402
+from common.stock_framing import has_trade_framing  # noqa: E402
 from common.text_check import is_clean, prompt_leaks  # noqa: E402
 from common.us_surging import load_us_stock_daily, top_us_surging  # noqa: E402
 
@@ -134,7 +135,9 @@ def pick(cands: list[str], digest: str, name: str) -> str | None:
     # 지시문이 샌 후보와 LEN_CEIL 을 넘는 후보는 **맨 먼저** 버린다. 2026-10-09 마벨은 다른 후보가 이름으로
     # 시작한다는 이유로 뒤로 밀리고, 이름 검사를 비켜간 126자 작업 설명이 '이름으로 시작하지 않는 후보'로 뽑혔다.
     # 순서가 뒤면 아래 선호(이름·명사 끝)가 쓰레기를 고른다.
-    cands = [t for t in cands if t.strip() and not prompt_leaks(t) and len(t) <= LEN_CEIL]
+    # 매수 · 매도로 읽히는 후보(증권사 투자의견 · 최선호 · 매매 신호)도 여기서 버린다 — 남는 게 없으면 화면이 흐름 요약으로 물러난다
+    # (2026-10-15 점검: 미장 7위 퍼스트솔라 '증권사 투자의견 상향 소식').
+    cands = [t for t in cands if t.strip() and not prompt_leaks(t) and len(t) <= LEN_CEIL and not has_trade_framing(t)]
     clean = [t for t in cands if is_clean(t, digest)] or cands
     # 이름으로 시작해 '~습니다'로 끝나는 후보는 지시문이 샌 것이다 — 'AST스페이스모바일 관련 화제는 … 담담하게 적습니다.'(2026-10-08 마지막 점검).
     # 아예 버린다. 남는 게 없으면 화면이 흐름 요약 · 움직인 이유로 물러난다(app/kadera/page.tsx).
@@ -152,13 +155,44 @@ def pick(cands: list[str], digest: str, name: str) -> str | None:
     return min(named, key=lambda t: abs(len(t) - mid))
 
 
+# 줄 머리 꼬리표 · 목록 표지 — 모델이 '후보: …' · '- …' 꼴로 답하는 날이 있다(2026-10-15 점검: GS · SCHW).
+_LINE_HEAD = re.compile(r"^(?:(?:후보|답|한 줄|정답)\s*[:：]\s*|[-•·*]\s+)+")
+_QUOTE_PAIRS = {'"': '"', "'": "'", "\u201c": "\u201d", "\u2018": "\u2019"}
+
+
+def _strip_line(ln: str) -> str:
+    """줄 머리 꼬리표 · 목록 표지를 떼고, 따옴표는 **양끝이 짝이고 안쪽에 같은 따옴표가 없을 때만** 벗긴다.
+
+    예전엔 앞뒤 따옴표를 따로 벗겨 `탱크데이' 이벤트 …` 처럼 안쪽 따옴표의 짝을 잃었다(2026-10-12 SBUX).
+    `"A" 와 "B"` 처럼 양끝이 서로 다른 짝인 줄도 그대로 둔다.
+    """
+    t = _LINE_HEAD.sub("", ln.strip()).strip()
+    while len(t) >= 2 and _QUOTE_PAIRS.get(t[0]) == t[-1] and t[0] not in t[1:-1] and t[-1] not in t[1:-1]:
+        t = t[1:-1].strip()
+    return t
+
+
+def tidy_ending(text: str | None) -> str | None:
+    """끝의 겹말을 던다 — '… 관련 소식' → '… 소식', '… 화제 소식' → '… 화제', '… 보도 소식' → '… 보도'.
+
+    7일 한 줄 211개 중 44개가 이 꼴로 끝났다(2026-10-15 점검). 줄인 뒤 LEN_MIN 아래가 되면 그대로 둔다.
+    """
+    if not text:
+        return text
+    for tail, repl in ((" 관련 소식", " 소식"), (" 화제 소식", " 화제"), (" 보도 소식", " 보도")):
+        if text.endswith(tail):
+            cut = text[: -len(tail)] + repl
+            return cut if len(cut) >= LEN_MIN else text
+    return text
+
+
 def answer_line(out: str) -> str:
     """모델 응답에서 카드에 쓸 한 줄. 지시문이 새지 않은 첫 줄을 쓴다(없으면 첫 줄 — pick 이 버린다).
 
     예전엔 무조건 첫 줄을 썼다. Haiku 5.5 는 첫 줄에 작업 설명("…이를 22~30자 한 문장으로 담백하게
     적습니다.")을 적고 다음 줄에 답을 쓰는 날이 있어, 답을 버리고 설명을 카드에 실었다(2026-10-09 마벨).
     """
-    lines = [ln.strip().strip('"').strip("'").strip() for ln in (out or "").splitlines()]
+    lines = [_strip_line(ln) for ln in (out or "").splitlines()]
     lines = [ln for ln in lines if ln]
     if not lines:
         return ""
@@ -182,6 +216,12 @@ def ask_oneline(client, digest: str, name: str) -> str | None:
         if prompt_leaks(cur):
             cands.append(call(digest))
             continue
+        # 매수 · 매도로 읽히는 말이 들었으면 방금 문장을 되먹이지 않고 처음 재료로 다시 묻는다(되먹이면 그 말을 다시 쓴다).
+        if has_trade_framing(cur):
+            cands.append(call(
+                f"증권사 의견이나 매매를 권하는 말 없이, 무엇이 화제였는지만 {LEN_MIN}~{LEN_MAX}자로 적어 주세요.\n\n{digest}"
+            ))
+            continue
         bad_name = starts_with_name(cur, name)
         sentence = ends_as_sentence(cur)
         if LEN_MIN <= len(cur) <= LEN_MAX and is_clean(cur, digest) and not bad_name and not sentence:
@@ -204,7 +244,7 @@ def ask_oneline(client, digest: str, name: str) -> str | None:
                 f"{LEN_MIN}~{LEN_MAX}자로 다시 써 주세요.\n\n{digest}\n\n[방금 쓴 문장]\n{cur}"
             )
         cands.append(call(fix))
-    return pick(cands, digest, name)
+    return tidy_ending(pick(cands, digest, name))
 
 
 def run_kr(db, client, dry_run: bool) -> int:
@@ -275,7 +315,8 @@ def run_us(db, client, dry_run: bool) -> int:
         for s in load_all(db, "us_stocks", "ticker,name_ko", order_by="ticker")
     }
     msgs = US.load_us_messages(db, since)
-    digests, _ = US.build_stock_digests(latest, msgs, name_of, tickers=tickers)
+    market_keys = KR.market_message_keys(db, min(m["date"] for m in msgs)) if msgs else None
+    digests, _ = US.build_stock_digests(latest, msgs, name_of, tickers=tickers, market_keys=market_keys)
     print(f"[미장] 기준일 {latest} · 대상 "
           + " · ".join(f"{name_of.get(t, t)}({t})" for t in tickers))
     return _generate(db, client, dry_run, "telegram_us_surging_oneliner", "ticker", latest, digests)

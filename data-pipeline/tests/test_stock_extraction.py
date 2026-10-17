@@ -973,3 +973,73 @@ def test_yes24_bookstore_links_and_venue_are_not_the_stock(text):
 )
 def test_yes24_stock_mentions_survive(text):
     assert "053280" in _yes24(text)
+
+
+# ── 2026-10-15: 미장 RTX(레이시온) ← GPU · 폼팩터(FORM) ← 일반 낱말 · 이턴(ETN) ← 다른 회사 ─────────────────────
+# RTX 태그 96건 중 50건이 GPU 글, FORM 36건 중 27건이 '기기 꼴'이라는 일반 낱말이었다. 10월 태그 875건을 옛 · 새 판으로
+# 돌리면 RTX 152 · FORM 274 · ETN 8 이 빠지고 새로 잡히는 것은 0, 빠진 것은 모두 다른 뜻이었다.
+# 규칙은 config.us_stock_extraction 의 NEGATIVE_CONTEXT · NEGATIVE_BEFORE · COMPANY_ONLY.
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "엔비디아 지포스 RTX 5090의 유럽 판매 가격이 5,000유로를 돌파",
+        "블랙웰 기반 RTX 50 시리즈 우선 지원",
+        "NVIDIA RTX PRO 5500 체크",
+        "엔비디아의 신형 인공지능(AI) 칩 'RTX 프로 5500' 구매를 승인",
+        "MS(+0.09%)는 엔비디아 RTX Spark를 탑재한 Surface Laptop Ultra",
+        "AI 인프라 외에 RTX/DGX 스파크 PC 칩과 소프트웨어",
+        "협력 범위는 데이터센터 외에 RTX·DGX 스파크 PC용 칩",
+        "서피스 랩톱 울트라는 엔비디아의 RTX 계열 칩을 활용해",
+        "엣지 컴퓨팅은 기존의 게이밍/RTX, 프로페셔널 비주얼라이제이션",
+    ],
+)
+def test_rtx_gpu_is_not_raytheon(us_tagger, text):
+    assert "RTX" not in us_tagger(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "━━━ 🛡️ Defense ━━━\n• RTX: $194.44  🔺0.48%\n• Lockheed",
+        "방산주 강세. 록히드마틴과 RTX(+1.9%)가 함께 올랐다",
+        "RTX 26Q3 Preview: 상업용 항공 정비 수요",
+        "AI 기반 공장을 짓는 Hadrian(RTX 프로그램 납기 준수율 98%)",
+        "RTX Corp. 미 국방부와 패트리엇 미사일 계약",
+        "RTX 10월 21일 실적 발표 예정",
+        "방산주 RTX 20% 급등",
+        "RTX 2026년 가이던스 상향",
+        "RTX 계열사 프랫앤휘트니 엔진 결함 점검",
+    ],
+)
+def test_raytheon_stays(us_tagger, text):
+    assert "RTX" in us_tagger(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "삼성전자의 혁신적 폼팩터가 글로벌 경쟁력을 입증",
+        "제품은 E3.S, E1.S, 2.5인치 폼팩터로 출시되며",
+        "온디바이스 AI 확산에 따라 안경 폼팩터의 차별적 경쟁력이 부각",
+    ],
+)
+def test_form_factor_word_is_not_formfactor(us_tagger, text):
+    assert "FORM" not in us_tagger(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "테라다인(TER)이 프로브카드 업체인 폼팩터(FORM)에 $300M 전략적 지분 투자 결정",
+        "▶️ 특징주 [폼팩터(+9.6%)] Deutsche Bank가 NVIDIA",
+        "수많은 프로브 카드를 필요로 하게 됩니다. 폼팩터(FormFactor), 마이크로닉스 재팬",
+    ],
+)
+def test_formfactor_company_stays(us_tagger, text):
+    assert "FORM" in us_tagger(text)
+
+
+def test_eton_pharma_is_not_eaton(us_tagger):
+    assert "ETN" not in us_tagger("제목 : 이턴 파머슈티컬스, 2분기 매출 99% 급증…연간 전망치 상향")
+    assert "ETN" in us_tagger("전력기기 강세. 이턴(+2.1%) · 버티브(+3.4%)")
