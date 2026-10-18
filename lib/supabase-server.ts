@@ -204,3 +204,33 @@ export function warnIfRowCapped(rows: readonly unknown[] | null | undefined, whe
     );
   }
 }
+
+let freshAdminClient: SupabaseClient | null = null;
+
+/**
+ * 데이터 캐시를 거치지 않는 service_role 클라이언트 — 종목 로고 판정표(/api/logo)만 쓴다.
+ *
+ * 화면의 조회 사본은 시간으로 만료되지 않고 파이프라인이 화면을 비울 때만 새로 받는다(위 cachedFetch 주석 · 2026-10-17).
+ * 로고 라우트가 그 사본으로 판정표를 읽으니, 판정을 고쳐도(손 보충 · 다시 판정) 다음 비우기까지 옛 판정으로 그림을 만들고
+ * 그 그림을 CDN 이 하루 더 들고 있었다(강원랜드가 고친 뒤에도 홍보 사진, 2026-10-19). 로고 응답은 CDN 이 종목 · 크기마다
+ * 하루 들고 있으므로 판정표는 매번 새로 읽어도 DB 를 거의 치지 않는다. 한 화면 안이 따로 바뀌는 문제도 로고에는 없다.
+ */
+export function getSupabaseAdminFresh(): SupabaseClient {
+  if (freshAdminClient) return freshAdminClient;
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
+
+  if (!supabaseUrl || !secretKey) {
+    throw new Error(
+      "SUPABASE_URL / SUPABASE_SECRET_KEY 환경변수가 설정되어 있지 않습니다.",
+    );
+  }
+
+  freshAdminClient = createClient(supabaseUrl, secretKey, {
+    auth: { persistSession: false },
+    global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) },
+  });
+
+  return freshAdminClient;
+}
