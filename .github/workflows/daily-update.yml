@@ -2416,11 +2416,12 @@ jobs:
   # 도메인으로 물어 되는 길을 stock_logo_source 에 적고, 화면의 /api/logo 가 그 길로 한 번만 묻는다(마이그레이션 103).
   # ⭐ 별도 잡이고 finalize 가 기다리지 않는다. 아무 화면 자료도 안 바꾸고, 판정은 다음 실행의 화면 비우기 뒤에 반영돼도 된다.
   # ⭐ logo.dev 무료는 IP 당 분당 100건이라 0.8초 간격으로 묻는다. 처음 채울 때(국장 2,800종목 남짓)는 실행마다 1,500종목까지
-  #    20~40분, 그 뒤로는 새 상장 · 도메인이 바뀐 종목 · 60일 넘은 종목만이라 몇 분이다.
+  #    20~40분, 그 뒤로는 새 상장 · 도메인이 바뀐 종목 · 60일 넘은 종목만이라 몇 분이다(처음 채우기는 2026-10-18 손으로 끝냈다).
   # ⚠️ 거래소(KIND)는 해외 러너에 403 을 일시 차단으로 준다. 못 받으면 표에 적힌 도메인으로 이어 간다.
+  # ⭐ 아침 실행에서만 돈다 — 새 상장 · 홈페이지 바뀜 · 60일 다시 묻기라 하루 한 번이면 된다(저녁에 또 돌 까닭이 없다).
   logos:
     needs: guard
-    if: ${{ !cancelled() && needs.guard.outputs.skip != 'true' }}
+    if: ${{ !cancelled() && needs.guard.outputs.skip != 'true' && github.event.inputs.slot == 'morning' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
