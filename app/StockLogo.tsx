@@ -96,9 +96,11 @@ function isRealLogo(img: HTMLImageElement): boolean {
 /**
  * 동그라미 안에서 못 읽히는 그림인가. 못 읽으면 거짓(로고를 그대로 띄운다).
  *  ① 불투명 픽셀 가운데 흰색에 가깝지 않은 것(R+G+B < 600)이 2% 도 안 된다 — 어두운 바탕용 흰 로고.
- *  ② 그림(흰색 아닌 불투명 픽셀)의 세로 폭이 높이의 30% 미만인데 가로로는 60% 넘게 퍼졌다 — 가로로 긴 글자 로고.
+ *  ② 그림(흰색 아닌 불투명 픽셀)의 세로 폭이 높이의 20% 미만인데 가로로는 60% 넘게 퍼졌다 — 아주 긴 글자 로고.
  *     22px 로 줄면 글자 높이가 4~7px 라 얼룩이나 짧은 선이 됐다(코미코 · 테스 · DB하이텍, 2026-10-05 점검). 띠 로고(삼성전자 검은 띠)는
  *     띠 자체가 어두워 세로 폭이 가득 차므로 걸리지 않는다.
+ *     처음엔 30% 였다. 넓은 로고를 칸 폭 끝까지 얹게 된 뒤(lib/logo-image.ts FIT_EMBLEM) KT&G 처럼 글자 자체가 로고인 곳까지 배지가
+ *     돼 '로고가 없다'로 읽혀, 가로세로 5배쯤까지(높이 20%)는 글자 로고를 그대로 둔다(2026-10-19).
  */
 function unreadableMark(img: HTMLImageElement): boolean {
   try {
@@ -131,7 +133,7 @@ function unreadableMark(img: HTMLImageElement): boolean {
     }
     if (opaque === 0) return false;
     if (dark / opaque < 0.02) return true;
-    return (bottom - top + 1) / n < 0.3 && (right - left + 1) / n > 0.6;
+    return (bottom - top + 1) / n < 0.2 && (right - left + 1) / n > 0.6;
   } catch {
     return false;
   }

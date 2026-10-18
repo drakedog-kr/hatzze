@@ -34,7 +34,7 @@ CROP_OVERRIDE: dict[str, list[float]] = {
     "003010": [0.6562, 0.3281, 0.2539, 0.2539],  # 혜인
     "010140": [0.3145, 0.375, 0.373, 0.123],  # 삼성중공업
     "028670": [0.0703, 0.4297, 0.0977, 0.1367],  # 팬오션
-    "033780": [0.0703, 0.4199, 0.1562, 0.1855],  # KT&G
+    "033780": [],  # KT&G — 글자 전체가 로고다(첫 글자 K 만 자르면 KT&G 로 안 읽힌다)
     "041830": [0.1562, 0.334, 0.1621, 0.1621],  # 인바디
     "073240": [0.0918, 0.4043, 0.1016, 0.1094],  # 금호타이어
     "077970": [0, 0.3809, 0.4922, 0.2109],  # STX엔진
@@ -128,6 +128,7 @@ CROP_OVERRIDE: dict[str, list[float]] = {
 }
 
 OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
+    "002140": ("http://www.hafeed.co.kr/images/common/logo_hafeed_gray.png", [0, 0, 0.3913, 0.9556]),  # 고려산업 — 해피드 웃는 얼굴(logo.dev 에 없다)
     "003160": ("http://www.di.co.kr/images/common/h1_logo.gif", [0.455, 0.2, 0.322, 0.5467]),  # 디아이 — 'INSIGHT DI' 에서 DI 와 점 심볼
     "009190": ("http://www.daiyangmetal.com/korean/img/logo_mini.png", [0, 0, 0.2404, 1]),  # 대양금속 — 파란 원형 심볼(logo.dev 에 없다)
     "006110": ("https://www.sama-al.com/kor/img_sns_sama.png", [0.25, 0, 0.5, 1]),  # 삼아알미늄 — 남색 네모 SAMA(logo.dev 는 흐림)
