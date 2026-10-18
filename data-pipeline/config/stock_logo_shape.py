@@ -8,6 +8,8 @@
                    못 자르거나 엉뚱한 데를 자를 때. [] 이면 자르지 않는다.
 - OWN_LOGO         logo.dev 에 그림이 없는 종목 — 회사 홈페이지의 로고 그림 주소와 (필요하면) 자를 상자(그 그림 안 비율).
                    파이프라인이 받아 256px 정사각형 PNG 로 다듬어 판정표 image 칸에 둔다(source = own).
+- KEEP_TICKER      티커 그림이 흐려도(흐린 원본) 도메인 그림으로 바꾸지 않을 종목 — 도메인 그림이 엉뚱할 때(사진 · 다른 회사).
+                   흐린 티커를 도메인으로 바꾼 종목은 실행 로그에 '흐린 티커 → 도메인' 으로 찍힌다. 눈으로 보고 여기에 적는다.
 
 상자는 2026-10-18 에 그림을 보며 정했다. 회사가 로고를 바꾸면 다시 봐야 한다.
 """
@@ -135,3 +137,5 @@ OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
     "333430": ("http://www.ilseung.co.kr/_public/images/common/logo3.png", None),  # 일승
     "356860": ("https://www.tlbpcb.com/img/favicon_144.png", None),  # 티엘비
 }
+
+KEEP_TICKER: set[str] = set()

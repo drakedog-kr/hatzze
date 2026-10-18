@@ -215,3 +215,48 @@ def test_crop_for_drops_blurry_piece(monkeypatch):
         monkeypatch.setattr(R, "fetch_logo", lambda *a, _b=blur, **k: (200, wide(_b)))
         got = R.crop_for("123456", buf.getvalue(), "ticker/123456.KQ", "k")
         assert (got != []) is want_cut, (blur, got)
+
+
+def test_blurry_ticker_switches_to_sharp_domain():
+    # 티커 그림이 흐리면(작은 원본을 키움) 선명한 도메인 그림으로 바꾼다.
+    sharp_t = (200, "t", None, b"", 120.0)
+    blurry_t = (200, "t", None, b"", 24.0)
+    sharp_d = (200, "d", 0.05, b"", 150.0)
+    blurry_d = (200, "d", 0.05, b"", 20.0)
+    assert R.decide(T, sharp_t, None)["source"] == "ticker"
+    row = R.decide(T, blurry_t, sharp_d)
+    assert (row["source"], row["digest"], row["note"]) == ("domain", "d", None)
+    # 도메인도 흐리거나 없으면 흐린 티커를 그대로 쓰되 손 보충 목록(note)에 올린다
+    for dom in (blurry_d, None, (404, None, None, None, None)):
+        row = R.decide(T, blurry_t, dom)
+        assert (row["source"], row["note"]) == ("ticker", R.BLUR_SOURCE_NOTE)
+    # 흐린 원본 note 는 자동 판정이라 손으로 뺀 것처럼 다시 묻지 않는다
+    assert R.BLUR_SOURCE_NOTE in R.AUTO_NOTES
+
+
+def test_steepness_tells_upscaled_from_sharp():
+    import io
+
+    import pytest
+
+    pytest.importorskip("PIL")
+    from PIL import Image, ImageDraw
+
+    def logo(blur: bool) -> bytes:
+        im = Image.new("RGB", (128, 128), "white")
+        ImageDraw.Draw(im).rectangle([30, 40, 98, 88], fill=(20, 40, 160))
+        if blur:  # 16px 원본을 키운 것
+            im = im.resize((16, 16), Image.BILINEAR).resize((128, 128), Image.BILINEAR)
+        out = io.BytesIO()
+        im.save(out, "PNG")
+        return out.getvalue()
+
+    assert R.steepness(logo(False)) >= R.STEEP_MIN
+    assert R.steepness(logo(True)) < R.STEEP_MIN
+
+
+def test_recheck_all_reprobes_recent_rows():
+    stocks = [{"code": "000001", "market": "KOSPI"}]
+    existing = {"000001": {"domain": "a.co.kr", "checked_at": "2026-10-18T00:00:00+00:00"}}
+    assert R.pick_targets(stocks, existing, {"000001": "a.co.kr"}, NOW, 10) == []
+    assert [t["code"] for t in R.pick_targets(stocks, existing, {"000001": "a.co.kr"}, NOW, 10, recheck_all=True)] == ["000001"]

@@ -57,7 +57,7 @@ from common.kind import get_page, rows_of  # noqa: E402
 from common.logo_shape import is_wide, piece_box, square_png  # noqa: E402
 from common.supabase_client import execute_with_retry, get_client, load_all  # noqa: E402
 from config.stock_logo_exclude import EXCLUDE  # noqa: E402
-from config.stock_logo_shape import CROP_OVERRIDE, DOMAIN_OVERRIDE, OWN_LOGO  # noqa: E402
+from config.stock_logo_shape import CROP_OVERRIDE, DOMAIN_OVERRIDE, KEEP_TICKER, OWN_LOGO  # noqa: E402
 
 TABLE = "stock_logo_source"
 # 상장회사 목록 전체(코스피 · 코스닥 · 코넥스). EUC-KR HTML 표 — 회사명 · 시장구분 · 종목코드 · 업종 · 주요제품 · 상장일 ·
@@ -93,7 +93,15 @@ GENERIC_NOTE = "기본 아이콘(여러 회사에 같은 그림)"
 BLUR_EDGE = 60
 BLUR_MAX = 0.005
 BLUR_NOTE = "흐린 그림(작은 파비콘을 키운 것)"
-AUTO_NOTES = (GENERIC_NOTE, BLUR_NOTE)
+# 묻는 그림 크기 — /api/logo 가 받는 크기(lib/stock-logo.ts LOGO_FETCH_SIZE)와 같아야 화면에 나갈 그림을 판정한다. 흐림(STEEP_MIN)도
+# 이 크기에서 잰다 — 64px 에서는 작은 원본을 키운 흐림이 덜 드러났다.
+PROBE_SIZE = 128
+# 원본이 작아 logo.dev 가 키운 그림은 경계가 완만하다. 128px 그림에서 이웃 픽셀 밝기 차이 상위 1% 의 평균(steepness)이 이보다
+# 작으면 흐린 원본으로 본다. 2026-10-19 실측: 삼성전기 · 이수페타시스 23~24, 선명한 로고 97~218(대덕전자 73).
+# 흐린 원본은 다른 길(티커 ↔ 도메인)이 선명하면 그쪽으로 바꾸고, 없으면 그대로 두되 note 로 손 보충 목록에 올린다.
+STEEP_MIN = 45
+BLUR_SOURCE_NOTE = "흐린 원본(작은 그림을 키운 것)"
+AUTO_NOTES = (GENERIC_NOTE, BLUR_NOTE, BLUR_SOURCE_NOTE)
 
 
 def domain_of(homepage: str | None) -> str | None:
@@ -121,12 +129,16 @@ def parse_kind(page: str) -> dict[str, str | None]:
     return out
 
 
-def pick_targets(stocks: list[dict], existing: dict[str, dict], domains: dict[str, str | None] | None, now: datetime, limit: int) -> list[dict]:
+def pick_targets(
+    stocks: list[dict], existing: dict[str, dict], domains: dict[str, str | None] | None, now: datetime, limit: int,
+    recheck_all: bool = False,
+) -> list[dict]:
     """이번에 물어볼 종목(새 종목 → 도메인 바뀐 종목 → 오래된 종목 순). 손으로 뺀 종목은 묻지 않는다(apply_filters 가 맡는다).
 
     새 종목은 시가총액이 큰 순이다 — 처음 채울 때 실행 상한에 걸려도 화면에 자주 나오는 종목부터 채워진다.
 
     `domains` 가 None 이면(KIND 를 못 받음) 표의 도메인을 그대로 쓰고, 도메인 바뀜은 따지지 않는다.
+    `recheck_all` 이면 모든 행을 오래된 것처럼 다시 묻는다(판정 규칙을 바꾼 뒤 한 번 — --recheck).
     """
     fresh, changed, stale = [], [], []
     cutoff = now - timedelta(days=RECHECK_DAYS)
@@ -145,7 +157,7 @@ def pick_targets(stocks: list[dict], existing: dict[str, dict], domains: dict[st
             changed.append(t)  # 손으로 뺐다가 제외 목록에서 지운 종목 — 다시 묻는다
         elif row.get("source") == "own":
             changed.append(t)  # 우리 그림을 두었다가 OWN_LOGO 에서 지운 종목 — 다시 묻는다
-        elif _parse_ts(row.get("checked_at")) < cutoff:
+        elif recheck_all or _parse_ts(row.get("checked_at")) < cutoff:
             stale.append((_parse_ts(row.get("checked_at")), t))
     stale.sort(key=lambda x: x[0])
     cap = {s["code"]: s.get("market_cap") or 0 for s in stocks}
@@ -167,8 +179,13 @@ def decide(target: dict, ticker: tuple, domain: tuple | None) -> dict | None:
     """
     base = {"code": target["code"], "market": target["market"], "domain": target["domain"], "note": None}
     st, digest, _sharp = ticker[:3]
-    if st == 200:
+    if st == 200 and not is_blurry(ticker):
         return {**base, "source": "ticker", "digest": digest}
+    if st == 200:
+        # 티커 그림이 흐리다 — 도메인 그림이 선명하면 그쪽, 아니면 흐린 채로 두고 손 보충 목록에 올린다.
+        if domain is not None and domain[0] == 200 and not is_blurry(domain) and not (domain[2] is not None and domain[2] < BLUR_MAX):
+            return {**base, "source": "domain", "digest": domain[1]}
+        return {**base, "source": "ticker", "digest": digest, "note": BLUR_SOURCE_NOTE}
     if st != 404:
         return None
     if domain is None:
@@ -177,10 +194,16 @@ def decide(target: dict, ticker: tuple, domain: tuple | None) -> dict | None:
     if st == 200 and sharp is not None and sharp < BLUR_MAX:
         return {**base, "source": "none", "digest": digest, "note": BLUR_NOTE}
     if st == 200:
-        return {**base, "source": "domain", "digest": digest}
+        return {**base, "source": "domain", "digest": digest, "note": BLUR_SOURCE_NOTE if is_blurry(domain) else None}
     if st != 404:
         return None
     return {**base, "source": "none", "digest": None}
+
+
+def is_blurry(probed: tuple) -> bool:
+    """물어본 결과(상태, sha256, 선명도, 그림, 경계 가파름)가 흐린 원본인가. 경계 가파름을 못 쟀으면 아니다."""
+    steep = probed[4] if len(probed) > 4 else None
+    return steep is not None and steep < STEEP_MIN
 
 
 def generic_digests(rows: list[dict]) -> set[str]:
@@ -247,6 +270,28 @@ def png_sharpness(body: bytes) -> float | None:
         return None
 
 
+def steepness(body: bytes) -> float | None:
+    """128px(흰 바탕)에서 이웃 픽셀 밝기 차이 상위 1% 의 평균 — 가장 날카로운 경계가 얼마나 가파른가. 못 재면 None.
+    작은 원본을 키운 그림은 경계가 몇 픽셀에 걸쳐 완만해 이 값이 작다(STEEP_MIN)."""
+    try:
+        import io
+
+        import numpy as np
+        from PIL import Image
+    except ImportError:
+        return None
+    try:
+        im = Image.open(io.BytesIO(body)).convert("RGBA")
+        bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
+        bg.alpha_composite(im)
+        g = np.asarray(bg.convert("L").resize((PROBE_SIZE, PROBE_SIZE))).astype(np.int16)
+        d = np.concatenate([np.abs(np.diff(g, axis=1)).ravel(), np.abs(np.diff(g, axis=0)).ravel()])
+        top = np.sort(d)[-max(10, len(d) // 100):]
+        return round(float(top.mean()), 1)
+    except Exception:  # noqa: BLE001 — 깨진 그림은 재지 않는다
+        return None
+
+
 class RateLimited(Exception):
     pass
 
@@ -276,12 +321,13 @@ def fetch_logo(path: str, key: str, size: int = SIZE) -> tuple[int, bytes | None
     return -1, None
 
 
-def probe(path: str, key: str, measure: bool = False) -> tuple[int, str | None, float | None, bytes | None]:
-    """logo.dev 에 한 번 묻는다 → (상태, 그림 sha256, 선명도, 그림). 선명도는 measure 일 때만 잰다(도메인 그림)."""
-    st, body = fetch_logo(path, key)
+def probe(path: str, key: str, measure: bool = False) -> tuple[int, str | None, float | None, bytes | None, float | None]:
+    """logo.dev 에 한 번 묻는다 → (상태, 그림 sha256, 선명도, 그림, 경계 가파름). 선명도는 measure 일 때만(도메인 그림),
+    경계 가파름(흐린 원본)은 늘 잰다."""
+    st, body = fetch_logo(path, key, PROBE_SIZE)
     if st != 200 or body is None:
-        return st, None, None, None
-    return 200, hashlib.sha256(body).hexdigest(), (png_sharpness(body) if measure else None), body
+        return st, None, None, None, None
+    return 200, hashlib.sha256(body).hexdigest(), (png_sharpness(body) if measure else None), body, steepness(body)
 
 
 def crop_for(code: str, body: bytes | None, path: str, key: str) -> list[float] | None:
@@ -341,6 +387,7 @@ def main() -> None:
     args = sys.argv[1:]
     dry_run = "--dry-run" in args
     limit = int(args[args.index("--max") + 1]) if "--max" in args else MAX_PROBES
+    recheck_all = "--recheck" in args  # 판정 규칙을 바꾼 뒤 모든 행을 한 번 다시 묻는다
     key = os.environ.get("LOGO_DEV_KEY") or os.environ.get("NEXT_PUBLIC_LOGO_DEV_KEY")
     if not key:
         print("[로고] LOGO_DEV_KEY 가 없어 건너뜁니다(GitHub Actions 시크릿 · .env.local).")
@@ -374,24 +421,29 @@ def main() -> None:
     print(f"[로고] 국장 {len(stocks):,}종목 · 표 {len(existing):,}행 · KIND {'못 받음' if domains is None else f'{len(domains):,}곳(도메인 있는 국장 종목 {with_dom:,})'}")
 
     now = datetime.now(timezone.utc)
-    targets = pick_targets(stocks, existing, domains, now, limit)
+    targets = pick_targets(stocks, existing, domains, now, limit, recheck_all)
     print(f"[로고] 이번에 물을 종목 {len(targets)} (상한 {limit})")
 
     rows = dict(existing)
     written: dict[str, dict] = {}
     counts: dict[str, int] = defaultdict(int)
+    switched: list[str] = []  # 흐린 티커를 도메인 그림으로 바꾼 종목 — 도메인 그림은 사람이 본 적이 없어 로그에 남긴다
     try:
         for i, t in enumerate(targets, 1):
             ticker = probe(f"ticker/{t['code']}.{MARKETS[t['market']]}", key)
             time.sleep(PACE_SEC)
             dom = None
-            if ticker[0] == 404 and t["domain"]:
+            # 티커가 없거나 흐리면 도메인도 묻는다(흐린 원본이면 선명한 쪽으로 — decide). 도메인 그림이 엉뚱한 곳은 KEEP_TICKER.
+            blurry = ticker[0] == 200 and is_blurry(ticker) and t["code"] not in KEEP_TICKER
+            if t["domain"] and (ticker[0] == 404 or blurry):
                 dom = probe(t["domain"], key, measure=True)
                 time.sleep(PACE_SEC)
             row = decide(t, ticker, dom)
             if row is None:
                 counts["미룸"] += 1
                 continue
+            if blurry and row["source"] == "domain":
+                switched.append(f"{t['code']}({t['domain']})")
             row["checked_at"] = now.isoformat()
             if has_shape:
                 got = ticker if row["source"] == "ticker" else dom
@@ -444,6 +496,8 @@ def main() -> None:
         written[r["code"]] = r
     filtered = sum(1 for r in written.values() if r.get("source") == "none" and r.get("note"))
     print("[로고] 판정 " + " · ".join(f"{k} {v}" for k, v in sorted(counts.items())) + f" · 거름 {filtered} · 적을 행 {len(written)}")
+    if switched:
+        print(f"[로고] 흐린 티커 → 도메인 {len(switched)}곳(도메인 그림이 엉뚱하면 config/stock_logo_shape.py KEEP_TICKER): " + " · ".join(switched))
 
     if dry_run:
         groups: dict[str, list[str]] = defaultdict(list)

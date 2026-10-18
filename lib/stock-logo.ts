@@ -56,9 +56,11 @@ export const LOGO_TICKER_RE = /^[A-Z0-9][A-Z0-9.\-]{0,11}$/;
  *   3 — 긴 글자 로고를 잘라 주고 홈페이지 그림(own)을 두기 시작(같은 날 · 마이그레이션 104). 판 2 로 받은 긴 글자 그림(7일)과
  *       빈 그림(하루)이 브라우저에 남아, 다듬은 로고 대신 배지가 보였다.
  *   4 — 잘라 준 그림이 정사각형이 아니던 것을 고침(2026-10-19 · lib/logo-image.ts). 판 3 의 271×480 그림이 브라우저에 7일 남는다.
+ *   5 — 모든 로고의 바탕을 걷고 칸 안쪽에 같은 크기로 얹기 시작(같은 날 · lib/logo-image.ts). 업스트림 주소도 바뀌어(요청 크기 →
+ *       LOGO_FETCH_SIZE PNG) 이때 한 번은 종목마다 logo.dev 를 다시 묻는다 — 그 뒤로는 크기가 달라도 종목마다 한 장이라 전보다 적다.
  * ⚠️ 판정표가 바뀌어도(파이프라인이 새 길 · 상자를 찾음) 같은 주소라 브라우저는 최대 7일 옛 그림을 쓴다. 큰 규칙을 바꿀 때만 올린다.
  */
-export const LOGO_PATH_VERSION = 4;
+export const LOGO_PATH_VERSION = 5;
 
 export function stockLogoPath(ticker: string, size: LogoSize): string {
   return `/api/logo/${encodeURIComponent(ticker)}?s=${size}&v=${LOGO_PATH_VERSION}`;
@@ -100,9 +102,17 @@ export function logoVerdict(status: number, contentType: string | null): LogoVer
 export type LogoSourceRow = { source: string; domain: string | null; crop?: unknown } | null;
 
 /**
- * 긴 글자 로고에서 잘라 쓸 상자를 잴 때의 그림 크기(마이그레이션 104 · data-pipeline/common/logo_shape.py).
- * 자를 상자가 있으면 /api/logo 가 이 크기를 받아 잘라, 요청한 크기의 정사각형으로 준다. 64px 그림에서는 긴 로고의 글자가 몇
- * 픽셀뿐이라 잘라 키우면 뭉개진다.
+ * /api/logo 가 logo.dev 에서 받는 그림 크기. 화면이 받는 가장 큰 크기(64 · 32px 칸의 두 배)의 두 배라, 여백이 큰 로고를 칸에
+ * 맞춰 키워도 원본 픽셀보다 커지지 않는다. 판정 파이프라인도 이 크기로 묻는다(refresh_stock_logo_sources.py PROBE_SIZE).
+ * ⚠️ 200px 넘게 받으면 바탕이 까맣게 뒤집힌 그림이 오는 종목이 있다(000430 · 2026-10-19 실측: 64 ~ 160 은 흰 바탕, 200 · 256 ·
+ *    512 는 까만 바탕). 그래서 크게 받지 않는다.
+ */
+export const LOGO_FETCH_SIZE = 128;
+
+/**
+ * 긴 글자 로고에서 잘라 쓸 상자를 잴 때의 그림 크기(마이그레이션 104 · data-pipeline/common/logo_shape.py). 자를 상자가 있으면
+ * /api/logo 가 이 크기를 받아 잘라 칸에 맞춘다 — 첫 글자만 남기므로 작은 그림에서 자르면 몇 픽셀뿐이라 키우면 뭉개진다.
+ * 까맣게 뒤집힌 그림(위 LOGO_FETCH_SIZE)에서는 파이프라인이 긴 로고를 못 찾아 상자를 두지 않는다.
  */
 export const LOGO_SHAPE_SIZE = 512;
 
