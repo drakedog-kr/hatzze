@@ -60,9 +60,11 @@ export const LOGO_TICKER_RE = /^[A-Z0-9][A-Z0-9.\-]{0,11}$/;
  *       LOGO_FETCH_SIZE PNG) 이때 한 번은 종목마다 logo.dev 를 다시 묻는다 — 그 뒤로는 크기가 달라도 종목마다 한 장이라 전보다 적다.
  *   6 — 흐린 단색 로고를 선명하게 다시 그리고(lib/logo-crisp.ts) 한 색뿐인 그림(새까만 네모)은 없는 로고로(같은 날). 판 5 그림이
  *       확인하던 브라우저에 남아 있어 올렸다.
+ *   7 — 아이콘 꼴은 칸을 채우고 넓은 엠블럼은 칸 폭까지(같은 날). 판 6 의 작은 네모가 브라우저에 남았다. 이 뒤로 로컬은 캐시하지
+ *       않는다(라우트 cacheFor) — 판은 운영에 나간 그림이 바뀔 때만 올린다.
  * ⚠️ 판정표가 바뀌어도(파이프라인이 새 길 · 상자를 찾음) 같은 주소라 브라우저는 최대 7일 옛 그림을 쓴다. 큰 규칙을 바꿀 때만 올린다.
  */
-export const LOGO_PATH_VERSION = 6;
+export const LOGO_PATH_VERSION = 7;
 
 export function stockLogoPath(ticker: string, size: LogoSize): string {
   return `/api/logo/${encodeURIComponent(ticker)}?s=${size}&v=${LOGO_PATH_VERSION}`;

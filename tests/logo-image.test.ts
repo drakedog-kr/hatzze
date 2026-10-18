@@ -152,9 +152,21 @@ describe("fitLogoWebp", () => {
       ),
     );
     assert.ok(tile.width === 64 && tile.corner[3] > 128, "흰 글자 뚫린 네모가 칸을 채우지 않았다");
-    // 가로로 긴 꽉 찬 띠는 아이콘 꼴이 아니다 — 안쪽 선에 얹는다
-    const bar = await inkOf(await fit(await canvas(512, CLEAR, [{ w: 300, h: 100, left: 106, top: 206 }]), 64));
-    assert.ok(bar.reach <= FIT + 0.04, `띠가 넘쳤다 ${bar.reach}`);
+  });
+
+  it("가로로 넓은 꽉 찬 엠블럼(삼성 타원)은 칸 폭까지 — 높이가 칸의 3할을 넘어 화면이 배지로 돌리지 않는다", async () => {
+    const oval = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512">
+      <ellipse cx="256" cy="256" rx="180" ry="60" fill="rgb(20,40,160)"/>
+      <rect x="150" y="240" width="212" height="32" fill="white"/>
+    </svg>`;
+    const body = await sharp(Buffer.from(oval)).png().toBuffer();
+    const out = await fit(body, 64);
+    const got = await inkOf(out);
+    assert.ok(got.reach <= 1.0, `마스크 밖으로 나갔다 ${got.reach}`);
+    assert.ok(got.h / 64 >= 0.31, `높이 ${got.h}`);
+    // 양 끝 가운데 픽셀이 불투명하면 화면이 띠 색으로 칸을 칠한다(readBandColor) — 비어 있어야 한다
+    const { data } = await sharp(out).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    assert.ok(data[(32 * 64 + 0) * 4 + 3] < 250 && data[(32 * 64 + 63) * 4 + 3] < 250, "양 끝이 칠해졌다");
   });
 
   it("자를 상자를 주면 그 안 로고만 얹는다 — 조각 귀퉁이가 글자에 닿아도 칠한 바탕으로 읽지 않는다", async () => {

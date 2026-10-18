@@ -83,8 +83,16 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/logo/[ticker
   return out ? image(out) : reply("error");
 }
 
+/**
+ * 캐시 머리. 로컬(개발 서버)에서는 캐시하지 않는다 — 다듬는 셈을 고쳐 가며 화면을 보는데, 브라우저가 7일 들고 있던 옛 그림을
+ * 보여 줬다(삼성전기가 고친 뒤에도 작은 네모로 보임, 2026-10-19).
+ */
+function cacheFor(verdict: "ok" | "missing" | "error"): string {
+  return process.env.NODE_ENV === "production" ? LOGO_CACHE[verdict] : "no-store";
+}
+
 function image(out: Buffer) {
-  return new Response(new Uint8Array(out), { headers: { "Content-Type": "image/webp", "Cache-Control": LOGO_CACHE.ok } });
+  return new Response(new Uint8Array(out), { headers: { "Content-Type": "image/webp", "Cache-Control": cacheFor("ok") } });
 }
 
 /**
@@ -161,6 +169,6 @@ const BLANK_GIF = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAA
 
 function reply(verdict: "missing" | "error") {
   return new Response(BLANK_GIF, {
-    headers: { "Content-Type": "image/gif", "Cache-Control": LOGO_CACHE[verdict], "X-Logo": verdict },
+    headers: { "Content-Type": "image/gif", "Cache-Control": cacheFor(verdict), "X-Logo": verdict },
   });
 }

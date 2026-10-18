@@ -27,6 +27,11 @@ import { STEEP_MIN, crispen, isBlank, steepness, type Raw } from "./logo-crisp.t
 
 /** 로고가 닿는 안쪽 둥근 네모 — 마스크의 이 비율. 24px 칸이면 둘레에 2px 쯤 틈이 남는다. */
 export const FIT = 0.84;
+/**
+ * 가로로 넓은 꽉 찬 엠블럼(삼성 타원)은 칸 끝까지 — FIT 으로 얹으면 높이가 칸의 3할이 안 돼 화면(StockLogo unreadableMark)이
+ * 배지로 돌렸다(삼성중공업, 2026-10-19). 1 이면 양 끝 픽셀이 칠해져 화면이 그 색을 띠 색으로 칸에 깐다(readBandColor) — 조금 남긴다.
+ */
+export const FIT_EMBLEM = 0.97;
 /** 마스크(둥근 네모)를 흉내 내는 초타원 지수. 대각선 점이 2^(-1/P) = 0.794 로 마스크 path 의 0.789 와 맞는다. */
 export const P = 3;
 
@@ -134,8 +139,8 @@ export function measureInk(raw: Raw, area: Box, bg: Exclude<Backdrop, null>): In
 }
 
 /** 원본 상자 크기와 초타원 반지름으로, size 칸에 얹을 크기 · 자리. 로고가 안쪽 둥근 네모(마스크 × FIT)에 닿는다. */
-export function placement(box: { width: number; height: number }, norm: number, size: number) {
-  const scale = (FIT * size) / 2 / norm;
+export function placement(box: { width: number; height: number }, norm: number, size: number, fit = FIT) {
+  const scale = (fit * size) / 2 / norm;
   const width = Math.min(size, Math.max(1, Math.round(box.width * scale)));
   const height = Math.min(size, Math.max(1, Math.round(box.height * scale)));
   return { width, height, left: Math.floor((size - width) / 2), top: Math.floor((size - height) / 2) };
@@ -173,6 +178,21 @@ function iconShape(m: InkMeasure): boolean {
   if (aspect < 0.85 || aspect > 1 / 0.85) return false;
   if (m.silhouette >= 0.9 && m.edge >= 0.75) return true;
   return m.silhouette >= 0.75 && m.fill >= 0.5 && m.norm <= 0.51 * Math.max(m.box.width, m.box.height);
+}
+
+/**
+ * 아이콘을 칸에 채울 때 잘라 낼 상자 — 로고 상자에서 네 변을 3% 씩 걷는다. 테두리의 반투명 픽셀(흐린 원본 · 안티앨리어싱)이
+ * 남으면 칸 가장자리에 옅은 띠가 둘러 '네모가 칸 안에 떠 있는' 꼴이 됐다. 마스크가 귀퉁이를 덮으니 걷어도 잃는 것이 없다.
+ */
+function iconBox(box: Box): Box {
+  const dx = Math.floor(box.width * 0.03);
+  const dy = Math.floor(box.height * 0.03);
+  return { left: box.left + dx, top: box.top + dy, width: Math.max(1, box.width - 2 * dx), height: Math.max(1, box.height - 2 * dy) };
+}
+
+/** 가로로 넓고(2배 넘게) 속이 찬 엠블럼인가 — 삼성 타원 · 글자를 품은 띠. 윤곽 7할 · 로고 픽셀 반 넘게. */
+function emblem(m: InkMeasure): boolean {
+  return m.box.width >= 2 * m.box.height && m.silhouette >= 0.7 && m.fill >= 0.5;
 }
 
 /** 그림을 비율만 지켜 size × size 칸에 채운다(바탕을 칠한 그림 · 다듬지 못한 그림). */
@@ -224,8 +244,8 @@ export async function fitLogoWebp(
   }
   // 둘레 여백만 있는 아이콘(파란 네모에 흰 S · 동그라미 심볼)은 여백을 걷고 칸을 채운다 — 여백 없이 오는 같은 꼴의 아이콘과
   // 크기를 맞춘다(삼성전기는 여백이 있어 작게, 삼성SDI 는 꽉 차게 나왔다).
-  if (!crop && iconShape(m)) return containWebp(await sharp(body).extract(m.box).png().toBuffer(), size);
-  const at = placement(m.box, m.norm, size);
+  if (!crop && iconShape(m)) return containWebp(await sharp(body).extract(iconBox(m.box)).png().toBuffer(), size);
+  const at = placement(m.box, m.norm, size, emblem(m) ? FIT_EMBLEM : FIT);
   const fill = bg.kind === "plain" ? { ...bg.color, alpha: 1 } : TRANSPARENT;
   return sharp(body)
     .extract(m.box)
