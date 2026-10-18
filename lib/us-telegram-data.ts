@@ -23,6 +23,7 @@ import { cache } from "react";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { usableOneliner } from "@/lib/prompt-leak";
 import { sentimentTone } from "@/lib/format";
+import { pageRefreshedAt } from "@/lib/refreshed-at";
 import { pickThemeRows } from "@/lib/theme-rows";
 import {
   LLM_TEXT_CARRY_DAYS,
@@ -421,15 +422,17 @@ export async function getMarketAttentionSplit(days = 14): Promise<MarketSplitPoi
 export async function getUsKaderaSummary(): Promise<UsKaderaSummary> {
   // 둘은 서로 안 기댄다 — 나란히 띄운다.
   // (현황 타일 넷 — 채널 수 둘·언급 수·종목 수 — 은 히어로에서 빠지며 같이 걷었다, 2026-09-27.)
-  const [{ dates }, lastUpdated] = await Promise.all([
+  const [{ dates }, refreshed, written] = await Promise.all([
     loadUsStockDaily(US_WINDOW_DAYS),
+    // 라벨은 이 화면이 실제로 새로 바뀐 시각이 먼저다(lib/refreshed-at.ts · 2026-10-18). 못 읽으면 아래 자료 시각.
+    pageRefreshedAt(),
     // 국장과 같은 규칙으로 '이 화면이 보여 주는 자료가 마지막으로 쓰인 시각'을 쓴다 — 미장 총평과 미장 등락 이유 중 늦은 쪽
     // (telegram-data 의 kaderaShownAt · 2026-10-18). 토요일 10:30 미장 이유가 다시 쓰여 화면이 바뀌면 라벨도 그 시각이 된다.
     kaderaShownAt(getSupabaseAdmin(), "us"),
   ]);
   return {
     lastDate: dates.at(-1) ?? null,
-    lastUpdated,
+    lastUpdated: refreshed ?? written,
   };
 }
 

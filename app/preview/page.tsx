@@ -9,6 +9,7 @@ import { getPreview, sessionWord, type PreviewLink, type PreviewMover } from "@/
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import { stockDetailHref } from "@/lib/insider-range";
 import { stockHref } from "@/lib/stock-page";
+import { pageRefreshedAt } from "@/lib/refreshed-at";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { latestWrittenAt } from "@/lib/telegram-data";
 
@@ -158,7 +159,8 @@ const HL_DEX = "xyz";
 const PERP_HOURS = [8, 18] as const;
 
 /**
- * 첫 줄 '업데이트' 라벨의 시각 — 이 화면이 보여 주는 자료 가운데 가장 늦게 쓰인 것(2026-10-18 · lib/format.ts latestIso).
+ * 첫 줄 '업데이트' 라벨의 물러설 시각 — 이 화면이 보여 주는 자료 가운데 가장 늦게 쓰인 것(2026-10-18 · lib/format.ts latestIso).
+ * 라벨은 화면이 새로 그려진 시각(lib/refreshed-at.ts)이 먼저고, 그 값을 못 읽을 때만 이걸 쓴다.
  * 밤사이 미장 표(아침 kr_preview 잡) · 개장 전 지금 값의 **담아 둔** 시각(실시간 덧씌움 말고) · 첫 줄 급부상 칩(국장 급부상 창 ·
  * 미장 언급 폭). 화면은 그 자료가 다 쓰인 직후에 바뀐다 — 아침 06:31, 저녁엔 급부상 한 줄 요약 뒤(daily-update.yml).
  * ⚠️ 실시간 값의 시각(getOvernightLive 의 capturedAt)을 넣으면 10분마다 라벨만 바뀐다 — 넣지 않는다.
@@ -678,7 +680,8 @@ export default async function PreviewPage() {
     getOvernightLive(),
     getKrIndexClosesSide(),
     loadPreviewCoverChips(),
-    preview.then((p) => previewShownAt(p.updatedAt)),
+    // 라벨은 이 화면이 실제로 새로 바뀐 시각이 먼저다(lib/refreshed-at.ts · 2026-10-18). 못 읽으면 자료 시각.
+    Promise.all([pageRefreshedAt(), preview.then((p) => previewShownAt(p.updatedAt))]).then(([r, w]) => r ?? w),
   ]);
   assertLoaded("/preview");
   const indexes = isLoadFailed(rawIndexes) ? null : rawIndexes;
