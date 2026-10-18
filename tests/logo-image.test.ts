@@ -10,6 +10,13 @@ import sharp from "sharp";
 
 import { FIT, P, fitLogoWebp } from "../lib/logo-image.ts";
 
+/** 로고가 있는 그림만 넣으므로 늘 그림이 나와야 한다. */
+async function fit(...args: Parameters<typeof fitLogoWebp>): Promise<Buffer> {
+  const out = await fitLogoWebp(...args);
+  assert.ok(out, "빈 그림으로 읽었다");
+  return out;
+}
+
 const CLEAR = { r: 0, g: 0, b: 0, alpha: 0 };
 const WHITE = { r: 255, g: 255, b: 255, alpha: 1 };
 const RED = { r: 220, g: 0, b: 30, alpha: 1 };
@@ -58,12 +65,12 @@ describe("fitLogoWebp", () => {
     const inputs = [
       await canvas(512, CLEAR, [{ w: 512, h: 112, left: 0, top: 200 }]),
       await canvas(300, WHITE, [{ w: 40, h: 40, left: 130, top: 130 }]),
-      await canvas(300, { r: 0, g: 80, b: 200, alpha: 1 }, []),
+      await canvas(300, { r: 0, g: 80, b: 200, alpha: 1 }, [{ w: 60, h: 120, left: 120, top: 90, color: { r: 255, g: 255, b: 255, alpha: 1 } }]),
       await circle(256, 250),
     ];
     for (const body of inputs)
       for (const size of [32, 48, 64, 128]) {
-        const got = await inkOf(await fitLogoWebp(body, size));
+        const got = await inkOf(await fit(body, size));
         assert.equal(got.width, size);
         assert.equal(got.height, size);
       }
@@ -77,20 +84,20 @@ describe("fitLogoWebp", () => {
       { w: 150, h: 300, left: 362, top: 100 },
     ]);
     for (const body of [small, edge]) {
-      const got = await inkOf(await fitLogoWebp(body, 64));
+      const got = await inkOf(await fit(body, 64));
       assert.ok(got.reach <= FIT + 0.04, `안쪽 선 밖으로 나갔다 ${got.reach}`);
       assert.ok(got.reach >= FIT - 0.06, `안쪽 선에 못 닿았다 ${got.reach}`);
     }
     // 정사각형 심볼의 한 변 = FIT · 칸 / 2^(1/P)
-    const sq = await inkOf(await fitLogoWebp(small, 64));
+    const sq = await inkOf(await fit(small, 64));
     assert.ok(Math.abs(sq.w - (FIT * 64) / Math.cbrt(2)) <= 2, `한 변 ${sq.w}`);
   });
 
   it("흰 바탕 그림은 흰 바탕을 그대로 두고, 투명 바탕은 투명으로 둔다", async () => {
-    const white = await inkOf(await fitLogoWebp(await canvas(300, WHITE, [{ w: 40, h: 40, left: 130, top: 130 }]), 64));
+    const white = await inkOf(await fit(await canvas(300, WHITE, [{ w: 40, h: 40, left: 130, top: 130 }]), 64));
     assert.deepEqual(white.corner.slice(0, 3).map((c) => c > 245), [true, true, true]);
     assert.ok(white.corner[3] > 250);
-    const clear = await inkOf(await fitLogoWebp(await canvas(300, CLEAR, [{ w: 40, h: 40, left: 130, top: 130 }]), 64));
+    const clear = await inkOf(await fit(await canvas(300, CLEAR, [{ w: 40, h: 40, left: 130, top: 130 }]), 64));
     assert.ok(clear.corner[3] < 8);
   });
 
@@ -101,25 +108,25 @@ describe("fitLogoWebp", () => {
       { w: 170, h: 496, left: 334, top: 8 },
       { w: 156, h: 232, left: 178, top: 8 },
     ]);
-    const got = await inkOf(await fitLogoWebp(body, 64));
+    const got = await inkOf(await fit(body, 64));
     assert.ok(got.reach <= FIT + 0.04, `안쪽 선 밖으로 나갔다 ${got.reach}`);
   });
 
   it("바탕을 칠한 아이콘 · 칸을 꽉 채운 아이콘 · 가로 띠는 칸에 그대로 채운다", async () => {
-    const icon = await inkOf(await fitLogoWebp(await canvas(300, { r: 0, g: 80, b: 200, alpha: 1 }, []), 64));
+    const icon = await inkOf(await fit(await canvas(300, { r: 0, g: 80, b: 200, alpha: 1 }, [{ w: 60, h: 120, left: 120, top: 90, color: { r: 255, g: 255, b: 255, alpha: 1 } }]), 64));
     assert.ok(icon.corner[3] > 250);
-    const full = await inkOf(await fitLogoWebp(await canvas(512, CLEAR, [{ w: 500, h: 500, left: 6, top: 6 }]), 64));
+    const full = await inkOf(await fit(await canvas(512, CLEAR, [{ w: 500, h: 500, left: 6, top: 6 }]), 64));
     assert.ok(full.w >= 60, `꽉 찬 아이콘이 줄었다 ${full.w}`);
     // 칸 크기 그대로 마스크 안에 드는 동그라미 아이콘도 줄이지 않는다
-    const round = await inkOf(await fitLogoWebp(await circle(512, 504), 64));
+    const round = await inkOf(await fit(await circle(512, 504), 64));
     assert.ok(round.w >= 60, `동그라미 아이콘이 줄었다 ${round.w}`);
     // 가운데 줄이 끝에서 끝까지 찬 띠 — 화면이 띠 색을 칸 바탕으로 깔아 이어야 하므로 양 끝에 닿아 있어야 한다
-    const band = await inkOf(await fitLogoWebp(await canvas(512, CLEAR, [{ w: 512, h: 112, left: 0, top: 200 }]), 64));
+    const band = await inkOf(await fit(await canvas(512, CLEAR, [{ w: 512, h: 112, left: 0, top: 200 }]), 64));
     assert.equal(band.w, 64);
   });
 
   it("동그라미 심볼은 지름이 FIT", async () => {
-    const got = await inkOf(await fitLogoWebp(await circle(512, 200), 128));
+    const got = await inkOf(await fit(await circle(512, 200), 128));
     assert.ok(Math.abs(got.w - FIT * 128) <= 3, `지름 ${got.w}`);
   });
 
@@ -129,7 +136,7 @@ describe("fitLogoWebp", () => {
       { w: 120, h: 120, left: 40, top: 196 },
       { w: 120, h: 120, left: 200, top: 196, color: { r: 0, g: 0, b: 0, alpha: 1 } },
     ]);
-    const got = await inkOf(await fitLogoWebp(body, 64, [40 / 512, 196 / 512, 120 / 512, 120 / 512]));
+    const got = await inkOf(await fit(body, 64, [40 / 512, 196 / 512, 120 / 512, 120 / 512]));
     assert.equal(got.width, 64);
     assert.ok(Math.abs(got.w - (FIT * 64) / Math.cbrt(2)) <= 2, `조각 한 변 ${got.w}`);
     assert.ok(got.reach <= FIT + 0.04);

@@ -36,6 +36,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-server";
  * 캐시 · 요청 크기와 상관없이 종목마다 한 장) sharp 로 바탕을 걷고 같은 크기로 얹는다 — 그림을 저장하지 않고, 결과는 CDN 이 하루 둔다.
  *   - 가로로 긴 글자 로고는 판정표의 자를 상자(crop · 마이그레이션 104)대로 첫 덩어리(심볼 · 브랜드 첫 글자)만 얹는다.
  *   - logo.dev 에 없는 종목(source = own)은 판정표의 그림(회사 홈페이지 로고를 다듬은 PNG)을 같은 셈으로 얹는다.
+ *   - 원본이 작아 흐린 단색 로고는 경계를 다시 세운다(lib/logo-crisp.ts). 한 색뿐인 그림(새까만 네모)은 없는 로고로 준다.
  */
 
 const UPSTREAM = "https://img.logo.dev/";
@@ -76,7 +77,9 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/logo/[ticker
   const type = upstream.headers.get("content-type");
   const verdict = logoVerdict(upstream.status, type);
   if (verdict !== "ok") return reply(verdict);
-  const out = await shape(Buffer.from(await upstream.arrayBuffer()), size, crop);
+  // 잘라 줄 로고가 아니면(LOGO_FETCH_SIZE 그림) 흐린 단색 로고의 경계를 다시 세운다.
+  const out = await shape(Buffer.from(await upstream.arrayBuffer()), size, crop, !crop);
+  if (out === "blank") return reply("missing");
   return out ? image(out) : reply("error");
 }
 
@@ -85,12 +88,18 @@ function image(out: Buffer) {
 }
 
 /**
- * 로고 칸에 맞춘 size × size WebP(lib/logo-image.ts). 다듬다 실패하면(그림이 바뀌어 상자가 밖으로 나가는 등) 다듬지 않은 그림을
- * 요청 크기로 준다 — 배지보다는 낫다. 그것도 못 읽으면 null.
+ * 로고 칸에 맞춘 size × size WebP(lib/logo-image.ts). 한 색뿐인 그림(logo.dev 가 로고 대신 주는 새까만 네모)이면 "blank" — 없는
+ * 로고로 준다. 다듬다 실패하면(그림이 바뀌어 상자가 밖으로 나가는 등) 다듬지 않은 그림을 요청 크기로 준다 — 배지보다는 낫다.
+ * 그것도 못 읽으면 null.
  */
-async function shape(body: Buffer, size: number, crop?: [number, number, number, number] | null): Promise<Buffer | null> {
+async function shape(
+  body: Buffer,
+  size: number,
+  crop?: [number, number, number, number] | null,
+  crisp = false,
+): Promise<Buffer | "blank" | null> {
   try {
-    return await fitLogoWebp(body, size, crop);
+    return (await fitLogoWebp(body, size, crop, crisp)) ?? "blank";
   } catch (e) {
     console.error("[api/logo] 로고를 다듬지 못했습니다 — 그대로 줄여 줍니다", e);
   }
@@ -110,6 +119,7 @@ async function ownLogo(ticker: string, size: number) {
     const b64 = (data as { image?: string | null } | null)?.image;
     if (error || !b64) return reply(error ? "error" : "missing");
     const out = await shape(Buffer.from(b64, "base64"), size);
+    if (out === "blank") return reply("missing");
     return out ? image(out) : reply("error");
   } catch {
     return reply("error");

@@ -1,5 +1,7 @@
 import sharp from "sharp";
 
+import { STEEP_MIN, crispen, isBlank, steepness, type Raw } from "./logo-crisp.ts";
+
 /**
  * /api/logo 가 그림을 로고 칸에 맞게 다듬는 셈(sharp). `server-only` 를 안 불러 `npm test` 로 바로 돈다(tests/logo-image.test.ts).
  *
@@ -32,7 +34,6 @@ const TRANSPARENT = { r: 255, g: 255, b: 255, alpha: 0 };
 type Rgb = { r: number; g: number; b: number };
 /** 그림의 바탕. 'transparent' · 고르게 밝은 색(plain) · null(바탕을 칠한 그림 — 바탕이 곧 로고). */
 export type Backdrop = { kind: "transparent" } | { kind: "plain"; color: Rgb } | null;
-type Raw = { data: Buffer; width: number; height: number };
 type Box = { left: number; top: number; width: number; height: number };
 
 /**
@@ -137,12 +138,28 @@ export function containWebp(body: Buffer, size: number): Promise<Buffer> {
 }
 
 /**
- * 받은 그림(crop 을 주면 그 안 상자 [x, y, w, h] · 비율)을 로고 칸에 맞춘 size × size WebP 로.
+ * 받은 그림(crop 을 주면 그 안 상자 [x, y, w, h] · 비율)을 로고 칸에 맞춘 size × size WebP 로. 한 색뿐인 그림(로고 대신 오는
+ * 새까만 네모)이면 null — 라우트가 '없음'으로 준다.
  * 바탕은 그림 전체의 귀퉁이로 가린다 — 잘라 낸 조각은 귀퉁이가 글자에 닿아 있어 조각만 보면 '칠한 바탕'으로 잘못 읽힌다.
+ * `crisp` 면(LOGO_FETCH_SIZE 그림) 흐린 단색 로고의 경계를 먼저 다시 세운다(lib/logo-crisp.ts · 문턱이 128px 에서 잰 값이다).
  */
-export async function fitLogoWebp(body: Buffer, size: number, crop?: [number, number, number, number] | null): Promise<Buffer> {
+export async function fitLogoWebp(
+  input: Buffer,
+  size: number,
+  crop?: [number, number, number, number] | null,
+  crisp = false,
+): Promise<Buffer | null> {
+  let body = input;
   const { data, info } = await sharp(body).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const raw: Raw = { data, width: info.width, height: info.height };
+  let raw: Raw = { data, width: info.width, height: info.height };
+  if (isBlank(raw)) return null;
+  if (crisp && steepness(raw) < STEEP_MIN) {
+    const sharper = crispen(raw);
+    if (sharper) {
+      raw = sharper;
+      body = await sharp(sharper.data, { raw: { width: sharper.width, height: sharper.height, channels: 4 } }).png().toBuffer();
+    }
+  }
   const W = raw.width;
   const H = raw.height;
   let area: Box = { left: 0, top: 0, width: W, height: H };

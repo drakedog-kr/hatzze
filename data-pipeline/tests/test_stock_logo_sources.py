@@ -287,3 +287,33 @@ def test_logo_config_has_no_repeated_codes():
             if isinstance(node, (ast.Dict, ast.Set)):
                 keys = [k.value for k in (node.keys if isinstance(node, ast.Dict) else node.elts) if isinstance(k, ast.Constant)]
                 assert [k for k, n in collections.Counter(keys).items() if n > 1] == [], name
+
+
+def test_probe_treats_one_color_picture_as_missing(monkeypatch):
+    # logo.dev 가 로고 대신 새까만 네모를 주는 종목(039440 · 357120) — 없는 것으로 보고 도메인을 묻게 한다
+    import io
+
+    import pytest
+
+    pytest.importorskip("PIL")
+    from PIL import Image, ImageDraw
+
+    def png(draw: bool) -> bytes:
+        im = Image.new("RGB", (128, 128), "black")
+        if draw:
+            ImageDraw.Draw(im).rectangle([30, 40, 98, 88], fill=(255, 200, 0))
+        out = io.BytesIO()
+        im.save(out, "PNG")
+        return out.getvalue()
+
+    monkeypatch.setattr(R, "fetch_logo", lambda path, key, size=0: (200, png(False)))
+    assert R.probe("ticker/039440.KQ", "k")[0] == 404
+    monkeypatch.setattr(R, "fetch_logo", lambda path, key, size=0: (200, png(True)))
+    assert R.probe("ticker/039440.KQ", "k")[0] == 200
+
+
+def test_pick_targets_only_codes():
+    stocks = [{"code": "000001", "market": "KOSPI"}, {"code": "000002", "market": "KOSPI"}]
+    existing = {c: {"domain": "a.co.kr", "source": "ticker", "checked_at": "2026-10-18T00:00:00+00:00"} for c in ("000001", "000002")}
+    picked = R.pick_targets(stocks, existing, {"000001": "a.co.kr", "000002": "a.co.kr"}, NOW, 10, only={"000002"})
+    assert [t["code"] for t in picked] == ["000002"]

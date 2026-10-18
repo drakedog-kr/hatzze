@@ -133,7 +133,7 @@ def parse_kind(page: str) -> dict[str, str | None]:
 
 def pick_targets(
     stocks: list[dict], existing: dict[str, dict], domains: dict[str, str | None] | None, now: datetime, limit: int,
-    recheck_all: bool = False,
+    recheck_all: bool = False, only: set[str] | None = None,
 ) -> list[dict]:
     """이번에 물어볼 종목(새 종목 → 도메인 바뀐 종목 → 오래된 종목 순). 손으로 뺀 종목은 묻지 않는다(apply_filters 가 맡는다).
 
@@ -141,12 +141,13 @@ def pick_targets(
 
     `domains` 가 None 이면(KIND 를 못 받음) 표의 도메인을 그대로 쓰고, 도메인 바뀜은 따지지 않는다.
     `recheck_all` 이면 모든 행을 오래된 것처럼 다시 묻는다(판정 규칙을 바꾼 뒤 한 번 — --recheck).
+    `only` 면 그 종목만 묻는다(손 설정을 고친 뒤 몇 종목만 — --codes 039440,357120).
     """
     fresh, changed, stale = [], [], []
     cutoff = now - timedelta(days=RECHECK_DAYS)
     for s in stocks:
         code = s["code"]
-        if code in EXCLUDE or code in OWN_LOGO:
+        if code in EXCLUDE or code in OWN_LOGO or (only is not None and code not in only):
             continue
         row = existing.get(code)
         dom = DOMAIN_OVERRIDE.get(code) or (domains.get(code) if domains is not None else (row or {}).get("domain"))
@@ -161,7 +162,7 @@ def pick_targets(
             changed.append(t)  # 우리 그림을 두었다가 OWN_LOGO 에서 지운 종목 — 다시 묻는다
         elif code in PREFER_DOMAIN and row.get("source") != "domain":
             changed.append(t)  # 손으로 도메인 그림을 고른 종목 — 다시 묻는다
-        elif recheck_all or _parse_ts(row.get("checked_at")) < cutoff:
+        elif recheck_all or only is not None or _parse_ts(row.get("checked_at")) < cutoff:
             stale.append((_parse_ts(row.get("checked_at")), t))
     stale.sort(key=lambda x: x[0])
     cap = {s["code"]: s.get("market_cap") or 0 for s in stocks}
@@ -323,12 +324,32 @@ def fetch_logo(path: str, key: str, size: int = SIZE) -> tuple[int, bytes | None
     return -1, None
 
 
+def is_blank(body: bytes) -> bool:
+    """한 색뿐인 그림인가 — logo.dev 가 로고 대신 새까만 네모를 주는 종목이 있다(039440 · 357120, 어느 크기로 받아도 · 2026-10-19).
+    미리곱 RGBA 로 픽셀 99.5% 가 평균색에서 8 안쪽이면 그렇다(lib/logo-crisp.ts isBlank 와 같은 셈). 못 읽으면 아니다."""
+    try:
+        import io
+
+        import numpy as np
+        from PIL import Image
+    except ImportError:
+        return False
+    try:
+        a = np.asarray(Image.open(io.BytesIO(body)).convert("RGBA")).astype(float)
+    except Exception:  # noqa: BLE001
+        return False
+    p = np.concatenate([a[..., :3] * a[..., 3:4] / 255, a[..., 3:4]], axis=2).reshape(-1, 4)
+    return bool((np.abs(p - p.mean(axis=0)).max(axis=1) > 8).mean() < 0.005)
+
+
 def probe(path: str, key: str, measure: bool = False) -> tuple[int, str | None, float | None, bytes | None, float | None]:
     """logo.dev 에 한 번 묻는다 → (상태, 그림 sha256, 선명도, 그림, 경계 가파름). 선명도는 measure 일 때만(도메인 그림),
-    경계 가파름(흐린 원본)은 늘 잰다."""
+    경계 가파름(흐린 원본)은 늘 잰다. 한 색뿐인 그림은 없는 것(404)으로 돌려 도메인을 묻게 한다."""
     st, body = fetch_logo(path, key, PROBE_SIZE)
     if st != 200 or body is None:
         return st, None, None, None, None
+    if is_blank(body):
+        return 404, None, None, None, None
     return 200, hashlib.sha256(body).hexdigest(), (png_sharpness(body) if measure else None), body, steepness(body)
 
 
@@ -390,6 +411,7 @@ def main() -> None:
     dry_run = "--dry-run" in args
     limit = int(args[args.index("--max") + 1]) if "--max" in args else MAX_PROBES
     recheck_all = "--recheck" in args  # 판정 규칙을 바꾼 뒤 모든 행을 한 번 다시 묻는다
+    only = set(args[args.index("--codes") + 1].split(",")) if "--codes" in args else None  # 몇 종목만 다시 묻는다
     key = os.environ.get("LOGO_DEV_KEY") or os.environ.get("NEXT_PUBLIC_LOGO_DEV_KEY")
     if not key:
         print("[로고] LOGO_DEV_KEY 가 없어 건너뜁니다(GitHub Actions 시크릿 · .env.local).")
@@ -423,7 +445,7 @@ def main() -> None:
     print(f"[로고] 국장 {len(stocks):,}종목 · 표 {len(existing):,}행 · KIND {'못 받음' if domains is None else f'{len(domains):,}곳(도메인 있는 국장 종목 {with_dom:,})'}")
 
     now = datetime.now(timezone.utc)
-    targets = pick_targets(stocks, existing, domains, now, limit, recheck_all)
+    targets = pick_targets(stocks, existing, domains, now, limit, recheck_all, only)
     print(f"[로고] 이번에 물을 종목 {len(targets)} (상한 {limit})")
 
     rows = dict(existing)
