@@ -113,8 +113,10 @@ const updateLabel = (p: ReturnType<typeof kstUpdateParts>, time: string, tail = 
  * 콜론 없이 '시·분' 으로 적는 건 그대로다(2026-08-29). "8:30" 은 그 시각에 정확히 잰 값처럼
  * 읽힌다. '경' 은 뗐다 — 모든 라벨이 같은 눈금이라 정확도를 가를 표시가 필요 없다.
  *
- * 테마 판세는 여기에 카더라 총평 시각을 넘긴다(lib/theme-page.ts 의 themeUpdatedAt).
- * 국장 미리보기만 정해 둔 정각에 붙인다(formatKstUpdateSnapped).
+ * ⭐ 넘기는 시각은 **그 화면이 보여 주는 자료 가운데 가장 늦게 쓰인 것**이다(2026-10-18 · latestIso). 화면은 그 자료가
+ * 다 쓰인 직후에 바뀌므로(daily-update.yml 의 화면 비우기 자리) 라벨이 화면이 바뀐 때와 맞는다. 예전엔 카더라 · 테마가
+ * 다 총평 시각을 써서, 아침 화면이 08:13 에 바뀌어도 '오전 7시 30분'(총평 07:40)이 떴다. 그 화면에 안 보이는 표는 넣지
+ * 않는다 — 넣으면 마지막 비우기 때 내용은 그대로인데 라벨만 바뀐다.
  * 꼬리(tail)는 기본 '기준'이다. v2 국장 카더라 첫 줄은 '업데이트'로 쓴다(2026-10-03 요청).
  */
 export function formatKstUpdate(isoString: string, tail = "기준"): string {
@@ -133,8 +135,8 @@ export function formatKstUpdate(isoString: string, tail = "기준"): string {
 const SCHEDULE_SLACK_HOURS = 2;
 
 /**
- * 정해 둔 정각에 붙이는 "최종 업데이트" 라벨. **국장 미리보기만 쓴다**(app/preview/page.tsx 의
- * HERO_HOURS · PERP_HOURS). 다른 화면은 2026-09-30 에 30분 눈금(formatKstUpdate)으로 옮겼다.
+ * 정해 둔 정각에 붙이는 "최종 업데이트" 라벨. 국장 미리보기 첫 줄이 쓰다가 2026-10-18 에 30분 눈금(formatKstUpdate)으로
+ * 옮겼다 — 정각 '오전 7시'는 06:31 에 바뀐 화면을 7시라고 했다. 다른 화면은 2026-09-30 에 먼저 옮겼다.
  *
  * `scheduledHours` 중 하나에서 ±2시간 안이면 그 정각("오전 7시 기준"), 밖이면 실제 시(時)에
  * '경'을 붙인다("오후 3시경 기준"). 벗어난 실행(수동·재시도)까지 정각에 붙이면 거짓말이 된다 —
@@ -308,3 +310,21 @@ export const withSubjectParticle = (name: string) => `${name}${hasFinal(name) ? 
 
 /** 보조사를 붙인 이름("엔비디아는" · "삼성전자는"). */
 export const withTopicParticle = (name: string) => `${name}${hasFinal(name) ? "은" : "는"}`;
+
+/**
+ * 여러 ISO 시각 중 가장 늦은 것. 비었거나 못 읽는 값은 건너뛴다(전부 없으면 null).
+ * '업데이트' 라벨이 화면이 보여 주는 자료 가운데 가장 늦게 쓰인 시각을 고를 때 쓴다(formatKstUpdate 주석).
+ */
+export function latestIso(...values: (string | null | undefined)[]): string | null {
+  let best: string | null = null;
+  let bestMs = -Infinity;
+  for (const v of values) {
+    if (!v) continue;
+    const ms = new Date(v).getTime();
+    if (Number.isFinite(ms) && ms > bestMs) {
+      best = v;
+      bestMs = ms;
+    }
+  }
+  return best;
+}
