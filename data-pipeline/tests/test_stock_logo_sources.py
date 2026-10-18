@@ -215,3 +215,105 @@ def test_crop_for_drops_blurry_piece(monkeypatch):
         monkeypatch.setattr(R, "fetch_logo", lambda *a, _b=blur, **k: (200, wide(_b)))
         got = R.crop_for("123456", buf.getvalue(), "ticker/123456.KQ", "k")
         assert (got != []) is want_cut, (blur, got)
+
+
+def test_blurry_ticker_stays_with_note_unless_domain_preferred():
+    # 흐린 티커 그림은 저절로 도메인으로 바꾸지 않는다 — 도메인 그림이 다른 회사일 수 있다(삼성전기 → 삼성중공업). note 만 단다.
+    sharp_t = (200, "t", None, b"", 120.0)
+    blurry_t = (200, "t", None, b"", 24.0)
+    sharp_d = (200, "d", 0.05, b"", 150.0)
+    blurry_d = (200, "d", 0.05, b"", 20.0)
+    assert (R.decide(T, sharp_t, None)["source"], R.decide(T, sharp_t, None)["note"]) == ("ticker", None)
+    for dom in (sharp_d, blurry_d, None):
+        row = R.decide(T, blurry_t, dom)
+        assert (row["source"], row["note"]) == ("ticker", R.BLUR_SOURCE_NOTE)
+    # 손으로 고른 종목(PREFER_DOMAIN)은 티커가 있어도 도메인 그림
+    row = R.decide(T, blurry_t, sharp_d, prefer_domain=True)
+    assert (row["source"], row["digest"], row["note"]) == ("domain", "d", None)
+    # 고른 도메인이 없거나 흐린 파비콘이면 티커로 돌아간다
+    for dom in (None, (404, None, None, None, None), (200, "f", 0.001, b"", 10.0)):
+        assert R.decide(T, blurry_t, dom, prefer_domain=True)["source"] == "ticker"
+    # 흐린 원본 note 는 자동 판정이라 손으로 뺀 것처럼 다시 묻지 않는다
+    assert R.BLUR_SOURCE_NOTE in R.AUTO_NOTES
+
+
+def test_steepness_tells_upscaled_from_sharp():
+    import io
+
+    import pytest
+
+    pytest.importorskip("PIL")
+    from PIL import Image, ImageDraw
+
+    def logo(blur: bool) -> bytes:
+        im = Image.new("RGB", (128, 128), "white")
+        ImageDraw.Draw(im).rectangle([30, 40, 98, 88], fill=(20, 40, 160))
+        if blur:  # 16px 원본을 키운 것
+            im = im.resize((16, 16), Image.BILINEAR).resize((128, 128), Image.BILINEAR)
+        out = io.BytesIO()
+        im.save(out, "PNG")
+        return out.getvalue()
+
+    assert R.steepness(logo(False)) >= R.STEEP_MIN
+    assert R.steepness(logo(True)) < R.STEEP_MIN
+
+
+def test_recheck_all_reprobes_recent_rows():
+    stocks = [{"code": "000001", "market": "KOSPI"}]
+    existing = {"000001": {"domain": "a.co.kr", "checked_at": "2026-10-18T00:00:00+00:00"}}
+    assert R.pick_targets(stocks, existing, {"000001": "a.co.kr"}, NOW, 10) == []
+    assert [t["code"] for t in R.pick_targets(stocks, existing, {"000001": "a.co.kr"}, NOW, 10, recheck_all=True)] == ["000001"]
+
+
+def test_prefer_domain_reprobes_ticker_rows(monkeypatch):
+    # 손으로 도메인 그림을 고르면(PREFER_DOMAIN) 아직 티커로 받는 행을 다시 묻는다
+    stocks = [{"code": "000001", "market": "KOSPI"}]
+    existing = {"000001": {"domain": "a.co.kr", "source": "ticker", "checked_at": "2026-10-18T00:00:00+00:00"}}
+    monkeypatch.setattr(R, "PREFER_DOMAIN", {"000001"})
+    assert [t["code"] for t in R.pick_targets(stocks, existing, {"000001": "a.co.kr"}, NOW, 10)] == ["000001"]
+    existing["000001"]["source"] = "domain"
+    assert R.pick_targets(stocks, existing, {"000001": "a.co.kr"}, NOW, 10) == []
+
+
+def test_logo_config_has_no_repeated_codes():
+    # 파이썬 dict 글자는 같은 키를 두 번 적으면 뒤의 것이 조용히 이긴다 — 손 설정에서 앞에 적은 상자가 사라졌다(이수페타시스, 2026-10-19).
+    import ast
+    import collections
+    from pathlib import Path
+
+    for name in ("stock_logo_shape.py", "stock_logo_exclude.py"):
+        tree = ast.parse((Path(__file__).resolve().parents[1] / "config" / name).read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Dict, ast.Set)):
+                keys = [k.value for k in (node.keys if isinstance(node, ast.Dict) else node.elts) if isinstance(k, ast.Constant)]
+                assert [k for k, n in collections.Counter(keys).items() if n > 1] == [], name
+
+
+def test_probe_treats_one_color_picture_as_missing(monkeypatch):
+    # logo.dev 가 로고 대신 새까만 네모를 주는 종목(039440 · 357120) — 없는 것으로 보고 도메인을 묻게 한다
+    import io
+
+    import pytest
+
+    pytest.importorskip("PIL")
+    from PIL import Image, ImageDraw
+
+    def png(draw: bool) -> bytes:
+        im = Image.new("RGB", (128, 128), "black")
+        if draw:
+            ImageDraw.Draw(im).rectangle([30, 40, 98, 88], fill=(255, 200, 0))
+        out = io.BytesIO()
+        im.save(out, "PNG")
+        return out.getvalue()
+
+    monkeypatch.setattr(R, "fetch_logo", lambda path, key, size=0: (200, png(False)))
+    assert R.probe("ticker/039440.KQ", "k")[0] == 404
+    monkeypatch.setattr(R, "fetch_logo", lambda path, key, size=0: (200, png(True)))
+    assert R.probe("ticker/039440.KQ", "k")[0] == 200
+
+
+def test_pick_targets_only_codes():
+    stocks = [{"code": "000001", "market": "KOSPI"}, {"code": "000002", "market": "KOSPI"}]
+    existing = {c: {"domain": "a.co.kr", "source": "ticker", "checked_at": "2026-10-18T00:00:00+00:00"} for c in ("000001", "000002")}
+    picked = R.pick_targets(stocks, existing, {"000001": "a.co.kr", "000002": "a.co.kr"}, NOW, 10, only={"000002"})
+    assert [t["code"] for t in picked] == ["000002"]

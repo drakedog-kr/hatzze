@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
-import sharp from "sharp";
 
 import {
   LOGO_CACHE,
+  LOGO_FETCH_SIZE,
   LOGO_SHAPE_SIZE,
   LOGO_TICKER_RE,
   isLogoSize,
@@ -10,9 +10,9 @@ import {
   logoCrop,
   logoUpstreamPath,
   logoVerdict,
-  squarePadding,
   type LogoSourceRow,
 } from "@/lib/stock-logo";
+import { containWebp, fitLogoWebp } from "@/lib/logo-image";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 
 /**
@@ -32,10 +32,11 @@ import { getSupabaseAdmin } from "@/lib/supabase-server";
  * 국장 종목은 파이프라인이 판정해 둔 길(티커 · 홈페이지 도메인 · 없음)로 묻는다(lib/stock-logo.ts logoUpstreamPath ·
  * 2026-10-18). 판정표 조회도 다른 화면 조회처럼 데이터 캐시에 담겨, CDN 이 빈 때에도 DB 를 매번 치지 않는다.
  *
- * 22px 동그라미에 맞게 다듬는다(마이그레이션 104).
- *   - 가로로 긴 글자 로고는 판정표의 자를 상자(crop)대로 첫 덩어리(심볼 · 브랜드 첫 글자)를 잘라 정사각형으로 준다. logo.dev 에서
- *     LOGO_SHAPE_SIZE 그림을 받아(데이터 캐시) sharp 로 자른다 — 그림을 저장하지 않고, 결과는 다른 로고처럼 CDN 이 하루 둔다.
- *   - logo.dev 에 없는 종목(source = own)은 판정표의 그림(회사 홈페이지 로고를 다듬은 PNG)을 요청 크기로 줄여 준다.
+ * 로고 칸(둥근 네모 마스크)에 맞게 다듬는다(lib/logo-image.ts). 그림을 logo.dev 에서 LOGO_FETCH_SIZE PNG 로 받아(데이터
+ * 캐시 · 요청 크기와 상관없이 종목마다 한 장) sharp 로 바탕을 걷고 같은 크기로 얹는다 — 그림을 저장하지 않고, 결과는 CDN 이 하루 둔다.
+ *   - 가로로 긴 글자 로고는 판정표의 자를 상자(crop · 마이그레이션 104)대로 첫 덩어리(심볼 · 브랜드 첫 글자)만 얹는다.
+ *   - logo.dev 에 없는 종목(source = own)은 판정표의 그림(회사 홈페이지 로고를 다듬은 PNG)을 같은 셈으로 얹는다.
+ *   - 원본이 작아 흐린 단색 로고는 경계를 다시 세운다(lib/logo-crisp.ts). 한 색뿐인 그림(새까만 네모)은 없는 로고로 준다.
  */
 
 const UPSTREAM = "https://img.logo.dev/";
@@ -62,9 +63,10 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/logo/[ticker
   let upstream: Response;
   try {
     // fallback=404: 기본 폴백은 티커 숫자로 만든 레터마크("4")라 우리 머리글자 배지보다 못하다.
-    // 자를 로고는 큰 그림을 PNG 로 받는다(sharp 가 자르고 줄인다).
-    const want = crop ? `size=${LOGO_SHAPE_SIZE}&format=png` : `size=${size}&format=webp`;
-    upstream = await fetch(`${UPSTREAM}${path}?token=${key}&${want}&fallback=404`, {
+    // 화면이 받는 가장 큰 크기의 두 배를 PNG 로 받는다 — 바탕을 걷고 키워도 뭉개지지 않게(sharp 가 다듬고 줄인다).
+    // 자를 로고는 첫 글자만 남기므로 더 큰 그림에서 자른다.
+    const fetchSize = crop ? LOGO_SHAPE_SIZE : LOGO_FETCH_SIZE;
+    upstream = await fetch(`${UPSTREAM}${path}?token=${key}&size=${fetchSize}&format=png&fallback=404`, {
       next: { revalidate: REVALIDATE_SEC },
       signal: AbortSignal.timeout(5000),
     });
@@ -75,55 +77,48 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/logo/[ticker
   const type = upstream.headers.get("content-type");
   const verdict = logoVerdict(upstream.status, type);
   if (verdict !== "ok") return reply(verdict);
-  const body = Buffer.from(await upstream.arrayBuffer());
-  if (crop) {
-    const shaped = await cropToSquare(body, crop, size);
-    // 자르다 실패하면(그림이 바뀌어 상자가 밖으로 나가는 등) 자르지 않은 그림을 요청 크기로 준다 — 배지보다는 낫다.
-    const out = shaped ?? (await toSize(body, size));
-    if (out) return image(out);
-    return reply("error");
-  }
-  return new Response(body, {
-    headers: { "Content-Type": type ?? "image/webp", "Cache-Control": LOGO_CACHE.ok },
-  });
+  // 잘라 줄 로고가 아니면(LOGO_FETCH_SIZE 그림) 흐린 단색 로고의 경계를 다시 세운다.
+  const out = await shape(Buffer.from(await upstream.arrayBuffer()), size, crop, !crop);
+  if (out === "blank") return reply("missing");
+  return out ? image(out) : reply("error");
+}
+
+/**
+ * 캐시 머리. 로컬(개발 서버)에서는 캐시하지 않는다 — 다듬는 셈을 고쳐 가며 화면을 보는데, 브라우저가 7일 들고 있던 옛 그림을
+ * 보여 줬다(삼성전기가 고친 뒤에도 작은 네모로 보임, 2026-10-19).
+ */
+function cacheFor(verdict: "ok" | "missing" | "error"): string {
+  return process.env.NODE_ENV === "production" ? LOGO_CACHE[verdict] : "no-store";
 }
 
 function image(out: Buffer) {
-  return new Response(new Uint8Array(out), { headers: { "Content-Type": "image/webp", "Cache-Control": LOGO_CACHE.ok } });
+  return new Response(new Uint8Array(out), { headers: { "Content-Type": "image/webp", "Cache-Control": cacheFor("ok") } });
 }
 
-/** 그림 안 상자를 잘라 투명 여백을 둔 정사각형으로, 요청 크기의 WebP 로. 실패하면 null. */
-async function cropToSquare(body: Buffer, crop: [number, number, number, number], size: number): Promise<Buffer | null> {
+/**
+ * 로고 칸에 맞춘 size × size WebP(lib/logo-image.ts). 한 색뿐인 그림(logo.dev 가 로고 대신 주는 새까만 네모)이면 "blank" — 없는
+ * 로고로 준다. 다듬다 실패하면(그림이 바뀌어 상자가 밖으로 나가는 등) 다듬지 않은 그림을 요청 크기로 준다 — 배지보다는 낫다.
+ * 그것도 못 읽으면 null.
+ */
+async function shape(
+  body: Buffer,
+  size: number,
+  crop?: [number, number, number, number] | null,
+  crisp = false,
+): Promise<Buffer | "blank" | null> {
   try {
-    const meta = await sharp(body).metadata();
-    const W = meta.width ?? LOGO_SHAPE_SIZE;
-    const H = meta.height ?? LOGO_SHAPE_SIZE;
-    const left = Math.min(W - 1, Math.max(0, Math.round(crop[0] * W)));
-    const top = Math.min(H - 1, Math.max(0, Math.round(crop[1] * H)));
-    const width = Math.max(1, Math.min(W - left, Math.round(crop[2] * W)));
-    const height = Math.max(1, Math.min(H - top, Math.round(crop[3] * H)));
-    const piece = await sharp(body).extract({ left, top, width, height }).png().toBuffer();
-    const pad = squarePadding(width, height);
-    return await sharp(piece)
-      .extend({ top: pad.top, bottom: pad.bottom, left: pad.left, right: pad.right, background: { r: 255, g: 255, b: 255, alpha: 0 } })
-      .resize(size, size)
-      .webp({ quality: 90 })
-      .toBuffer();
+    return (await fitLogoWebp(body, size, crop, crisp)) ?? "blank";
   } catch (e) {
-    console.error("[api/logo] 로고를 자르지 못했습니다 — 자르지 않은 그림을 줍니다", e);
-    return null;
+    console.error("[api/logo] 로고를 다듬지 못했습니다 — 그대로 줄여 줍니다", e);
   }
-}
-
-async function toSize(body: Buffer, size: number): Promise<Buffer | null> {
   try {
-    return await sharp(body).resize(size, size, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 0 } }).webp({ quality: 90 }).toBuffer();
+    return await containWebp(body, size);
   } catch {
     return null;
   }
 }
 
-/** 판정표에 둔 우리 그림(source = own) — 요청 크기로 줄여 준다. 그림이 없거나 못 읽으면 없는 로고. */
+/** 판정표에 둔 우리 그림(source = own) — 같은 셈으로 칸에 맞춰 준다. 그림이 없거나 못 읽으면 없는 로고. */
 async function ownLogo(ticker: string, size: number) {
   const code = krLogoCode(ticker);
   if (!code) return reply("missing");
@@ -131,7 +126,8 @@ async function ownLogo(ticker: string, size: number) {
     const { data, error } = await getSupabaseAdmin().from("stock_logo_source").select("image").eq("code", code).maybeSingle();
     const b64 = (data as { image?: string | null } | null)?.image;
     if (error || !b64) return reply(error ? "error" : "missing");
-    const out = await toSize(Buffer.from(b64, "base64"), size);
+    const out = await shape(Buffer.from(b64, "base64"), size);
+    if (out === "blank") return reply("missing");
     return out ? image(out) : reply("error");
   } catch {
     return reply("error");
@@ -173,6 +169,6 @@ const BLANK_GIF = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAA
 
 function reply(verdict: "missing" | "error") {
   return new Response(BLANK_GIF, {
-    headers: { "Content-Type": "image/gif", "Cache-Control": LOGO_CACHE[verdict], "X-Logo": verdict },
+    headers: { "Content-Type": "image/gif", "Cache-Control": cacheFor(verdict), "X-Logo": verdict },
   });
 }

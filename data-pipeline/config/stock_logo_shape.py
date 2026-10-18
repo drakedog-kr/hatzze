@@ -8,6 +8,9 @@
                    못 자르거나 엉뚱한 데를 자를 때. [] 이면 자르지 않는다.
 - OWN_LOGO         logo.dev 에 그림이 없는 종목 — 회사 홈페이지의 로고 그림 주소와 (필요하면) 자를 상자(그 그림 안 비율).
                    파이프라인이 받아 256px 정사각형 PNG 로 다듬어 판정표 image 칸에 둔다(source = own).
+- PREFER_DOMAIN    티커 그림이 있어도 도메인 그림(DOMAIN_OVERRIDE 또는 거래소 목록의 홈페이지)을 쓸 종목 — 티커 그림이 흐릴 때.
+                   흐린 원본은 실행 로그에 '흐린 원본' 으로 찍힌다(시가총액 순). 도메인 그림을 눈으로 보고 맞는 회사 로고일 때만 적는다
+                   — 저절로 바꾸지 않는 이유는 refresh_stock_logo_sources.py STEEP_MIN 주석.
 
 상자는 2026-10-18 에 그림을 보며 정했다. 회사가 로고를 바꾸면 다시 봐야 한다.
 """
@@ -20,6 +23,9 @@ DOMAIN_OVERRIDE: dict[str, str] = {
     "005940": "nonghyup.com",  # NH투자증권
     "250930": "yesuntech.com",  # 예선테크
     "394800": "3billion.io",  # 쓰리빌리언 — 거래소 목록에 홈페이지가 없다
+    "066570": "lg.com",  # LG전자 — 티커 · lge.co.kr 둘 다 흐린 원본, lg.com 은 선명한 LG 심볼(PREFER_DOMAIN)
+    "066575": "lg.com",  # LG전자우
+    "007660": "isupetasys.com",  # 이수페타시스 — 티커 · petasys.com 둘 다 흐린 원본(PREFER_DOMAIN · 상자 ISU)
 }
 
 CROP_OVERRIDE: dict[str, list[float]] = {
@@ -34,9 +40,17 @@ CROP_OVERRIDE: dict[str, list[float]] = {
     "077970": [0, 0.3809, 0.4922, 0.2109],  # STX엔진
     "084370": [0.125, 0.4355, 0.2617, 0.1211],  # 유진테크
     "090460": [0.0605, 0.4316, 0.3809, 0.1309],  # 비에이치
+    "005960": [0.0078, 0.4238, 0.1426, 0.1426],  # 동부건설 — 꽃 심볼(작아서 자동 흐림 거름에 걸린다)
+    "006730": [0.0996, 0.418, 0.0645, 0.1094],  # 서부T&D — 네 칸 심볼(작아서 자동 흐림 거름에 걸린다)
+    "007660": [0.0195, 0.4082, 0.3125, 0.1641],  # 이수페타시스 — ISU(자동은 첫 글자 I 만 잘라 못 쓴다)
+    "007980": [],  # 태평양물산 — TP 두 글자(자동은 T 만 자른다)
+    "020560": [0.8125, 0.3203, 0.1484, 0.1484],  # 아시아나항공 — 빨간 날개(ASIANA AIRLINES 글자는 칸에서 못 읽는다)
+    "060370": [0.1035, 0.4121, 0.3398, 0.1445],  # LS마린솔루션 — LS
     "099220": [],  # SDN
+    "257720": [0.6875, 0.4258, 0.1621, 0.1504],  # 실리콘투 — 빨간 2(SILICON 글자는 칸에서 못 읽는다)
+    "281740": [0.123, 0.4258, 0.168, 0.1504],  # 레이크머티리얼즈 — 부채꼴 심볼(가는 선이라 자동 흐림 거름에 걸린다)
     "100090": [0.1953, 0.3027, 0.2148, 0.1465],  # SK오션플랜트 — 날개만(글자 SK · oceanplant 와 겹쳐 둘 다 넣으면 잘린다)
-    "103140": [],  # 풍산 — 원본이 작아 첫 글자 P 가 흐리다
+    "103140": [0.1445, 0.4414, 0.1973, 0.1348],  # 풍산 — 두 고리(OO). 첫 글자 P 는 원본이 작아 흐리다
     "108490": [0.0703, 0.3594, 0.1543, 0.1641],  # 로보티즈
     "174900": [],  # 앱클론 — 첫 덩어리(A)가 옅은 회색이라 동그라미에서 안 보인다
     "241560": [0.0293, 0.4395, 0.123, 0.123],  # 두산밥캣
@@ -57,7 +71,6 @@ CROP_OVERRIDE: dict[str, list[float]] = {
     "005950": [],  # 이수화학
     "007570": [],  # 일양약품
     "007575": [],  # 일양약품우
-    "007660": [],  # 이수페타시스
     "011210": [],  # 현대위아
     "011930": [],  # 신성이엔지
     "012170": [],  # 아센디오
@@ -100,7 +113,6 @@ CROP_OVERRIDE: dict[str, list[float]] = {
     "246960": [],  # SCL사이언스
     "253840": [],  # 수젠텍
     "255440": [],  # 야스
-    "257720": [],  # 실리콘투
     "264660": [],  # 씨앤지하이테크
     "274400": [],  # 이노시뮬레이션
     "286750": [],  # 나노실리칸첨단소재
@@ -116,6 +128,19 @@ CROP_OVERRIDE: dict[str, list[float]] = {
 }
 
 OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
+    "003160": ("http://www.di.co.kr/images/common/h1_logo.gif", [0.455, 0.2, 0.322, 0.5467]),  # 디아이 — 'INSIGHT DI' 에서 DI 와 점 심볼
+    "009190": ("http://www.daiyangmetal.com/korean/img/logo_mini.png", [0, 0, 0.2404, 1]),  # 대양금속 — 파란 원형 심볼(logo.dev 에 없다)
+    "006110": ("https://www.sama-al.com/kor/img_sns_sama.png", [0.25, 0, 0.5, 1]),  # 삼아알미늄 — 남색 네모 SAMA(logo.dev 는 흐림)
+    "006120": ("https://www.skdiscovery.com/images/logo_header_kr.png", [0, 0, 0.5, 1]),  # SK디스커버리 — SK 나비
+    "007390": ("https://www.naturecell.co.kr/images/naturecell-logo3.png", [0.0289, 0, 0.1302, 1]),  # 네이처셀 — 글자 로고의 N
+    "030530": ("https://www.wonikholdings.kr/imgs/common/logo.png", [0, 0, 0.1928, 1]),  # 원익홀딩스 — 파란 타원 심볼
+    "035250": ("https://www.high1.com/DATA/site/logo/www/logo.png", [0.0087, 0.5825, 0.2783, 0.4175]),  # 강원랜드 — 하이원 꽃(logo.dev 는 홍보 사진)
+    "036540": ("https://www.sfasemicon.com/assets/images/www/common/logo.jpg", [0, 0, 0.4848, 1]),  # SFA반도체 — SFA
+    "093370": ("https://www.foosungchem.com/images/logo.png", [0, 0, 0.4268, 1]),  # 후성 — 마름모 심볼
+    "169330": ("https://www.embrain.com/resources/kor/pc/_asset/common/images/common/favicon.png", None),  # 엠브레인 — 화살표 심볼(logo.dev 는 유튜브 채널 그림)
+    "323280": ("https://www.taesung2000.com/images/common/logo.png", [0, 0, 0.2095, 1]),  # 태성 — T 동그라미
+    "395400": ("https://www.skreit.co.kr/static/images/meta.png", [0.07, 0.25, 0.865, 0.5025]),  # SK리츠 — SK 나비와 리츠(logo.dev 는 흐림)
+    "457190": ("https://www.isuspecialtychemical.com/img/logo.png", [0, 0, 0.2619, 1]),  # 이수스페셜티케미컬 — ISU
     "011780": ("https://www.kkpc.com/resources/kor/images/common/header/img_logo01.gif", [0, 0, 0.165, 1]),  # 금호석유화학
     "011930": ("https://www.shinsungeng.com/images/common/foot_logo.jpg", [0, 0, 0.19, 1]),  # 신성이엔지
     "043260": ("http://www.sungho.net/images/common/logo.png", None),  # 성호전자
@@ -133,4 +158,11 @@ OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
     "317240": ("https://tstrillion.co.kr/wp-content/uploads/2023/08/cropped-logo-192x192.png", None),  # TS트릴리온
     "333430": ("http://www.ilseung.co.kr/_public/images/common/logo3.png", None),  # 일승
     "356860": ("https://www.tlbpcb.com/img/favicon_144.png", None),  # 티엘비
+}
+
+PREFER_DOMAIN: set[str] = {
+    "066570",  # LG전자
+    "066575",  # LG전자우
+    "007660",  # 이수페타시스
+    "281740",  # 레이크머티리얼즈 — lake-led.com(상자 부채꼴 심볼)
 }
