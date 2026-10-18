@@ -18,7 +18,7 @@
     evening2    월~금 마감 뒤   '저녁 브리핑' — 온도 + 오늘(7시~18시) + 처음 회자된 종목 + 내일 일정
     midweek     수 12:30        '주중 점검' — 월~수 이야기의 흐름 + 이번 주 새 얼굴 + 남은 주 일정
     us_weekend  토 10:30        '이번 주 미장 흐름' — 금요일 세션 포함 + 다음 주 미장 일정
-    weekly2     일 21:00        '한 주 정리와 다음 주 일정' — 온도 흐름 + 한 주 세 갈래 + 새 얼굴 + 다음 주 일정
+    weekly2     일 21:00        '한 주 정리와 다음 주 일정' — 온도 흐름 + 월~일 세 갈래 + 새 얼굴 + 다음 주 일정
     (제목은 후보 10개씩에서 골랐다 · 2026-09-10)
 
 1판 포맷은 스크립트에 그대로 남아 있다(morning·evening·theme·weekly). 워크플로는 이 판만
@@ -115,6 +115,16 @@ DAY_TO_HOUR = 18
 EXCERPT_CHARS = 400
 EXCERPTS_DAY = 70           # 하루짜리 창에서 모델에 주는 발췌 수(1판 14)
 EXCERPTS_MULTI = 100        # 며칠짜리 창
+# 일요일 글의 주말 몫 — 토(토 07:00 ~ 일 07:00) · 일(일 07:00 ~ 보내는 시각) 하루에 이만큼씩. 평일 몫이 나머지를
+# 채운다(load_weekly_material). 수치는 2026-10-12 주를 일요일 21시 글이 보는 DB 그대로 잰 값이다.
+# · 창을 일요일까지 늘리기만 하면 100건 중 주말 글이 3건(토 3 · 일 0)이었다. 조회수는 모을 때 적힌 값이라 몇 시간 전에
+#   올라온 글이 밀린다 — 조회 중앙값 평일 2,000~2,400 · 토 1,792 · 일 1,080.
+# · 주말 20건을 한 번에 뽑아도 일요일은 3건(07 · 09 · 09시)이었다. 하루씩 나누면 일요일 10건(07~12시).
+# · ⚠️ 나눠도 일요일 12시 뒤 후보 270건 중 1건만 든다 — 같은 이유(조회수가 덜 쌓였다). 고르는 점수(pick_excerpts)를 고쳐야
+#   풀리는데 아침 · 저녁 글도 같은 점수를 쓴다. 지난 주말을 나중에 재면 그 뒤 실행이 조회수를 다시 적어 둬서 일요일이 실제보다
+#   많이 뽑힌다(10-04 9건 · 10-11 7건) — 실제 글이 본 값으로 재려면 그 일요일 저녁, 다음 수집 전에 잴 것.
+# 주말 후보는 전체의 8.5%(1,220 / 14,377건)지만 주말 이야기를 다루는 글은 일요일 글 하나라 그보다 넉넉히 잡았다.
+WEEKLY_WEEKEND_EXCERPTS_PER_DAY = 10
 MULTI_MIN_FORWARDS = 3      # 며칠짜리 창은 서버에서 전달 3회 이상만 받는다(주 4만 건을 다 읽지 않는다)
 FALLBACK_DAYS = 3           # 창이 비면 하루씩 물러나는 상한(1판 NIGHT_FALLBACK_DAYS 와 같다)
 MIN_WINDOW_MSGS = 100       # 이보다 적으면 '수집이 안 된 창'으로 보고 물러난다
@@ -1067,9 +1077,10 @@ TASKS = {
 종목 줄에 함께 적으세요.""",
     "weekly2": """\
 [이번 글 — 한 주 요약]
-월요일부터 금요일까지 한 주 동안 채널의 이야기를 {n} 갈래로 정리합니다. 갈래마다 그
+월요일부터 일요일까지 한 주 동안 채널의 이야기를 {n} 갈래로 정리합니다. 갈래마다 그
 이야기가 언제 시작해 어떻게 커지거나 식었는지, 계기가 무엇이었는지를 적으세요. 날짜는
-요일로 부르세요. [지난 요약] 자료가 있으면 그 갈래 이름을 그대로 이어 쓰세요.""",
+요일로 부르세요. [주말 발췌]는 장이 쉬는 토요일과 일요일에 나온 이야기입니다. [지난 요약]
+자료가 있으면 그 갈래 이름을 그대로 이어 쓰세요.""",
 }
 
 # [직전 글]이 있을 때 과제 끝에 붙이는 말(머리말 '직전 글과 겹치지 않게').
@@ -1781,24 +1792,77 @@ def build_us_weekend(db, llm, model: str, R: Render, as_of: date, now: datetime,
     return _fit(lines, optional, R.cta_link(*CTA["us_weekend"]))
 
 
+def load_weekly_material(db, sat: date, now: datetime) -> tuple[Material, list[Excerpt], list[Excerpt]]:
+    """일요일 글의 발췌 — 평일(월 07:00 ~ 토 07:00) · 토(~ 일 07:00) · 일(~ 보내는 시각) 몫을 따로 뽑아 번호를 잇는다.
+
+    예전 창은 토 07:00 에서 끝나 토요일 아침부터 일요일 저녁까지의 글(10-17~18 2,261건)이 어느 글에도 안 들어갔다.
+    월요일 아침 글은 일요일 저녁 실행이 모은 마지막 글 다음부터다(run_window). 정원을 나누는 이유는
+    WEEKLY_WEEKEND_EXCERPTS_PER_DAY 주석.
+
+    주말 몫의 끝은 시각으로 못박지 않고 보내는 시각(now)이다. 발송 워크플로는 글을 모으지 않아 DB 에는 일요일 저녁 실행이
+    모은 글까지만 있다(10-18 은 17:23 글이 마지막). 19시처럼 시각으로 자르면 저녁 실행이 늦게 돈 날 그 뒤 글이 이 글과
+    월요일 아침 글 사이로 빠진다. 다음 주 월요일 07:00 은 넘지 않는다 — 거기서 다음 주 창이 시작한다(손으로 늦게 돌릴 때).
+
+    토 · 일 몫을 먼저 뽑고 평일 몫이 남은 정원을 채운다 — 주말 글이 적은 주(토요일에 손으로 돌릴 때 · 주말 수집 실패)에도
+    발췌 수는 그대로다. 앞 몫의 글을 뒤 몫에서 다시 올린 글(앞 60자가 같은 글)은 앞 몫 발췌 하나로 묶고 채널만 더한다.
+    pick_excerpts 가 한 창 안에서 하는 일을 몫 사이에도 한다. 그래서 주말 발췌는 20건보다 적을 수 있다(9월 12일 ~ 10월 18일
+    여섯 주 중 세 주가 19건).
+    """
+    lo, mid = at(sat - timedelta(days=5), NIGHT_TO_HOUR), at(sat, NIGHT_TO_HOUR)
+    hi = max(mid, min(now, at(sat + timedelta(days=2), NIGHT_TO_HOUR)))
+    sun_lo = min(hi, at(sat + timedelta(days=1), NIGHT_TO_HOUR))
+    days = [
+        load_material(db, mid, sun_lo, WEEKLY_WEEKEND_EXCERPTS_PER_DAY, multi=True),
+        load_material(db, sun_lo, hi, WEEKLY_WEEKEND_EXCERPTS_PER_DAY, multi=True),
+    ]
+    week = load_material(db, lo, mid, EXCERPTS_MULTI - sum(len(d.excerpts) for d in days), multi=True)
+
+    by_key = {_norm_key(e.text): e for e in week.excerpts}
+    fresh: list[Excerpt] = []
+    for e in days[0].excerpts + days[1].excerpts:
+        k = _norm_key(e.text)
+        if k in by_key:
+            by_key[k].channels |= e.channels
+        else:
+            by_key[k] = e
+            fresh.append(e)
+    for i, e in enumerate(week.excerpts + fresh):
+        e.n = i + 1
+    mat = Material(
+        week.excerpts + fresh,
+        {**week.kr_names, **days[0].kr_names, **days[1].kr_names},
+        {**week.us_names, **days[0].us_names, **days[1].us_names},
+        (lo, hi),
+        week.total + sum(d.total for d in days),
+    )
+    return mat, week.excerpts, fresh
+
+
 def build_weekly2(db, llm, model: str, R: Render, as_of: date, now: datetime, store: bool) -> str:
+    """일요일 · 한 주 정리와 다음 주 일정 — 월요일부터 일요일 저녁까지(2026-10-18 에 토요일 아침까지에서 늘렸다).
+
+    일요일까지 가는 건 발췌와 새로 회자된 종목이다. 온도 · 구간 등락 · 종목별 이유는 장이 금요일에 끝나 금요일까지다.
+    """
     sat = last_saturday(as_of)
-    monday, friday = sat - timedelta(days=5), sat - timedelta(days=1)
-    mat = load_material(db, at(monday, NIGHT_TO_HOUR), at(sat, NIGHT_TO_HOUR), EXCERPTS_MULTI, multi=True)
+    monday, friday, sunday = sat - timedelta(days=5), sat - timedelta(days=1), sat + timedelta(days=1)
+    mat, week_ex, weekend_ex = load_weekly_material(db, sat, now)
     if not mat.excerpts:
         print("[skip] 이번 주 메시지가 없어 주간 글을 만들 수 없습니다.")
         return ""
+    # 날짜 줄의 끝. 보통 일요일이고, 토요일에 손으로 돌리면 그날이다(그때까지 모은 글만 있다).
+    last = min(sunday, mat.window[1].date())
     kr_d, kr_reasons = load_kr_reasons(db, friday)
-    faces = load_week_new_faces(db, monday, friday)
+    faces = load_week_new_faces(db, monday, last)
     events = load_events(db, sat + timedelta(days=2), sat + timedelta(days=8), "KR")
     scores = [r for r in load_scores(db, 7, until=friday) if r["date"] >= monday.isoformat()]
     past = stored_digest_lines(db, [monday + timedelta(days=i) for i in range(5)], R, before=at(sat, NIGHT_TO_HOUR))
 
     digest = "\n".join(
-        [f"[창] {span_label(*mat.window)} (KST) · {R.date_label(monday.isoformat())} 부터 {R.date_label(friday.isoformat())} 까지"]
+        [f"[창] {span_label(*mat.window)} (KST) · {R.date_label(monday.isoformat())} 부터 {R.date_label(last.isoformat())} 까지"]
         + past
         + [""]
-        + excerpt_lines(mat, "이번 주 발췌")
+        + excerpt_lines(mat, "평일 발췌", week_ex)
+        + ([""] + excerpt_lines(mat, "주말 발췌", weekend_ex) if weekend_ex else [])
         + [""]
         + (reason_lines("종목별 이유 · 이번 주 움직인 종목", kr_reasons, 8, with_change=True) if kr_reasons else [])
         + [""] + event_lines(R, events, EVENT_LINES_WEEK)
@@ -1810,7 +1874,7 @@ def build_weekly2(db, llm, model: str, R: Render, as_of: date, now: datetime, st
     # 한 주 구간 등락(지난 금요일 종가 대비 이번 금요일 종가).
     chg_kr, chg_us = _changes_for(db, sections, [], now, ("range", monday, friday), ("range", monday, friday))
 
-    lines = ["📅 <b>한 주 정리와 다음 주 일정</b>", f"{R.date_label(monday.isoformat())} ~ {R.date_label(friday.isoformat())}"]
+    lines = ["📅 <b>한 주 정리와 다음 주 일정</b>", f"{R.date_label(monday.isoformat())} ~ {R.date_label(last.isoformat())}"]
     if scores:
         lines += ["", score_line(R, scores, weekly=True)]   # 온도는 날짜 줄과 한 칸 띄고(2026-09-10)
     lines += render_sections(R, sections, mat, chg_kr, chg_us)
@@ -1821,7 +1885,8 @@ def build_weekly2(db, llm, model: str, R: Render, as_of: date, now: datetime, st
         ] if b
     ]
     if store:
-        store_digest(db, sat, "weekly", sections, model)
+        # 일요일 날짜로 남긴다 — 월요일 아침 글의 [직전 글]이 이 글을 '일요일 한 주 정리'로 읽는다(예전엔 토요일 행).
+        store_digest(db, sunday, "weekly", sections, model)
     return _fit(lines, optional, R.cta_link(*CTA["weekly2"]))
 
 
