@@ -19,6 +19,7 @@ DOMAIN_OVERRIDE: dict[str, str] = {
     "486990": "nota.ai",  # 노타
     "005940": "nonghyup.com",  # NH투자증권
     "250930": "yesuntech.com",  # 예선테크
+    "394800": "3billion.io",  # 쓰리빌리언 — 거래소 목록에 홈페이지가 없다
 }
 
 CROP_OVERRIDE: dict[str, list[float]] = {

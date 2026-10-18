@@ -53,8 +53,11 @@ export const LOGO_TICKER_RE = /^[A-Z0-9][A-Z0-9.\-]{0,11}$/;
  * 브라우저 · CDN 이 새로 받는다. 라우트는 이 값을 읽지 않는다. logo.dev 쪽 데이터 캐시 열쇠는 업스트림 주소라 판을 올려도
  * logo.dev 요청이 몰리지 않는다.
  *   2 — 국장 종목을 홈페이지 도메인으로도 받기 시작(2026-10-18). 예전 '없음'은 브라우저에 7일 남았다.
+ *   3 — 긴 글자 로고를 잘라 주고 홈페이지 그림(own)을 두기 시작(같은 날 · 마이그레이션 104). 판 2 로 받은 긴 글자 그림(7일)과
+ *       빈 그림(하루)이 브라우저에 남아, 다듬은 로고 대신 배지가 보였다.
+ * ⚠️ 판정표가 바뀌어도(파이프라인이 새 길 · 상자를 찾음) 같은 주소라 브라우저는 최대 7일 옛 그림을 쓴다. 큰 규칙을 바꿀 때만 올린다.
  */
-export const LOGO_PATH_VERSION = 2;
+export const LOGO_PATH_VERSION = 3;
 
 export function stockLogoPath(ticker: string, size: LogoSize): string {
   return `/api/logo/${encodeURIComponent(ticker)}?s=${size}&v=${LOGO_PATH_VERSION}`;
