@@ -64,9 +64,11 @@ export const LOGO_TICKER_RE = /^[A-Z0-9][A-Z0-9.\-]{0,11}$/;
  *       않는다(라우트 cacheFor) — 판은 운영에 나간 그림이 바뀔 때만 올린다.
  *   8 — 판정표를 데이터 캐시 없이 읽기 시작(같은 날). 판 7 배포 직후 옛 판정 사본으로 만든 그림(강원랜드 홍보 사진 · 대양금속 없음)이
  *       CDN · 브라우저에 하루 남는다.
+ *   9 — 같은 날. 아침 파이프라인의 로고 잡이 머지 전 코드(손 설정 없음)로 돌아 손 보충 판정을 되돌렸고, 그사이 판 8 48px 그림
+ *       24장이 되돌린 판정으로 CDN 에 들어갔다. ⚠️ 라우트 캐시 비우기(revalidatePath)로는 CDN 의 이 응답이 안 버려진다 — 주소를 바꾼다.
  * ⚠️ 판정표가 바뀌어도(파이프라인이 새 길 · 상자를 찾음) 같은 주소라 브라우저는 최대 7일 옛 그림을 쓴다. 큰 규칙을 바꿀 때만 올린다.
  */
-export const LOGO_PATH_VERSION = 8;
+export const LOGO_PATH_VERSION = 9;
 
 export function stockLogoPath(ticker: string, size: LogoSize): string {
   return `/api/logo/${encodeURIComponent(ticker)}?s=${size}&v=${LOGO_PATH_VERSION}`;
