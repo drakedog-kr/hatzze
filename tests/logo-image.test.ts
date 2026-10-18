@@ -111,15 +111,17 @@ describe("fitLogoWebp", () => {
     assert.ok(clear.corner[3] < 8);
   });
 
-  it("칸을 거의 채운 굵은 글자는 속이 8할 넘게 차도 아이콘이 아니라 글자로 보고 안쪽 선에 얹는다", async () => {
-    // 굵은 N 꼴(023810) — 두 기둥이 위아래 끝까지, 가운데는 위쪽만. 상자 97% · 속 83% · 가운데 줄은 비었다(띠 아님)
-    const body = await canvas(512, CLEAR, [
-      { w: 170, h: 496, left: 8, top: 8 },
-      { w: 170, h: 496, left: 334, top: 8 },
-      { w: 156, h: 232, left: 178, top: 8 },
-    ]);
-    const got = await inkOf(await fit(body, 64));
-    assert.ok(got.reach <= FIT + 0.04, `안쪽 선 밖으로 나갔다 ${got.reach}`);
+  it("칸을 거의 채운 굵은 글자(N · H)는 아이콘이 아니라 글자로 보고 안쪽 선에 얹는다", async () => {
+    // 023810 같은 굵은 N 과 H — 상자를 거의 채우지만 가장자리를 따라 획 사이가 비어 있다
+    const glyphs = [
+      `<polygon points="8,8 130,8 382,330 382,8 504,8 504,504 382,504 130,182 130,504 8,504" fill="rgb(220,0,30)"/>`,
+      `<polygon points="8,8 150,8 150,190 362,190 362,8 504,8 504,504 362,504 362,322 150,322 150,504 8,504" fill="rgb(20,20,20)"/>`,
+    ];
+    for (const g of glyphs) {
+      const body = await sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512">${g}</svg>`)).png().toBuffer();
+      const got = await inkOf(await fit(body, 64));
+      assert.ok(got.reach <= FIT + 0.04, `안쪽 선 밖으로 나갔다 ${got.reach}`);
+    }
   });
 
   it("바탕을 칠한 아이콘 · 칸을 꽉 채운 아이콘 · 가로 띠는 칸에 그대로 채운다", async () => {
@@ -152,6 +154,17 @@ describe("fitLogoWebp", () => {
       ),
     );
     assert.ok(tile.width === 64 && tile.corner[3] > 128, "흰 글자 뚫린 네모가 칸을 채우지 않았다");
+    // 흰 무늬가 큰 동그라미(LG 얼굴) · 모서리가 크게 둥근 타일도 칸을 채운다
+    const face = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512">
+      <circle cx="256" cy="256" r="150" fill="rgb(165,0,52)"/>
+      <rect x="170" y="200" width="60" height="140" fill="white"/><circle cx="310" cy="220" r="22" fill="white"/>
+      <path d="M220 320 H340 V300 H220 Z" fill="white"/></svg>`;
+    const lg = await inkOf(await fit(await sharp(Buffer.from(face)).png().toBuffer(), 64));
+    assert.ok(lg.w >= 60, `흰 무늬 큰 동그라미 지름 ${lg.w}`);
+    const rounded = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512">
+      <rect x="106" y="106" width="300" height="300" rx="90" fill="rgb(200,20,30)"/><path d="M170 180 L256 330 L342 180" stroke="white" stroke-width="40" fill="none"/></svg>`;
+    const rt = await inkOf(await fit(await sharp(Buffer.from(rounded)).png().toBuffer(), 64));
+    assert.ok(rt.w >= 60, `둥근 타일 한 변 ${rt.w}`);
   });
 
   it("가로로 넓은 꽉 찬 엠블럼(삼성 타원)은 칸 폭까지 — 높이가 칸의 3할을 넘어 화면이 배지로 돌리지 않는다", async () => {
@@ -170,9 +183,10 @@ describe("fitLogoWebp", () => {
   });
 
   it("자를 상자를 주면 그 안 로고만 얹는다 — 조각 귀퉁이가 글자에 닿아도 칠한 바탕으로 읽지 않는다", async () => {
-    // 흰 바탕에 첫 글자(정사각형 120) · 둘째 글자(정사각형 120)가 나란한 긴 로고. 상자는 첫 글자에 꼭 맞다.
+    // 흰 바탕에 첫 글자(ㄴ 꼴 · 상자 120) · 둘째 글자(정사각형 120)가 나란한 긴 로고. 상자는 첫 글자에 꼭 맞다.
     const body = await canvas(512, WHITE, [
-      { w: 120, h: 120, left: 40, top: 196 },
+      { w: 36, h: 120, left: 40, top: 196 },
+      { w: 84, h: 36, left: 76, top: 280 },
       { w: 120, h: 120, left: 200, top: 196, color: { r: 0, g: 0, b: 0, alpha: 1 } },
     ]);
     const got = await inkOf(await fit(body, 64, [40 / 512, 196 / 512, 120 / 512, 120 / 512]));

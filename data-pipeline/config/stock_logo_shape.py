@@ -44,6 +44,8 @@ CROP_OVERRIDE: dict[str, list[float]] = {
     "006730": [0.0996, 0.418, 0.0645, 0.1094],  # 서부T&D — 네 칸 심볼(작아서 자동 흐림 거름에 걸린다)
     "007660": [0.0195, 0.4082, 0.3125, 0.1641],  # 이수페타시스 — ISU(자동은 첫 글자 I 만 잘라 못 쓴다)
     "007980": [],  # 태평양물산 — TP 두 글자(자동은 T 만 자른다)
+    "020560": [0.8125, 0.3203, 0.1484, 0.1484],  # 아시아나항공 — 빨간 날개(ASIANA AIRLINES 글자는 칸에서 못 읽는다)
+    "060370": [0.1035, 0.4121, 0.3398, 0.1445],  # LS마린솔루션 — LS
     "099220": [],  # SDN
     "257720": [0.6875, 0.4258, 0.1621, 0.1504],  # 실리콘투 — 빨간 2(SILICON 글자는 칸에서 못 읽는다)
     "281740": [0.123, 0.4258, 0.168, 0.1504],  # 레이크머티리얼즈 — 부채꼴 심볼(가는 선이라 자동 흐림 거름에 걸린다)
@@ -128,6 +130,17 @@ CROP_OVERRIDE: dict[str, list[float]] = {
 OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
     "003160": ("http://www.di.co.kr/images/common/h1_logo.gif", [0.455, 0.2, 0.322, 0.5467]),  # 디아이 — 'INSIGHT DI' 에서 DI 와 점 심볼
     "009190": ("http://www.daiyangmetal.com/korean/img/logo_mini.png", [0, 0, 0.2404, 1]),  # 대양금속 — 파란 원형 심볼(logo.dev 에 없다)
+    "006110": ("https://www.sama-al.com/kor/img_sns_sama.png", [0.25, 0, 0.5, 1]),  # 삼아알미늄 — 남색 네모 SAMA(logo.dev 는 흐림)
+    "006120": ("https://www.skdiscovery.com/images/logo_header_kr.png", [0, 0, 0.5, 1]),  # SK디스커버리 — SK 나비
+    "007390": ("https://www.naturecell.co.kr/images/naturecell-logo3.png", [0.0289, 0, 0.1302, 1]),  # 네이처셀 — 글자 로고의 N
+    "030530": ("https://www.wonikholdings.kr/imgs/common/logo.png", [0, 0, 0.1928, 1]),  # 원익홀딩스 — 파란 타원 심볼
+    "035250": ("https://www.high1.com/DATA/site/logo/www/logo.png", [0.0087, 0.5825, 0.2783, 0.4175]),  # 강원랜드 — 하이원 꽃(logo.dev 는 홍보 사진)
+    "036540": ("https://www.sfasemicon.com/assets/images/www/common/logo.jpg", [0, 0, 0.4848, 1]),  # SFA반도체 — SFA
+    "093370": ("https://www.foosungchem.com/images/logo.png", [0, 0, 0.4268, 1]),  # 후성 — 마름모 심볼
+    "169330": ("https://www.embrain.com/resources/kor/pc/_asset/common/images/common/favicon.png", None),  # 엠브레인 — 화살표 심볼(logo.dev 는 유튜브 채널 그림)
+    "323280": ("https://www.taesung2000.com/images/common/logo.png", [0, 0, 0.2095, 1]),  # 태성 — T 동그라미
+    "395400": ("https://www.skreit.co.kr/static/images/meta.png", [0.07, 0.25, 0.865, 0.5025]),  # SK리츠 — SK 나비와 리츠(logo.dev 는 흐림)
+    "457190": ("https://www.isuspecialtychemical.com/img/logo.png", [0, 0, 0.2619, 1]),  # 이수스페셜티케미컬 — ISU
     "011780": ("https://www.kkpc.com/resources/kor/images/common/header/img_logo01.gif", [0, 0, 0.165, 1]),  # 금호석유화학
     "011930": ("https://www.shinsungeng.com/images/common/foot_logo.jpg", [0, 0, 0.19, 1]),  # 신성이엔지
     "043260": ("http://www.sungho.net/images/common/logo.png", None),  # 성호전자
