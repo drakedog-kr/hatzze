@@ -64,8 +64,8 @@ describe("LOGO_TICKER_RE", () => {
 });
 
 describe("stockLogoPath", () => {
-  it("라우트 주소에 크기를 붙인다", () => {
-    assert.equal(stockLogoPath("005930.KS", 48), "/api/logo/005930.KS?s=48");
+  it("라우트 주소에 크기와 판을 붙인다 — 판이 바뀌면 브라우저 캐시의 옛 '없음'을 건너뛴다", () => {
+    assert.equal(stockLogoPath("005930.KS", 48), "/api/logo/005930.KS?s=48&v=2");
   });
 });
 

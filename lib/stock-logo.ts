@@ -48,8 +48,16 @@ export function logoTicker(code: string, market: string | null): string | null {
 /** 라우트가 받아 주는 티커 꼴. 대문자·숫자·점·하이픈으로 12자까지(BRK.B · BF-B 도 든다). */
 export const LOGO_TICKER_RE = /^[A-Z0-9][A-Z0-9.\-]{0,11}$/;
 
+/**
+ * 로고 주소의 판. 판정 규칙이 바뀌어 예전 '없음'(1×1 그림)이 브라우저 캐시에 남으면 안 될 때 올린다 — 주소가 바뀌어야
+ * 브라우저 · CDN 이 새로 받는다. 라우트는 이 값을 읽지 않는다. logo.dev 쪽 데이터 캐시 열쇠는 업스트림 주소라 판을 올려도
+ * logo.dev 요청이 몰리지 않는다.
+ *   2 — 국장 종목을 홈페이지 도메인으로도 받기 시작(2026-10-18). 예전 '없음'은 브라우저에 7일 남았다.
+ */
+export const LOGO_PATH_VERSION = 2;
+
 export function stockLogoPath(ticker: string, size: LogoSize): string {
-  return `/api/logo/${encodeURIComponent(ticker)}?s=${size}`;
+  return `/api/logo/${encodeURIComponent(ticker)}?s=${size}&v=${LOGO_PATH_VERSION}`;
 }
 
 /**
