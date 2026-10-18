@@ -115,11 +115,16 @@ DAY_TO_HOUR = 18
 EXCERPT_CHARS = 400
 EXCERPTS_DAY = 70           # 하루짜리 창에서 모델에 주는 발췌 수(1판 14)
 EXCERPTS_MULTI = 100        # 며칠짜리 창
-# 일요일 글의 주말 몫(토 07:00 ~ 보내는 시각). 평일 몫이 나머지를 채운다(load_weekly_material).
-# 창을 일요일까지 늘리기만 하면 100건 중 주말 글이 3건(토 3 · 일 0)이었다(2026-10-12 주 실측). 조회수는 모을 때 적힌
-# 값이라 몇 시간 전에 올라온 일요일 글이 밀린다 — 조회 중앙값 평일 2,000~2,400 · 토 1,792 · 일 1,080.
+# 일요일 글의 주말 몫 — 토(토 07:00 ~ 일 07:00) · 일(일 07:00 ~ 보내는 시각) 하루에 이만큼씩. 평일 몫이 나머지를
+# 채운다(load_weekly_material). 수치는 2026-10-12 주를 일요일 21시 글이 보는 DB 그대로 잰 값이다.
+# · 창을 일요일까지 늘리기만 하면 100건 중 주말 글이 3건(토 3 · 일 0)이었다. 조회수는 모을 때 적힌 값이라 몇 시간 전에
+#   올라온 글이 밀린다 — 조회 중앙값 평일 2,000~2,400 · 토 1,792 · 일 1,080.
+# · 주말 20건을 한 번에 뽑아도 일요일은 3건(07 · 09 · 09시)이었다. 하루씩 나누면 일요일 10건(07~12시).
+# · ⚠️ 나눠도 일요일 12시 뒤 후보 270건 중 1건만 든다 — 같은 이유(조회수가 덜 쌓였다). 고르는 점수(pick_excerpts)를 고쳐야
+#   풀리는데 아침 · 저녁 글도 같은 점수를 쓴다. 지난 주말을 나중에 재면 그 뒤 실행이 조회수를 다시 적어 둬서 일요일이 실제보다
+#   많이 뽑힌다(10-04 9건 · 10-11 7건) — 실제 글이 본 값으로 재려면 그 일요일 저녁, 다음 수집 전에 잴 것.
 # 주말 후보는 전체의 8.5%(1,220 / 14,377건)지만 주말 이야기를 다루는 글은 일요일 글 하나라 그보다 넉넉히 잡았다.
-WEEKLY_WEEKEND_EXCERPTS = 20
+WEEKLY_WEEKEND_EXCERPTS_PER_DAY = 10
 MULTI_MIN_FORWARDS = 3      # 며칠짜리 창은 서버에서 전달 3회 이상만 받는다(주 4만 건을 다 읽지 않는다)
 FALLBACK_DAYS = 3           # 창이 비면 하루씩 물러나는 상한(1판 NIGHT_FALLBACK_DAYS 와 같다)
 MIN_WINDOW_MSGS = 100       # 이보다 적으면 '수집이 안 된 창'으로 보고 물러난다
@@ -1788,39 +1793,47 @@ def build_us_weekend(db, llm, model: str, R: Render, as_of: date, now: datetime,
 
 
 def load_weekly_material(db, sat: date, now: datetime) -> tuple[Material, list[Excerpt], list[Excerpt]]:
-    """일요일 글의 발췌 — 평일 몫(월 07:00 ~ 토 07:00)과 주말 몫(토 07:00 ~ 보내는 시각)을 따로 뽑아 번호를 잇는다.
+    """일요일 글의 발췌 — 평일(월 07:00 ~ 토 07:00) · 토(~ 일 07:00) · 일(~ 보내는 시각) 몫을 따로 뽑아 번호를 잇는다.
 
     예전 창은 토 07:00 에서 끝나 토요일 아침부터 일요일 저녁까지의 글(10-17~18 2,261건)이 어느 글에도 안 들어갔다.
-    월요일 아침 글은 일요일 저녁 실행이 모은 마지막 글 다음부터다(run_window). 정원을 나누는 이유는 WEEKLY_WEEKEND_EXCERPTS 주석.
+    월요일 아침 글은 일요일 저녁 실행이 모은 마지막 글 다음부터다(run_window). 정원을 나누는 이유는
+    WEEKLY_WEEKEND_EXCERPTS_PER_DAY 주석.
 
     주말 몫의 끝은 시각으로 못박지 않고 보내는 시각(now)이다. 발송 워크플로는 글을 모으지 않아 DB 에는 일요일 저녁 실행이
     모은 글까지만 있다(10-18 은 17:23 글이 마지막). 19시처럼 시각으로 자르면 저녁 실행이 늦게 돈 날 그 뒤 글이 이 글과
     월요일 아침 글 사이로 빠진다. 다음 주 월요일 07:00 은 넘지 않는다 — 거기서 다음 주 창이 시작한다(손으로 늦게 돌릴 때).
 
-    주말 몫을 먼저 뽑고 평일 몫이 남은 정원을 채운다 — 주말 글이 적은 주에도 발췌 수는 그대로다. 주말에 다시 올라온
-    평일 글(앞 60자가 같은 글)은 평일 발췌 하나로 묶고 채널만 더한다. pick_excerpts 가 한 창 안에서 하는 일을 두 창 사이에도 한다.
+    토 · 일 몫을 먼저 뽑고 평일 몫이 남은 정원을 채운다 — 주말 글이 적은 주(토요일에 손으로 돌릴 때 · 주말 수집 실패)에도
+    발췌 수는 그대로다. 앞 몫의 글을 뒤 몫에서 다시 올린 글(앞 60자가 같은 글)은 앞 몫 발췌 하나로 묶고 채널만 더한다.
+    pick_excerpts 가 한 창 안에서 하는 일을 몫 사이에도 한다. 그래서 주말 발췌는 20건보다 적을 수 있다(9월 12일 ~ 10월 18일
+    여섯 주 중 세 주가 19건).
     """
     lo, mid = at(sat - timedelta(days=5), NIGHT_TO_HOUR), at(sat, NIGHT_TO_HOUR)
     hi = max(mid, min(now, at(sat + timedelta(days=2), NIGHT_TO_HOUR)))
-    weekend = load_material(db, mid, hi, WEEKLY_WEEKEND_EXCERPTS, multi=True)
-    week = load_material(db, lo, mid, EXCERPTS_MULTI - len(weekend.excerpts), multi=True)
+    sun_lo = min(hi, at(sat + timedelta(days=1), NIGHT_TO_HOUR))
+    days = [
+        load_material(db, mid, sun_lo, WEEKLY_WEEKEND_EXCERPTS_PER_DAY, multi=True),
+        load_material(db, sun_lo, hi, WEEKLY_WEEKEND_EXCERPTS_PER_DAY, multi=True),
+    ]
+    week = load_material(db, lo, mid, EXCERPTS_MULTI - sum(len(d.excerpts) for d in days), multi=True)
 
     by_key = {_norm_key(e.text): e for e in week.excerpts}
     fresh: list[Excerpt] = []
-    for e in weekend.excerpts:
-        dup = by_key.get(_norm_key(e.text))
-        if dup is not None:
-            dup.channels |= e.channels
+    for e in days[0].excerpts + days[1].excerpts:
+        k = _norm_key(e.text)
+        if k in by_key:
+            by_key[k].channels |= e.channels
         else:
+            by_key[k] = e
             fresh.append(e)
     for i, e in enumerate(week.excerpts + fresh):
         e.n = i + 1
     mat = Material(
         week.excerpts + fresh,
-        {**week.kr_names, **weekend.kr_names},
-        {**week.us_names, **weekend.us_names},
+        {**week.kr_names, **days[0].kr_names, **days[1].kr_names},
+        {**week.us_names, **days[0].us_names, **days[1].us_names},
         (lo, hi),
-        week.total + weekend.total,
+        week.total + sum(d.total for d in days),
     )
     return mat, week.excerpts, fresh
 

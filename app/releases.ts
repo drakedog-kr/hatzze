@@ -31,7 +31,7 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
-    // 텔레그램 일요일 글(weekly2)의 발췌를 월 07:00 ~ 토 07:00 에서 보내는 시각까지로 늘리고 주말 몫 20건을 따로 뽑는다
+    // 텔레그램 일요일 글(weekly2)의 발췌를 월 07:00 ~ 토 07:00 에서 보내는 시각까지로 늘리고 주말 몫(토 10 · 일 10건)을 따로 뽑는다
     // (broadcast_digest.load_weekly_material). 날짜 줄도 월~금 → 월~일. 받는 법은 그대로라 Patch. 날짜는 머지하는 날로 고친다.
     version: "2.14.16",
     date: "2026-10-18",
