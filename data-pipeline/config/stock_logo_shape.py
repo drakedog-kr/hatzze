@@ -131,7 +131,7 @@ OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
     "003160": ("http://www.di.co.kr/images/common/h1_logo.gif", [0.455, 0.2, 0.322, 0.5467]),  # 디아이 — 'INSIGHT DI' 에서 DI 와 점 심볼
     "009190": ("http://www.daiyangmetal.com/korean/img/logo_mini.png", [0, 0, 0.2404, 1]),  # 대양금속 — 파란 원형 심볼(logo.dev 에 없다)
     "006110": ("https://www.sama-al.com/kor/img_sns_sama.png", [0.25, 0, 0.5, 1]),  # 삼아알미늄 — 남색 네모 SAMA(logo.dev 는 흐림)
-    "006120": ("https://www.skdiscovery.com/images/logo_header_kr.png", [0, 0, 0.5, 1]),  # SK디스커버리 — SK 나비
+    "006120": ("https://www.skdiscovery.com/images/logo_header_kr.png", [0, 0, 0.4, 1]),  # SK디스커버리 — SK 나비(나비 끝이 '디' 위로 넘어가 0.4 에서 자른다)
     "007390": ("https://www.naturecell.co.kr/images/naturecell-logo3.png", [0.0289, 0, 0.1302, 1]),  # 네이처셀 — 글자 로고의 N
     "030530": ("https://www.wonikholdings.kr/imgs/common/logo.png", [0, 0, 0.1928, 1]),  # 원익홀딩스 — 파란 타원 심볼
     "035250": ("https://www.high1.com/DATA/site/logo/www/logo.png", [0.0087, 0.5825, 0.2783, 0.4175]),  # 강원랜드 — 하이원 꽃(logo.dev 는 홍보 사진)
