@@ -72,6 +72,9 @@ SIZE = 64
 SHAPE_SIZE = 512
 # 우리가 두는 그림(source = own)의 크기. 화면이 가장 크게 쓰는 눈금(128)의 두 배.
 OWN_SIZE = 256
+# 잘라 낸 조각이 이보다 흐리면(선명도 · BLUR_EDGE 기준) 자르지 않는다 — 원본이 작아 키운 첫 글자가 뭉갰다. 2026-10-18 자동 조각
+# 578장을 눈으로 본 것에서 나쁜 69장 중 33장을 잡고 멀쩡한 것은 6장만 걸렀다(0.03 이면 43장 · 18장).
+CROP_BLUR_MAX = 0.02
 PACE_SEC = 0.8
 MAX_PROBES = 1500
 RECHECK_DAYS = 60
@@ -295,7 +298,12 @@ def crop_for(code: str, body: bytes | None, path: str, key: str) -> list[float] 
     time.sleep(PACE_SEC)
     if st != 200 or big is None:
         return None
-    return piece_box(big) or []
+    box = piece_box(big)
+    if not box:
+        return []
+    piece = square_png(big, SIZE, box)
+    sharp = png_sharpness(piece) if piece else None
+    return [] if sharp is not None and sharp < CROP_BLUR_MAX else box
 
 
 def logo_path(row: dict) -> str | None:

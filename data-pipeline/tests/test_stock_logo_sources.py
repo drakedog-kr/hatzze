@@ -183,3 +183,35 @@ def test_logo_path_matches_route():
     assert R.logo_path({"code": "005930", "market": "KOSPI", "source": "ticker"}) == "ticker/005930.KS"
     assert R.logo_path({"code": "169330", "market": "KOSDAQ", "source": "domain", "domain": "embrain.com"}) == "embrain.com"
     assert R.logo_path({"code": "1", "market": "KOSDAQ", "source": "none"}) is None
+
+
+def test_crop_for_drops_blurry_piece(monkeypatch):
+    # 긴 로고의 첫 덩어리가 흐리면(작은 원본을 키운 것) 자르지 않는다.
+    import io
+
+    import pytest
+
+    PIL = pytest.importorskip("PIL")  # noqa: F841
+    from PIL import Image, ImageDraw, ImageFilter
+
+    def wide(blur: bool) -> bytes:
+        im = Image.new("RGB", (512, 512), "white")
+        d = ImageDraw.Draw(im)
+        d.rectangle([40, 220, 100, 280], fill=(0, 90, 200))
+        for i in range(4):
+            d.rectangle([130 + i * 80, 225, 180 + i * 80, 275], fill=(20, 20, 20))
+        if blur:
+            im = im.resize((32, 32)).resize((512, 512)).filter(ImageFilter.GaussianBlur(6))
+        out = io.BytesIO()
+        im.save(out, "PNG")
+        return out.getvalue()
+
+    monkeypatch.setattr(R, "CROP_OVERRIDE", {})
+    monkeypatch.setattr(R.time, "sleep", lambda *_: None)
+    small = Image.new("RGB", (64, 16), "black")
+    buf = io.BytesIO()
+    small.save(buf, "PNG")
+    for blur, want_cut in ((False, True), (True, False)):
+        monkeypatch.setattr(R, "fetch_logo", lambda *a, _b=blur, **k: (200, wide(_b)))
+        got = R.crop_for("123456", buf.getvalue(), "ticker/123456.KQ", "k")
+        assert (got != []) is want_cut, (blur, got)
