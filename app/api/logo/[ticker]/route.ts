@@ -13,7 +13,7 @@ import {
   type LogoSourceRow,
 } from "@/lib/stock-logo";
 import { containWebp, fitLogoWebp } from "@/lib/logo-image";
-import { getSupabaseAdmin } from "@/lib/supabase-server";
+import { getSupabaseAdminFresh } from "@/lib/supabase-server";
 
 /**
  * 종목 로고를 logo.dev 에서 받아 캐시 가능한 그림으로 준다. 왜 브라우저 직결을 걷어냈는지는
@@ -30,7 +30,8 @@ import { getSupabaseAdmin } from "@/lib/supabase-server";
  * 두드리던 것이 CDN 에서 멈추고, 화면은 머리글자 배지가 즉시 뜬다.
  *
  * 국장 종목은 파이프라인이 판정해 둔 길(티커 · 홈페이지 도메인 · 없음)로 묻는다(lib/stock-logo.ts logoUpstreamPath ·
- * 2026-10-18). 판정표 조회도 다른 화면 조회처럼 데이터 캐시에 담겨, CDN 이 빈 때에도 DB 를 매번 치지 않는다.
+ * 2026-10-18). 판정표는 데이터 캐시 없이 읽는다(getSupabaseAdminFresh) — 화면 조회 사본은 파이프라인이 비울 때만 새로워져
+ * 고친 판정이 하루 넘게 안 닿았다. CDN 이 응답을 종목 · 크기마다 하루 들고 있어 DB 를 거의 안 친다.
  *
  * 로고 칸(둥근 네모 마스크)에 맞게 다듬는다(lib/logo-image.ts). 그림을 logo.dev 에서 LOGO_FETCH_SIZE PNG 로 받아(데이터
  * 캐시 · 요청 크기와 상관없이 종목마다 한 장) sharp 로 바탕을 걷고 같은 크기로 얹는다 — 그림을 저장하지 않고, 결과는 CDN 이 하루 둔다.
@@ -123,7 +124,7 @@ async function ownLogo(ticker: string, size: number) {
   const code = krLogoCode(ticker);
   if (!code) return reply("missing");
   try {
-    const { data, error } = await getSupabaseAdmin().from("stock_logo_source").select("image").eq("code", code).maybeSingle();
+    const { data, error } = await getSupabaseAdminFresh().from("stock_logo_source").select("image").eq("code", code).maybeSingle();
     const b64 = (data as { image?: string | null } | null)?.image;
     if (error || !b64) return reply(error ? "error" : "missing");
     const out = await shape(Buffer.from(b64, "base64"), size);
@@ -142,7 +143,7 @@ async function logoSource(ticker: string): Promise<LogoSourceRow> {
   const code = krLogoCode(ticker);
   if (!code) return null;
   try {
-    const db = getSupabaseAdmin();
+    const db = getSupabaseAdminFresh();
     let { data, error } = await db.from("stock_logo_source").select("source,domain,crop").eq("code", code).maybeSingle();
     // 42703 = 칸이 없다(마이그레이션 104 전) — 자르지 않고 103 처럼 돈다.
     if (error?.code === "42703") ({ data, error } = await db.from("stock_logo_source").select("source,domain").eq("code", code).maybeSingle());
