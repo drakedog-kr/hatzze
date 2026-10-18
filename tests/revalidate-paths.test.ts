@@ -8,7 +8,16 @@ import { describe, it } from "node:test";
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 
-import { MAX_PATHS, MAX_ROUTES, TOP_SEGMENTS, allExceptTargets, parseRevalidatePaths } from "../lib/revalidate-paths.ts";
+import {
+  ALL_REFRESH_KEY,
+  MAX_PATHS,
+  MAX_ROUTES,
+  TOP_SEGMENTS,
+  allExceptTargets,
+  labelRefreshKeys,
+  parseRevalidatePaths,
+  refreshKeys,
+} from "../lib/revalidate-paths.ts";
 
 describe("parseRevalidatePaths", () => {
   it("본문이 없으면 빈 배열이다 — 전부 비우라는 뜻", () => {
@@ -139,5 +148,54 @@ describe("데일리 노트 올리기는 노트 화면만 비운다(2026-10-17)",
     assert.ok(!("reason" in parsed), JSON.stringify(parsed));
     assert.ok("paths" in parsed && parsed.paths.includes("/daily") && parsed.routes.includes("/daily/[date]"));
     assert.match(py, /data=json\.dumps\(REVALIDATE_BODY\)/);
+  });
+});
+
+describe("비운 시각 줄 이름(page_refresh · 2026-10-18)", () => {
+  // /api/revalidate 가 비운 범위 그대로 적고(refreshKeys), 화면 라벨은 제 라우트 · 제 최상위 자리 · 전부를 읽는다(labelRefreshKeys).
+  // 둘이 어긋나면 비웠는데 라벨이 안 바뀌거나, 안 비웠는데 라벨이 바뀐다.
+  const covers = (written: string[], route: string) => labelRefreshKeys(route).some((k) => written.includes(k));
+
+  it("찍은 경로 · 패턴은 그대로, 본문 없는 호출은 전부(*)", () => {
+    assert.deepEqual(refreshKeys({ paths: ["/kadera"], routes: [] }), ["/kadera"]);
+    assert.deepEqual(refreshKeys({ paths: ["/theme", "/theme/us"], routes: ["/theme/[theme]"] }), ["/theme", "/theme/us", "/theme/[theme]"]);
+    assert.deepEqual(refreshKeys({ paths: [], routes: [] }), [ALL_REFRESH_KEY]);
+  });
+
+  it("이것만 빼고 전부는 뺀 자리 말고 최상위 자리마다 — 홈은 '/', 나머지는 '/x/*'", () => {
+    const keys = refreshKeys({ paths: [], routes: [], except: ["/preview", "/", "/kadera", "/theme"] });
+    assert.ok(keys.includes("/dividend/*") && keys.includes("/stock/*") && keys.includes("/robots.txt"));
+    for (const k of ["/", "/kadera/*", "/theme/*", "/preview/*"]) assert.ok(!keys.includes(k), k);
+    assert.equal(keys.length, TOP_SEGMENTS.length - 4);
+  });
+
+  it("라벨이 보는 줄 — 제 라우트 · 제 최상위 자리 · 전부", () => {
+    assert.deepEqual(labelRefreshKeys("/"), ["/", "*"]);
+    assert.deepEqual(labelRefreshKeys("/kadera"), ["/kadera", "/kadera/*", "*"]);
+    assert.deepEqual(labelRefreshKeys("/kadera/us"), ["/kadera/us", "/kadera/*", "*"]);
+    assert.deepEqual(labelRefreshKeys("/theme/[theme]"), ["/theme/[theme]", "/theme/*", "*"]);
+  });
+
+  it("국장 카더라만 비우면 국장 라벨만 바뀌고 미장 · 홈은 그대로다", () => {
+    const w = refreshKeys({ paths: ["/kadera"], routes: [] });
+    assert.ok(covers(w, "/kadera"));
+    assert.ok(!covers(w, "/kadera/us"));
+    assert.ok(!covers(w, "/"));
+  });
+
+  it("아침 finalize(먼저 바뀐 자리를 뺌)는 라벨 화면 다섯을 안 건드린다", () => {
+    const w = refreshKeys({ paths: [], routes: [], except: ["/preview", "/", "/kadera", "/theme"] });
+    for (const r of ["/", "/kadera", "/kadera/us", "/theme", "/theme/us", "/preview"]) assert.ok(!covers(w, r), r);
+    assert.ok(covers(w, "/dividend") && covers(w, "/stock/[code]"));
+  });
+
+  it("아침 한 묶음은 다섯 화면 라벨을 다 바꾼다", () => {
+    const w = refreshKeys({ paths: ["/", "/kadera", "/kadera/us", "/theme", "/theme/us"], routes: ["/theme/[theme]", "/theme/us/[theme]"] });
+    for (const r of ["/", "/kadera", "/kadera/us", "/theme", "/theme/us", "/theme/[theme]"]) assert.ok(covers(w, r), r);
+    assert.ok(!covers(w, "/preview"));
+  });
+
+  it("전부 비우면 모든 라벨이 바뀐다", () => {
+    for (const r of ["/", "/kadera", "/preview", "/dividend"]) assert.ok(covers(refreshKeys({ paths: [], routes: [] }), r), r);
   });
 });

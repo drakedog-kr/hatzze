@@ -1,6 +1,6 @@
 /**
  * 화면 '업데이트' 라벨은 그 화면이 실제로 바뀐 때를 말해야 한다(2026-10-18).
- * 라벨은 **화면이 새로 그려진 시각**이 먼저다(lib/refreshed-at.ts — 그 화면 조회 사본의 응답 시각). 아침 화면은 자료가 쓰이고도
+ * 라벨은 **화면을 마지막으로 비운 시각**이 먼저다(lib/refreshed-at.ts — /api/revalidate 가 DB 에 적는다). 아침 화면은 자료가 쓰이고도
  * KRX 08:00 등락률을 기다려 한 묶음으로 바뀌어서, 자료 시각을 쓰면 08:05 에 바뀐 화면이 '오전 7시 30분'이 된다. 그 값을 못 읽을
  * 때만 **보여 주는 자료 가운데 가장 늦게 쓰인 시각**으로 물러선다. 예전엔 카더라 · 테마가 다 총평 시각을, 미리보기는 정각
  * '오전 7시'를 써서 08:13 에 바뀐 화면이 '오전 7시 30분'이었다.
@@ -44,12 +44,31 @@ describe("화면마다 라벨에 넣는 표", () => {
 });
 
 describe("라벨은 화면이 새로 그려진 시각이 먼저다", () => {
-  it("그 시각은 이 화면 조회 사본(라우트 머리 · 무기한)의 응답 시각이다 — 시간으로 다시 그려져도 그대로다", () => {
+  it("그 시각은 /api/revalidate 가 비우기 직전에 DB(page_refresh)에 적은 값이다 — 배포 · 캐시를 다시 받아도 같다", () => {
     const src = read("lib/refreshed-at.ts");
-    assert.match(src, /readCacheInit\(\{ headers: \{ apikey: key, Authorization: `Bearer \$\{key\}` \} \}, currentRoute\(\)\)/);
-    assert.match(src, /res\.headers\.get\("date"\)/);
-    // 실패하면 null — 던지면 화면이 통째로 안 그려진다.
-    assert.match(src, /catch \{\n\s+return null;/);
+    assert.match(src, /\.from\("page_refresh"\)\s*\.select\("refreshed_at"\)\s*\.in\("target", labelRefreshKeys\(route\)\)/);
+    // 응답 머리의 시각을 다시 읽지 않는다 — 운영에선 배포 즈음에 사본이 다시 받아져 라벨이 바뀌었다(10-18).
+    assert.ok(!src.includes('headers.get("date")'), "응답 시각(date 머리)을 라벨로 다시 쓴다");
+    // 실패하면 null — 이 조회 하나로 화면을 던지지 않는다.
+    assert.match(src, /withScopedLoadFailures/);
+    assert.match(src, /return failed\.length \? null : value;/);
+  });
+
+  it("비우기 API 는 비우기 앞에서 비운 자리마다 시각을 적는다", () => {
+    const src = read("app/api/revalidate/route.ts");
+    const stamp = src.indexOf("const stamped = await stampRefresh(refreshKeys(parsed));");
+    assert.ok(stamp > 0, "시각을 적는 자리가 없다");
+    const firstRevalidate = src.indexOf("revalidatePath(", src.indexOf("export async function POST"));
+    assert.ok(stamp < firstRevalidate, "비운 뒤에 적으면 비운 직후 그린 화면이 옛 시각을 읽는다");
+    assert.match(src, /\/rest\/v1\/page_refresh\?on_conflict=target/);
+    assert.match(src, /Prefer: "resolution=merge-duplicates,return=minimal"/);
+    assert.match(src, /cache: "no-store"/);
+  });
+
+  it("마이그레이션이 코드가 쓰는 표 · 칸을 만든다", () => {
+    const sql = read("supabase/migration_105_page_refresh.sql");
+    assert.match(sql, /create table if not exists public\.page_refresh \(\n\s+target text primary key,\n\s+refreshed_at timestamptz not null default now\(\),/);
+    assert.match(sql, /alter table public\.page_refresh enable row level security;/);
   });
 
   it("다섯 화면이 그 시각을 먼저 쓰고, 못 읽으면 자료 시각으로 물러선다", () => {
