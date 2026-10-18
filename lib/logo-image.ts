@@ -17,7 +17,8 @@ import { STEEP_MIN, crispen, isBlank, steepness, type Raw } from "./logo-crisp.t
  * 틈이 같다.
  *
  * 바탕을 칠한 그림(앱 아이콘 · 귀퉁이까지 색이 찬 그림)과 칸을 꽉 채운 아이콘 · 가로 띠 로고는 그 바탕이 곧 로고라 그대로
- * 칸에 채운다. 가로 띠는 화면(StockLogo readBandColor)이 띠 색을 칸 바탕으로 깔아 이어 준다.
+ * 칸에 채운다. 둘레 여백만 있는 아이콘 꼴(꽉 찬 네모 · 동그라미)은 여백을 걷고 칸을 채운다 — 같은 꼴이 여백 유무로 크기가 달랐다.
+ * 가로 띠는 화면(StockLogo readBandColor)이 띠 색을 칸 바탕으로 깔아 이어 준다.
  *
  * ⚠️ sharp 는 부른 순서가 아니라 **정해진 순서로** 처리한다 — 크기 맞추기(resize)가 먼저, 여백 붙이기(extend)가 나중이다.
  *    2.14.14 는 '여백 → 크기' 순으로 써서 128px 요청에 271×480 같은 그림이 나갔다. 그래서 얹을 크기로 먼저 맞추고 남는 만큼만
@@ -72,7 +73,19 @@ function isInk(data: Buffer, i: number, bg: Exclude<Backdrop, null>): boolean {
  * 영역(area) 안 로고의 꼭 맞는 상자와, 그 상자 가운데에서 잰 초타원 반지름의 최댓값(norm · 원본 픽셀).
  * 줄마다 가장 왼쪽 · 오른쪽 잉크만 보면 된다 — 같은 줄에선 가운데서 먼 쪽이 늘 더 크다. 로고가 없으면 null.
  */
-export function measureInk(raw: Raw, area: Box, bg: Exclude<Backdrop, null>): { box: Box; norm: number; fill: number } | null {
+export type InkMeasure = {
+  box: Box;
+  /** 상자 가운데에서 잰 초타원 반지름의 최댓값(원본 픽셀) */
+  norm: number;
+  /** 상자 안 로고 픽셀 비율 */
+  fill: number;
+  /** 상자 안 윤곽 비율 — 줄마다 첫 로고 픽셀에서 끝 로고 픽셀까지를 찬 것으로 센다(속에 뚫린 글자 · 무늬는 찬 것) */
+  silhouette: number;
+  /** 상자 네 변에서 4% 안쪽 줄 · 칸이 로고 픽셀로 찬 비율 가운데 가장 작은 것(꽉 찬 네모면 크다) */
+  edge: number;
+};
+
+export function measureInk(raw: Raw, area: Box, bg: Exclude<Backdrop, null>): InkMeasure | null {
   const { data, width } = raw;
   const rows: Array<[number, number, number]> = [];
   let ink = 0;
@@ -95,13 +108,29 @@ export function measureInk(raw: Raw, area: Box, bg: Exclude<Backdrop, null>): { 
   const cx = (left + right) / 2;
   const cy = (top + bottom) / 2;
   let norm = 0;
+  let span = 0;
   for (const [y, lo, hi] of rows) {
     const dy = Math.max(Math.abs(y - cy), Math.abs(y + 1 - cy));
     const dx = Math.max(cx - lo, hi + 1 - cx);
     norm = Math.max(norm, (dx ** P + dy ** P) ** (1 / P));
+    span += hi - lo + 1;
   }
   const box = { left, top, width: right - left, height: bottom - top };
-  return { box, norm, fill: ink / (box.width * box.height) };
+  const inX = Math.floor(0.04 * box.width);
+  const inY = Math.floor(0.04 * box.height);
+  const covered = (x0: number, y0: number, dx: number, dy: number, n: number) => {
+    let k = 0;
+    for (let j = 0; j < n; j++) if (isInk(data, ((y0 + j * dy) * width + x0 + j * dx) * 4, bg)) k++;
+    return k / n;
+  };
+  const edge = Math.min(
+    covered(left, top + inY, 1, 0, box.width),
+    covered(left, bottom - 1 - inY, 1, 0, box.width),
+    covered(left + inX, top, 0, 1, box.height),
+    covered(right - 1 - inX, top, 0, 1, box.height),
+  );
+  const areaPx = box.width * box.height;
+  return { box, norm, fill: ink / areaPx, silhouette: span / areaPx, edge };
 }
 
 /** 원본 상자 크기와 초타원 반지름으로, size 칸에 얹을 크기 · 자리. 로고가 안쪽 둥근 네모(마스크 × FIT)에 닿는다. */
@@ -118,7 +147,7 @@ export function placement(box: { width: number; height: number }, norm: number, 
  * 넘게 차도 모서리가 마스크 밖으로 나가므로 아이콘이 아니다 — 안쪽 선에 다시 얹는다(023810, 2026-10-19).
  * 띠는 투명 바탕이면 불투명한 픽셀로(흰 띠도 띠다), 밝은 바탕이면 로고 픽셀로 센다 — 밝은 바탕 그림은 어느 줄이나 불투명하다.
  */
-function fillsTile(raw: Raw, area: Box, m: { box: Box; norm: number; fill: number }, bg: Exclude<Backdrop, null>): boolean {
+function fillsTile(raw: Raw, area: Box, m: InkMeasure, bg: Exclude<Backdrop, null>): boolean {
   if (m.box.width >= 0.9 * area.width && m.box.height >= 0.9 * area.height) {
     if (m.fill >= 0.9) return true;
     if (m.fill >= 0.75 && m.norm <= 0.51 * Math.max(area.width, area.height)) return true;
@@ -130,6 +159,20 @@ function fillsTile(raw: Raw, area: Box, m: { box: Box; norm: number; fill: numbe
     if (bg.kind === "transparent" ? raw.data[i + 3] >= 250 : isInk(raw.data, i, bg)) full++;
   }
   return full >= 0.95 * area.width;
+}
+
+/**
+ * 로고 상자가 아이콘 꼴인가 — 거의 정사각형이면서
+ *  - 꽉 찬 네모(둥근 네모 포함): 윤곽이 9할 넘게 차고, 네 변 바로 안쪽 줄 · 칸이 7할 반 넘게 찬다. 속에 흰 글자가 뚫려 있어도
+ *    된다(삼성전기 파란 네모에 흰 S). 굵은 글자(N · D · H)는 어느 한 변이 비어 아니다.
+ *  - 꽉 찬 동그라미: 윤곽이 7할 반 넘게 차고 로고 픽셀이 반 넘으며, 상자 크기 그대로 마스크 안에 든다(가는 고리는 아니다).
+ * fillsTile 의 아이콘 규칙을 그림 테두리 대신 로고 상자에 댄 것이다.
+ */
+function iconShape(m: InkMeasure): boolean {
+  const aspect = m.box.width / m.box.height;
+  if (aspect < 0.85 || aspect > 1 / 0.85) return false;
+  if (m.silhouette >= 0.9 && m.edge >= 0.75) return true;
+  return m.silhouette >= 0.75 && m.fill >= 0.5 && m.norm <= 0.51 * Math.max(m.box.width, m.box.height);
 }
 
 /** 그림을 비율만 지켜 size × size 칸에 채운다(바탕을 칠한 그림 · 다듬지 못한 그림). */
@@ -179,6 +222,9 @@ export async function fitLogoWebp(
     const whole = crop ? await sharp(body).extract(area).png().toBuffer() : body;
     return containWebp(whole, size);
   }
+  // 둘레 여백만 있는 아이콘(파란 네모에 흰 S · 동그라미 심볼)은 여백을 걷고 칸을 채운다 — 여백 없이 오는 같은 꼴의 아이콘과
+  // 크기를 맞춘다(삼성전기는 여백이 있어 작게, 삼성SDI 는 꽉 차게 나왔다).
+  if (!crop && iconShape(m)) return containWebp(await sharp(body).extract(m.box).png().toBuffer(), size);
   const at = placement(m.box, m.norm, size);
   const fill = bg.kind === "plain" ? { ...bg.color, alpha: 1 } : TRANSPARENT;
   return sharp(body)

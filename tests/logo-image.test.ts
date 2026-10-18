@@ -33,6 +33,12 @@ async function canvas(side: number, bg: typeof CLEAR, boxes: Array<{ w: number; 
   return sharp({ create: { width: side, height: side, channels: 4, background: bg } }).composite(parts).png().toBuffer();
 }
 
+/** 300px 그림 가운데의 ㄴ 꼴 심볼(아이콘 꼴이 아니라 안쪽 선에 얹힌다). */
+const ELL = [
+  { w: 12, h: 40, left: 130, top: 130 },
+  { w: 28, h: 12, left: 142, top: 158 },
+];
+
 /** 지름 d 의 빨간 동그라미를 가운데 둔 투명 PNG. */
 async function circle(side: number, d: number) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${side}" height="${side}"><circle cx="${side / 2}" cy="${side / 2}" r="${d / 2}" fill="rgb(220,0,30)"/></svg>`;
@@ -77,7 +83,11 @@ describe("fitLogoWebp", () => {
   });
 
   it("여백이 큰 작은 심볼은 키워서, 칸 끝에 닿은 로고는 줄여서 같은 안쪽 선에 닿게 얹는다", async () => {
-    const small = await canvas(512, CLEAR, [{ w: 100, h: 100, left: 206, top: 206 }]);
+    // ㄴ 꼴 심볼(상자 100 · 속 51%) — 아이콘 꼴이 아니라 안쪽 선에 얹는다
+    const small = await canvas(512, CLEAR, [
+      { w: 30, h: 100, left: 206, top: 206 },
+      { w: 70, h: 30, left: 236, top: 276 },
+    ]);
     // 흰 바탕에서 양 끝에 닿은 두 글자(가운데는 비었다 — 띠가 아니다). 왼쪽 글자는 위 귀퉁이까지 닿았다.
     const edge = await canvas(512, WHITE, [
       { w: 150, h: 300, left: 0, top: 0 },
@@ -94,10 +104,10 @@ describe("fitLogoWebp", () => {
   });
 
   it("흰 바탕 그림은 흰 바탕을 그대로 두고, 투명 바탕은 투명으로 둔다", async () => {
-    const white = await inkOf(await fit(await canvas(300, WHITE, [{ w: 40, h: 40, left: 130, top: 130 }]), 64));
+    const white = await inkOf(await fit(await canvas(300, WHITE, ELL), 64));
     assert.deepEqual(white.corner.slice(0, 3).map((c) => c > 245), [true, true, true]);
     assert.ok(white.corner[3] > 250);
-    const clear = await inkOf(await fit(await canvas(300, CLEAR, [{ w: 40, h: 40, left: 130, top: 130 }]), 64));
+    const clear = await inkOf(await fit(await canvas(300, CLEAR, ELL), 64));
     assert.ok(clear.corner[3] < 8);
   });
 
@@ -125,9 +135,26 @@ describe("fitLogoWebp", () => {
     assert.equal(band.w, 64);
   });
 
-  it("동그라미 심볼은 지름이 FIT", async () => {
-    const got = await inkOf(await fit(await circle(512, 200), 128));
-    assert.ok(Math.abs(got.w - FIT * 128) <= 3, `지름 ${got.w}`);
+  it("둘레 여백만 있는 아이콘(꽉 찬 네모 · 동그라미)은 여백을 걷고 칸을 채운다 — 여백 없이 오는 아이콘과 크기가 같다", async () => {
+    const round = await inkOf(await fit(await circle(512, 200), 128));
+    assert.ok(round.w >= 124, `동그라미 지름 ${round.w}`);
+    const square = await inkOf(await fit(await canvas(512, CLEAR, [{ w: 200, h: 200, left: 156, top: 156 }]), 64));
+    assert.ok(square.w >= 62, `네모 한 변 ${square.w}`);
+    // 속에 흰 글자가 뚫린 파란 네모(삼성전기 S) — 흰 글자는 로고 픽셀이 아니지만 윤곽 · 네 변이 차 있어 아이콘이다
+    const tile = await inkOf(
+      await fit(
+        await canvas(512, CLEAR, [
+          { w: 200, h: 200, left: 156, top: 156, color: { r: 20, g: 40, b: 160, alpha: 1 } },
+          { w: 110, h: 30, left: 201, top: 241, color: { r: 255, g: 255, b: 255, alpha: 1 } },
+          { w: 110, h: 30, left: 201, top: 301, color: { r: 255, g: 255, b: 255, alpha: 1 } },
+        ]),
+        64,
+      ),
+    );
+    assert.ok(tile.width === 64 && tile.corner[3] > 128, "흰 글자 뚫린 네모가 칸을 채우지 않았다");
+    // 가로로 긴 꽉 찬 띠는 아이콘 꼴이 아니다 — 안쪽 선에 얹는다
+    const bar = await inkOf(await fit(await canvas(512, CLEAR, [{ w: 300, h: 100, left: 106, top: 206 }]), 64));
+    assert.ok(bar.reach <= FIT + 0.04, `띠가 넘쳤다 ${bar.reach}`);
   });
 
   it("자를 상자를 주면 그 안 로고만 얹는다 — 조각 귀퉁이가 글자에 닿아도 칠한 바탕으로 읽지 않는다", async () => {
