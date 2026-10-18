@@ -38,9 +38,11 @@ logo.dev 무료는 **IP 당 분당 100건**이다(429 + Retry-After 60 · 2026-1
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import os
 import re
+import ssl
 import sys
 import time
 import urllib.error
@@ -52,8 +54,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.kind import get_page, rows_of  # noqa: E402
+from common.logo_shape import is_wide, piece_box, square_png  # noqa: E402
 from common.supabase_client import execute_with_retry, get_client, load_all  # noqa: E402
 from config.stock_logo_exclude import EXCLUDE  # noqa: E402
+from config.stock_logo_shape import CROP_OVERRIDE, DOMAIN_OVERRIDE, OWN_LOGO  # noqa: E402
 
 TABLE = "stock_logo_source"
 # 상장회사 목록 전체(코스피 · 코스닥 · 코넥스). EUC-KR HTML 표 — 회사명 · 시장구분 · 종목코드 · 업종 · 주요제품 · 상장일 ·
@@ -63,6 +67,11 @@ KIND_URL = "https://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searc
 MIN_KIND_ROWS = 2000
 LOGO_URL = "https://img.logo.dev/"
 SIZE = 64
+# 긴 로고에서 자를 상자는 이 크기 그림에서 잰다 — /api/logo 도 같은 크기를 받아 자른다(상자는 비율이라 크기가 같아야 할 까닭은
+# 없지만, 64px 에서는 긴 로고의 글자가 몇 픽셀뿐이라 덩어리가 안 갈린다).
+SHAPE_SIZE = 512
+# 우리가 두는 그림(source = own)의 크기. 화면이 가장 크게 쓰는 눈금(128)의 두 배.
+OWN_SIZE = 256
 PACE_SEC = 0.8
 MAX_PROBES = 1500
 RECHECK_DAYS = 60
@@ -120,10 +129,10 @@ def pick_targets(stocks: list[dict], existing: dict[str, dict], domains: dict[st
     cutoff = now - timedelta(days=RECHECK_DAYS)
     for s in stocks:
         code = s["code"]
-        if code in EXCLUDE:
+        if code in EXCLUDE or code in OWN_LOGO:
             continue
         row = existing.get(code)
-        dom = (domains.get(code) if domains is not None else (row or {}).get("domain"))
+        dom = DOMAIN_OVERRIDE.get(code) or (domains.get(code) if domains is not None else (row or {}).get("domain"))
         t = {"code": code, "market": s["market"], "domain": dom}
         if row is None:
             fresh.append(t)
@@ -131,6 +140,8 @@ def pick_targets(stocks: list[dict], existing: dict[str, dict], domains: dict[st
             changed.append(t)
         elif row.get("note") and row.get("note") not in AUTO_NOTES:
             changed.append(t)  # 손으로 뺐다가 제외 목록에서 지운 종목 — 다시 묻는다
+        elif row.get("source") == "own":
+            changed.append(t)  # 우리 그림을 두었다가 OWN_LOGO 에서 지운 종목 — 다시 묻는다
         elif _parse_ts(row.get("checked_at")) < cutoff:
             stale.append((_parse_ts(row.get("checked_at")), t))
     stale.sort(key=lambda x: x[0])
@@ -152,14 +163,14 @@ def decide(target: dict, ticker: tuple, domain: tuple | None) -> dict | None:
     선명도는 도메인 그림만 잰다(None 이면 못 잰 것 — 거르지 않는다).
     """
     base = {"code": target["code"], "market": target["market"], "domain": target["domain"], "note": None}
-    st, digest, _sharp = ticker
+    st, digest, _sharp = ticker[:3]
     if st == 200:
         return {**base, "source": "ticker", "digest": digest}
     if st != 404:
         return None
     if domain is None:
         return {**base, "source": "none", "digest": None}
-    st, digest, sharp = domain
+    st, digest, sharp = domain[:3]
     if st == 200 and sharp is not None and sharp < BLUR_MAX:
         return {**base, "source": "none", "digest": digest, "note": BLUR_NOTE}
     if st == 200:
@@ -187,7 +198,7 @@ def apply_filters(rows: dict[str, dict], stocks: list[dict]) -> list[dict]:
     market_of = {s["code"]: s["market"] for s in stocks}
     for code, reason in EXCLUDE.items():
         r = rows.get(code)
-        if code not in market_of:
+        if code not in market_of or code in OWN_LOGO:
             continue
         if r is None or r.get("source") != "none" or r.get("note") != reason:
             rows[code] = {**(r or {"code": code, "market": market_of[code], "domain": None, "digest": None}), "source": "none", "note": reason}
@@ -237,17 +248,16 @@ class RateLimited(Exception):
     pass
 
 
-def probe(path: str, key: str, measure: bool = False) -> tuple[int, str | None, float | None]:
-    """logo.dev 에 한 번 묻는다 → (상태, 그림 sha256, 선명도). 없는 로고는 fallback=404 라 404 로 온다.
-    선명도는 measure 일 때만 잰다(도메인 그림)."""
-    url = f"{LOGO_URL}{path}?token={key}&size={SIZE}&format=png&fallback=404"
+def fetch_logo(path: str, key: str, size: int = SIZE) -> tuple[int, bytes | None]:
+    """logo.dev 에 한 번 묻는다 → (상태, 그림 바이트). 없는 로고는 fallback=404 라 404 로 온다. 429 는 한 번 기다렸다 다시."""
+    url = f"{LOGO_URL}{path}?token={key}&size={size}&format=png&fallback=404"
     for attempt in (1, 2):
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "hatzze/1.0 (+https://hatzze.fun)"}), timeout=20) as r:
                 body = r.read()
                 if not (r.headers.get("content-type") or "").startswith("image/"):
-                    return -1, None, None
-                return 200, hashlib.sha256(body).hexdigest(), (png_sharpness(body) if measure else None)
+                    return -1, None
+                return 200, body
         except urllib.error.HTTPError as e:
             if e.code == 429 and attempt == 1:
                 wait = int(e.headers.get("Retry-After") or 60)
@@ -256,11 +266,67 @@ def probe(path: str, key: str, measure: bool = False) -> tuple[int, str | None, 
                 continue
             if e.code == 429:
                 raise RateLimited() from e
-            return e.code, None, None
+            return e.code, None
         except Exception as e:  # noqa: BLE001 — 끊김 · 타임아웃은 이 종목만 다음 실행으로 미룬다
             print(f"[로고] {path} 요청 실패: {type(e).__name__}")
-            return -1, None, None
-    return -1, None, None
+            return -1, None
+    return -1, None
+
+
+def probe(path: str, key: str, measure: bool = False) -> tuple[int, str | None, float | None, bytes | None]:
+    """logo.dev 에 한 번 묻는다 → (상태, 그림 sha256, 선명도, 그림). 선명도는 measure 일 때만 잰다(도메인 그림)."""
+    st, body = fetch_logo(path, key)
+    if st != 200 or body is None:
+        return st, None, None, None
+    return 200, hashlib.sha256(body).hexdigest(), (png_sharpness(body) if measure else None), body
+
+
+def crop_for(code: str, body: bytes | None, path: str, key: str) -> list[float] | None:
+    """화면에 쓸 그림이 가로로 긴 로고면 잘라 쓸 상자, 아니면 [](자르지 않는다). 손 설정(CROP_OVERRIDE)이 먼저다.
+    긴 로고면 SHAPE_SIZE 그림을 한 번 더 받아 첫 덩어리를 잰다(common/logo_shape.piece_box). 못 재면 None — 다음 실행에 다시."""
+    if code in CROP_OVERRIDE:
+        return CROP_OVERRIDE[code]
+    wide = is_wide(body) if body else None
+    if wide is None:
+        return None
+    if not wide:
+        return []
+    st, big = fetch_logo(path, key, SHAPE_SIZE)
+    time.sleep(PACE_SEC)
+    if st != 200 or big is None:
+        return None
+    return piece_box(big) or []
+
+
+def logo_path(row: dict) -> str | None:
+    """판정 행이 logo.dev 에 묻는 길 — /api/logo 의 logoUpstreamPath 와 같다."""
+    if row.get("source") == "ticker":
+        return f"ticker/{row['code']}.{MARKETS[row['market']]}"
+    if row.get("source") == "domain" and row.get("domain"):
+        return row["domain"]
+    return None
+
+
+# 회사 홈페이지 그림을 받을 때. 사이트마다 인증서가 낡거나 사슬이 빠진 곳이 많아 검증을 끈다 — 공개 그림을 읽기만 하고,
+# 받은 그림은 사람이 고른 주소(OWN_LOGO)의 것이며 다듬은 뒤 판정표에 둔다.
+_LOOSE_SSL = ssl.create_default_context()
+_LOOSE_SSL.check_hostname = False
+_LOOSE_SSL.verify_mode = ssl.CERT_NONE
+BROWSER_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
+
+
+def own_image(url: str, box: list[float] | None) -> tuple[str, str] | None:
+    """홈페이지 그림 → (base64 PNG, sha256). 정사각형으로 다듬는다(긴 로고면 box 또는 첫 덩어리). 못 받으면 None."""
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": BROWSER_UA}), timeout=20, context=_LOOSE_SSL) as r:
+            body = r.read(5_000_000)
+    except Exception as e:  # noqa: BLE001 — 사이트가 잠깐 안 열리면 예전 그림을 그대로 둔다
+        print(f"[로고] 홈페이지 그림을 못 받았습니다 {url}: {type(e).__name__}")
+        return None
+    png = square_png(body, OWN_SIZE, box)
+    if png is None:
+        return None
+    return base64.b64encode(png).decode("ascii"), hashlib.sha256(png).hexdigest()
 
 
 def main() -> None:
@@ -274,13 +340,22 @@ def main() -> None:
 
     db = get_client()
     stocks = [s for s in load_all(db, "stocks", "code,market,market_cap", order_by="code") if s.get("market") in MARKETS]
+    base_cols = "code,market,source,domain,digest,checked_at,note"
+    # 마이그레이션 104(crop · image · image_src) 전이면 다듬기는 건너뛰고 103 처럼만 돈다.
+    has_shape = True
     try:
-        existing = {r["code"]: r for r in load_all(db, TABLE, "code,market,source,domain,digest,checked_at,note", order_by="code")}
-    except Exception as e:  # noqa: BLE001 — 표가 없으면(마이그레이션 103 전) 적을 곳이 없다
-        print(f"[로고] {TABLE} 를 못 읽었습니다({type(e).__name__}) — 마이그레이션 103 을 먼저 실행하세요.")
-        if not dry_run:
-            return
-        existing = {}
+        existing = {r["code"]: r for r in load_all(db, TABLE, base_cols + ",crop,image_src", order_by="code")}
+    except Exception:  # noqa: BLE001
+        has_shape = False
+        try:
+            existing = {r["code"]: r for r in load_all(db, TABLE, base_cols, order_by="code")}
+        except Exception as e:  # noqa: BLE001 — 표가 없으면(마이그레이션 103 전) 적을 곳이 없다
+            print(f"[로고] {TABLE} 를 못 읽었습니다({type(e).__name__}) — 마이그레이션 103 을 먼저 실행하세요.")
+            if not dry_run:
+                return
+            existing = {}
+    if not has_shape:
+        print("[로고] 마이그레이션 104 전이라 긴 로고 자르기 · 우리 그림은 건너뜁니다.")
 
     page = get_page(KIND_URL, encoding="euc-kr")
     domains = parse_kind(page) if page else None
@@ -310,10 +385,50 @@ def main() -> None:
                 counts["미룸"] += 1
                 continue
             row["checked_at"] = now.isoformat()
+            if has_shape:
+                got = ticker if row["source"] == "ticker" else dom
+                row["crop"] = crop_for(t["code"], got[3] if got else None, logo_path(row), key) if row["source"] in ("ticker", "domain") else []
+                if (existing.get(t["code"]) or {}).get("source") == "own":
+                    row["image"] = row["image_src"] = None  # 우리 그림을 두었다가 다시 logo.dev 로 — 그림을 지운다
             rows[t["code"]] = written[t["code"]] = row
             counts[row["source"]] += 1
             if i % 200 == 0:
                 print(f"[로고] {i}/{len(targets)} · " + " · ".join(f"{k} {v}" for k, v in sorted(counts.items())))
+        if has_shape:
+            # 자를 상자를 아직 안 잰 행(103 때 판정한 것 · 손 설정을 고친 것) — 남은 몫만큼, 시가총액 큰 순으로.
+            cap = {s["code"]: s.get("market_cap") or 0 for s in stocks}
+            todo = sorted(
+                (r for c, r in rows.items() if c not in written and r.get("source") in ("ticker", "domain")
+                 and (r.get("crop") is None or (c in CROP_OVERRIDE and r.get("crop") != CROP_OVERRIDE[c]))),
+                key=lambda r: -cap.get(r["code"], 0),
+            )[: max(0, limit - len(targets))]
+            for r in todo:
+                c = r["code"]
+                if c in CROP_OVERRIDE:
+                    crop = CROP_OVERRIDE[c]
+                else:
+                    st, body = fetch_logo(logo_path(r), key)
+                    time.sleep(PACE_SEC)
+                    crop = crop_for(c, body if st == 200 else None, logo_path(r), key) if st in (200, 404) else None
+                if crop is None:
+                    continue
+                rows[c] = written[c] = {**r, "crop": crop}
+                counts["상자" if crop else "상자 없음"] += 1
+            # 우리 그림 — 주소나 상자가 바뀐 것만 다시 받는다.
+            market_of = {s["code"]: s["market"] for s in stocks}
+            for c, (url, box) in OWN_LOGO.items():
+                r = rows.get(c) or {}
+                if c not in market_of or (r.get("source") == "own" and r.get("image_src") == url and r.get("crop") == (box or [])):
+                    continue
+                got = own_image(url, box)
+                if got is None:
+                    continue
+                image, digest = got
+                rows[c] = written[c] = {
+                    "code": c, "market": market_of[c], "source": "own", "domain": r.get("domain"), "digest": digest,
+                    "note": None, "crop": box or [], "image": image, "image_src": url, "checked_at": now.isoformat(),
+                }
+                counts["우리 그림"] += 1
     except RateLimited:
         print("[로고] 다시 물어도 429 — 여기서 멈추고 물어본 데까지만 적습니다")
 
@@ -334,12 +449,20 @@ def main() -> None:
             by[(r["market"], r["source"])] += 1
         print("[dry-run] " + " · ".join(f"{m} {s} {n}" for (m, s), n in sorted(by.items())) + " — 적지 않고 끝냅니다.")
         return
-    payload = [
-        {k: r.get(k) for k in ("code", "market", "source", "domain", "digest", "note")} | {"checked_at": r.get("checked_at") or now.isoformat()}
-        for r in written.values()
-    ]
-    for i in range(0, len(payload), 500):
-        execute_with_retry(db.table(TABLE).upsert(payload[i : i + 500], on_conflict="code"))
+    # ⚠️ 여러 행을 한 번에 upsert 하면 모든 행이 같은 칸을 가져야 한다(빠진 칸은 null 로 들어간다). 그래서 그림 칸(image)이
+    #    있는 행과 없는 행을 따로 쓴다 — 함께 쓰면 그림을 안 건드린 행이 우리 그림을 지운다.
+    cols = ["code", "market", "source", "domain", "digest", "note", "checked_at"] + (["crop", "image_src"] if has_shape else [])
+    plain, with_image = [], []
+    for r in written.values():
+        row = {k: r.get(k) for k in cols} | {"checked_at": r.get("checked_at") or now.isoformat()}
+        if has_shape and "image" in r:
+            with_image.append(row | {"image": r["image"]})
+        else:
+            plain.append(row)
+    for group in (plain, with_image):
+        for i in range(0, len(group), 500):
+            execute_with_retry(db.table(TABLE).upsert(group[i : i + 500], on_conflict="code"))
+    payload = plain + with_image
     total = defaultdict(int)
     for r in rows.values():
         total[(r.get("market"), r.get("source"))] += 1

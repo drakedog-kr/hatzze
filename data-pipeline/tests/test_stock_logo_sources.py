@@ -148,3 +148,38 @@ def test_new_stocks_go_by_market_cap():
     ]
     got = R.pick_targets(stocks, {}, {}, NOW, 3)
     assert [t["code"] for t in got] == ["000002", "000004", "000001"]
+
+
+def test_domain_override_and_own_logo(monkeypatch):
+    monkeypatch.setattr(R, "EXCLUDE", {})
+    monkeypatch.setattr(R, "DOMAIN_OVERRIDE", {"000001": "nota.ai"})
+    monkeypatch.setattr(R, "OWN_LOGO", {"000002": ("https://x.example/logo.png", None)})
+    stocks = [{"code": "000001", "market": "KOSDAQ"}, {"code": "000002", "market": "KOSDAQ"}]
+    got = R.pick_targets(stocks, {}, {"000001": None}, NOW, 10)
+    # 손 도메인이 거래소 목록보다 먼저 · 우리 그림 종목은 logo.dev 에 묻지 않는다
+    assert got == [{"code": "000001", "market": "KOSDAQ", "domain": "nota.ai"}]
+
+
+def test_exclude_does_not_override_own_logo(monkeypatch):
+    monkeypatch.setattr(R, "EXCLUDE", {"9": "흐린 그림"})
+    monkeypatch.setattr(R, "OWN_LOGO", {"9": ("https://x.example/logo.png", None)})
+    rows = {"9": {"code": "9", "market": "KOSDAQ", "source": "own", "digest": "x"}}
+    assert R.apply_filters(rows, [{"code": "9", "market": "KOSDAQ"}]) == []
+    assert rows["9"]["source"] == "own"
+
+
+def test_crop_for_prefers_manual_box(monkeypatch):
+    monkeypatch.setattr(R, "CROP_OVERRIDE", {"000270": [0.1, 0.4, 0.3, 0.2], "099220": []})
+    called = []
+    monkeypatch.setattr(R, "fetch_logo", lambda *a, **k: called.append(a) or (200, b""))
+    assert R.crop_for("000270", None, "ticker/000270.KS", "k") == [0.1, 0.4, 0.3, 0.2]
+    assert R.crop_for("099220", None, "ticker/099220.KQ", "k") == []
+    assert called == []  # 손 설정이면 logo.dev 에 다시 묻지 않는다
+    # 그림을 못 읽으면 None(다음 실행에 다시)
+    assert R.crop_for("005930", None, "ticker/005930.KS", "k") is None
+
+
+def test_logo_path_matches_route():
+    assert R.logo_path({"code": "005930", "market": "KOSPI", "source": "ticker"}) == "ticker/005930.KS"
+    assert R.logo_path({"code": "169330", "market": "KOSDAQ", "source": "domain", "domain": "embrain.com"}) == "embrain.com"
+    assert R.logo_path({"code": "1", "market": "KOSDAQ", "source": "none"}) is None

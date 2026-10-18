@@ -93,7 +93,38 @@ export function logoVerdict(status: number, contentType: string | null): LogoVer
  * data-pipeline/scripts/refresh_stock_logo_sources.py). 티커로는 코스닥의 21% 만 나와서(코스피 82% · 2026-10-18 표본),
  * 티커로 없는 종목은 회사 홈페이지 도메인으로 묻는다. 판정이 none 이면 묻지 않고 배지다.
  */
-export type LogoSourceRow = { source: string; domain: string | null } | null;
+export type LogoSourceRow = { source: string; domain: string | null; crop?: unknown } | null;
+
+/**
+ * 긴 글자 로고에서 잘라 쓸 상자를 잴 때의 그림 크기(마이그레이션 104 · data-pipeline/common/logo_shape.py).
+ * 자를 상자가 있으면 /api/logo 가 이 크기를 받아 잘라, 요청한 크기의 정사각형으로 준다. 64px 그림에서는 긴 로고의 글자가 몇
+ * 픽셀뿐이라 잘라 키우면 뭉개진다.
+ */
+export const LOGO_SHAPE_SIZE = 512;
+
+/**
+ * 판정표의 자를 상자([x, y, w, h], 그림 안 비율)가 쓸 만한가. 아니면 null(자르지 않는다). 빈 배열 · 꼴이 틀린 값 · 0 폭도 null.
+ * 표 값이 sharp 의 extract 를 깨뜨리지 못하게 범위도 본다.
+ */
+export function logoCrop(crop: unknown): [number, number, number, number] | null {
+  if (!Array.isArray(crop) || crop.length !== 4) return null;
+  const v = crop.map(Number);
+  if (!v.every((n) => Number.isFinite(n) && n >= 0 && n <= 1)) return null;
+  const [x, y, w, h] = v;
+  if (w <= 0 || h <= 0 || x + w > 1.001 || y + h > 1.001) return null;
+  return [x, y, w, h];
+}
+
+/**
+ * 잘라 낸 조각을 정사각형에 얹을 때의 자리(픽셀). 조각의 긴 변 × 1.28 이 한 변 — data-pipeline/common/logo_shape.square_png 와
+ * 같은 여백이라 우리 그림(own)과 잘라 준 그림의 크기가 같다.
+ */
+export function squarePadding(w: number, h: number): { side: number; top: number; bottom: number; left: number; right: number } {
+  const side = Math.round(Math.max(w, h) * 1.28);
+  const padX = side - w;
+  const padY = side - h;
+  return { side, top: Math.floor(padY / 2), bottom: Math.ceil(padY / 2), left: Math.floor(padX / 2), right: Math.ceil(padX / 2) };
+}
 
 /** 로고 티커가 국장 종목이면 종목코드('058470.KQ' → '058470'), 아니면 null(미국은 판정표가 없다). */
 export function krLogoCode(ticker: string): string | null {
@@ -104,11 +135,12 @@ export function krLogoCode(ticker: string): string | null {
 const LOGO_DOMAIN_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
 /**
- * logo.dev 에 물을 경로 — 'ticker/005930.KS' 또는 'embrain.com'. 판정이 none 이면 null(묻지 않는다).
+ * logo.dev 에 물을 경로 — 'ticker/005930.KS' 또는 'embrain.com'. 판정이 none 이면 null(묻지 않는다). own 도 null —
+ * 그 그림은 판정표에 있다(라우트가 따로 꺼낸다).
  * 판정표에 없거나 못 읽었으면 예전처럼 티커로 묻는다 — 표가 비어도 화면은 지금과 같다.
  */
 export function logoUpstreamPath(ticker: string, row: LogoSourceRow): string | null {
-  if (row?.source === "none") return null;
+  if (row?.source === "none" || row?.source === "own") return null;
   if (row?.source === "domain" && row.domain && LOGO_DOMAIN_RE.test(row.domain)) return row.domain;
   return `ticker/${ticker}`;
 }

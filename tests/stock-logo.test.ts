@@ -11,8 +11,10 @@ import {
   LOGO_TICKER_RE,
   isLogoSize,
   krLogoCode,
+  logoCrop,
   logoSize,
   logoUpstreamPath,
+  squarePadding,
   logoTicker,
   logoVerdict,
   stockLogoPath,
@@ -111,5 +113,26 @@ describe("국장 로고 판정(krLogoCode · logoUpstreamPath)", () => {
   it("도메인 꼴이 아니면 티커로 돌아간다 — 표 값이 주소를 흔들지 못하게", () => {
     assert.equal(logoUpstreamPath("169330.KQ", { source: "domain", domain: "evil.com/x?token=" }), "ticker/169330.KQ");
     assert.equal(logoUpstreamPath("169330.KQ", { source: "domain", domain: null }), "ticker/169330.KQ");
+  });
+});
+
+describe("긴 로고 다듬기(logoCrop · squarePadding · own)", () => {
+  it("자를 상자는 [x, y, w, h] 비율 넷일 때만 — 빈 배열 · 꼴이 틀린 값은 자르지 않는다", () => {
+    assert.deepEqual(logoCrop([0.082, 0.4004, 0.3418, 0.1973]), [0.082, 0.4004, 0.3418, 0.1973]);
+    assert.equal(logoCrop([]), null);
+    assert.equal(logoCrop(null), null);
+    assert.equal(logoCrop([0.1, 0.2, 0.3]), null);
+    assert.equal(logoCrop([0.9, 0.2, 0.3, 0.1]), null); // 그림 밖으로 나간다
+    assert.equal(logoCrop([0.1, 0.2, 0, 0.1]), null);
+    assert.equal(logoCrop(["a", 0, 0.5, 0.5]), null);
+  });
+  it("정사각형 여백은 긴 변 × 1.28 — 파이프라인 square_png 와 같다", () => {
+    assert.deepEqual(squarePadding(100, 50), { side: 128, top: 39, bottom: 39, left: 14, right: 14 });
+    const p = squarePadding(61, 40);
+    assert.equal(p.left + p.right + 61, p.side);
+    assert.equal(p.top + p.bottom + 40, p.side);
+  });
+  it("우리 그림(own)은 logo.dev 에 묻지 않는다", () => {
+    assert.equal(logoUpstreamPath("011780.KS", { source: "own", domain: "kkpc.com" }), null);
   });
 });
