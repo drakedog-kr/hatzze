@@ -1,6 +1,7 @@
 """KRX KIND(kind.krx.co.kr) 목록 페이지 — 서버가 표를 그려서 주는 POST 한 번짜리 조회들의 공통 조각.
 
-쓰는 곳: fetch_kr_high_dividend.py(고배당기업 현황) · fetch_kr_dividend_payout.py(배당정보). 둘 다 같은 꼴이다 —
+쓰는 곳: fetch_kr_high_dividend.py(고배당기업 현황) · fetch_kr_dividend_payout.py(배당정보) · refresh_stock_logo_sources.py
+(상장회사 목록, GET). 앞의 둘은 같은 꼴이다 —
 검색 폼을 POST 하면 `<tr>` 들이 오고, `currentPageSize=3000` 이면 한 번에 다 온다(2026-09-13 실측 635 · 2,733).
 
 ⚠️ 회사명이 **법인명**이다(케이티·삼성화재해상보험·롯데칠성음료). 종목명과 다른 곳이 스무 곳쯤 있어
@@ -41,11 +42,23 @@ def post_list(url: str, referer: str, data: dict) -> str | None:
     """
     body = urllib.parse.urlencode(data).encode()
     headers = {"User-Agent": UA, "Referer": referer, "X-Requested-With": "XMLHttpRequest"}
-    name = url.rsplit("/", 1)[-1]
+    return _fetch(lambda: urllib.request.Request(url, data=body, headers=headers), url, "utf-8")
+
+
+def get_page(url: str, encoding: str = "utf-8") -> str | None:
+    """폼 없이 GET 한 번으로 표를 주는 주소(상장회사 목록 내려받기 — refresh_stock_logo_sources.py).
+
+    재시도 · 실패는 post_list 와 같다. 상장회사 목록은 EUC-KR 이라 encoding 을 받는다.
+    """
+    return _fetch(lambda: urllib.request.Request(url, headers={"User-Agent": UA}), url, encoding)
+
+
+def _fetch(make_request, url: str, encoding: str) -> str | None:
+    name = url.split("?", 1)[0].rsplit("/", 1)[-1]
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            with urllib.request.urlopen(urllib.request.Request(url, data=body, headers=headers), timeout=90) as r:
-                return r.read().decode("utf-8", "ignore")
+            with urllib.request.urlopen(make_request(), timeout=90) as r:
+                return r.read().decode(encoding, "ignore")
         except urllib.error.HTTPError as exc:
             if exc.code < 500 and exc.code != 403:
                 print(f"[KIND] {name} HTTP {exc.code} — 재시도하지 않습니다")

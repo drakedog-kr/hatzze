@@ -10,7 +10,11 @@ import {
   LOGO_SIZES,
   LOGO_TICKER_RE,
   isLogoSize,
+  krLogoCode,
+  logoCrop,
   logoSize,
+  logoUpstreamPath,
+  squarePadding,
   logoTicker,
   logoVerdict,
   stockLogoPath,
@@ -62,8 +66,8 @@ describe("LOGO_TICKER_RE", () => {
 });
 
 describe("stockLogoPath", () => {
-  it("라우트 주소에 크기를 붙인다", () => {
-    assert.equal(stockLogoPath("005930.KS", 48), "/api/logo/005930.KS?s=48");
+  it("라우트 주소에 크기와 판을 붙인다 — 판이 바뀌면 브라우저 캐시의 옛 '없음'을 건너뛴다", () => {
+    assert.equal(stockLogoPath("005930.KS", 48), "/api/logo/005930.KS?s=48&v=3");
   });
 });
 
@@ -81,9 +85,54 @@ describe("logoVerdict", () => {
   });
   it("error 만 짧게 캐시한다 — 한도가 풀리면 곧 로고가 돌아와야 한다", () => {
     const secs = (cc: string) => Number(/max-age=(\d+)/.exec(cc)![1]);
+    const cdn = (cc: string) => /s-maxage=(\d+)/.exec(cc)![1];
     assert.equal(secs(LOGO_CACHE.error) <= 900, true);
     assert.equal(secs(LOGO_CACHE.ok) >= 86400, true);
-    assert.equal(LOGO_CACHE.missing, LOGO_CACHE.ok);
+    // 없는 로고는 브라우저에 하루만(파이프라인이 길을 찾으면 다음 날 보이게) · CDN 은 그림과 같다.
+    assert.equal(secs(LOGO_CACHE.missing), 86400);
+    assert.equal(cdn(LOGO_CACHE.missing), cdn(LOGO_CACHE.ok));
     for (const cc of Object.values(LOGO_CACHE)) assert.match(cc, /^public, /);
+  });
+});
+
+describe("국장 로고 판정(krLogoCode · logoUpstreamPath)", () => {
+  it("국장 티커만 종목코드를 준다", () => {
+    assert.equal(krLogoCode("058470.KQ"), "058470");
+    assert.equal(krLogoCode("005930.KS"), "005930");
+    assert.equal(krLogoCode("0035S0.KQ"), "0035S0");
+    assert.equal(krLogoCode("NVDA"), null);
+    assert.equal(krLogoCode("BRK.B"), null);
+  });
+  it("판정대로 묻는다 — 없으면 티커, 도메인이면 도메인, none 이면 묻지 않는다", () => {
+    assert.equal(logoUpstreamPath("005930.KS", null), "ticker/005930.KS");
+    assert.equal(logoUpstreamPath("005930.KS", { source: "ticker", domain: "samsung.com" }), "ticker/005930.KS");
+    assert.equal(logoUpstreamPath("169330.KQ", { source: "domain", domain: "embrain.com" }), "embrain.com");
+    assert.equal(logoUpstreamPath("037350.KQ", { source: "none", domain: "sungdokorea.com" }), null);
+    assert.equal(logoUpstreamPath("NVDA", null), "ticker/NVDA");
+  });
+  it("도메인 꼴이 아니면 티커로 돌아간다 — 표 값이 주소를 흔들지 못하게", () => {
+    assert.equal(logoUpstreamPath("169330.KQ", { source: "domain", domain: "evil.com/x?token=" }), "ticker/169330.KQ");
+    assert.equal(logoUpstreamPath("169330.KQ", { source: "domain", domain: null }), "ticker/169330.KQ");
+  });
+});
+
+describe("긴 로고 다듬기(logoCrop · squarePadding · own)", () => {
+  it("자를 상자는 [x, y, w, h] 비율 넷일 때만 — 빈 배열 · 꼴이 틀린 값은 자르지 않는다", () => {
+    assert.deepEqual(logoCrop([0.082, 0.4004, 0.3418, 0.1973]), [0.082, 0.4004, 0.3418, 0.1973]);
+    assert.equal(logoCrop([]), null);
+    assert.equal(logoCrop(null), null);
+    assert.equal(logoCrop([0.1, 0.2, 0.3]), null);
+    assert.equal(logoCrop([0.9, 0.2, 0.3, 0.1]), null); // 그림 밖으로 나간다
+    assert.equal(logoCrop([0.1, 0.2, 0, 0.1]), null);
+    assert.equal(logoCrop(["a", 0, 0.5, 0.5]), null);
+  });
+  it("정사각형 여백은 긴 변 × 1.28 — 파이프라인 square_png 와 같다", () => {
+    assert.deepEqual(squarePadding(100, 50), { side: 128, top: 39, bottom: 39, left: 14, right: 14 });
+    const p = squarePadding(61, 40);
+    assert.equal(p.left + p.right + 61, p.side);
+    assert.equal(p.top + p.bottom + 40, p.side);
+  });
+  it("우리 그림(own)은 logo.dev 에 묻지 않는다", () => {
+    assert.equal(logoUpstreamPath("011780.KS", { source: "own", domain: "kkpc.com" }), null);
   });
 });
