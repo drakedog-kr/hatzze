@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import { channelPhotoUrl } from "@/lib/channel-photo";
 import { sentimentTone, latestIso } from "@/lib/format";
+import { pageRefreshedAt } from "@/lib/refreshed-at";
 import { THEMES } from "@/lib/stock-themes";
 import { LOAD_FAILED, type MaybeFailed } from "@/lib/load-state";
 import { RISING_WINDOW_DAYS, channelDeltas, type ChannelDelta, type ChannelSnapshot } from "@/lib/rising-channels";
@@ -572,7 +573,8 @@ export async function latestWrittenAt(
 }
 
 /**
- * 카더라 화면 '업데이트' 라벨의 시각 — 총평과 등락 이유 중 늦은 쪽(2026-10-18).
+ * 카더라 화면 '업데이트' 라벨의 물러설 시각 — 총평과 등락 이유 중 늦은 쪽(2026-10-18). 라벨은 화면이 새로 그려진 시각
+ * (lib/refreshed-at.ts)이 먼저고, 그 값을 못 읽을 때만 이걸 쓴다.
  * 아침 국장 카더라는 '등락 이유' 칸의 KRX 확정 등락률이 08:00 뒤에 채워진 다음 바뀐다(daily-update.yml). 총평 시각만 쓰면
  * 화면은 08:00 에 바뀌는데 라벨은 총평(07:40)의 '오전 7시 30분'이었다. 등락 이유 표는 그 채우기 때 updated_at 이 바뀐다.
  */
@@ -604,7 +606,9 @@ export async function lastSyncedAt(db: ReturnType<typeof getSupabaseAdmin>): Pro
  */
 export async function getTelegramSummary(): Promise<TelegramSummary> {
   const db = getSupabaseAdmin();
-  const [stored, lastUpdated] = await Promise.all([storedCollectionStats(db), kaderaShownAt(db, "kr")]);
+  // 라벨은 이 화면이 실제로 새로 바뀐 시각이 먼저다(lib/refreshed-at.ts · 2026-10-18). 못 읽으면 자료가 쓰인 시각.
+  const [stored, refreshed, written] = await Promise.all([storedCollectionStats(db), pageRefreshedAt(), kaderaShownAt(db, "kr")]);
+  const lastUpdated = refreshed ?? written;
   if (stored) return { ...stored, lastUpdated };
   return { ...(await computeSummaryLive(db)), lastUpdated };
 }
