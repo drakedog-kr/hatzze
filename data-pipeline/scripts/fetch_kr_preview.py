@@ -349,13 +349,19 @@ def ewy_premium(db, prev: date, ewy_c: float | None, session: str) -> tuple[floa
     ⚠️ 수집기는 휴장일 아침에도 줄을 쓴다. 그 줄은 세지 않는다 — 2026-10-15 까지는 미장 세션으로만 골라
        한글날(10/9) 아침 줄의 10/8 세션이 끼었고, 그날 괴리가 백테스트 정의(−1.34%)와 달리 −0.58% 로 섰다.
     ⚠️ 기록이 EWY_BASE 번 쌓이기 전에는 괴리가 None 이다 — 화면은 그 줄을 안 그린다(비율만 쌓는다).
+    ⚠️ 원/달러(ECOS)나 코스피 종가를 못 받으면 같은 재료로 앞서 낸 비율을 쓴다(same_basis_ratio). 주말 · 연휴 뒤 첫 개장일
+       아침은 주말 아침 줄과 재료가 같은데, 2026-10-19(월) 아침 ECOS 가 URLError 로 막혀 EWY 줄이 통째로 빠졌다.
     """
     if not ewy_c:
         return None, None
     fx, kc = ecos_fx_close(prev), kospi_close(db, prev)
-    if not fx or not kc:
-        return None, None
-    ratio = ewy_c * fx / kc
+    if fx and kc:
+        ratio = ewy_c * fx / kc
+    else:
+        ratio = same_basis_ratio(db, prev, session)
+        if ratio is None:
+            return None, None
+        print(f"[EWY] 원/달러 · 코스피 종가 없이 같은 재료(미장 {session} · 국장 {prev})로 앞서 낸 비율 {ratio} 을 씁니다")
     try:
         hist = (
             db.table("kr_preview_day").select("date,us_session,ewy_ratio")
@@ -370,7 +376,7 @@ def ewy_premium(db, prev: date, ewy_c: float | None, session: str) -> tuple[floa
     open_days = set(krx_trading_days(min(days), max(days))) if days else set()
     seen: dict[str, float] = {}
     for h, d in zip(hist, days):
-        if d in open_days:
+        if d in open_days and str(h["us_session"]) < session:
             seen.setdefault(str(h["us_session"]), float(h["ewy_ratio"]))
     past = list(seen.values())[:EWY_BASE]
     if len(past) < EWY_BASE:
@@ -379,6 +385,26 @@ def ewy_premium(db, prev: date, ewy_c: float | None, session: str) -> tuple[floa
     past.sort()
     mid = past[len(past) // 2] if len(past) % 2 else (past[len(past) // 2 - 1] + past[len(past) // 2]) / 2
     return round(ratio, 6), round((ratio / mid - 1) * 100, 2)
+
+
+def same_basis_ratio(db, prev: date, session: str) -> float | None:
+    """같은 재료로 앞서 낸 EWY 비율 — 같은 미장 세션(EWY 종가)이고 그 줄의 기준 국장일(원/달러 · 코스피 종가)이 오늘과 같은
+    줄. 주말 · 연휴 아침 줄이 그렇다. 미장만 쉰 날(국장은 열림)은 미장 세션이 같아도 기준 국장일이 달라 쓰지 않는다. 없으면 None."""
+    try:
+        rows = (
+            db.table("kr_preview_day").select("date,us_session,ewy_ratio")
+            .eq("us_session", session).not_.is_("ewy_ratio", "null")
+            .order("date", desc=True).limit(10).execute().data
+        ) or []
+    except Exception as e:  # noqa: BLE001
+        print(f"[경고] 앞서 낸 EWY 비율을 못 읽었습니다({e})")
+        return None
+    for r in rows:
+        if str(r.get("us_session")) != session or r.get("ewy_ratio") is None:
+            continue
+        if last_open_day(date.fromisoformat(str(r["date"]))) == prev:
+            return float(r["ewy_ratio"])
+    return None
 
 
 def next_open_day(today: date) -> date:
