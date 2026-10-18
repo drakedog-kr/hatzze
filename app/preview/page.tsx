@@ -3,12 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getKrIndexClosesSide } from "@/lib/data";
-import { formatKstSnappedShort, formatKstUpdateSnapped } from "@/lib/format";
+import { formatKstSnappedShort, formatKstUpdate, latestIso } from "@/lib/format";
 import { getOvernightLive, type OvernightData, type OvernightRow } from "@/lib/kr-overnight";
 import { getPreview, sessionWord, type PreviewLink, type PreviewMover } from "@/lib/kr-preview";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import { stockDetailHref } from "@/lib/insider-range";
 import { stockHref } from "@/lib/stock-page";
+import { getSupabaseAdmin } from "@/lib/supabase-server";
+import { latestWrittenAt } from "@/lib/telegram-data";
 
 import { loadPreviewCoverChips } from "../kadera/cover-chips";
 import { CoverIndexCell, CoverLinkCell, CoverMeta, Module } from "../kadera/V2Modules";
@@ -147,14 +149,29 @@ const VOL = (v: number | null) => {
 const HL_DEX = "xyz";
 
 /**
- * 이 화면의 자료가 **실제로 쓰이는 시각**(KST). `formatKstUpdateSnapped` 가 이 정각에 붙인다.
- *   HERO_HOURS   종목 줄은 06:30 KST 까지 기다렸다 도는 kr_preview 잡이라 07시다(06:31 에 쓰여도 2시간 안이라 7시에 붙는다).
- *   PERP_HOURS   하이퍼리퀴드는 **KRX 08:00 게이트 바로 뒤**라 아침 08시 · 저녁 18시다
- *                (실시간을 못 받아 담아 둔 값으로 물러선 날에만 쓰인다).
+ * 하이퍼리퀴드 담아 둔 값의 시각 알약(`formatKstSnappedShort`)이 붙는 정각(KST). **KRX 08:00 게이트 바로 뒤**라 아침 08시 ·
+ * 저녁 18시다(실시간을 못 받아 담아 둔 값으로 물러선 날에만 쓰인다).
  * ⚠️ 스텝 자리를 옮기면 이 값도 함께 옮길 것. 라벨은 조용히 틀린다.
+ * ⛔ 첫 줄 '업데이트' 라벨은 2026-10-18 부터 정각(옛 HERO_HOURS · 늘 '오전 7시')이 아니라 이 화면이 실제로 바뀐 때다 — 아래
+ *    previewShownAt.
  */
-const HERO_HOURS = [7] as const;
 const PERP_HOURS = [8, 18] as const;
+
+/**
+ * 첫 줄 '업데이트' 라벨의 시각 — 이 화면이 보여 주는 자료 가운데 가장 늦게 쓰인 것(2026-10-18 · lib/format.ts latestIso).
+ * 밤사이 미장 표(아침 kr_preview 잡) · 개장 전 지금 값의 **담아 둔** 시각(실시간 덧씌움 말고) · 첫 줄 급부상 칩(국장 급부상 창 ·
+ * 미장 언급 폭). 화면은 그 자료가 다 쓰인 직후에 바뀐다 — 아침 06:31, 저녁엔 급부상 한 줄 요약 뒤(daily-update.yml).
+ * ⚠️ 실시간 값의 시각(getOvernightLive 의 capturedAt)을 넣으면 10분마다 라벨만 바뀐다 — 넣지 않는다.
+ */
+async function previewShownAt(tableUpdatedAt: string | null): Promise<string | null> {
+  const db = getSupabaseAdmin();
+  const [overnight, krSurging, usBreadth] = await Promise.all([
+    latestWrittenAt(db, "kr_overnight", "captured_at"),
+    latestWrittenAt(db, "telegram_surging_window"),
+    latestWrittenAt(db, "telegram_us_stock_breadth"),
+  ]);
+  return latestIso(tableUpdatedAt, overnight, krSurging, usBreadth);
+}
 
 /**
  * 살아 있는 값의 '시점' 표기 — "9/4 오전 2:40".
@@ -655,11 +672,13 @@ export default async function PreviewPage() {
 
   // ⚠️ 나란히 부른다. 표가 서로 달라 한쪽이 비어도 다른 쪽은 그린다 — 하이퍼리퀴드 표가 없던 날에도 아래 표는 멀쩡해야 한다.
   // 첫 줄의 지수 종가 · 링크 칸 둘은 곁들이는 칸이다(칸 하나가 실패하면 그 칸만 뺀다 — cover-chips 의 scoped).
-  const [{ date, updatedAt, spx, sectors, moverCount, usHoliday, usSession, usFrom, soxx, ewyPrem, nextOpen }, overnight, rawIndexes, coverLinks] = await Promise.all([
-    getPreview(),
+  const preview = getPreview();
+  const [{ date, spx, sectors, moverCount, usHoliday, usSession, usFrom, soxx, ewyPrem, nextOpen }, overnight, rawIndexes, coverLinks, shownAt] = await Promise.all([
+    preview,
     getOvernightLive(),
     getKrIndexClosesSide(),
     loadPreviewCoverChips(),
+    preview.then((p) => previewShownAt(p.updatedAt)),
   ]);
   assertLoaded("/preview");
   const indexes = isLoadFailed(rawIndexes) ? null : rawIndexes;
@@ -690,10 +709,10 @@ export default async function PreviewPage() {
         {coverLinks.map((c) => (
           <CoverLinkCell key={c.ga} c={c} />
         ))}
-        {/* ⚠️ 다른 화면의 30분 눈금이 아니라 HERO_HOURS 정각에 붙인다(06:31 에 쓰여 늘 '오전 7시'). 손으로 밖에서 돌린 실행만 '오후 3시경'. */}
+        {/* 다른 화면과 같은 30분 눈금 · 이 화면이 실제로 바뀐 때(previewShownAt). 예전엔 정각 '오전 7시'에 붙여 06:31 에 바뀐 화면이 7시라고 했다. */}
         {/* 근거(미장 N종목 · 국장 N종목)는 걷었다 — 링크 칸 둘 뒤에 붙이면 1,100 · 1,280 · 1,366 에서 업데이트 글자가 혼자 둘째 줄을
             차지해 띠 절반이 비었다(2026-10-05 점검). 같은 수를 브리핑 첫 줄과 표가 말한다. */}
-        <CoverMeta updated={updatedAt ? formatKstUpdateSnapped(updatedAt, HERO_HOURS, "업데이트") : "업데이트 준비 중"} />
+        <CoverMeta updated={shownAt ? formatKstUpdate(shownAt, "업데이트") : "업데이트 준비 중"} />
       </div>
 
       {/* 둘째 줄 — 밤사이 뉴욕 | 해외에서 거래 중인 값 | 오늘의 브리핑. 해외 값이 없는 날(수집 실패 · 표 없음)은 그 모듈째 빼고 두 칸.

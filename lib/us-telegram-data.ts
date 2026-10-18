@@ -31,7 +31,7 @@ import {
   addDaysISO,
   channelMeta,
   fetchAllRows,
-  lastKaderaUpdatedAt,
+  kaderaShownAt,
   loadMarketSentiment,
   loadSentimentTrend,
   loadThemeUsual,
@@ -423,8 +423,9 @@ export async function getUsKaderaSummary(): Promise<UsKaderaSummary> {
   // (현황 타일 넷 — 채널 수 둘·언급 수·종목 수 — 은 히어로에서 빠지며 같이 걷었다, 2026-09-27.)
   const [{ dates }, lastUpdated] = await Promise.all([
     loadUsStockDaily(US_WINDOW_DAYS),
-    // 국장과 같은 규칙으로 '이 화면이 만들어진 시각'을 쓴다(telegram-data 의 주석 참고).
-    lastKaderaUpdatedAt(getSupabaseAdmin(), "telegram_us_daily_brief"),
+    // 국장과 같은 규칙으로 '이 화면이 보여 주는 자료가 마지막으로 쓰인 시각'을 쓴다 — 미장 총평과 미장 등락 이유 중 늦은 쪽
+    // (telegram-data 의 kaderaShownAt · 2026-10-18). 토요일 10:30 미장 이유가 다시 쓰여 화면이 바뀌면 라벨도 그 시각이 된다.
+    kaderaShownAt(getSupabaseAdmin(), "us"),
   ]);
   return {
     lastDate: dates.at(-1) ?? null,

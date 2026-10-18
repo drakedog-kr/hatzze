@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { channelPhotoUrl } from "@/lib/channel-photo";
-import { sentimentTone } from "@/lib/format";
+import { sentimentTone, latestIso } from "@/lib/format";
 import { THEMES } from "@/lib/stock-themes";
 import { LOAD_FAILED, type MaybeFailed } from "@/lib/load-state";
 import { RISING_WINDOW_DAYS, channelDeltas, type ChannelDelta, type ChannelSnapshot } from "@/lib/rising-channels";
@@ -557,6 +557,33 @@ export async function lastKaderaUpdatedAt(
   return updated ?? (await lastSyncedAt(db));
 }
 
+/**
+ * 표에서 가장 늦게 쓰인 시각 하나(`col` 내림차순 첫 줄). 못 읽으면 null — 라벨은 다른 표의 시각으로 선다.
+ * 화면 '업데이트' 라벨이 그 화면이 보여 주는 표들의 가장 늦은 시각을 고를 때 쓴다(lib/format.ts latestIso).
+ */
+export async function latestWrittenAt(
+  db: ReturnType<typeof getSupabaseAdmin>,
+  table: string,
+  col: "updated_at" | "created_at" | "captured_at" = "updated_at",
+): Promise<string | null> {
+  const { data, error } = await db.from(table).select(col).order(col, { ascending: false }).limit(1);
+  if (error) console.error(`[latestWrittenAt] ${table}.${col} 을 못 읽었습니다`, error);
+  return ((data?.[0] as Record<string, unknown> | undefined)?.[col] as string | undefined) ?? null;
+}
+
+/**
+ * 카더라 화면 '업데이트' 라벨의 시각 — 총평과 등락 이유 중 늦은 쪽(2026-10-18).
+ * 아침 국장 카더라는 '등락 이유' 칸의 KRX 확정 등락률이 08:00 뒤에 채워진 다음 바뀐다(daily-update.yml). 총평 시각만 쓰면
+ * 화면은 08:00 에 바뀌는데 라벨은 총평(07:40)의 '오전 7시 30분'이었다. 등락 이유 표는 그 채우기 때 updated_at 이 바뀐다.
+ */
+export async function kaderaShownAt(db: ReturnType<typeof getSupabaseAdmin>, market: "kr" | "us"): Promise<string | null> {
+  const [brief, reasons] = await Promise.all([
+    lastKaderaUpdatedAt(db, market === "us" ? "telegram_us_daily_brief" : "telegram_daily_brief"),
+    latestWrittenAt(db, market === "us" ? "telegram_us_stock_move_reason" : "telegram_stock_move_reason"),
+  ]);
+  return latestIso(brief, reasons);
+}
+
 export async function lastSyncedAt(db: ReturnType<typeof getSupabaseAdmin>): Promise<string | null> {
   const { data, error } = await db
     .from("telegram_channels")
@@ -577,7 +604,7 @@ export async function lastSyncedAt(db: ReturnType<typeof getSupabaseAdmin>): Pro
  */
 export async function getTelegramSummary(): Promise<TelegramSummary> {
   const db = getSupabaseAdmin();
-  const [stored, lastUpdated] = await Promise.all([storedCollectionStats(db), lastKaderaUpdatedAt(db)]);
+  const [stored, lastUpdated] = await Promise.all([storedCollectionStats(db), kaderaShownAt(db, "kr")]);
   if (stored) return { ...stored, lastUpdated };
   return { ...(await computeSummaryLive(db)), lastUpdated };
 }

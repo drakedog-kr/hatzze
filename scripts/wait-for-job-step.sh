@@ -10,6 +10,8 @@
 #
 # ⚠️ 못 읽으면(권한 · 깃헙 장애) 시간이 다 될 때까지 기다리다 **그냥 지나간다** — 겹칠 위험만 남고 배당 수집은 돈다.
 #    잡에 `actions: read` 권한과 GH_TOKEN 이 있어야 한다.
+# ⚠️ WAIT_STRICT=1 이면 시간이 다 됐을 때 1 로 끝난다(2026-10-18) — 기다린 뒤에만 해야 하는 일을 `&&` 로 잇는 자리
+#    (아침 국장 카더라 비우기: 배당 잡의 KRX 등락률 채우기 뒤에만 비운다).
 set -uo pipefail
 
 timeout_min="${1:?분}"; shift
@@ -34,6 +36,10 @@ done_one() {  # "잡" 또는 "잡::스텝 앞부분" 이 끝났나
 for target in "$@"; do
   until done_one "$target"; do
     if [ "$(date +%s)" -ge "$deadline" ]; then
+      if [ -n "${WAIT_STRICT:-}" ]; then
+        echo "⚠️ '$target' 가 ${timeout_min}분 안에 끝나지 않았거나 상태를 못 읽었습니다 — 뒤 일을 하지 않습니다(WAIT_STRICT)"
+        exit 1
+      fi
       echo "⚠️ '$target' 가 ${timeout_min}분 안에 끝나지 않았거나 상태를 못 읽었습니다 — 기다리지 않고 지나갑니다"
       exit 0
     fi

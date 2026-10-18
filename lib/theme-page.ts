@@ -1,5 +1,6 @@
 import "server-only";
 
+import { latestIso } from "@/lib/format";
 import { cache } from "react";
 
 import { getSupabaseAdmin } from "./supabase-server";
@@ -12,6 +13,7 @@ import {
   getThemeRotation,
   kaderaBaseDate,
   lastKaderaUpdatedAt,
+  latestWrittenAt,
 } from "./telegram-data";
 import { THEMES } from "./stock-themes";
 import { expectedUsualMentions } from "./stock-usual";
@@ -637,8 +639,15 @@ export function flowStats(flow: (number | null)[]): { streak: number; topDays: n
  * 정기 실행과 다른 시각이 떠서 다른 화면과 어긋났다(2026-09-23 "다른 페이지들 동일하게"). 국장은 국장 총평,
  * 미장은 미장 총평의 시각을 쓴다 — 두 카더라 화면이 쓰는 그대로다.
  */
-export function themeUpdatedAt(market: "kr" | "us"): Promise<string | null> {
-  return lastKaderaUpdatedAt(getSupabaseAdmin(), market === "us" ? "telegram_us_daily_brief" : "telegram_daily_brief");
+export async function themeUpdatedAt(market: "kr" | "us"): Promise<string | null> {
+  // ⭐ 2026-10-18 부터 총평과 테마 요약 중 늦은 쪽 — 테마 목록은 테마 요약이 쓰인 직후에 바뀐다(daily-update.yml '테마 리포트
+  //    화면만 먼저 비우고 데우기'). 총평 시각만 쓰면 화면이 바뀐 때보다 이르게 떴다(lib/format.ts formatKstUpdate 주석).
+  const db = getSupabaseAdmin();
+  const [brief, themes] = await Promise.all([
+    lastKaderaUpdatedAt(db, market === "us" ? "telegram_us_daily_brief" : "telegram_daily_brief"),
+    latestWrittenAt(db, market === "us" ? "telegram_us_theme_brief" : "telegram_theme_brief"),
+  ]);
+  return latestIso(brief, themes);
 }
 
 /**
