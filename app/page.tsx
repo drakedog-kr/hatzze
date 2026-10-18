@@ -1,5 +1,6 @@
 import { SCORE_TREND_DAYS, getKospiCloseSeries, getKrIndexClosesSide, getLatestDailyScore, getPublicIndicators, getScoreHistory, getTopStockHighGaps } from "@/lib/data";
 import { formatKstUpdate } from "@/lib/format";
+import { pageRefreshedAt } from "@/lib/refreshed-at";
 import { assertLoaded, isLoadFailed } from "@/lib/load-state";
 import type { IndicatorCategory } from "@/lib/data";
 import { stageForScore } from "./ui";
@@ -51,7 +52,7 @@ const FALLBACK_ICONS: Record<string, IconName> = {
 };
 
 export default async function Home() {
-  const [dailyScore, indicators, rawTopGaps, rawKospiPath, rawScoreTrend, spotlight, rawIndexes] = await Promise.all([
+  const [dailyScore, indicators, rawTopGaps, rawKospiPath, rawScoreTrend, spotlight, rawIndexes, refreshedAt] = await Promise.all([
     getLatestDailyScore(),
     getPublicIndicators(),
     getTopStockHighGaps(3),
@@ -64,6 +65,8 @@ export default async function Home() {
     loadSpotlight(),
     // v2 첫 줄의 지수 종가(국장 카더라와 같은 칸). 곁들이는 칸이라 실패해도 칸만 빠진다.
     getKrIndexClosesSide(),
+    // 첫 줄 '업데이트' 라벨 — 이 화면이 실제로 새로 바뀐 시각(lib/refreshed-at.ts · 2026-10-18). 못 읽으면 점수 시각.
+    pageRefreshedAt(),
   ]);
 
   /* 조회 실패를 "자료 없음" 과 가른다(lib/load-state.ts). 두 값 다 카드의 **곁가지**라,
@@ -161,7 +164,7 @@ export default async function Home() {
                 <CoverLinkCell key={c.ga} c={c} />
               ))}
               {/* '지표 25개 분석'은 걷었다 — 바로 아래 햇쩨 지수 머리('지표 25개')와 같은 말이다(v2, 2026-10-03). */}
-              <CoverMeta updated={dailyScore ? formatKstUpdate(dailyScore.updated_at, "업데이트") : "업데이트 준비 중"} />
+              <CoverMeta updated={dailyScore ? formatKstUpdate(refreshedAt ?? dailyScore.updated_at, "업데이트") : "업데이트 준비 중"} />
             </div>
 
             {/* 둘째 줄 — 햇쩨 지수 | 오늘의 브리핑 */}
