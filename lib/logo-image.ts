@@ -28,8 +28,9 @@ import { STEEP_MIN, crispen, isBlank, steepness, type Raw } from "./logo-crisp.t
 /** 로고가 닿는 안쪽 둥근 네모 — 마스크의 이 비율. 24px 칸이면 둘레에 2px 쯤 틈이 남는다. */
 export const FIT = 0.84;
 /**
- * 가로로 넓은 꽉 찬 엠블럼(삼성 타원)은 칸 끝까지 — FIT 으로 얹으면 높이가 칸의 3할이 안 돼 화면(StockLogo unreadableMark)이
- * 배지로 돌렸다(삼성중공업, 2026-10-19). 1 이면 양 끝 픽셀이 칠해져 화면이 그 색을 띠 색으로 칸에 깐다(readBandColor) — 조금 남긴다.
+ * 가로로 넓은 로고(2배 넘게 · 삼성 타원 · KT&G 같은 글자 로고)는 칸 폭 끝까지 — 마스크는 가운데 높이에서 칸 폭 끝까지 닿으므로
+ * 넓은 로고는 더 키울 수 있다. FIT 으로 얹으면 높이가 작아 화면(StockLogo unreadableMark)이 배지로 돌렸다(삼성중공업 · KT&G,
+ * 2026-10-19). 1 이면 양 끝 픽셀이 칠해져 화면이 그 색을 띠 색으로 칸에 깐다(readBandColor) — 조금 남긴다.
  */
 export const FIT_EMBLEM = 0.97;
 /** 마스크(둥근 네모)를 흉내 내는 초타원 지수. 대각선 점이 2^(-1/P) = 0.794 로 마스크 path 의 0.789 와 맞는다. */
@@ -196,9 +197,9 @@ function iconBox(box: Box): Box {
   return { left: box.left + dx, top: box.top + dy, width: Math.max(1, box.width - 2 * dx), height: Math.max(1, box.height - 2 * dy) };
 }
 
-/** 가로로 넓고(2배 넘게) 속이 찬 엠블럼인가 — 삼성 타원 · 글자를 품은 띠. 윤곽 7할 · 로고 픽셀 반 넘게. */
+/** 가로로 넓은 로고인가(2배 넘게) — 삼성 타원 · 글자 로고. 칸 폭 끝까지 얹는다(FIT_EMBLEM). */
 function emblem(m: InkMeasure): boolean {
-  return m.box.width >= 2 * m.box.height && m.silhouette >= 0.7 && m.fill >= 0.5;
+  return m.box.width >= 2 * m.box.height;
 }
 
 /** 그림을 비율만 지켜 size × size 칸에 채운다(바탕을 칠한 그림 · 다듬지 못한 그림). */
