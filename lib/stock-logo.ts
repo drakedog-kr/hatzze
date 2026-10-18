@@ -55,9 +55,10 @@ export const LOGO_TICKER_RE = /^[A-Z0-9][A-Z0-9.\-]{0,11}$/;
  *   2 — 국장 종목을 홈페이지 도메인으로도 받기 시작(2026-10-18). 예전 '없음'은 브라우저에 7일 남았다.
  *   3 — 긴 글자 로고를 잘라 주고 홈페이지 그림(own)을 두기 시작(같은 날 · 마이그레이션 104). 판 2 로 받은 긴 글자 그림(7일)과
  *       빈 그림(하루)이 브라우저에 남아, 다듬은 로고 대신 배지가 보였다.
+ *   4 — 잘라 준 그림이 정사각형이 아니던 것을 고침(2026-10-19 · lib/logo-image.ts). 판 3 의 271×480 그림이 브라우저에 7일 남는다.
  * ⚠️ 판정표가 바뀌어도(파이프라인이 새 길 · 상자를 찾음) 같은 주소라 브라우저는 최대 7일 옛 그림을 쓴다. 큰 규칙을 바꿀 때만 올린다.
  */
-export const LOGO_PATH_VERSION = 3;
+export const LOGO_PATH_VERSION = 4;
 
 export function stockLogoPath(ticker: string, size: LogoSize): string {
   return `/api/logo/${encodeURIComponent(ticker)}?s=${size}&v=${LOGO_PATH_VERSION}`;
@@ -116,17 +117,6 @@ export function logoCrop(crop: unknown): [number, number, number, number] | null
   const [x, y, w, h] = v;
   if (w <= 0 || h <= 0 || x + w > 1.001 || y + h > 1.001) return null;
   return [x, y, w, h];
-}
-
-/**
- * 잘라 낸 조각을 정사각형에 얹을 때의 자리(픽셀). 조각의 긴 변 × 1.28 이 한 변 — data-pipeline/common/logo_shape.square_png 와
- * 같은 여백이라 우리 그림(own)과 잘라 준 그림의 크기가 같다.
- */
-export function squarePadding(w: number, h: number): { side: number; top: number; bottom: number; left: number; right: number } {
-  const side = Math.round(Math.max(w, h) * 1.28);
-  const padX = side - w;
-  const padY = side - h;
-  return { side, top: Math.floor(padY / 2), bottom: Math.ceil(padY / 2), left: Math.floor(padX / 2), right: Math.ceil(padX / 2) };
 }
 
 /** 로고 티커가 국장 종목이면 종목코드('058470.KQ' → '058470'), 아니면 null(미국은 판정표가 없다). */

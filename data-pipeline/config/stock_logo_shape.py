@@ -116,6 +116,7 @@ CROP_OVERRIDE: dict[str, list[float]] = {
 }
 
 OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
+    "003160": ("http://www.di.co.kr/images/common/h1_logo.gif", [0.455, 0.2, 0.322, 0.5467]),  # 디아이 — 'INSIGHT DI' 에서 DI 와 점 심볼
     "011780": ("https://www.kkpc.com/resources/kor/images/common/header/img_logo01.gif", [0, 0, 0.165, 1]),  # 금호석유화학
     "011930": ("https://www.shinsungeng.com/images/common/foot_logo.jpg", [0, 0, 0.19, 1]),  # 신성이엔지
     "043260": ("http://www.sungho.net/images/common/logo.png", None),  # 성호전자

@@ -10,9 +10,9 @@ import {
   logoCrop,
   logoUpstreamPath,
   logoVerdict,
-  squarePadding,
   type LogoSourceRow,
 } from "@/lib/stock-logo";
+import { cropSquareWebp } from "@/lib/logo-image";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 
 /**
@@ -92,23 +92,10 @@ function image(out: Buffer) {
   return new Response(new Uint8Array(out), { headers: { "Content-Type": "image/webp", "Cache-Control": LOGO_CACHE.ok } });
 }
 
-/** 그림 안 상자를 잘라 투명 여백을 둔 정사각형으로, 요청 크기의 WebP 로. 실패하면 null. */
+/** 그림 안 상자를 잘라 투명 여백을 둔 size × size 정사각형 WebP 로(lib/logo-image.ts). 실패하면 null. */
 async function cropToSquare(body: Buffer, crop: [number, number, number, number], size: number): Promise<Buffer | null> {
   try {
-    const meta = await sharp(body).metadata();
-    const W = meta.width ?? LOGO_SHAPE_SIZE;
-    const H = meta.height ?? LOGO_SHAPE_SIZE;
-    const left = Math.min(W - 1, Math.max(0, Math.round(crop[0] * W)));
-    const top = Math.min(H - 1, Math.max(0, Math.round(crop[1] * H)));
-    const width = Math.max(1, Math.min(W - left, Math.round(crop[2] * W)));
-    const height = Math.max(1, Math.min(H - top, Math.round(crop[3] * H)));
-    const piece = await sharp(body).extract({ left, top, width, height }).png().toBuffer();
-    const pad = squarePadding(width, height);
-    return await sharp(piece)
-      .extend({ top: pad.top, bottom: pad.bottom, left: pad.left, right: pad.right, background: { r: 255, g: 255, b: 255, alpha: 0 } })
-      .resize(size, size)
-      .webp({ quality: 90 })
-      .toBuffer();
+    return await cropSquareWebp(body, crop, size);
   } catch (e) {
     console.error("[api/logo] 로고를 자르지 못했습니다 — 자르지 않은 그림을 줍니다", e);
     return null;
