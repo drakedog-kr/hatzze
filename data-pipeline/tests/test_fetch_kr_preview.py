@@ -220,10 +220,38 @@ def test_ewy_premium_waits_for_five_sessions(monkeypatch):
 
 
 def test_ewy_premium_drops_when_fx_missing(monkeypatch):
-    """원/달러 종가를 못 받은 날은 그 줄만 빠진다(ECOS 는 해외 러너에서 가끔 막힌다)."""
+    """원/달러 종가를 못 받았고 같은 재료로 낸 비율도 없으면 그 줄만 빠진다(ECOS 는 해외 러너에서 가끔 막힌다)."""
     monkeypatch.setattr(fkp, "ecos_fx_close", lambda d: None)
     monkeypatch.setattr(fkp, "kospi_close", lambda db, d: 100.0)
     assert ewy_premium(_Db([]), date(2026, 10, 12), 10.0, "2026-10-12") == (None, None)
+
+
+def test_ewy_premium_reuses_weekend_ratio_when_fx_missing(monkeypatch):
+    """2026-10-19(월) 아침 — ECOS 가 막혀도 주말 아침 줄(같은 미장 세션 10/16 · 같은 기준 국장일 10/16)의 비율을 다시 써서
+    주말과 같은 괴리(−1.3%)를 낸다. 실제 운영 기록 그대로."""
+    monkeypatch.setattr(fkp, "ecos_fx_close", lambda d: None)
+    monkeypatch.setattr(fkp, "kospi_close", lambda db, d: None)
+    hist = [  # 최신이 앞(date desc) — 운영 kr_preview_day 그대로
+        {"date": "2026-10-18", "us_session": "2026-10-16", "ewy_ratio": 35.337694},
+        {"date": "2026-10-17", "us_session": "2026-10-16", "ewy_ratio": 35.337694},
+        {"date": "2026-10-16", "us_session": "2026-10-15", "ewy_ratio": 37.818706},
+        {"date": "2026-10-15", "us_session": "2026-10-14", "ewy_ratio": 35.597812},
+        {"date": "2026-10-14", "us_session": "2026-10-13", "ewy_ratio": 37.121269},
+        {"date": "2026-10-13", "us_session": "2026-10-12", "ewy_ratio": 35.574142},
+        {"date": "2026-10-12", "us_session": "2026-10-09", "ewy_ratio": 35.804143},
+        {"date": "2026-10-09", "us_session": "2026-10-08", "ewy_ratio": 35.612232},
+        {"date": "2026-10-08", "us_session": "2026-10-07", "ewy_ratio": 36.187786},
+    ]
+    ratio, prem = ewy_premium(_Db(hist), date(2026, 10, 16), 99.9, "2026-10-16")
+    assert ratio == pytest.approx(35.337694)
+    assert prem == pytest.approx(-1.3, abs=0.005)
+
+
+def test_same_basis_ratio_skips_rows_with_other_kr_close():
+    """미장만 쉰 날은 미장 세션이 같아도 기준 국장일이 달라(그 사이 국장이 열렸다) 비율을 다시 쓰지 않는다."""
+    rows = [{"date": "2026-10-16", "us_session": "2026-10-14", "ewy_ratio": 35.0}]  # 기준 국장일 10/15
+    assert fkp.same_basis_ratio(_Db(rows), date(2026, 10, 16), "2026-10-14") is None
+    assert fkp.same_basis_ratio(_Db(rows), date(2026, 10, 15), "2026-10-14") == pytest.approx(35.0)
 
 
 @pytest.mark.parametrize(
