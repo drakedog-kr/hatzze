@@ -46,6 +46,34 @@ export function allExceptTargets(except: readonly string[]): { path: string; typ
   return TOP_SEGMENTS.filter((s) => !except.includes(s)).map(segmentTarget);
 }
 
+/**
+ * 화면을 비운 시각을 적는 표(page_refresh · supabase/migration_105_page_refresh.sql)의 줄 이름(2026-10-18).
+ * 첫 줄 '업데이트' 라벨이 이 표를 읽는다(lib/refreshed-at.ts). 줄 이름은 비운 꼴 그대로다 — 경로 한 장(`/kadera`),
+ * 패턴(`/theme/[theme]`), 최상위 자리 아래 전부(`/kadera/*`), 전부(`*`).
+ */
+export const ALL_REFRESH_KEY = "*";
+
+/** 최상위 자리를 비운 줄 이름. 홈 · 파일 라우트는 그 한 장뿐이라 경로 그대로, 나머지는 그 아래 전부(`/kadera/*`). */
+export function segmentRefreshKey(seg: string): string {
+  return segmentTarget(seg).type === "layout" ? `${seg}/*` : seg;
+}
+
+/** `/api/revalidate` 한 번이 적는 줄 이름들 — 비우는 범위와 같다. */
+export function refreshKeys(parsed: { paths: readonly string[]; routes: readonly string[]; except?: readonly string[] }): string[] {
+  if (parsed.except) return TOP_SEGMENTS.filter((s) => !parsed.except!.includes(s)).map(segmentRefreshKey);
+  if (parsed.paths.length === 0 && parsed.routes.length === 0) return [ALL_REFRESH_KEY];
+  return [...new Set([...parsed.paths, ...parsed.routes])];
+}
+
+/**
+ * 화면 하나(라우트 `/kadera/us` · `/theme/[theme]` …)의 라벨이 보는 줄 이름 — 제 라우트 · 제 최상위 자리 · 전부.
+ * 셋 가운데 가장 늦은 시각이 그 화면을 마지막으로 비운 때다.
+ */
+export function labelRefreshKeys(route: string): string[] {
+  const top = route === "/" ? "/" : `/${route.split("/")[1]}`;
+  return [...new Set([route, segmentRefreshKey(top), ALL_REFRESH_KEY])];
+}
+
 /** 라우트 패턴 한 칸. 글자 칸(`theme`, `us`) 이거나 동적 칸(`[theme]`)이다. `[...slug]` · `[[...slug]]` 는 이 저장소에 없어 안 받는다. */
 const ROUTE_SEGMENT = /^(?:[A-Za-z0-9_.-]+|\[[A-Za-z0-9_]+\])$/;
 

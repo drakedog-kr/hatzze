@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
-import { allExceptTargets, parseRevalidatePaths } from "@/lib/revalidate-paths";
+import { allExceptTargets, parseRevalidatePaths, refreshKeys } from "@/lib/revalidate-paths";
 
 /**
  * 화면 사본(ISR)을 비운다. 파이프라인이 자료를 쓰고 나서 부른다
@@ -56,9 +56,50 @@ import { allExceptTargets, parseRevalidatePaths } from "@/lib/revalidate-paths";
  * 아무것도 안 하고 503 — 잠그지 않은 채 열어 두면 누구나 우리 캐시를 비워 함수 비용을
  * 올릴 수 있다.
  *
+ * ## 비운 시각을 적는다(2026-10-18)
+ *
+ * 비우기 **앞에** 비운 자리마다 지금 시각을 page_refresh 표에 적는다(supabase/migration_105_page_refresh.sql). 첫 줄
+ * '업데이트' 라벨이 그 값을 읽는다(lib/refreshed-at.ts). 처음엔 화면 조회 사본의 응답 시각을 라벨로 썼는데, 운영 Vercel 에선
+ * 배포 즈음에 그 사본이 다시 받아져 파이프라인이 안 돌았는데도 라벨이 바뀌었다(10-18 저녁 '오후 7시 30분'→'오후 8시').
+ * DB 값은 다음에 그 자리를 비울 때만 바뀐다. 적다가 실패해도 비우기는 그대로 한다 — 라벨만 앞 시각에 머문다.
+ *
  * ⚠️ 이 라우트 자체는 캐시되면 안 된다(force-dynamic). POST 라 어차피 안 되지만 명시한다.
  */
 export const dynamic = "force-dynamic";
+
+/**
+ * 비운 자리마다 지금 시각을 page_refresh 표에 적는다(줄 이름은 lib/revalidate-paths.ts refreshKeys).
+ * ⚠️ 비우기 **앞**이다 — 비운 뒤 처음 그리는 화면이 이 값을 읽어야 한다.
+ * ⚠️ 데이터 캐시를 안 타게 supabase-js(lib/supabase-server.ts 의 cachedFetch) 말고 PostgREST 를 바로 부른다.
+ */
+async function stampRefresh(keys: string[]): Promise<boolean> {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SECRET_KEY;
+  if (!url || !key || keys.length === 0) return false;
+  const at = new Date().toISOString();
+  try {
+    const res = await fetch(`${url}/rest/v1/page_refresh?on_conflict=target`, {
+      method: "POST",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify(keys.map((target) => ({ target, refreshed_at: at }))),
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) {
+      console.error(`[revalidate] page_refresh 를 못 적었습니다 — ${res.status} ${(await res.text()).slice(0, 200)}`);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("[revalidate] page_refresh 를 못 적었습니다", e);
+    return false;
+  }
+}
 
 export async function POST(req: Request) {
   const secret = process.env.REVALIDATE_SECRET;
@@ -85,19 +126,20 @@ export async function POST(req: Request) {
   if ("reason" in parsed) {
     return NextResponse.json({ ok: false, reason: parsed.reason }, { status: 400 });
   }
+  const stamped = await stampRefresh(refreshKeys(parsed));
   if (parsed.except) {
     // 이것만 빼고 전부 — 최상위 자리를 하나씩 비운다(lib/revalidate-paths.ts TOP_SEGMENTS).
     for (const t of allExceptTargets(parsed.except)) {
       if (t.type) revalidatePath(t.path, t.type);
       else revalidatePath(t.path);
     }
-    return NextResponse.json({ ok: true, revalidated: "all", except: parsed.except, at: new Date().toISOString() });
+    return NextResponse.json({ ok: true, revalidated: "all", except: parsed.except, stamped, at: new Date().toISOString() });
   }
   if (parsed.paths.length === 0 && parsed.routes.length === 0) {
     revalidatePath("/", "layout");
-    return NextResponse.json({ ok: true, revalidated: "/ (layout)", at: new Date().toISOString() });
+    return NextResponse.json({ ok: true, revalidated: "/ (layout)", stamped, at: new Date().toISOString() });
   }
   for (const path of parsed.paths) revalidatePath(path);
   for (const route of parsed.routes) revalidatePath(route, "page");
-  return NextResponse.json({ ok: true, revalidated: parsed.paths, routes: parsed.routes, at: new Date().toISOString() });
+  return NextResponse.json({ ok: true, revalidated: parsed.paths, routes: parsed.routes, stamped, at: new Date().toISOString() });
 }
