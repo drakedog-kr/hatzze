@@ -39,10 +39,19 @@ export function isLogoSize(n: number): n is LogoSize {
  * 그대로(NVDA·AAPL·TSM 실측).
  */
 export function logoTicker(code: string, market: string | null): string | null {
-  if (market === "KOSPI") return `${code}.KS`;
-  if (market === "KOSDAQ") return `${code}.KQ`;
+  if (market === "KOSPI") return `${commonShareCode(code)}.KS`;
+  if (market === "KOSDAQ") return `${commonShareCode(code)}.KQ`;
   if (market === "US") return code.toUpperCase();
   return null;
+}
+
+/**
+ * 우선주는 보통주 로고를 쓴다. 종목코드는 끝자리만 다르다(005935 → 005930 · 37550K → 375500). 국장 2,787종목 가운데 끝자리가
+ * 0 이 아닌 114개는 모두 우선주였고, 보통주가 같은 시장에 있었다(2026-10-19). logo.dev 에 우선주 티커가 없는 곳은 배지가 됐고
+ * (NH투자증권우 · 금호석유화학우 등 18), 보통주에 둔 손 보충(상자 · 홈페이지 그림)도 우선주에는 가지 않았다.
+ */
+export function commonShareCode(code: string): string {
+  return /^[0-9A-Z]{5}[1-9A-Z]$/.test(code) ? `${code.slice(0, 5)}0` : code;
 }
 
 /** 라우트가 받아 주는 티커 꼴. 대문자·숫자·점·하이픈으로 12자까지(BRK.B · BF-B 도 든다). */

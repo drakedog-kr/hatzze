@@ -44,6 +44,14 @@ describe("logoTicker", () => {
     assert.equal(logoTicker("247540", "KOSDAQ"), "247540.KQ");
     assert.equal(logoTicker("nvda", "US"), "NVDA");
   });
+  it("우선주는 보통주 티커로 묻는다(끝자리만 다르다)", () => {
+    assert.equal(logoTicker("005935", "KOSPI"), "005930.KS");
+    assert.equal(logoTicker("37550K", "KOSPI"), "375500.KS");
+    assert.equal(logoTicker("0220WL", "KOSPI"), "0220W0.KS");
+    assert.equal(logoTicker("002787", "KOSPI"), "002780.KS");
+    assert.equal(logoTicker("0001A0", "KOSDAQ"), "0001A0.KQ");
+    assert.equal(logoTicker("BRK.B", "US"), "BRK.B");
+  });
   it("시장을 모르면 요청하지 않는다(null)", () => {
     assert.equal(logoTicker("005930", null), null);
     assert.equal(logoTicker("005930", ""), null);
