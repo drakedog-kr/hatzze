@@ -31,7 +31,7 @@ US_THEMES: dict[str, list[str]] = {
     "AI반도체": [
         "NVDA", "AMD", "AVGO", "TSM", "ARM", "MRVL", "QCOM", "INTC",
         "ALAB", "MPWR", "ON", "NXPI", "TXN", "SWKS", "QRVO", "NVTS",
-        "WOLF", "TSEM", "CBRS", "CRDO",
+        "WOLF", "TSEM", "CBRS", "CRDO", "GFS",
     ],
     # 메모리를 AI반도체에서 떼어 낸 건 **국내 투자자에게 이게 별개의 이야기**라서다.
     # 마이크론·샌디스크 얘기는 곧 삼성전자·SK하이닉스 얘기로 이어진다.
@@ -45,7 +45,7 @@ US_THEMES: dict[str, list[str]] = {
     # 아래 전력·원자력 테마와 같이 움직이는 일이 잦다.
     "AI 인프라·클라우드": [
         "ORCL", "PLTR", "CRWV", "NBIS", "SMCI", "DELL", "ANET", "VRT",
-        "IREN", "WULF", "EQIX", "DLR", "IBM", "CSCO", "NOK",
+        "IREN", "WULF", "EQIX", "DLR", "IBM", "CSCO", "NOK", "NTAP", "APLD",
     ],
     "소프트웨어": [
         "CRM", "NOW", "ADBE", "SNOW", "DDOG", "NET", "PANW", "CRWD",
@@ -83,7 +83,7 @@ US_THEMES: dict[str, list[str]] = {
         "KO", "WMT", "COST", "SBUX", "MCD", "NKE", "CMG", "PEP", "PM",
         "DIS", "DKNG", "ORLY", "DECK", "LUV", "DHI", "PLD", "WELL",
         "CPNG", "MELI", "URI", "ABNB", "BKNG", "CAT", "VZ",
-        "HD", "BBY", "DLTR", "EBAY", "LULU", "KR", "CCL",
+        "HD", "BBY", "DLTR", "EBAY", "LULU", "KR", "CCL", "SPOT",
     ],
     "에너지·원자재": ["XOM", "CVX", "KMI", "VLO", "FCX", "NEM", "NUE", "ALB"],
     # 아직 작지만(합쳐 170회) 뜰 때 한꺼번에 뜨는 묶음이라 따로 둔다.
