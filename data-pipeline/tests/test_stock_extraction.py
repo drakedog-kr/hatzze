@@ -1043,3 +1043,48 @@ def test_formfactor_company_stays(us_tagger, text):
 def test_eton_pharma_is_not_eaton(us_tagger):
     assert "ETN" not in us_tagger("제목 : 이턴 파머슈티컬스, 2분기 매출 99% 급증…연간 전망치 상향")
     assert "ETN" in us_tagger("전력기기 강세. 이턴(+2.1%) · 버티브(+3.4%)")
+
+
+# ── 2026-10-19: CS(065770) ← 괄호 속 약어 풀이 · 고객 응대 · 강재 표기 · 미국 회사 기사(이슈 #775) ─────────
+# 사례는 전 기간 코퍼스의 실제 문장이다. 근거와 수치는 config/stock_extraction.py 의 HOMONYM_CUES["CS"] 주석.
+
+
+def _cs(text: str) -> set[str]:
+    match_to_code = {"CS": "065770"}
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = set(match_to_code) & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, {"CS": "dict"}, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "•증권업계는 AI 자본지출이 기업 이익 성장의 핵심 동력이며, 글로벌 CS)의 투자 확대가 지속되고 있다고 분석.",
+        "medicube(에이피알)는 인지도 대비 광고 피로·기기 CS 불만이 부담.",
+        "과거 SVB 파산, 레고랜드 사태, 크레디트스위스(CS) AT1 전액 상각 사례에서 보듯",
+        "심지어 고객 센터(CS)를 두지 않아도 사용자들이 알아서 찾아옵니다.",
+        "셀룰로오스 스페셜티(CS) 평균 판매 가격이 전년 동기 대비 21% 상승하며 실적을 이끌었다.",
+        "계약내용 : COLUMS/HEAVT WALL DRUM(CS,SS,CLAD) 공급계약 계약상대 : JGC Fluor BC LNG",
+        "제목 : CS 디스코, 2분기 매출 13% 증가한 4310만 달러…순손실 축소 *이데일리FX*",
+        "제목 : 올레녹스 인더스트리즈, 비트코인 채굴업체 인수 후 2분기 매출 194% 급증 *이데일리FX* CS 디지털 벤처스 인수",
+    ],
+)
+def test_cs_other_meanings_are_not_the_stock(text):
+    assert _cs(text) == set()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "알엔투테크놀로지 -5 / -17 / -11 CS -1 / -23 / -12 이노인스트루먼트 0 / 0 / -3",
+        "2) 윤성에프앤씨 (29.99% / 0억) 3) CS (29.98% / 16억) 4) 비큐AI (29.93% / 30억)",
+        "관련주 : 대한광통신, 기가레인, 케이엠더블유, 이노인스트루먼트, CS, 쏠리드, 우리로, RFHIC",
+        "(코스닥)CS - 단일판매ㆍ공급계약체결(자율공시)",
+        "CS(065770) 단일판매ㆍ공급계약체결  기간대비(%) : 5.36",
+        "알멕(+15.79%) 북미 우주항공 사업 확대 · CS(+18.89%) 해외 중계기와 CCTV 사업 추진",
+        "상장폐지 절차 유예 속 상한가  CS (065770) (+29.97%)",
+        "49. 에스아이리소스 추가상장(유상증자) 50. CS 추가상장(유상증자)",
+    ],
+)
+def test_cs_stock_mentions_survive(text):
+    assert _cs(text) == {"065770"}
