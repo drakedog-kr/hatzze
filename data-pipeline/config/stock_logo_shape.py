@@ -46,6 +46,7 @@ CROP_OVERRIDE: dict[str, list[float]] = {
     "007980": [],  # 태평양물산 — TP 두 글자(자동은 T 만 자른다)
     "020560": [0.8125, 0.3203, 0.1484, 0.1484],  # 아시아나항공 — 빨간 날개(ASIANA AIRLINES 글자는 칸에서 못 읽는다)
     "060370": [0.1035, 0.4121, 0.3398, 0.1445],  # LS마린솔루션 — LS
+    "060720": [0.2969, 0.3301, 0.416, 0.3105],  # KH바텍 — 큰 글자 KH(KH VATEC 전체는 칸에서 못 읽는다)
     "099220": [],  # SDN
     "257720": [0.6875, 0.4258, 0.1621, 0.1504],  # 실리콘투 — 빨간 2(SILICON 글자는 칸에서 못 읽는다)
     "281740": [0.123, 0.4258, 0.168, 0.1504],  # 레이크머티리얼즈 — 부채꼴 심볼(가는 선이라 자동 흐림 거름에 걸린다)
@@ -129,6 +130,8 @@ CROP_OVERRIDE: dict[str, list[float]] = {
 
 OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
     "002140": ("http://www.hafeed.co.kr/images/common/logo_hafeed_gray.png", [0, 0, 0.3913, 0.9556]),  # 고려산업 — 해피드 웃는 얼굴(logo.dev 에 없다)
+    "006340": ("http://www.daewoncable.co.kr/images/common/logo.png", [0, 0, 0.1628, 1]),  # 대원전선 — 빨간 두 고리(logo.dev 에 없다)
+    "317400": ("http://www.xisnd.com/resource/frontend/images/logo1.png", [0, 0, 0.3609, 1]),  # 자이에스앤디 — XI(logo.dev 에 없다)
     "003160": ("http://www.di.co.kr/images/common/h1_logo.gif", [0.455, 0.2, 0.322, 0.5467]),  # 디아이 — 'INSIGHT DI' 에서 DI 와 점 심볼
     "009190": ("http://www.daiyangmetal.com/korean/img/logo_mini.png", [0, 0, 0.2404, 1]),  # 대양금속 — 파란 원형 심볼(logo.dev 에 없다)
     "006110": ("https://www.sama-al.com/kor/img_sns_sama.png", [0.25, 0, 0.5, 1]),  # 삼아알미늄 — 남색 네모 SAMA(logo.dev 는 흐림)
