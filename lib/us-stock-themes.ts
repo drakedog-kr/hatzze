@@ -30,11 +30,11 @@ export function themesForTicker(ticker: string): string[] {
 }
 
 export const US_THEMES: Record<string, string[]> = {
-  "AI반도체": ["NVDA", "AMD", "AVGO", "TSM", "ARM", "MRVL", "QCOM", "INTC", "ALAB", "MPWR", "ON", "NXPI", "TXN", "SWKS", "QRVO", "NVTS", "WOLF", "TSEM", "CBRS", "CRDO"],
+  "AI반도체": ["NVDA", "AMD", "AVGO", "TSM", "ARM", "MRVL", "QCOM", "INTC", "ALAB", "MPWR", "ON", "NXPI", "TXN", "SWKS", "QRVO", "NVTS", "WOLF", "TSEM", "CBRS", "CRDO", "GFS"],
   "메모리": ["MU", "SNDK", "WDC", "STX"],
   "반도체 장비·소재": ["ASML", "LRCX", "KLAC", "AMAT", "TER", "FORM", "AMKR", "COHR", "LITE", "GLW", "SNPS", "CDNS", "CLS", "CIEN"],
   "빅테크": ["GOOGL", "AMZN", "AAPL", "META", "MSFT", "NFLX"],
-  "AI 인프라·클라우드": ["ORCL", "PLTR", "CRWV", "NBIS", "SMCI", "DELL", "ANET", "VRT", "IREN", "WULF", "EQIX", "DLR", "IBM", "CSCO", "NOK"],
+  "AI 인프라·클라우드": ["ORCL", "PLTR", "CRWV", "NBIS", "SMCI", "DELL", "ANET", "VRT", "IREN", "WULF", "EQIX", "DLR", "IBM", "CSCO", "NOK", "NTAP", "APLD"],
   "소프트웨어": ["CRM", "NOW", "ADBE", "SNOW", "DDOG", "NET", "PANW", "CRWD", "TEAM", "APP", "TTD", "RDDT", "RBLX", "SHOP", "ZBRA", "APH", "OKTA", "WDAY", "INTU", "ZS", "MDB"],
   "전기차·자율주행": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "STLA", "UBER", "CVNA", "LI", "APTV"],
   "전력·원자력": ["SMR", "OKLO", "CEG", "VST", "NRG", "NEE", "GEV", "PWR", "ETN", "CCJ", "HON", "FSLR", "ENPH", "BE"],
@@ -42,7 +42,7 @@ export const US_THEMES: Record<string, string[]> = {
   "바이오·헬스케어": ["LLY", "MRNA", "NVO", "MRK", "PFE", "ABBV", "AZN", "NVS", "JNJ", "UNH", "ISRG", "MDGL", "CVS", "CAH", "AMGN", "MDT", "EVMN"],
   "금융": ["GS", "JPM", "MS", "BAC", "BRK", "BX", "SCHW", "MA", "AXP", "PYPL", "SOFI", "UPST", "C", "WFC"],
   "가상자산": ["COIN", "MSTR", "CRCL", "GLXY", "CLSK", "RIOT", "CIFR", "HOOD"],
-  "소비재·유통": ["KO", "WMT", "COST", "SBUX", "MCD", "NKE", "CMG", "PEP", "PM", "DIS", "DKNG", "ORLY", "DECK", "LUV", "DHI", "PLD", "WELL", "CPNG", "MELI", "URI", "ABNB", "BKNG", "CAT", "VZ", "HD", "BBY", "DLTR", "EBAY", "LULU", "KR", "CCL"],
+  "소비재·유통": ["KO", "WMT", "COST", "SBUX", "MCD", "NKE", "CMG", "PEP", "PM", "DIS", "DKNG", "ORLY", "DECK", "LUV", "DHI", "PLD", "WELL", "CPNG", "MELI", "URI", "ABNB", "BKNG", "CAT", "VZ", "HD", "BBY", "DLTR", "EBAY", "LULU", "KR", "CCL", "SPOT"],
   "에너지·원자재": ["XOM", "CVX", "KMI", "VLO", "FCX", "NEM", "NUE", "ALB"],
   "양자컴퓨팅": ["IONQ", "QBTS", "RGTI"],
   "중국": ["BABA", "BIDU", "PDD", "JD"],
