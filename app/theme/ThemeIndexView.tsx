@@ -282,6 +282,20 @@ export function ThemeIndexView({
                 );
               })}
             </ol>
+            {/* 종목 칸 자 — 아래 급부상 표의 종목 칸(로고 · 이름 · 태그)과 같은 글을 보이지 않게 깔아 테마 칸이 그만큼 넓어진다.
+                아래 표 종목 칸이 긴 이름 따라 넓어지는 날에도 '요즘 도는 얘기'와 '채널이 말한 이유'가 한 세로선에서 시작한다(2026-10-19).
+                넓은 화면(1,000 이상)에서만 쓴다 — 그 아래는 문장이 둘째 층이라 맞출 선이 없다(v2.css .v2-tm-flowsizer). */}
+            {risers?.length ? (
+              <div className="v2-tm-flowsizer" aria-hidden="true">
+                {risers.map((r) => (
+                  <span key={r.theme} className="v2-td-stock">
+                    <i />
+                    <span className="v2-td-name">{r.name}</span>
+                    <span className="hz-theme-tag">{riserDelta(r)}</span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
         )}
       </Module>
