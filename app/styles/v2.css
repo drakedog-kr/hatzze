@@ -2120,9 +2120,21 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-td-date { margin-left: 6px; font-style: normal; font-size: var(--fs-11); color: var(--t-ink3); white-space: nowrap; }
 
 /* 테마별 급부상 종목 — 테마 · 종목(태그) · 요즘 도는 얘기 · 언급(그 전). 테마 흐름과 같은 이름 → 문장 → 숫자 차례. */
-/* 테마 칸 104 — 96 이면 'AI 인프라·클라우드'가 한 글자만 꺾였다(2026-10-08 점검). 종목 칸은 실측 최대 207 이라 252 로 충분하다. */
-.v2-tm-risertbl .v2-tr { grid-template-columns: 20px 104px 220px minmax(0, 1fr) 88px; min-height: 44px; }
-/* 순위 칸 20 — 바로 위 '테마 흐름' 표와 테마 이름 세로선이 32px 어긋났다(2026-10-13 점검). 종목 칸 220 은 실제로 쓰는 최대 216 보다 넓다. */
+.v2-tm-risertbl .v2-tr { min-height: 44px; }
+/* 표 한 장이 한 격자 — 머리 줄 · 줄은 subgrid 라 종목 칸이 가장 긴 줄(로고 · 이름 · 태그)만큼 넓어지고 칸 선은 줄마다 같다.
+   220 에 못박았을 땐 'HD현대에너지솔루션 · 앞 3일보다 +67%'(243)가 이름 두 줄로 꺾였다(2026-10-19). 다 들어가는 날은 220 그대로.
+   상한 288 = 사전에서 가장 긴 줄('LIG디펜스앤에어로스페이스 · 앞 3일보다 +199%' 285) — 넘는 이름만 칸 안에서 감긴다.
+   첫 칸 34 · 끝 칸 102 는 줄 안쪽 14 를 품은 값이다(subgrid 줄의 안쪽 여백이 첫 · 끝 칸을 먹는다) — 실폭 20(순위) · 88(언급).
+   테마 칸 104 — 96 이면 'AI 인프라·클라우드'가 한 글자만 꺾였다(2026-10-08 점검).
+   순위 칸 20 — 바로 위 '테마 흐름' 표와 테마 이름 세로선이 32px 어긋났다(2026-10-13 점검). 폰(679 이하)은 줄마다 두 층이라 격자를 안 나눈다. */
+@container kd (min-width: 680px) {
+  .v2-tm-risertbl { display: grid; grid-template-columns: 34px 104px minmax(220px, max-content) minmax(0, 1fr) 102px; column-gap: 12px; }
+  .v2-tm-risertbl > .v2-tr,
+  .v2-tm-risertbl > .v2-tbody,
+  .v2-tm-risertbl .v2-tbody > li,
+  .v2-tm-risertbl .v2-tbody > li > .v2-tr { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; }
+  .v2-tm-risertbl .v2-td-stock { max-width: 288px; }
+}
 .v2-tm-risertbl .v2-td-theme { word-break: keep-all; }
 .v2-tm-risertbl .v2-tr:hover { background: none; }
 /* 순위 칸이 앞에 서서 문장 머리('채널이 말한 이유')가 넷째다 — 공통 규칙(넷째부터 숫자 · 오른쪽)을 되돌린다. */
@@ -2357,7 +2369,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-tm-flowtbl .v2-td-share { grid-area: share; }
   .v2-tm-flowtbl .v2-td-flow2 { grid-area: flow; }
   .v2-tm-flowtbl .v2-td-text { grid-area: text; margin-top: 0; }
-  .v2-tm-risertbl .v2-tr { grid-template-columns: 20px 88px 220px minmax(0, 1fr) 80px; }
+  .v2-tm-risertbl { grid-template-columns: 34px 88px minmax(220px, max-content) minmax(0, 1fr) 94px; }
   .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px minmax(0, 1fr) 80px 64px 72px; }
   .v2-tm-days.no-close .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px minmax(0, 1fr) 72px 72px; }
 }
