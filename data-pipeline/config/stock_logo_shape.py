@@ -162,6 +162,227 @@ OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
     "317240": ("https://tstrillion.co.kr/wp-content/uploads/2023/08/cropped-logo-192x192.png", None),  # TS트릴리온
     "333430": ("http://www.ilseung.co.kr/_public/images/common/logo3.png", None),  # 일승
     "356860": ("https://www.tlbpcb.com/img/favicon_144.png", None),  # 티엘비
+    # 2026-10-19 — logo.dev 에 없는 종목(배지)을 홈페이지 그림으로 채웠다. 옛 이름 · 제품 · 다른 회사 이름이 적힌 로고와 호스팅 기본 그림은 뺐다.
+    "0001A0": ("https://www.dyenergen.com/favicon-152.png", [0, 0, 1, 1]),  # 덕양에너젠
+    "000590": ("http://www.chosunwelding.com/kr/images/logo.gif", None),  # CS홀딩스
+    "000650": ("https://www.chunilexpress.com/images/main/logo.jpg", [0, 0, 0.14, 1]),  # 천일고속
+    "000950": ("http://www.chonbang.co.kr/wp-content/uploads/2020/09/logo_top.png", None),  # 전방
+    "001080": ("http://www.manhorope.com/images/common/logo.gif", None),  # MH머트리얼즈
+    "0010F0": ("http://www.bowonchem.co.kr/image/logo.png?v=2", None),  # 보원케미칼
+    "001380": ("http://www.sgglobal.co.kr/images/logo.gif", [0, 0, 1, 1]),  # SG글로벌
+    "001840": ("http://www.ee-hwa.co.kr/2010/images/eehwa/eehwa_logo.PNG", None),  # 이화공영
+    "001940": ("https://www.kiscoholdings.co.kr/holdings/_Img/Layout/logo_c.png", None),  # KISCO홀딩스
+    "002030": ("https://www.asiaholdings.co.kr/skin/default/img/common/top_logo.png", [0, 0, 1, 1]),  # 아세아
+    "002680": ("http://www.hantop.com/image/head/logo.png", [0, 0, 1, 1]),  # 한탑
+    "002870": ("http://spinc.co.kr/images/sns_link.png", None),  # 신풍
+    "003480": ("http://www.hhic-holdings.com/html/images/common/logo.gif", None),  # 한진중공업홀딩스
+    "003580": ("http://hlb.softjs.kr/logo.png", [0, 0, 1, 1]),  # HLB글로벌
+    "003780": ("https://www.cyc1963.com/theme/m/img/logo.png", None),  # 진양산업
+    "004080": ("https://www.shinhung.co.kr/images/head/logo.png", [0, 0, 1, 1]),  # 신흥
+    "004650": ("http://www.chethanol.com/homek/assets/images/common/logo.png", None),  # 창해에탄올
+    "005820": ("http://www.wonlim.co.kr/file/logo.jpg", None),  # 원림
+    "005860": ("http://hanilfeed.com/wp-content/uploads/2019/08/logo_s.png", None),  # 한일사료
+    "006140": ("http://pjes.kjhhkh.gethompy.com/wp-content/uploads/2018/02/asgahjki.png", None),  # 피제이전자
+    "006910": ("https://www.bosungpower.co.kr/images/main/flogo.jpg", None),  # 보성파워텍
+    "007770": ("http://www.hanzinc.com/new/images/common/logo.png", None),  # 한일화학
+    "008420": ("http://www.moonbaesteel.co.kr/asset/img/mb/mb_logo_new.png", None),  # 문배철강
+    "009310": ("http://www.charmeng.com/img/common/logo.png", None),  # 참엔지니어링
+    "009460": ("https://www.hanchangpaper.co.kr/img/logo_up.png", None),  # 한창제지
+    "009520": ("https://www.poscomtech.com/resources/images/common/footer-logo.png", [0, 0, 1, 0.4231]),  # 포스코엠텍
+    "009780": ("http://www.msckorea.com/_img/msc_logo1.png", [0, 0, 1, 1]),  # 엠에스씨
+    "010100": ("https://www.koreamovenex.com/image/common/logo_on_n.png", [0, 0, 1, 1]),  # 한국무브넥스
+    "010470": ("https://www.oricom.com/common/images/logo.gif", [0, 0, 1, 1]),  # 오리콤
+    "010640": ("https://www.chinyangpoly.kr/img/main/logo.jpg", None),  # 진양폴리
+    "011040": ("https://www.kdpharma.co.kr/img/common/2024_redesign_logo_1.png", None),  # 경동제약
+    "012160": ("http://www.youngwire.com/kor/images/common/logo2.jpg", [0.0609, 0, 0.4213, 1]),  # 영흥
+    "012210": ("http://www.sammimetal.com/images/common/logo_Sammi.jpg", None),  # 삼미금속
+    "012320": ("https://www.kdinvest.co.kr/images/logo.jpg", None),  # 경동인베스트
+    "012700": ("https://www.leadcorp.co.kr/logo192.png", [0, 0, 1, 1]),  # 리드코프
+    "012790": ("https://www.sinilpharm.com/images/ci.png", None),  # 신일제약
+    "013030": ("https://www.hy-lok.com/img/logo.png", [0, 0, 1, 1]),  # 하이록코리아
+    "013700": ("http://www.camusenc.com/files/attach/xeicon/mobicon.png", [0, 0, 1, 1]),  # 까뮤이앤씨
+    "014470": ("http://www.bubang.com/img/common/top_ci_black.png", None),  # 부방
+    "015020": ("http://www.e-starco.co.kr/img/main_logo.gif", None),  # 이스타코
+    "016250": ("https://sgcenc.co.kr/images/nav/new_logo2.png", [0, 0, 1, 1]),  # SGC E&C
+    "016580": ("https://whanin.com/_theme/basic/img/ci.png", None),  # 환인제약
+    "016740": ("https://www.idual.co.kr/theme/basic/img/layout/logo-b.png", [0, 0, 1, 1]),  # 두올
+    "017480": ("https://www.samsteel.co.kr/images/inc/copy_logo.gif", [0, 0, 1, 1]),  # 삼현철강
+    "017650": ("http://www.daelimpaper.co.kr/images/header/logo.png", None),  # 대림제지
+    "017860": ("https://www.dsdansuk.com/include/images/logo_new.png", None),  # DS단석
+    "017900": ("https://www.auk.co.kr/img/logo.png", None),  # 광전자
+    "019010": ("http://www.venueg.com/images/common/logo.png", [0, 0, 1, 1]),  # 베뉴지
+    "019550": ("https://www.sbik.co.kr/common/images/common/main_logo.gif", None),  # SBI인베스트먼트
+    "021050": ("http://www.swbrass.co.kr/kor/images/common/logo.gif", None),  # 서원
+    "021320": ("https://www.kccworld.net/images/common/logo.png", None),  # KCC건설
+    "021650": ("https://cubic.co.kr:443/common/img_kr/main/flogo.png", [0, 0, 1, 1]),  # 한국큐빅
+    "023000": ("http://www.samwon-steel.co.kr/common/img/logo.gif", None),  # 삼원강재
+    "023910": ("https://www.daihan.com/images/inc/t_logo.png", None),  # 대한약품
+    "024800": ("https://www.yoosungtns.co.kr/home/tns/base/img/logo_intro_menu.png", None),  # 유성티엔에스
+    "025530": ("http://www.sjmholdings.co.kr/images/logo3_2025.gif", [0, 0, 1, 1]),  # SJM홀딩스
+    "025890": ("https://www.hascokorea.co.kr:443/images/top_logo.png", None),  # 한국주강
+    "026150": ("https://www.tuksu.co.kr/home/img/logo.jpg", [0, 0, 0.29, 1]),  # 특수건설
+    "027710": ("http://www.dodrambnf.co.kr/html/images/main_logo_2.png", None),  # 팜스토리
+    "029460": ("https://www.kct.co.kr/img/logo.png", None),  # 케이씨
+    "030960": ("http://yangjisa.com/eng/images/header/h_logo.png", None),  # 양지사
+    "032500": ("https://www.kmwinc.com/img/footer_logo.jpg", [0, 0, 1, 1]),  # 케이엠더블유
+    "033200": ("https://www.moatech.co.kr/hd/top_menu/logo_bk.png", [0, 0, 1, 1]),  # 모아텍
+    "033320": ("https://www.jchyun.com/Common/img/LOGO_D.png", None),  # 제이씨현시스템
+    "034810": ("https://www.haesungind.co.kr/images/front/ko/web/img_logo.png", None),  # 해성산업
+    "035200": ("http://www.plumbfast.co.kr/file/img/s_img/logo.gif", None),  # 프럼파스트
+    "035810": ("https://www.easyholdings.co.kr/img/logo_main_200605.png", None),  # 이지홀딩스
+    "036120": ("https://www.sci.co.kr/images/common/sci-og.png", None),  # 서울평가정보
+    "036480": ("https://dsmbio.com/wp-content/uploads/2026/07/cropped-favicon-180x180.png", [0, 0, 1, 1]),  # 대성미생물
+    "036560": ("https://www.kzpc.co.kr/img/common/ft_logo_2.png", None),  # KZ정밀
+    "036710": ("https://www.simmtechholdings.co.kr/skin/images/gnb/holdings_logo.png", None),  # 심텍홀딩스
+    "037230": ("https://www.hkpak.co.kr/img/logo_active.png", None),  # 한국팩키지
+    "037330": ("https://www.inzidisplay.co.kr/img/common/og_img.jpg", [0, 0, 1, 1]),  # 인지디스플레
+    "039310": ("https://www.sejoong.com/_img/comn/logo.gif", [0, 0, 1, 1]),  # 세중
+    "039340": ("https://img.wownet.co.kr/wownet20/front/images/static/logo.png", [0, 0, 1, 1]),  # 한국경제TV
+    "039560": ("https://www.dasannetworks.com/images/sns_link.png", None),  # 다산네트웍스
+    "040350": ("https://www.curocom.com/images/logo/creosg.png", None),  # 크레오에스지
+    "040610": ("http://www.sgng.com/img/logo_on.png", [0, 0, 1, 1]),  # SG&G
+    "041190": ("https://www.wooricapital.co.kr/img/common/nav_logo.png", [0.083, 0.0556, 0.2988, 0.8333]),  # 우리기술투자
+    "041460": ("https://www.crosscert.com/images/logo_bottom.gif", [0.2845, 0, 0.1724, 1]),  # 한국전자인증
+    "041520": ("https://www.elckor.com/uploads/dropzone/2026/08/b151887f8f5328e8af1784685f3e8c52.png", None),  # 이엘씨
+    "041910": ("https://www.polarisaipharma.com/ko/front/image/common/logo.png", None),  # 폴라리스AI파마
+    "044180": ("https://www.kdcon.co.kr/images/main/menu_on_logo.png", [0, 0, 1, 1]),  # KD
+    "044990": ("https://www.hnshightech.com/img/logo.png", [0, 0, 1, 1]),  # 에이치엔에스하이텍
+    "046120": ("https://www.orbitech.co.kr/images/common/logo-footer.png", [0, 0, 1, 1]),  # 오르비텍
+    "046940": ("https://www.woowonerd.com/new/common/images/title/ci.jpg", None),  # 우원개발
+    "047820": ("https://chorokbaem.com/design/ko/images/newimg/t_logo.jpg", None),  # 초록뱀미디어
+    "048410": ("https://cdn.imweb.me/thumbnail/20260122/bb52def5a2e38.png", [0, 0, 1, 1]),  # 현대바이오
+    "049120": ("https://www.finednc.com/m/img/logo.png", [0, 0, 1, 1]),  # 파인디앤씨
+    "049520": ("https://www.e-uil.com/images/main/logo.png", None),  # 유아이엘
+    "049630": ("https://www.jysolutec.com/common/img/layout/logo.png", [0, 0, 1, 1]),  # 재영솔루텍
+    "050120": ("http://www.escube.co.kr/images/main/head_logo.png", None),  # ES큐브
+    "051490": ("https://www.naramnd.com/kor/image/layout/toplogo.jpg", None),  # 나라엠앤디
+    "051780": ("https://www.curoholdings.com/images/logo/top_logo.png", [0, 0, 1, 1]),  # 큐로홀딩스
+    "052300": ("https://www.oceaninw.co.kr/shh1/images/logo.jpg", [0, 0, 1, 1]),  # 오션인더블유
+    "052900": ("http://kxhitech.com/theme/business/extend/sections/header/kmhhitech_header2/img/logo-b.png", [0, 0, 1, 1]),  # KX하이텍
+    "054040": ("http://www.kci.co.kr/project/design/lnb/h_ci.png", None),  # 한국컴퓨터
+    "054090": ("https://samjin.co.kr/favicon.png", [0, 0, 1, 1]),  # 삼진엘앤디
+    "054210": ("https://www.elentec.co.kr/ko/images/logo.png", None),  # 이랜텍
+    "054300": ("https://www.heshbon.com/files/attach/images/19295/8cc051055c38228ff14820daed3332ca.png", None),  # 팬스타엔터프라이즈
+    "054940": ("https://www.exaenc.com/theme/basic/images/logo.png", [0, 0, 1, 1]),  # 엑사이엔씨
+    "057680": ("https://delete.or.kr/img/new_logo_LR.png", None),  # 티사이언티픽
+    "058400": ("https://www.knn.co.kr/images/logo_knn.png", [0, 0, 1, 1]),  # KNN
+    "060540": ("https://www.satech.co.kr/images/logo.jpg", None),  # 에스에이티
+    "060560": ("https://www.hchomecenter.co.kr/images/logo.gif?20170331", [0.014, 0.1556, 0.2651, 0.6889]),  # HC홈센타
+    "064820": ("https://cape.co.kr/images/favicon.png", [0, 0, 1, 1]),  # 케이프
+    "065130": ("https://www.topengnet.com/common/images/logo.png", None),  # 탑엔지니어링
+    "065530": ("https://www.wiable.co.kr/images/common/logo.png", None),  # 와이어블
+    "065770": ("https://cs-holdings.co.kr/wp-content/uploads/2020/08/logo.png", None),  # CS
+    "067170": ("http://www.autech.co.kr/img/logo_simbol.png", [0, 0, 1, 1]),  # 오텍
+    "067570": ("https://www.nvhkorea.com/Images/footer_logo.png", [0, 0, 1, 1]),  # 엔브이에이치코리아
+    "067630": ("https://www.hlb-ls.com/include/images/common/logo.png", [0, 0, 0.5272, 1]),  # HLB생명과학
+    "067730": ("http://www.logisys.co.kr/static/images/logisys_logo.jpg", [0.1167, 0.2794, 0.2167, 0.4559]),  # 로지시스
+    "067770": ("http://www.sejints.co.kr/img/Common/logo.png", None),  # 세진티에스
+    "067900": ("http://www.y-entec.co.kr/wp-content/uploads/2020/07/logo_footer.png", [0, 0, 0.32, 1]),  # 와이엔텍
+    "069330": ("http://www.uidkorea.co.kr/file/img/s_img/logo.png", None),  # 유아이디
+    "069510": ("https://www.estec.co.kr/kr/_Img/logo.png", None),  # 에스텍
+    "073010": ("http://www.kspvalve.com/images/common/logo_kumkang.png", None),  # 케이에스피
+    "075970": ("https://www.dkref.co.kr/img/m_logo.png", [0.006, 0, 0.4167, 1]),  # 동국알앤에스
+    "077360": ("https://www.dshm.co.kr/images/logo.png", [0.1361, 0, 0.355, 1]),  # 덕산하이메탈
+    "081150": ("http://www.tplex.co.kr/images/common/f_logo.png", [0, 0, 1, 1]),  # 티플랙스
+    "083930": ("http://www.avaco.co.kr/pages/layout/A_layout/A_type/images/common/m_logo.png", [0, 0, 1, 1]),  # 아바코
+    "086670": ("https://www.superlok.com/kr/_Img/Intro/intro_logo.png", None),  # 비엠티
+    "088390": ("http://www.innoxcorp.com/img/common/logo.png", [0, 0, 1, 1]),  # 이녹스
+    "089470": ("https://www.hdc-hyundaiep.com/assets/user/img/common/HDCEP-logo.png", [0, 0, 0.5736, 1]),  # HDC현대EP
+    "089790": ("https://www.jtcorp.co.kr/img/logo.png?var", [0, 0, 1, 1]),  # 제이티
+    "089970": ("https://www.vmsemi.com/kor/img/ci.jpg", [0, 0, 1, 1]),  # 브이엠
+    "090370": ("https://www.metalabs.co.kr/new/kor/images/logo_.png", [0, 0, 0.2241, 1]),  # 메타랩스
+    "092070": ("https://www.dnfsolution.com/html_new/images/layout/logo_on.png", [0, 0, 1, 1]),  # 디엔에프
+    "092130": ("https://www.ecredible.co.kr/images/common/icon-512.png", [0, 0, 1, 1]),  # 이크레더블
+    "092230": ("https://kpxholdings.com:443/_public/images/main/main_logo_kpxch.jpg", None),  # KPX홀딩스
+    "095270": ("https://wavetc.com/wp-content/uploads/2024/09/logo.png", [0, 0, 1, 1]),  # 웨이브일렉트로
+    "097780": ("http://ecovoltdynamics.co.kr/images/common/h1_logo_1.jpg", None),  # 에코볼트
+    "099520": ("http://www.itxai.com/KR/images/logo_dg-itx.png", [0, 0, 1, 1]),  # DGI
+    "100660": ("https://www.smiltd.co.kr/wp_images/logo.gif", [0, 0, 1, 1]),  # 서암기계공업
+    "104700": ("https://www.kisco.co.kr/kor/_Img/Layout/logo_c.png", None),  # 한국철강
+    "104830": ("https://www.wimco.co.kr/views/_layout/bootstrap/images/header/logo.png", None),  # 원익머트리얼즈
+    "105330": ("http://www.knwkorea.com/images/common/logo.gif", [0, 0, 1, 1]),  # 케이엔더블유
+    "106190": ("http://www.htpharm.com/images/common/f_logo.gif", [0, 0, 0.2952, 1]),  # 하이텍팜
+    "106240": ("https://www.finetechnix.com/html/_img/comm/logo.png", [0, 0, 1, 1]),  # 파인테크닉스
+    "111710": ("http://www.muangc.co.kr/images_cc/logo.png", None),  # 남화산업
+    "115500": ("https://kcins.co.kr/brand/favicon-180.png", [0, 0, 1, 1]),  # 케이씨에스
+    "115570": ("http://www.star-flex.com/new/img/logo_img.png", [0, 0, 1, 1]),  # 스타플렉스
+    "120030": ("http://www.chosunwelding.com/kr/images/logo.gif", None),  # 조선선재
+    "120240": ("http://www.daejungchem.co.kr/images/logo.png", None),  # 대정화금
+    "123750": ("https://www.altonsports.co.kr/frontend/assets/images/icons/header_ci.png", [0, 0, 1, 1]),  # 알톤
+    "125490": ("http://www.hlcast.co.kr/images/logo.png", [0.0549, 0, 0.3765, 1]),  # 한라캐스트
+    "126720": ("https://www.soosanind.co.kr/apple-icon-60x60.png", [0, 0, 1, 1]),  # 수산인더스트리
+    "131220": ("https://mall.daihan-sci.com/images/logo.png", [0, 0, 1, 1]),  # 대한과학
+    "131400": ("https://evam.co.kr/img/logo-evam.png", None),  # 이브이첨단소재
+    "136150": ("http://www.woniltni.co.kr/img/logo.png", None),  # 원일티엔아이
+    "138360": ("http://www.hjfm.co.kr/image/bottom_logo_Nrobotics.png", None),  # 앤로보틱스
+    "140430": ("https://www.catis.co.kr/img/logo2.png", [0, 0, 1, 1]),  # 카티스
+    "142210": ("https://unitrontech.com/wp-content/uploads/2017/07/unitrontech_logo.png", None),  # 유니트론텍
+    "144960": ("https://www.newpower.co.kr/sub/img/logo.jpg", [0, 0, 1, 1]),  # 뉴파워프라즈마
+    "147760": ("http://www.pmt23.com/img/footer_logo_color_R2.png", [0, 0, 1, 1]),  # 피엠티
+    "149950": ("https://www.avatec.co.kr/pages/layout/images/common/logo.png", [0, 0, 1, 1]),  # 아바텍
+    "149980": ("https://www.hironic.com/static/image/common/logo.png", [0, 0, 1, 1]),  # 하이로닉
+    "155650": ("https://www.ymc-inc.com/default/img/logo_bottom.png", [0, 0, 1, 1]),  # 와이엠씨
+    "160980": ("http://cymechsnew.helloweb.co.kr/wp-content/uploads/2015/07/logo.png", [0, 0, 1, 1]),  # 싸이맥스
+    "161580": ("https://www.philoptics.com/images/common/logo.png", None),  # 필옵틱스
+    "171120": ("https://www.lctkorea.com/static/imgs/front/cw/icon/taekyung_logo.png", None),  # 라이온켐텍
+    "179900": ("https://www.utikorea.com/ko/front/image/common/logo.png", [0, 0, 1, 1]),  # 유티아이
+    "198940": ("https://www.hanjoolightmetal.com/images/main_company_logo_m.png", [0, 0, 1, 1]),  # 한주라이트메탈
+    "211050": ("https://www.incar.co.kr/files/attach/xeicon/mobicon.png?20221020112035", [0, 0, 1, 1]),  # 인카금융서비스
+    "214610": ("https://rolling-stone.co.kr/images/common/logo_R2_c.png?ver=251104", None),  # 롤링스톤
+    "220260": ("http://chemtros.com/wp-content/uploads/logo.png", [0, 0, 1, 1]),  # 켐트로스
+    "222110": ("https://pangen.com/layout/images/common/logo_on.png", None),  # 팬젠
+    "224060": ("http://thecodi.kr/wp-content/uploads/2022/12/logo_thecodi-e1670395721193.png", None),  # 더코디
+    "225430": ("https://www.kmkmp.com/web/upload/share-image-1-c69cf7d5442ac29c96267d79c40fbda2.jpg", [0, 0, 1, 1]),  # 케이엠제약
+    "225530": ("https://www.hcbokwangindustry.co.kr/assets/images/logo.png?20170331", [0, 0.2951, 0.3424, 0.4098]),  # HC보광산업
+    "227950": ("http://www.n2tech.kr/images/_main/logo_2_211202.gif", [0, 0, 1, 1]),  # 엔투텍
+    "238490": ("https://www.hims.co.kr/img/body/logo.png", [0, 0, 0.5968, 1]),  # 힘스
+    "240550": ("https://dbneedle.com/theme/response/img/logo.png", None),  # 동방메디컬
+    "241770": ("https://www.mecaro.com/assets/images/main/logo-color.png", [0, 0, 1, 1]),  # 메카로
+    "260660": ("https://www.arlico.co.kr/images/inc/favicon.png", [0, 0, 1, 1]),  # 알리코제약
+    "260970": ("http://www.isnd.co.kr/images/logo.png", None),  # 에스앤디
+    "263770": ("https://u-st.co.kr/assets/favicon/apple-touch-icon.png", [0, 0, 1, 1]),  # 유에스티
+    "267320": ("https://www.naintec.co.kr/images/logo_m.png", None),  # 나인테크
+    "282880": ("https://cowinrobotics.com/img/common/logo.png", None),  # 코윈로보틱스
+    "284620": ("https://www.kainosmedicine.com/images/user/common/logo.jpg", None),  # 카이노스메드
+    "286750": ("https://ns-am.com/theme/nanobrick/images/favicon.png", [0, 0, 1, 1]),  # 나노실리칸첨단소재
+    "287840": ("https://intocell.com/img/logo.png", None),  # 인투셀
+    "290520": ("https://www.lcd.co.kr/img/logo.png", None),  # 신도기연
+    "307280": ("https://www.wonbiogen.co.kr/kor/images/footer_logo.png", [0, 0, 1, 1]),  # 원바이오젠
+    "310870": ("https://www.dycauto.com/images/common/h1_logo_bk.png", [0, 0, 0.395, 1]),  # 디와이씨
+    "311320": ("http://www.goelement.co.kr/images/common/footer_logo.png", [0, 0, 1, 1]),  # 지오엘리먼트
+    "311390": ("https://framerusercontent.com/images/waECj35I34SaUzphOvgwDyGvg.png", None),  # 네오크레마
+    "314140": ("https://rpbio.co.kr/images/img_logo.png", [0, 0, 1, 1]),  # 알피바이오
+    "317450": ("https://myunginph.co.kr/design/ko/images/default/logo.png", None),  # 명인제약
+    "317530": ("https://cdn.imweb.me/thumbnail/20260402/6cd255fb4584c.png", [0, 0, 1, 1]),  # 에피소드컴퍼니
+    "323350": ("https://www.nexview.co.kr/images/logo.png", None),  # 다원넥스뷰
+    "336680": ("https://www.toprun.co.kr/images/common/logo_on.png", None),  # 탑런토탈솔루션
+    "348350": ("https://www.withtech.co.kr/kr_m/img/gnbLogo.png", None),  # 위드텍
+    "352940": ("http://www.enbio.co.kr/img/head/logo_k.jpg", None),  # 인바이오
+    "355690": ("https://ecimg.cafe24img.com/pg1608b21617766050/iatum3322/web/upload/free_design/head_logo.png", [0, 0, 1, 1]),  # 에이텀
+    "364950": ("http://www.aik.co.kr/RAD/PEG/logo_17467761292855.png", None),  # 에이아이코리아
+    "365330": ("https://www.systeeltech.com/image/main/logo2.png", [0, 0, 1, 1]),  # 에스와이스틸텍
+    "372320": ("https://curocellbtx.com/wp-content/uploads/2023/10/cropped-favicon-180x180.png", [0, 0, 1, 1]),  # 큐로셀
+    "382800": ("https://www.gnbseco.com/images/common/logo.png", [0, 0, 1, 1]),  # 지앤비에스 에코
+    "402490": ("http://www.greenresource.kr/logo.jpg", None),  # 그린리소스
+    "412350": ("https://static.wixstatic.com/media/593654_fd622b3f26f445818aa95177d6a45477%7Emv2.png/v1/fill/w_180%2Ch_180%2Clg_1%2Cusm_0.66_1.00_0.01/593654_fd622b3f26f445818aa95177d6a45477%7Emv2.png", [0, 0, 1, 1]),  # 레이저쎌
+    "416180": ("http://www.shinsungst.co.kr/images/common/logo.png", [0.0114, 0.0238, 0.2015, 0.9048]),  # 신성에스티
+    "417840": ("http://www.justem.co.kr/main/img/logo.png", None),  # 저스템
+    "420570": ("https://www.j2kbio.com/theme/basic/img/layout/hd_logo_h.png", [0, 0, 1, 1]),  # 제이투케이바이오
+    "424980": ("https://lh3.googleusercontent.com/pkilLrwfrAJYjLwwvIqpuXcmvTX4kBtQWBkdI0ByIjc1Sb0iczop31s0dFjUu7zvkAV1MPvSmQgN6KS27lIHm4mEA-OD6u--ZbQEnS7v9pPp82ah5Cc-Lg", [0.0059, 0, 0.3887, 1]),  # 마이크로투나노
+    "432470": ("https://knssystem.com/design/ko/images/newimg/logo.png", [0, 0, 1, 1]),  # 케이엔에스
+    "448730": ("http://www.samsungfnreit.com/img/header_fixed_logo.png", None),  # 삼성FN리츠
+    "457370": ("https://www.hanchem.net/public/images/layout/logo.png", None),  # 한켐
+    "458650": ("https://www.e-sungwoo.co.kr/img/footer_logo.jpg", [0, 0, 0.3361, 1]),  # 성우
+    "460850": ("https://www.dongkukcm.com/assets/ko/images/common/logo.png", None),  # 동국씨엠
+    "460930": ("https://www.hyms.kr/Images/toplogo.jpg", None),  # 현대힘스
+    "465770": ("https://www.stxgreenlogis.co.kr/images/common/h_logo_footer.png", [0, 0, 0.3015, 0.9118]),  # STX그린로지스
+    "475430": ("https://www.kistron.com/images/logo.png", None),  # 키스트론
+    "475580": ("https://cdn.imweb.me/thumbnail/20230818/2c75ed14a707d.png", [0, 0, 1, 1]),  # 에이럭스
+    "476830": ("https://www.rznomics.com/images/main/h-logo.png", None),  # 알지노믹스
+    "479960": ("http://www.wns21.co.kr/images/logo.gif", None),  # 위너스일렉
+    "900070": ("http://globalsmtech.com/korean/img/main/logo.png", None),  # 글로벌에스엠
+    "900250": ("http://www.crystalnewmaterial.com/image/common/logo.png", [0, 0, 1, 1]),  # 크리스탈신소재
+    "900270": ("http://hengsheng.co.kr/wp-content/uploads/2016/07/hs-logo-2.png", None),  # 헝셩그룹
 }
 
 PREFER_DOMAIN: set[str] = {
