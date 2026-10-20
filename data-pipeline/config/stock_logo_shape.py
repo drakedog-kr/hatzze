@@ -26,6 +26,61 @@ DOMAIN_OVERRIDE: dict[str, str] = {
     "066570": "lg.com",  # LG전자 — 티커 · lge.co.kr 둘 다 흐린 원본, lg.com 은 선명한 LG 심볼(PREFER_DOMAIN)
     "066575": "lg.com",  # LG전자우
     "007660": "isupetasys.com",  # 이수페타시스 — 티커 · petasys.com 둘 다 흐린 원본(PREFER_DOMAIN · 상자 ISU)
+    # 2026-10-20 — 거래소 목록에 홈페이지가 없거나 옛 주소라 배지이던 종목. 네이버 기업정보의 홈페이지로 logo.dev 에 묻는다(그림은 눈으로 봄).
+    "0004V0": "nbr-motion.com",  # 엔비알모션
+    "003800": "acebed.com",  # 에이스침대
+    "004590": "koreafurniture.com",  # 한국가구
+    "006050": "kukyounggnm.com",  # 국영지앤엠
+    "0088M0": "me-zoo.com",  # 메쥬
+    "009620": "samboind.kr",  # 삼보산업
+    "017250": "inter-m.com",  # 인터엠
+    "025870": "sillasg.co.kr",  # 신라에스지
+    "027040": "seoulset.co.kr",  # 서울전자통신
+    "031510": "austem.co.kr",  # 오스템
+    "032940": "wonik.co.kr",  # 원익
+    "042000": "cafe24corp.com",  # 카페24
+    "047560": "estsoft.co.kr",  # 이스트소프트
+    "048870": "synergyinno.com",  # 시너지이노베이션
+    "053280": "yes24.com",  # 예스24
+    "053700": "sambomotors.com",  # 삼보모터스
+    "059210": "meta-biomed.com",  # 메타바이오메드
+    "060900": "daehangreenpower.com",  # 에이전트AI
+    "065690": "pakers.co.kr",  # 파커스
+    "066700": "theragenetex.com",  # 테라젠이텍스
+    "073490": "innowireless.com",  # LIG아큐버
+    "090150": "iwin.kr",  # 아이윈
+    "094850": "verygoodtour.com",  # 참좋은여행
+    "100590": "mercury.co.kr",  # 머큐리
+    "101170": "woorimpts.com",  # 우림피티에스
+    "101670": "hydroli.co.kr",  # 하이드로리튬
+    "128660": "pjmetal.co.kr",  # 피제이메탈
+    "131180": "dilli.co.kr",  # 딜리
+    "133750": "megamd.co.kr",  # 메가엠디
+    "136480": "harim.com",  # 하림
+    "138610": "nibec.co.kr",  # 나이벡
+    "154030": "asiaseed.net",  # 아시아종묘
+    "192250": "ksign.com",  # 케이사인
+    "208710": "photon25.com",  # 포톤
+    "266690": "navcours.com",  # 덕산넵코어스
+    "270660": "everybot.co.kr",  # 에브리봇
+    "278650": "hlbbiostep.com",  # HLB바이오스텝
+    "307750": "kukjeon.co.kr",  # 국전
+    "322780": "copus.co.kr",  # 코퍼스코리아
+    "331520": "valofe.com",  # 밸로프
+    "331740": "autocrypt.io",  # 아우토크립트
+    "336060": "wavus.co.kr",  # 웨이버스
+    "353190": "hurumcorp.com",  # 휴럼
+    "363260": "mobidays.com",  # 모비데이즈
+    "369370": "blitzway.com",  # 블리츠웨이엔터테인먼트
+    "387570": "finemedix.com",  # 파인메딕스
+    "391710": "kornic.co.kr",  # 코닉오토메이션
+    "396690": "globalreit.miraeasset.com",  # 미래에셋글로벌리츠
+    "451800": "hanwhareit.com",  # 한화리츠
+    "453860": "astech.co.kr",  # 에이에스텍
+    "462310": "newkiki.com",  # 뉴키즈온
+    "466410": "synapsoft.co.kr",  # 사이냅소프트
+    "478340": "naraspace.com",  # 나라스페이스테크놀로지
+    "493330": "gfi-aegis.com",  # 지에프아이
 }
 
 CROP_OVERRIDE: dict[str, list[float]] = {
@@ -126,6 +181,14 @@ CROP_OVERRIDE: dict[str, list[float]] = {
     "462510": [],  # 라메디텍
     "464500": [],  # 아이언디바이스
     "469750": [],  # 아이비젼웍스
+    # 2026-10-20 — 짧은 글자 로고는 첫 글자만 자르지 않고 통째로(DOMAIN_OVERRIDE 로 새로 받은 것).
+    "004590": [],  # 한국가구
+    "0088M0": [],  # 메쥬
+    "053280": [],  # 예스24
+    "131180": [],  # 딜리
+    "353190": [],  # 휴럼
+    "266690": [0.1289, 0.3691, 0.2617, 0.248],  # 덕산넵코어스 — DS 와 빨간 획(뒤 Navcours 는 뺀다)
+    "278650": [0.0234, 0.2266, 0.9531, 0.375],  # HLB바이오스텝 — HLB 타원(글자 줄은 뺀다)
 }
 
 OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
@@ -383,6 +446,38 @@ OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
     "900070": ("http://globalsmtech.com/korean/img/main/logo.png", None),  # 글로벌에스엠
     "900250": ("http://www.crystalnewmaterial.com/image/common/logo.png", [0, 0, 1, 1]),  # 크리스탈신소재
     "900270": ("http://hengsheng.co.kr/wp-content/uploads/2016/07/hs-logo-2.png", None),  # 헝셩그룹
+    # 2026-10-20 — 위와 같은 종목 중 logo.dev 에 없거나 맞지 않는 곳은 새 홈페이지의 그림으로.
+    "007370": ("https://www.jinyangpharm.com/theme/102114/kr/images/main/header_logo.png", None),  # 진양제약
+    "024900": ("https://dydeokyang.co.kr/wp-content/themes/dyauto/favicons/apple-touch-icon.png", [0, 0, 1, 1]),  # 디와이덕양
+    "033340": ("https://www.gpin.co.kr/include/images/topmenu_ci.gif", [0, 0, 1, 1]),  # 좋은사람들
+    "037350": ("https://www.sungdokorea.com/images/common/new_logo_250916.png", [0, 0, 1, 1]),  # 성도이엔지
+    "038620": ("https://www.wizcorp.co.kr/img/logo.png", [0, 0, 1, 1]),  # 위즈코프
+    "046440": ("https://www.mobilians.co.kr/mpay/images/2026/og_img.jpg", [0.17, 0.3, 0.66, 0.45]),  # KG파이낸셜
+    "079900": ("https://www.junjin.com/images/common/logo.png", [0, 0, 1, 1]),  # 전진건설로봇
+    "081180": ("https://www.seceng.co.kr/wp-content/uploads/2016/04/cropped-icon-180x180.png", [0, 0, 1, 1]),  # 쎄크
+    "088290": ("https://www.ewonseat.com/theme/ewon/img/logo2.png", None),  # 이원컴포텍
+    "094970": ("http://www.jmtkorea.com/img/logo.gif", None),  # 제이엠티
+    "101160": ("http://www.worldexint.com/img/common/logo.jpg", None),  # 월덱스
+    "123700": ("https://www.sjmflex.com/theme/responsive_sjm/include/img/sns_logo.png", [0, 0, 1, 1]),  # SJM
+    "129920": ("http://www.topdsht.com/images/apple-touch-icon.png", [0, 0, 1, 1]),  # 대성하이텍
+    "134060": ("http://www.e-future.kr/img/efuture_logo.jpg", None),  # 이퓨쳐
+    "137940": ("https://www.nexteye.com/layout/img/logo.png", [0, 0, 1, 1]),  # 넥스트아이
+    "171010": ("https://www.ramtech.co.kr/images/common/allmenu_logo.png", None),  # 램테크놀러지
+    "179530": ("http://www.adbiotech.com/img/favicon/apple-touch-icon.png", [0, 0, 1, 1]),  # 애드바이오텍
+    "210120": ("https://cdn.imweb.me/thumbnail/20260917/60785bc5a615b.png", [0, 0, 1, 1]),  # 빅텐츠
+    "215790": ("https://innoinstrument.com/wp-content/uploads/2023/10/inno-favicon-green.png", [0, 0, 1, 1]),  # 이노인스트루먼트
+    "290550": ("https://www.dkttech.co.kr/images/main/visual_logo_03.png", [0, 0, 1, 1]),  # 디케이티
+    "308170": ("https://centralmotek.co.kr/img/head/head_logo2.png", [0, 0, 0.4805, 1]),  # 씨티알모빌리티
+    "340440": ("https://www.serimbng.co.kr/upload/siteset/og_img.png", None),  # 세림B&G
+    "373110": ("https://www.xcell.co.kr/img/common/main_logo.png", [0, 0, 1, 1]),  # 엑셀세라퓨틱스
+    "377330": ("http://www.egtronics.co.kr/html/_skin/img/common/logo_header_black.png", None),  # 이지트로닉스
+    "010580": ("https://smbexel.com/images/intro_logo.png", [0.0681, 0.25, 0.3362, 0.5]),  # 에스엠벡셀 — SM(logo.dev 는 깨진 픽셀 그림)
+    "417200": ("https://www.lsmaterials.co.kr/ico/apple-icon-180x180.png", [0, 0, 1, 1]),  # LS머트리얼즈 — LS(logo.dev 는 긴 글자)
+    "456160": ("https://www.g2gbio.com/images/common/header_logo_color.png", None),  # 지투지바이오
+    "462520": ("https://www.chosunref.co.kr/assets/images/common/logo-gray.png", None),  # 조선내화
+    "464580": ("https://www.dot-mill.com/_File/siteMng//ogImageFile_1690284621_0.jpg", [0, 0, 1, 1]),  # 닷밀
+    "900120": ("http://www.ckhfnh.co.kr/i/logo_cxi.png", [0, 0, 1, 1]),  # 씨엑스아이
+    "900260": ("http://www.rothwell.tech/images/common/logo.png", None),  # 로스웰
 }
 
 PREFER_DOMAIN: set[str] = {

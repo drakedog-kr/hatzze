@@ -11,6 +11,7 @@ import {
   logoUpstreamPath,
   logoVerdict,
   type LogoSourceRow,
+  type LogoVerdict,
 } from "@/lib/stock-logo";
 import { containWebp, fitLogoWebp } from "@/lib/logo-image";
 import { getSupabaseAdminFresh } from "@/lib/supabase-server";
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/logo/[ticker
   const row = await logoSource(ticker);
   if (row?.source === "own") return ownLogo(ticker, size);
   const path = logoUpstreamPath(ticker, row);
-  if (path === null) return reply("missing");
+  if (path === null) return reply("none");
   const crop = logoCrop(row?.crop);
 
   let upstream: Response;
@@ -88,7 +89,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/logo/[ticker
  * 캐시 머리. 로컬(개발 서버)에서는 캐시하지 않는다 — 다듬는 셈을 고쳐 가며 화면을 보는데, 브라우저가 7일 들고 있던 옛 그림을
  * 보여 줬다(삼성전기가 고친 뒤에도 작은 네모로 보임, 2026-10-19).
  */
-function cacheFor(verdict: "ok" | "missing" | "error"): string {
+function cacheFor(verdict: LogoVerdict): string {
   return process.env.NODE_ENV === "production" ? LOGO_CACHE[verdict] : "no-store";
 }
 
@@ -168,7 +169,7 @@ async function logoSource(ticker: string): Promise<LogoSourceRow> {
  */
 const BLANK_GIF = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
 
-function reply(verdict: "missing" | "error") {
+function reply(verdict: Exclude<LogoVerdict, "ok">) {
   return new Response(BLANK_GIF, {
     headers: { "Content-Type": "image/gif", "Cache-Control": cacheFor(verdict), "X-Logo": verdict },
   });

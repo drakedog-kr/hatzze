@@ -85,17 +85,20 @@ export function stockLogoPath(ticker: string, size: LogoSize): string {
 }
 
 /**
- * 업스트림 응답을 어떻게 돌려줄지. 셋으로 가른다.
+ * 업스트림 응답을 어떻게 돌려줄지. 넷으로 가른다.
  *   ok       그림 그대로. 브라우저 7일 · CDN 하루(지나면 옛 그림을 먼저 주고 뒤에서 갱신한다).
  *   missing  없는 로고(404). 그림과 같은 시간 캐시한다 — 없는 로고 12장이 방문마다 새로 나가던 자리.
  *   error    한도 초과(429)·장애·이상한 본문. 15분만 캐시한다. 그동안은 배지, 지나면 다시 물어본다.
  *            한도가 풀리는 날 재방문자도 15분 안에 로고를 본다. 429 를 길게 캐시하면 그 반대가 되고,
  *            너무 짧으면 한도를 넘긴 동안 CDN 이 못 막아 logo.dev 를 계속 두드린다.
+ *   none     국장 판정표가 '없음'이라 logo.dev 에 묻지 않은 것. 한 시간만 — 파이프라인 · 손 보충이 그림을 넣으면 그날 보여야
+ *            한다. 하루였을 때는 판정표에 그림을 넣은 뒤에도 CDN 의 '없음'이 하루 남아 화면에 배지로 보였다(자이에스앤디,
+ *            2026-10-20). 묻는 곳이 우리 판정표뿐이라 짧게 둬도 logo.dev 한도와 상관없다.
  *
  * 브라우저 7일은 우리 응답이라 우리가 정한다(logo.dev 자체는 하루). 재방문자가 일주일간 요청을
  * 안 보내 Vercel CDN 요청 수(Pro 포함분 월 100만)를 아낀다. 리브랜딩이 최대 일주일 늦게 보인다.
  */
-export type LogoVerdict = "ok" | "missing" | "error";
+export type LogoVerdict = "ok" | "missing" | "error" | "none";
 
 export const LOGO_CACHE: Record<LogoVerdict, string> = {
   ok: "public, max-age=604800, s-maxage=86400, stale-while-revalidate=86400",
@@ -103,6 +106,7 @@ export const LOGO_CACHE: Record<LogoVerdict, string> = {
   // 일주일이면 재방문자는 로고가 생긴 뒤에도 일주일 내내 배지를 봤다. CDN 은 그림과 같다.
   missing: "public, max-age=86400, s-maxage=86400, stale-while-revalidate=86400",
   error: "public, max-age=900, s-maxage=900",
+  none: "public, max-age=3600, s-maxage=3600, stale-while-revalidate=3600",
 };
 
 export function logoVerdict(status: number, contentType: string | null): LogoVerdict {

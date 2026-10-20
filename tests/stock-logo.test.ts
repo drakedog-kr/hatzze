@@ -98,6 +98,9 @@ describe("logoVerdict", () => {
     // 없는 로고는 브라우저에 하루만(파이프라인이 길을 찾으면 다음 날 보이게) · CDN 은 그림과 같다.
     assert.equal(secs(LOGO_CACHE.missing), 86400);
     assert.equal(cdn(LOGO_CACHE.missing), cdn(LOGO_CACHE.ok));
+    // 판정표가 '없음'인 국장 종목은 한 시간만 — 판정표에 그림을 넣으면 그날 보여야 한다(logo.dev 에는 안 묻는다).
+    assert.equal(secs(LOGO_CACHE.none) <= 3600, true);
+    assert.equal(Number(cdn(LOGO_CACHE.none)) <= 3600, true);
     for (const cc of Object.values(LOGO_CACHE)) assert.match(cc, /^public, /);
   });
 });
