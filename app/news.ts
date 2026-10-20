@@ -1,4 +1,5 @@
 import type { IconName } from "@/lib/icon-names";
+import { ETF_PAGE } from "./etf/copy";
 
 /**
  * 셸 맨 위 소식 띠와 사이드바 · 폰 메뉴의 시황 구독 단추가 같이 쓰는 정의. 서버(app/layout.tsx — 걸 소식 고르기 · 첫 그림 전 숨김)와
@@ -47,7 +48,7 @@ export const TELEGRAM: { href: string; label: string; aria: string; icon: IconNa
    `app/screen-flags.ts` 의 플래그로 갈라 목적지가 열려 있을 때만 걸리게 한다(국장
    미리보기·배당으로 살기·테마 리포트 때 그렇게 했다). */
 /* 지금 거는 소식은 하나(NEWS). 목적지가 우리 화면이면 **그 구역 안에서는 안 그린다**(NewsStrip 의 startsWith).
-   이전 소식들(내부자 → 국장 미리보기 → 데일리 노트 → 텔레그램 2판 → 배당으로 살기 → 텔레그램 3판 → 테마 리포트 오픈)은
+   이전 소식들(내부자 → 국장 미리보기 → 데일리 노트 → 텔레그램 2판 → 배당으로 살기 → 텔레그램 3판 → 테마 리포트 오픈 → v2 의견 설문)은
    git 이력에 있다 — 되살릴 땐 키를 새로 딴다.
    ⚠️ 문구에 숫자를 넣지 않는다(위 주석).
    ⛔ 소식을 새로 걸거나 문구를 고칠 때는 app/releases.ts 에 판을 올리지 않는다(2026-10-01 지시 — 업데이트 기록에 안 싣는다). */
@@ -78,26 +79,24 @@ export const TELEGRAM_NEWS: NewsItem = {
   ga: "news-telegram",
 };
 
-/* 2026-10-05 · v2 의견 설문(구글 설문, 1분 · 추첨 10명 커피 기프티콘 · 10월 20일 마감). 텔레그램 4판을 내리고 건다.
-   문구는 운영자가 후보 열 중에 고른 것이다. 상품 수 · 마감일은 문장에 안 넣고(설문 첫 장이 말한다) '1분'과 '커피'만 둔다.
-   ⚠️ 키를 새로 땄다 — 텔레그램 띠를 닫았던 사람에게도 한 번 뜬다. 마감 다음 날 0시(KST)부터는 저절로 텔레그램 4판으로 돌아간다(until ·
-   아래 NEWS). 4판을 이미 닫은 사람에게는 안 뜬다 — 다시 모두에게 띄우려면 그때 4판 키를 새로 딴다.
-   아이콘 campaign 은 본문 어디에도 안 쓰는 그림이라 한 화면 두 번 규칙에 안 걸린다. */
-export const SURVEY_NEWS: NewsItem = {
-  key: "hz-news-survey-v2",
-  from: "2026-10-05T00:00:00+09:00",
-  until: "2026-10-21T00:00:00+09:00",
-  href: "https://forms.gle/otD2jw73frGsTBqb9",
-  head: "hatzze가 새로 바뀌었습니다. 1분 의견 설문에 답하시면 추첨으로 커피를 드립니다. ",
-  name: "참여하기",
-  tail: "",
-  aria: "hatzze가 새로 바뀌었습니다. 1분 의견 설문에 답하시면 추첨으로 커피를 드립니다. 참여하기. 의견 설문 열기(새 탭)",
-  icon: "campaign",
-  ga: "news-survey",
+/* 2026-10-21 · ETF 자금 흐름 오픈 소식. v2 의견 설문(10-05~10-20, 키 hz-news-survey-v2)이 끝나 그 자리에 건다. 화면은 10-13 에 열었다.
+   이름이 앞에 서는 꼴(테마 리포트 오픈 때와 같다)이라 폰에서는 한 줄로 잘린다 — 짧은 꼬리(tailShort)로 바꿔 끼운다.
+   목적지가 /etf 라 그 구역(메인과 상세 /etf/069500) 안에서는 안 그린다(NewsStrip 의 startsWith).
+   ⚠️ 키를 새로 땄다 — 텔레그램 4판을 닫았던 사람에게도 한 번 뜬다. 아이콘은 사이드바 NAV 의 그 화면 아이콘(swap_vert)과 같은 것. */
+export const ETF_NEWS: NewsItem = {
+  key: "hz-news-etf",
+  // 머지·배포 직후부터. 화면은 이미 열려 있으니 기다릴 글이 없다.
+  from: "2026-10-21T00:00:00+09:00",
+  href: ETF_PAGE.href,
+  name: ETF_PAGE.label,
+  tail: "을 열었습니다. 어느 ETF에 자금이 몰리고 빠지는지 봅니다.",
+  tailShort: "을 열었습니다",
+  icon: ETF_PAGE.icon,
+  ga: "news-etf",
 };
 
-/** 거는 차례 — 앞에서부터 기간 안인 첫 소식 하나를 건다. 설문이 끝나면(until) 텔레그램 4판으로 돌아간다. 소식을 바꿀 땐 이 줄과 위 덩이만 갈아 끼운다. */
-export const NEWS_ITEMS: NewsItem[] = [SURVEY_NEWS, TELEGRAM_NEWS];
+/** 거는 차례 — 앞에서부터 기간 안인 첫 소식 하나를 건다. 소식을 바꿀 땐 이 줄과 위 덩이만 갈아 끼운다. */
+export const NEWS_ITEMS: NewsItem[] = [ETF_NEWS, TELEGRAM_NEWS];
 
 /** 그 시각에 걸려 있나. 개발 서버에서는 시각과 무관하게 띄운다 — 문구 · 아이콘을 로컬에서 보려면 날짜를 기다릴 수 없다. */
 export const newsLiveAt = (news: NewsItem, now: number) =>
