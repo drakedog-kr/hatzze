@@ -2094,7 +2094,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-tm-flowtbl .v2-td-theme2 { contain: inline-size; }
   .v2-tm-flowsizer { display: block; grid-column: 2; height: 0; overflow: hidden; visibility: hidden; padding-left: 116px; }
   /* 아래 표 종목 칸과 같은 상한 · 같은 로고 자리 */
-  .v2-tm-flowsizer > .v2-td-stock { max-width: 288px; }
+  .v2-tm-flowsizer > .v2-td-stock { max-width: 291px; }
   .v2-tm-flowsizer i { flex-shrink: 0; width: 22px; }
 }
 .v2-tm-flowtbl .v2-th > * { white-space: nowrap; }
@@ -2140,7 +2140,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-risertbl .v2-tr { min-height: 44px; }
 /* 표 한 장이 한 격자 — 머리 줄 · 줄은 subgrid 라 종목 칸이 가장 긴 줄(로고 · 이름 · 태그)만큼 넓어지고 칸 선은 줄마다 같다.
    220 에 못박았을 땐 'HD현대에너지솔루션 · 앞 3일보다 +67%'(243)가 이름 두 줄로 꺾였다(2026-10-19). 다 들어가는 날은 220 그대로.
-   상한 288 = 사전에서 가장 긴 줄('LIG디펜스앤에어로스페이스 · 앞 3일보다 +199%' 285) — 넘는 이름만 칸 안에서 감긴다.
+   상한 291 = 사전에서 가장 긴 줄('LIG디펜스앤에어로스페이스 · 3일 전 대비 +199%' 288) — 넘는 이름만 칸 안에서 감긴다.
+   태그가 '앞 3일…'(가장 긴 줄 285 · 상한 288)에서 '3일 전 대비…'로 바뀌며 3px 늘었다(2026-10-20). 배수는 10배에서 멈추지 않지만
+   세 자리('3일 전 대비 380배' 281)까지도 +199% 보다 짧다.
    위 테마 흐름 표는 이 칸 폭을 따라 문장 칸 시작선을 맞춘다 — 상한을 바꾸면 .v2-tm-flowsizer 도 같이.
    첫 칸 34 · 끝 칸 102 는 줄 안쪽 14 를 품은 값이다(subgrid 줄의 안쪽 여백이 첫 · 끝 칸을 먹는다) — 실폭 20(순위) · 88(언급).
    테마 칸 104 — 96 이면 'AI 인프라·클라우드'가 한 글자만 꺾였다(2026-10-08 점검).
@@ -2151,7 +2153,7 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-tm-risertbl > .v2-tbody,
   .v2-tm-risertbl .v2-tbody > li,
   .v2-tm-risertbl .v2-tbody > li > .v2-tr { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; }
-  .v2-tm-risertbl .v2-td-stock { max-width: 288px; }
+  .v2-tm-risertbl .v2-td-stock { max-width: 291px; }
 }
 .v2-tm-risertbl .v2-td-theme { word-break: keep-all; }
 .v2-tm-risertbl .v2-tr:hover { background: none; }

@@ -46,8 +46,12 @@ const FLOW_ROWS = 10;
 
 /**
  * 태그 글자 — 바로 옆 칸의 **횟수**(최근 · 그 전)와 같은 잣대로 적는다. 몫의 배수(r.ratio, 줄 세우는 잣대)를 적으면 '39회 · 그 전 3회'
- * 옆에 '31.0배'가 서서 셈이 안 맞았다(2026-10-04 점검). 꼴은 테마 화면 '언급 상위 종목'과 같다(3배부터 반올림 · 10배 넘게에서 멈춤).
+ * 옆에 '31.0배'가 서서 셈이 안 맞았다(2026-10-04 점검). 3배 아래는 +%, 3배부터 반올림한 배수다.
  * 줄은 횟수가 는 종목만이라(lib/theme-risers.ts parseRisers) 손해로 읽히는 배수는 안 나온다.
+ * 기준 말은 '3일 전 대비' 하나로 적는다(2026-10-20 운영자 판단) — '앞 3일의 N배' · '앞 3일보다 +N%'는 '의'와 '보다'가 섞였고,
+ * '앞'은 같은 화면들의 '앞으로 5주'처럼 다가올 날로도 읽혔다. 오른쪽 칸 둘째 줄은 '그 전 3일 N회'.
+ * 10배에서 멈추지 않는다('10배 넘게'는 붙이지 않는다, 같은 날 판단) — 그 전 3일이 1회 이상인 횟수라, 상세의 '평소'(0.1회 같은
+ * 몫이라 '+8900%'가 찍혀 10배에서 멈춘다 · lib/stock-usual.ts)처럼 잡음으로 부풀지 않는다. 49회 · 그 전 3일 3회면 '16배'.
  */
 function riserMultiple(r: ThemeRiser): number | null {
   return r.ratio === null || r.prior <= 0 ? null : r.recent / r.prior;
@@ -55,9 +59,8 @@ function riserMultiple(r: ThemeRiser): number | null {
 function riserDelta(r: ThemeRiser): string {
   const x = riserMultiple(r);
   if (x === null) return "새로 등장";
-  if (x >= 10) return "앞 3일의 10배 넘게";
-  if (x >= 3) return `앞 3일의 ${Math.round(x)}배`;
-  return `앞 3일보다 +${Math.round((x - 1) * 100)}%`;
+  if (x >= 3) return `3일 전 대비 ${Math.round(x)}배`;
+  return `3일 전 대비 +${Math.round((x - 1) * 100)}%`;
 }
 
 // 부호는 반올림한 값으로 — −0.04 가 '−0.0%p'로 찍혔다(2026-10-04 점검).
@@ -307,13 +310,13 @@ export function ThemeIndexView({
         id="risers"
         title="테마별 급부상 종목"
         // 연휴 끝처럼 그날 줄이 하나도 없으면 줄이 있던 가장 최근 날의 목록이다 — 그날을 앞에 밝힌다.
-        meta={`${risersAsOf ? `${Number(risersAsOf.slice(5, 7))}/${Number(risersAsOf.slice(8, 10))} 기준 · ` : ""}최근 ${KADERA_WINDOW_DAYS}일 · 앞 3일 대비`}
+        meta={`${risersAsOf ? `${Number(risersAsOf.slice(5, 7))}/${Number(risersAsOf.slice(8, 10))} 기준 · ` : ""}최근 ${KADERA_WINDOW_DAYS}일 · 3일 전 대비`}
         ai
       >
         {risers === null ? (
           <p className="v2-empty">테마 요약을 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 주십시오.</p>
         ) : risers.length === 0 ? (
-          <p className="v2-empty">앞 3일보다 언급이 늘고 채널이 이유를 말한 종목이 없습니다.</p>
+          <p className="v2-empty">3일 전보다 언급이 늘고 채널이 이유를 말한 종목이 없습니다.</p>
         ) : (
           <div className="v2-tbl v2-tm-risertbl">
             <div className="v2-tr v2-th" aria-hidden="true">
@@ -333,7 +336,7 @@ export function ThemeIndexView({
                     <Link href={market.themeHref(r.theme)} className="v2-td-theme" data-ga="theme_riser_theme_click">
                       {r.theme}
                     </Link>
-                    {/* 종목 + 앞 3일 대비 태그(테마 화면 '언급 상위 종목'과 같은 태그 · 같은 색 단계). 색은 태그에 적은 횟수 배수 그대로. */}
+                    {/* 종목 + 3일 전 대비 태그(테마 화면 '언급 상위 종목'과 같은 태그 · 같은 색 단계). 색은 태그에 적은 횟수 배수 그대로. */}
                     <Link href={market.stockHref(r.code)} className="v2-td-stock" data-ga="theme_riser_stock_click">
                       <StockLogo code={r.code} name={r.name} market={r.market} size={22} />
                       <span className="v2-td-name">{r.name}</span>
@@ -342,8 +345,8 @@ export function ThemeIndexView({
                     <span className="v2-td-text">{r.reason}</span>
                     <span className="v2-td-num v2-td-two">
                       {r.recent.toLocaleString("ko-KR")}회
-                      {/* '앞 3일' — 태그('앞 3일의 9배')와 같은 말로. '새로 등장'(앞 3일 0회)이면 태그가 이미 말해 적지 않는다(2026-10-05 점검). */}
-                      {r.prior > 0 && <em>앞 3일 {r.prior.toLocaleString("ko-KR")}회</em>}
+                      {/* '그 전 3일' — 태그('3일 전 대비 9배')가 견준 사흘. '새로 등장'(그 전 3일 0회)이면 태그가 이미 말해 적지 않는다(2026-10-05 점검). */}
+                      {r.prior > 0 && <em>그 전 3일 {r.prior.toLocaleString("ko-KR")}회</em>}
                     </span>
                   </div>
                 </li>
