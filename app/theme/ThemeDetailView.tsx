@@ -94,8 +94,6 @@ function Trend({ points, recent }: { points: ThemeTrendPoint[]; recent: Set<stri
 export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePageData }) {
   const theme = d.theme;
   const mentionedCount = d.hotStocks.length;
-  const trendFrom = d.trend[0]?.date;
-  const trendTo = d.trend[d.trend.length - 1]?.date;
   // 추이 위 숫자 셋 — 최고인 날 · 집계가 있는 날의 평균 · 연속 오른(내린) 날.
   const counted = d.trend.filter((p) => p.rank != null);
   const peak = counted.reduce<ThemeTrendPoint | null>((best, p) => (best == null || p.share > best.share ? p : best), null);
@@ -272,7 +270,8 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
       {/* 둘째 줄 — [요즘 도는 얘기 | 30일 점유율 추이]. 글이 키를 정하고 막대가 남는 높이를 받는다. */}
       <div className="v2-tm-band is-brief">
         {/* 모듈 머리 날짜는 모두 M/D — 한 화면에 '10/2~10/4' · '9월 28일 ~ 10월 4일' 두 꼴이 섰다(2026-10-05 점검). 알약(10/7(수))과 같은 꼴이다. */}
-        <Module title="요즘 도는 얘기" ai meta={d.brief ? `${mdShort(d.brief.date)} · 최근 ${KADERA_WINDOW_DAYS}일 채널 글` : undefined}>
+        {/* '채널 글' → '여론'(2026-10-20 운영자 판단). */}
+        <Module title="요즘 도는 얘기" ai meta={d.brief ? `${mdShort(d.brief.date)} · 최근 ${KADERA_WINDOW_DAYS}일 여론` : undefined}>
           {d.brief?.brief ? (
             <div className="v2-brief">
               {/* 두 문단(파이프라인이 빈 줄로 가른다). 첫 문단은 가장 크게 오간 이야기, 둘째는 그 밖의 이야기. */}
@@ -294,7 +293,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
 
         <Module
           title={`${THEME_TREND_DAYS}일 점유율 추이`}
-          meta={trendFrom && trendTo ? `${mdShort(trendFrom)}~${mdShort(trendTo)}` : undefined}
+          // 날짜 범위('9/21~10/20')는 뺐다 — 제목이 기간(30일)을 말하고 날마다의 값은 막대 말풍선에 있다(2026-10-20 운영자 판단).
           className="v2-tm-trendmod"
           // 날마다의 값은 막대 말풍선에만 있다 — 폰은 눌러야 열린다(종목 화면 커뮤니티 관심 추이와 같은 id).
           hint={!d.loadFailed && d.trend.length ? { id: "trend-bar", anchor: ".v2-tm-trend", at: "inside", text: "막대를 누르면 그날 값이 나옵니다" } : undefined}
@@ -408,7 +407,8 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
       {/* '크게 움직인 날'은 뺐다 — 이유 후보엔 많이 언급된 종목도 들어 −0.98% 같은 작은 움직임 줄이 섞인다(2026-10-04 점검). */}
       {/* 이유가 하나도 없는 주는 모듈째 그리지 않는다 — 문장 한 줄짜리 판 폭 모듈이 섰다(방산, 2026-10-05 점검). */}
       {reasonDays.length > 0 && (
-        <Module title="등락의 이유" meta={`${mdShort(reasonStart)}~${mdShort(reasonEnd)}`} className="v2-tm-reasons" ai>
+        // 머리는 날짜 범위('10/14~10/20') 대신 '최근 일주일' — 줄마다 날짜 머리가 있다(2026-10-20 운영자 판단).
+        <Module title="등락의 이유" meta="최근 일주일" className="v2-tm-reasons" ai>
           <div className={`v2-tm-days${anyClose ? "" : " no-close"}`}>
             {reasonDays.map(([date, list]) => (
               <section key={date} aria-label={fmtKoWd(date)}>
