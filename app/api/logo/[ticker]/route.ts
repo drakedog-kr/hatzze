@@ -11,8 +11,9 @@ import {
   logoUpstreamPath,
   logoVerdict,
   type LogoSourceRow,
+  type LogoVerdict,
 } from "@/lib/stock-logo";
-import { containWebp, fitLogoWebp } from "@/lib/logo-image";
+import { containWebp, fitLogoWebp, isSvg, svgToPng } from "@/lib/logo-image";
 import { getSupabaseAdminFresh } from "@/lib/supabase-server";
 
 /**
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/logo/[ticker
   const row = await logoSource(ticker);
   if (row?.source === "own") return ownLogo(ticker, size);
   const path = logoUpstreamPath(ticker, row);
-  if (path === null) return reply("missing");
+  if (path === null) return reply("none");
   const crop = logoCrop(row?.crop);
 
   let upstream: Response;
@@ -88,7 +89,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/logo/[ticker
  * 캐시 머리. 로컬(개발 서버)에서는 캐시하지 않는다 — 다듬는 셈을 고쳐 가며 화면을 보는데, 브라우저가 7일 들고 있던 옛 그림을
  * 보여 줬다(삼성전기가 고친 뒤에도 작은 네모로 보임, 2026-10-19).
  */
-function cacheFor(verdict: "ok" | "missing" | "error"): string {
+function cacheFor(verdict: LogoVerdict): string {
   return process.env.NODE_ENV === "production" ? LOGO_CACHE[verdict] : "no-store";
 }
 
@@ -119,15 +120,24 @@ async function shape(
   }
 }
 
-/** 판정표에 둔 우리 그림(source = own) — 같은 셈으로 칸에 맞춰 준다. 그림이 없거나 못 읽으면 없는 로고. */
+/**
+ * 판정표에 둔 우리 그림(source = own) — 같은 셈으로 칸에 맞춰 준다. 그림이 없거나 못 읽으면 없는 로고.
+ * PNG 는 파이프라인이 상자대로 잘라 둔 것이다. SVG 는 파이프라인이 못 그려 문서 그대로 두므로, 여기서 그림으로 바꾸고 상자(crop 칸)대로 자른다.
+ */
 async function ownLogo(ticker: string, size: number) {
   const code = krLogoCode(ticker);
   if (!code) return reply("missing");
   try {
-    const { data, error } = await getSupabaseAdminFresh().from("stock_logo_source").select("image").eq("code", code).maybeSingle();
-    const b64 = (data as { image?: string | null } | null)?.image;
-    if (error || !b64) return reply(error ? "error" : "missing");
-    const out = await shape(Buffer.from(b64, "base64"), size);
+    const { data, error } = await getSupabaseAdminFresh().from("stock_logo_source").select("image,crop").eq("code", code).maybeSingle();
+    const row = data as { image?: string | null; crop?: unknown } | null;
+    if (error || !row?.image) return reply(error ? "error" : "missing");
+    let body: Buffer = Buffer.from(row.image, "base64");
+    let crop: ReturnType<typeof logoCrop> = null;
+    if (isSvg(body)) {
+      body = await svgToPng(body);
+      crop = logoCrop(row.crop);
+    }
+    const out = await shape(body, size, crop);
     if (out === "blank") return reply("missing");
     return out ? image(out) : reply("error");
   } catch {
@@ -168,7 +178,7 @@ async function logoSource(ticker: string): Promise<LogoSourceRow> {
  */
 const BLANK_GIF = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
 
-function reply(verdict: "missing" | "error") {
+function reply(verdict: Exclude<LogoVerdict, "ok">) {
   return new Response(BLANK_GIF, {
     headers: { "Content-Type": "image/gif", "Cache-Control": cacheFor(verdict), "X-Logo": verdict },
   });

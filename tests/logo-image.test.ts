@@ -8,7 +8,7 @@ import { describe, it } from "node:test";
 
 import sharp from "sharp";
 
-import { FIT, P, fitLogoWebp } from "../lib/logo-image.ts";
+import { FIT, P, SVG_RASTER, fitLogoWebp, isSvg, svgToPng } from "../lib/logo-image.ts";
 
 /** 로고가 있는 그림만 넣으므로 늘 그림이 나와야 한다. */
 async function fit(...args: Parameters<typeof fitLogoWebp>): Promise<Buffer> {
@@ -193,5 +193,31 @@ describe("fitLogoWebp", () => {
     assert.equal(got.width, 64);
     assert.ok(Math.abs(got.w - (FIT * 64) / Math.cbrt(2)) <= 2, `조각 한 변 ${got.w}`);
     assert.ok(got.reach <= FIT + 0.04);
+  });
+});
+
+describe("SVG 로고(isSvg · svgToPng)", () => {
+  // 작게 적힌(120×40) 가로 로고 — 왼쪽 빨간 네모가 심볼, 오른쪽 회색 막대가 글자 자리.
+  const SVG = Buffer.from(
+    `<?xml version="1.0"?>\n<!-- 그린 도구 주석 -->\n<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40" viewBox="0 0 120 40">` +
+      `<rect x="0" y="0" width="40" height="40" fill="rgb(220,0,30)"/><rect x="50" y="12" width="70" height="16" fill="rgb(90,90,90)"/></svg>`,
+  );
+
+  it("앞 1KB 에 <svg 가 있는 문서만 SVG 로 본다(HTML · PNG 는 아니다)", async () => {
+    assert.equal(isSvg(SVG), true);
+    assert.equal(isSvg(Buffer.from("<!doctype html><html><body><svg></svg></body></html>")), false);
+    assert.equal(isSvg(await sharp({ create: { width: 8, height: 8, channels: 4, background: RED } }).png().toBuffer()), false);
+  });
+
+  it("작게 적힌 SVG 도 긴 변 SVG_RASTER 로 그리고, 상자로 심볼만 잘라 칸에 얹는다", async () => {
+    const png = await svgToPng(SVG);
+    const m = await sharp(png).metadata();
+    assert.equal(Math.max(m.width!, m.height!), SVG_RASTER);
+    const out = await fit(png, 48, [0, 0, 40 / 120, 1]);
+    const { data, info } = await sharp(out).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    assert.equal(info.width, 48);
+    let grey = 0;
+    for (let i = 0; i < data.length; i += 4) if (data[i + 3] > 200 && [0, 1, 2].every((c) => Math.abs(data[i + c] - 90) < 25)) grey++;
+    assert.equal(grey, 0, "상자 밖 글자 자리가 따라 들어왔다");
   });
 });

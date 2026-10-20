@@ -16,6 +16,7 @@ import {
   logoUpstreamPath,
   logoTicker,
   logoVerdict,
+  spacSponsorTicker,
   stockLogoPath,
 } from "../lib/stock-logo.ts";
 
@@ -52,6 +53,12 @@ describe("logoTicker", () => {
     assert.equal(logoTicker("0001A0", "KOSDAQ"), "0001A0.KQ");
     assert.equal(logoTicker("BRK.B", "US"), "BRK.B");
   });
+  it("스팩은 만든 증권사의 로고 티커로 묻는다(시장도 증권사 쪽)", () => {
+    assert.equal(logoTicker("0041L0", "KOSDAQ", "하나35호스팩"), "086790.KS");
+    assert.equal(logoTicker("478110", "KOSDAQ", "이베스트스팩6호"), "078020.KQ");
+    assert.equal(logoTicker("005930", "KOSPI", "삼성전자"), "005930.KS");
+    assert.equal(logoTicker("0041L0", null, "하나35호스팩"), null);
+  });
   it("시장을 모르면 요청하지 않는다(null)", () => {
     assert.equal(logoTicker("005930", null), null);
     assert.equal(logoTicker("005930", ""), null);
@@ -61,6 +68,35 @@ describe("logoTicker", () => {
     for (const t of [logoTicker("005930", "KOSPI"), logoTicker("247540", "KOSDAQ"), logoTicker("BRK.B", "US"), logoTicker("BF-B", "US")]) {
       assert.equal(LOGO_TICKER_RE.test(t!), true, t!);
     }
+  });
+});
+
+describe("spacSponsorTicker", () => {
+  // 2026-10-20 국장 스팩 76곳의 이름 — 앞머리 23가지가 모두 증권사로 이어져야 한다.
+  const SPACS = [
+    "DB금융스팩12호", "IBKS제23호스팩", "IBKS제24호스팩", "IBKS제25호스팩", "KB제29호스팩", "KB제30호스팩", "KB제31호스팩",
+    "KB제32호스팩", "KB제33호스팩", "KB제34호스팩", "교보15호스팩", "교보16호스팩", "교보17호스팩", "교보18호스팩", "교보19호스팩",
+    "교보20호스팩", "대신밸런스제17호스팩", "대신밸런스제19호스팩", "대신밸런스제20호스팩", "디비금융제13호스팩", "디비금융제14호스팩",
+    "메리츠제1호스팩", "메리츠제2호스팩", "미래에셋비전스팩10호", "미래에셋비전스팩11호", "미래에셋비전스팩4호", "미래에셋비전스팩5호",
+    "미래에셋비전스팩6호", "미래에셋비전스팩7호", "미래에셋비전스팩8호", "미래에셋비전스팩9호", "비엔케이제3호스팩", "삼성스팩10호",
+    "삼성스팩11호", "삼성스팩12호", "삼성스팩13호", "신영스팩10호", "신영스팩11호", "신한제12호스팩", "신한제13호스팩", "신한제14호스팩",
+    "신한제15호스팩", "신한제16호스팩", "신한제17호스팩", "신한제18호스팩", "에스케이증권제11호스팩", "에스케이증권제12호스팩",
+    "에스케이증권제13호스팩", "에이치엠씨제7호스팩", "엔에이치스팩31호", "엔에이치스팩32호", "엔에이치스팩33호", "엔에이치스팩34호",
+    "엘에스스팩1호", "유안타제15호스팩", "유안타제16호스팩", "유안타제17호스팩", "유진스팩10호", "유진스팩11호", "유진스팩12호",
+    "이베스트스팩6호", "키움제10호스팩", "키움제11호스팩", "키움히어로제1호스팩", "키움히어로제2호스팩", "하나30호스팩", "하나31호스팩",
+    "하나32호스팩", "하나33호스팩", "하나34호스팩", "하나35호스팩", "하나36호스팩", "한국제15호스팩", "한국제16호스팩", "한국제17호스팩",
+    "한화플러스제5호스팩",
+  ];
+  it("지금 상장된 스팩은 모두 증권사 티커로 이어진다", () => {
+    for (const name of SPACS) {
+      const t = spacSponsorTicker(name);
+      assert.ok(t && LOGO_TICKER_RE.test(t) && /\.(KS|KQ)$/.test(t), name);
+    }
+  });
+  it("스팩이 아니거나 모르는 앞머리면 null", () => {
+    assert.equal(spacSponsorTicker("삼성전자"), null);
+    assert.equal(spacSponsorTicker("한국전력"), null);
+    assert.equal(spacSponsorTicker("새증권제1호스팩"), null);
   });
 });
 
@@ -98,6 +134,9 @@ describe("logoVerdict", () => {
     // 없는 로고는 브라우저에 하루만(파이프라인이 길을 찾으면 다음 날 보이게) · CDN 은 그림과 같다.
     assert.equal(secs(LOGO_CACHE.missing), 86400);
     assert.equal(cdn(LOGO_CACHE.missing), cdn(LOGO_CACHE.ok));
+    // 판정표가 '없음'인 국장 종목은 한 시간만 — 판정표에 그림을 넣으면 그날 보여야 한다(logo.dev 에는 안 묻는다).
+    assert.equal(secs(LOGO_CACHE.none) <= 3600, true);
+    assert.equal(Number(cdn(LOGO_CACHE.none)) <= 3600, true);
     for (const cc of Object.values(LOGO_CACHE)) assert.match(cc, /^public, /);
   });
 });

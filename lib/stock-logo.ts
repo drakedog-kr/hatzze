@@ -36,13 +36,61 @@ export function isLogoSize(n: number): n is LogoSize {
  * logo.dev 가 받는 티커. KRX 는 접미사가 거래소와 맞아야 한다(KOSPI=.KS / KOSDAQ=.KQ).
  * 틀리면 에러가 아니라 조용히 폴백 이미지가 와서(에코프로비엠에 .KS 를 주면 "2"가 그려진다),
  * 시장을 모르면 아예 요청하지 않는다(null → 머리글자 배지). 미국 상장은 접미사 없이 티커
- * 그대로(NVDA·AAPL·TSM 실측).
+ * 그대로(NVDA·AAPL·TSM 실측). 국장 스팩은 이름(name)으로 만든 증권사의 로고를 쓴다(spacSponsorTicker).
  */
-export function logoTicker(code: string, market: string | null): string | null {
-  if (market === "KOSPI") return `${commonShareCode(code)}.KS`;
-  if (market === "KOSDAQ") return `${commonShareCode(code)}.KQ`;
+export function logoTicker(code: string, market: string | null, name?: string): string | null {
+  if (market === "KOSPI" || market === "KOSDAQ") {
+    const sponsor = name ? spacSponsorTicker(name) : null;
+    if (sponsor) return sponsor;
+    return `${commonShareCode(code)}.${market === "KOSPI" ? "KS" : "KQ"}`;
+  }
   if (market === "US") return code.toUpperCase();
   return null;
+}
+
+/**
+ * 스팩 이름 앞머리 → 만든 증권사(또는 그 금융지주)의 로고 티커. 시장은 증권사 쪽 것이다(스팩은 코스닥, 증권사는 대개 코스피).
+ * 2026-10-20 국장 스팩 76곳의 앞머리 23가지를 모두 담았고, 영문 · 한글 표기를 둘 다 적는다(KB · 케이비).
+ */
+const SPAC_SPONSORS: readonly (readonly [string, string])[] = [
+  ["교보", "030610.KS"], // 교보증권
+  ["대신", "003540.KS"], // 대신증권
+  ["DB", "016610.KS"], // DB증권
+  ["디비", "016610.KS"],
+  ["메리츠", "138040.KS"], // 메리츠금융지주
+  ["미래에셋", "006800.KS"], // 미래에셋증권
+  ["BNK", "138930.KS"], // BNK금융지주
+  ["비엔케이", "138930.KS"],
+  ["삼성", "016360.KS"], // 삼성증권
+  ["신영", "001720.KS"], // 신영증권
+  ["신한", "055550.KS"], // 신한지주
+  ["SK", "001510.KS"], // SK증권
+  ["에스케이", "001510.KS"],
+  ["현대차", "001500.KS"], // 현대차증권(옛 HMC투자증권)
+  ["에이치엠씨", "001500.KS"],
+  ["NH", "005940.KS"], // NH투자증권
+  ["엔에이치", "005940.KS"],
+  ["LS", "078020.KQ"], // LS증권(옛 이베스트투자증권)
+  ["엘에스", "078020.KQ"],
+  ["이베스트", "078020.KQ"],
+  ["유안타", "003470.KS"], // 유안타증권
+  ["유진", "001200.KS"], // 유진투자증권
+  ["IBK", "024110.KS"], // 기업은행(IBK투자증권은 상장 안 됨)
+  ["KB", "105560.KS"], // KB금융(KB증권은 상장 안 됨)
+  ["케이비", "105560.KS"],
+  ["키움", "039490.KS"], // 키움증권
+  ["하나", "086790.KS"], // 하나금융지주
+  ["한국", "071050.KS"], // 한국금융지주(한국투자증권)
+  ["한화", "003530.KS"], // 한화투자증권
+];
+
+/**
+ * 스팩이면 만든 증권사의 로고 티커, 아니면 null. 스팩은 합병용 회사라 제 로고가 없다 — 국장 스팩 76곳 중 54곳이 배지였고,
+ * logo.dev 에 그림이 있던 22곳도 대개 증권사 로고였지만 몇은 흐리거나 다른 회사 그림이었다(2026-10-20). 모르는 앞머리면 null(배지).
+ */
+export function spacSponsorTicker(name: string): string | null {
+  if (!name.includes("스팩")) return null;
+  return SPAC_SPONSORS.find(([prefix]) => name.startsWith(prefix))?.[1] ?? null;
 }
 
 /**
@@ -85,17 +133,20 @@ export function stockLogoPath(ticker: string, size: LogoSize): string {
 }
 
 /**
- * 업스트림 응답을 어떻게 돌려줄지. 셋으로 가른다.
+ * 업스트림 응답을 어떻게 돌려줄지. 넷으로 가른다.
  *   ok       그림 그대로. 브라우저 7일 · CDN 하루(지나면 옛 그림을 먼저 주고 뒤에서 갱신한다).
  *   missing  없는 로고(404). 그림과 같은 시간 캐시한다 — 없는 로고 12장이 방문마다 새로 나가던 자리.
  *   error    한도 초과(429)·장애·이상한 본문. 15분만 캐시한다. 그동안은 배지, 지나면 다시 물어본다.
  *            한도가 풀리는 날 재방문자도 15분 안에 로고를 본다. 429 를 길게 캐시하면 그 반대가 되고,
  *            너무 짧으면 한도를 넘긴 동안 CDN 이 못 막아 logo.dev 를 계속 두드린다.
+ *   none     국장 판정표가 '없음'이라 logo.dev 에 묻지 않은 것. 한 시간만 — 파이프라인 · 손 보충이 그림을 넣으면 그날 보여야
+ *            한다. 하루였을 때는 판정표에 그림을 넣은 뒤에도 CDN 의 '없음'이 하루 남아 화면에 배지로 보였다(자이에스앤디,
+ *            2026-10-20). 묻는 곳이 우리 판정표뿐이라 짧게 둬도 logo.dev 한도와 상관없다.
  *
  * 브라우저 7일은 우리 응답이라 우리가 정한다(logo.dev 자체는 하루). 재방문자가 일주일간 요청을
  * 안 보내 Vercel CDN 요청 수(Pro 포함분 월 100만)를 아낀다. 리브랜딩이 최대 일주일 늦게 보인다.
  */
-export type LogoVerdict = "ok" | "missing" | "error";
+export type LogoVerdict = "ok" | "missing" | "error" | "none";
 
 export const LOGO_CACHE: Record<LogoVerdict, string> = {
   ok: "public, max-age=604800, s-maxage=86400, stale-while-revalidate=86400",
@@ -103,6 +154,7 @@ export const LOGO_CACHE: Record<LogoVerdict, string> = {
   // 일주일이면 재방문자는 로고가 생긴 뒤에도 일주일 내내 배지를 봤다. CDN 은 그림과 같다.
   missing: "public, max-age=86400, s-maxage=86400, stale-while-revalidate=86400",
   error: "public, max-age=900, s-maxage=900",
+  none: "public, max-age=3600, s-maxage=3600, stale-while-revalidate=3600",
 };
 
 export function logoVerdict(status: number, contentType: string | null): LogoVerdict {

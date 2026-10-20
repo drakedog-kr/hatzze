@@ -118,6 +118,13 @@ def piece_box(body: bytes) -> list[float] | None:
     return None
 
 
+def is_svg(body: bytes) -> bool:
+    """SVG 문서인가(앞 1KB 에 <svg 가 있고 HTML 이 아니다). Pillow 는 SVG 를 못 읽어 /api/logo 가 sharp 로 그린다
+    (lib/logo-image.ts isSvg 와 같은 판정)."""
+    head = body[:1024].decode("utf-8", "ignore").lower()
+    return "<svg" in head and "<html" not in head
+
+
 def square_png(body: bytes, size: int = 256, box: list[float] | None = None) -> bytes | None:
     """그림(또는 그 안의 상자)을 투명 여백을 둔 정사각형 PNG 로. 흰 바탕은 투명으로 바꾸지 않는다(로고 그대로).
     긴 로고면 첫 덩어리를 자른다(box 를 안 주면 piece_box 로 찾는다). 못 읽으면 None."""
