@@ -213,15 +213,10 @@ export function ThemeIndexView({
         title="테마 흐름"
         // 요즘 도는 얘기 첫 문장이 AI 글이라 고지는 모듈 머리에 둔다(카더라 네 표와 같은 자리, 2026-10-04 점검).
         ai
-        // 점유율 아래 +%p 가 견준 기간('1주 전 대비')은 점유율 칸 머리 둘째 줄이 말한다 — 칸 꼴(점유율 / 그 아래 변화)과 같은 두 줄이다.
-        // 머리 근거에 두었더니 칸 머리 '최근 3일 점유율'과 기간 둘이 한 모듈에 따로 섰다(2026-10-05 운영자 판단, 카더라와 같은 정리).
-        // 폰은 표 머리 줄이 숨어서 머리 근거 끝에 남긴다(.v2-tm-basis). 날짜 범위는 뺐다 — 열흘 값처럼 읽혔다(2026-10-04 점검).
-        meta={
-          <>
-            점유율 상위 {FLOW_ROWS}
-            <span className="v2-tm-basis"> · 1주 전 대비</span>
-          </>
-        }
+        // 점유율 아래 +%p 가 견준 기간('1주 전 대비')은 모듈 머리가 말하고, 점유율 칸 머리는 '최근 3일 점유율' 한 줄이다(2026-10-20 운영자 판단).
+        // 10-05 엔 칸 머리 두 줄(최근 3일 점유율 / 1주 전 대비)이었는데 머리 줄만 두 줄로 높았다. 폰도 같은 머리라 따로 꼬리를 달지 않는다.
+        // 날짜 범위는 뺐다 — 열흘 값처럼 읽혔다(2026-10-04 점검).
+        meta={`1주 전 대비 점유율 상위 ${FLOW_ROWS}`}
         // 폰 전용 쪽지 — 넓은 화면은 지도 칸 쪽지(같은 id)가 같은 말을 한다(v2.css .v2-hint-phone).
         hint={themes?.length ? { id: "theme-tap", anchor: ".v2-tbody > li:first-child", className: "v2-hint-phone", text: "테마를 누르면 종목과 이유가 함께 나옵니다" } : undefined}
       >
@@ -233,10 +228,7 @@ export function ThemeIndexView({
               <span />
               <span>테마 · 언급 상위 종목</span>
               <span>요즘 도는 얘기</span>
-              <span className="v2-th-two">
-                최근 {KADERA_WINDOW_DAYS}일 점유율
-                <em>1주 전 대비</em>
-              </span>
+              <span>최근 {KADERA_WINDOW_DAYS}일 점유율</span>
               <span>최근 {flowDates.length || THEME_FLOW_DAYS}일</span>
             </div>
             <ol className="v2-tbody">

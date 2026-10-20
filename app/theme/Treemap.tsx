@@ -64,6 +64,8 @@ export type TreemapTile = {
   /** 툴팁·aria-label. */
   tip: string;
   valueText: string;
+  /** 값 옆 변화 — 테마 칸만. 부호 없는 크기('2.6%p')와 방향(▲ · ▼). 값과 같이 서고 같이 숨는다(값이 숨는 작은 칸엔 없다). */
+  delta?: { up: boolean; text: string };
   /** 큰 칸(lg)에만 서는 곁줄 — 테마 칸이면 그 테마의 언급 상위 종목. 가장 큰 칸이 판 절반을 빈 색 면으로 쓰던 것을 채운다(v2, 2026-10-03). */
   sub?: string;
 };
@@ -78,6 +80,8 @@ export function themeTiles(themes: ThemeOverview[], market: ThemeMarketKey = "kr
     href: marketThemeHref(market, t.theme),
     tip: `${t.theme} · 점유율 ${t.sharePct.toFixed(1)}% · ${t.shareDelta == null ? fmtDelta(null) : `1주 전 대비 ${fmtDelta(t.shareDelta)}`} · ${t.rank}위`,
     valueText: `${t.sharePct.toFixed(1)}%`,
+    // 흐름 표 점유율 칸과 같은 문턱 — 움직임이 0.05%p 아래면 안 적는다.
+    delta: t.shareDelta != null && Math.abs(t.shareDelta) >= 0.05 ? { up: t.shareDelta > 0, text: `${Math.abs(t.shareDelta).toFixed(1)}%p` } : undefined,
     sub: t.topStocks.length ? t.topStocks.map((x) => x.name).join(" · ") : undefined,
   }));
 }
@@ -180,10 +184,20 @@ export function Treemap({
                 {/* 점 앞은 붙이고(\u2060) 점 뒤에 끊을 자리(\u200b)를 둔다 — '전기차·자율주 / 행' 대신 '전기차· / 자율주행'. */}
                 <span className="hz-tm-name">{t.label.replace(/·/g, "\u2060·\u200b")}</span>
                 {size !== "xs" && size !== "tall" && (
-                  // 큰 칸에도 변화(+12.3%p)는 적지 않는다 — 띠 · 흐름 표와 한 화면에 세 번 섰고, 칸 색이 이미 말한다(2026-10-05 점검). 툴팁엔 있다.
+                  // 값 옆에 변화(▼8.4%p)를 적는다(2026-10-20 운영자 판단). 10-05 점검에선 띠 · 흐름 표와 겹친다고 걷었지만, 지도만 보고도
+                  // 얼마나 늘고 줄었는지가 읽혀야 한다. 꼴은 홈 히어로 · 스포트라이트와 같은 '▲2.6%p'(삼각형 + 부호 없는 크기).
+                  // 삼각형도 숫자도 칸 이름과 같은 잉크다 — 틴트 위 오름 · 내림 색은 명암비가 모자랐다(v2.css .hz-tm-arrow). 방향은 모양과 칸 색이 말한다.
                   // 작은 칸(sm)도 값을 그린다 — 숨김은 칸을 재는 컨테이너 쿼리(88×76 아래)가 맡는다. 판정이 어긋나 더 큰 칸에 값이 없었다.
                   <span className="hz-tm-val" style={{ fontFamily: MONO }}>
                     {t.valueText}
+                    {t.delta && (
+                      <span className="hz-tm-delta">
+                        <span className={`hz-tm-arrow ${t.delta.up ? "is-up" : "is-down"}`} aria-hidden="true">
+                          {t.delta.up ? "▲" : "▼"}
+                        </span>
+                        {t.delta.text}
+                      </span>
+                    )}
                   </span>
                 )}
                 {size === "lg" && t.sub && <span className="hz-tm-sub">{t.sub}</span>}
