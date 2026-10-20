@@ -302,7 +302,8 @@ export function ThemeIndexView({
         id="risers"
         title="테마별 급부상 종목"
         // 연휴 끝처럼 그날 줄이 하나도 없으면 줄이 있던 가장 최근 날의 목록이다 — 그날을 앞에 밝힌다.
-        meta={`${risersAsOf ? `${Number(risersAsOf.slice(5, 7))}/${Number(risersAsOf.slice(8, 10))} 기준 · ` : ""}최근 ${KADERA_WINDOW_DAYS}일 · 3일 전 대비`}
+        // '최근 3일'은 뺐다 — 표 머리 '최근 3일 언급'이 말한다(2026-10-20 운영자 판단).
+        meta={`${risersAsOf ? `${Number(risersAsOf.slice(5, 7))}/${Number(risersAsOf.slice(8, 10))} 기준 · ` : ""}3일 전 대비`}
         ai
       >
         {risers === null ? (
