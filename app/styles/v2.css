@@ -2038,6 +2038,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm .hz-tm-tile.is-tall .hz-tm-name { font-size: var(--fs-11); font-weight: 600; }
 .v2-tm .hz-tm-val { font-size: var(--fs-11); font-weight: 500; }
 .v2-tm .hz-tm-delta { font-size: var(--fs-11); font-weight: 500; }
+/* 지도 칸 변화의 삼각형 — 숫자와 같은 잉크로 숫자 머리에 붙인다. 오름 · 내림 색(--t-up · --t-down)을 입혔더니 가장 진한
+   파랑 칸에서 라이트 2.88 · 다크 2.16 이었다(그림이라도 3 이 문턱, 2026-10-20 실측). 방향은 삼각형 모양과 칸 색이 말한다. */
+.v2-tm .hz-tm-arrow { margin-right: 1px; font-size: 0.8em; }
 /* 큰 칸의 곁줄 — 그 테마의 언급 상위 종목(Treemap.tsx sub). 두 줄까지. */
 .hz-tm-sub {
   margin-top: 6px;
@@ -2099,11 +2102,6 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 }
 .v2-tm-flowtbl .v2-th > * { white-space: nowrap; }
 .v2-tm-flowtbl .v2-th { min-height: 44px; }
-/* 점유율 칸 머리 두 줄 — 칸 꼴(점유율 / 그 아래 변화)과 같다. 둘째 줄이 변화가 견준 기간이다(2026-10-05 운영자 판단 '1주 전 대비'). */
-.v2-tm-flowtbl .v2-th > .v2-th-two { display: flex; flex-direction: column; align-items: flex-end; line-height: 16px; }
-.v2-th-two em { font-style: normal; }
-/* 흐름 머리 근거 끝 '· 1주 전 대비'는 폰만 — 넓은 화면은 점유율 칸 머리가 말한다. 폰은 표 머리 줄이 숨는다. */
-.v2-tm-basis { display: none; }
 /* 순위는 테마 이름 줄에 — 이름 · 종목 두 줄 칸이 줄 가운데를 정해 순위가 둘 사이에 떠 보였다(2026-10-05 점검). 테마 칸 위 여백 7 과 같은 줄. */
 .v2-tm-flowtbl .v2-tbody .v2-td-rank { align-self: start; margin-top: 7px; }
 /* 숫자 · 문장 칸 첫 줄도 이름 줄에 — 가운데 맞춤이면 9px 엇갈렸다(2026-10-08 점검). 1,000 미만은 두 층이라 따로. */
@@ -2409,7 +2407,6 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-tm-map-bar { display: block; }
   .v2-tm-title-wide { display: none; }
   .v2-tm-title-phone { display: inline; }
-  .v2-tm-basis { display: inline; }
   /* 테마 흐름 — 위 테마 · 점유율, 가운데 열흘 한 조각, 아래 요즘 도는 얘기. */
   .v2-tm-flowtbl .v2-tr {
     grid-template-columns: 20px minmax(0, 1fr) auto;
