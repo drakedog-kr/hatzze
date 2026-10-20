@@ -59,8 +59,6 @@ DOMAIN_OVERRIDE: dict[str, str] = {
     "136480": "harim.com",  # 하림
     "138610": "nibec.co.kr",  # 나이벡
     "154030": "asiaseed.net",  # 아시아종묘
-    "192250": "ksign.com",  # 케이사인
-    "208710": "photon25.com",  # 포톤
     "266690": "navcours.com",  # 덕산넵코어스
     "270660": "everybot.co.kr",  # 에브리봇
     "278650": "hlbbiostep.com",  # HLB바이오스텝
@@ -226,7 +224,6 @@ OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
     "333430": ("http://www.ilseung.co.kr/_public/images/common/logo3.png", None),  # 일승
     "356860": ("https://www.tlbpcb.com/img/favicon_144.png", None),  # 티엘비
     # 2026-10-19 — logo.dev 에 없는 종목(배지)을 홈페이지 그림으로 채웠다. 옛 이름 · 제품 · 다른 회사 이름이 적힌 로고와 호스팅 기본 그림은 뺐다.
-    "0001A0": ("https://www.dyenergen.com/favicon-152.png", [0, 0, 1, 1]),  # 덕양에너젠
     "000590": ("http://www.chosunwelding.com/kr/images/logo.gif", None),  # CS홀딩스
     "000650": ("https://www.chunilexpress.com/images/main/logo.jpg", [0, 0, 0.14, 1]),  # 천일고속
     "000950": ("http://www.chonbang.co.kr/wp-content/uploads/2020/09/logo_top.png", None),  # 전방
@@ -478,6 +475,28 @@ OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
     "464580": ("https://www.dot-mill.com/_File/siteMng//ogImageFile_1690284621_0.jpg", [0, 0, 1, 1]),  # 닷밀
     "900120": ("http://www.ckhfnh.co.kr/i/logo_cxi.png", [0, 0, 1, 1]),  # 씨엑스아이
     "900260": ("http://www.rothwell.tech/images/common/logo.png", None),  # 로스웰
+    # 2026-10-20 — 홈페이지 로고가 SVG 뿐인 곳. 파이프라인은 문서 그대로 두고 /api/logo 가 그려 상자대로 자른다(None 이면 통째).
+    "006740": ("http://www.khblue.com/theme/wering/img/logo_blue.svg", [0, 0, 0.1367, 1]),  # 블루산업개발
+    "0126Z0": ("https://www.samsungepisholdings.com/images/common/logo.svg", None),  # 삼성에피스홀딩스
+    "0218L0": ("https://www.neovue.com/images/main/logo-dark.svg", None),  # 네오뷰
+    "025560": ("https://www.mirae.co.kr/uploads/logo/logo_1783900994.svg", [0.7271, 0, 0.2729, 1]),  # 미래산업
+    "032820": ("https://www.wooritg.com/assets/images/common/logo-color.svg", [0, 0, 0.5509, 1]),  # 우리기술
+    "037370": ("http://www.egcorp.co.kr/assets/basic/images/logo.svg", None),  # EG
+    "042110": ("https://www.sscd.co.kr:443/theme/basic/images/top_logo.svg", None),  # 에스씨디
+    "078070": ("https://ubiquoss.com:44335/renew/resources/img/common/logo.svg", None),  # 유비쿼스홀딩스
+    "080470": ("https://www.sc-autotech.com/img/common/logo.svg", [0, 0, 0.2305, 1]),  # 성창오토텍
+    "096870": ("https://www.ldt.co.kr/design/theme/ldt/image/main/logo.svg", None),  # 엘디티
+    "118000": ("http://smedi.net/theme/basic/img/logo.svg", [0, 0, 0.1953, 1]),  # 메타케어
+    "126880": ("https://jnk-global.com/theme/basic/img/style/logo.svg", None),  # 제이엔케이글로벌
+    "142760": ("https://moalifeplus.com/images/main_logo.svg", None),  # 모아라이프플러스
+    "204020": ("https://www.gritee.com/data/skin/respon_default/images/skin/logo.svg", None),  # 그리티
+    "208350": ("https://www.jiransecurity.com/img/_common/logo.svg", [0, 0, 0.1973, 1]),  # 지란지교시큐리티
+    "252500": ("https://www.sewha.co.kr/imgs/layouts/front/sewha_logo_black.svg", None),  # 세화피앤씨
+    "262840": ("https://www.iquest.co.kr/view/assets/imgs/logo.svg", [0, 0, 0.1797, 1]),  # 아이퀘스트
+    "264450": ("https://ubiquoss.com:44335/renew/resources/img/common/logo.svg", None),  # 유비쿼스
+    "368970": ("https://www.osppetfood.com/kor/main/images/logo.svg", None),  # 오에스피
+    "440290": ("https://www.hbvc.co.kr/img/svg/logo.svg", [0, 0, 0.2383, 1]),  # HB인베스트먼트
+    "452190": ("https://www.hblaser.co.kr/default/img/onepixel/images/logo-dark.svg", [0.0303, 0, 0.457, 1]),  # 한빛레이저
 }
 
 PREFER_DOMAIN: set[str] = {

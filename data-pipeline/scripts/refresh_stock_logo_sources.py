@@ -54,7 +54,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.kind import get_page, rows_of  # noqa: E402
-from common.logo_shape import is_wide, piece_box, square_png  # noqa: E402
+from common.logo_shape import is_svg, is_wide, piece_box, square_png  # noqa: E402
 from common.supabase_client import execute_with_retry, get_client, load_all  # noqa: E402
 from config.stock_logo_exclude import EXCLUDE  # noqa: E402
 from config.stock_logo_shape import CROP_OVERRIDE, DOMAIN_OVERRIDE, OWN_LOGO, PREFER_DOMAIN  # noqa: E402
@@ -72,6 +72,7 @@ SIZE = 64
 SHAPE_SIZE = 512
 # 우리가 두는 그림(source = own)의 크기. 화면이 가장 크게 쓰는 눈금(128)의 두 배.
 OWN_SIZE = 256
+SVG_MAX = 300_000  # 홈페이지 SVG 로고는 대개 수 KB ~ 수십 KB. 이보다 크면 그림을 품은 문서라 받지 않는다
 # 잘라 낸 조각이 이보다 흐리면(선명도 · BLUR_EDGE 기준) 자르지 않는다 — 원본이 작아 키운 첫 글자가 뭉갰다. 2026-10-18 자동 조각
 # 578장을 눈으로 본 것에서 나쁜 69장 중 33장을 잡고 멀쩡한 것은 6장만 걸렀다(0.03 이면 43장 · 18장).
 CROP_BLUR_MAX = 0.02
@@ -393,13 +394,20 @@ BROWSER_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
 
 
 def own_image(url: str, box: list[float] | None) -> tuple[str, str] | None:
-    """홈페이지 그림 → (base64 PNG, sha256). 정사각형으로 다듬는다(긴 로고면 box 또는 첫 덩어리). 못 받으면 None."""
+    """홈페이지 그림 → (base64 PNG 또는 SVG 문서, sha256). PNG 는 정사각형으로 다듬는다(긴 로고면 box 또는 첫 덩어리). 못 받으면 None."""
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": BROWSER_UA}), timeout=20, context=_LOOSE_SSL) as r:
             body = r.read(5_000_000)
     except Exception as e:  # noqa: BLE001 — 사이트가 잠깐 안 열리면 예전 그림을 그대로 둔다
         print(f"[로고] 홈페이지 그림을 못 받았습니다 {url}: {type(e).__name__}")
         return None
+    if is_svg(body):
+        # Pillow 는 SVG 를 못 읽는다 — 문서 그대로 두고 /api/logo 가 그림으로 바꿔 상자(crop 칸)대로 자른다. 그래서 SVG 는
+        # 첫 덩어리를 스스로 못 찾는다(box 를 손으로 적는다 · None 이면 통째). 2026-10-20 홈페이지 로고가 SVG 뿐인 곳 40.
+        if len(body) > SVG_MAX:
+            print(f"[로고] SVG 가 너무 큽니다({len(body):,}바이트) {url}")
+            return None
+        return base64.b64encode(body).decode("ascii"), hashlib.sha256(body).hexdigest()
     png = square_png(body, OWN_SIZE, box)
     if png is None:
         return None

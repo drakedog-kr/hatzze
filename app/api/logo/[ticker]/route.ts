@@ -13,7 +13,7 @@ import {
   type LogoSourceRow,
   type LogoVerdict,
 } from "@/lib/stock-logo";
-import { containWebp, fitLogoWebp } from "@/lib/logo-image";
+import { containWebp, fitLogoWebp, isSvg, svgToPng } from "@/lib/logo-image";
 import { getSupabaseAdminFresh } from "@/lib/supabase-server";
 
 /**
@@ -120,15 +120,24 @@ async function shape(
   }
 }
 
-/** 판정표에 둔 우리 그림(source = own) — 같은 셈으로 칸에 맞춰 준다. 그림이 없거나 못 읽으면 없는 로고. */
+/**
+ * 판정표에 둔 우리 그림(source = own) — 같은 셈으로 칸에 맞춰 준다. 그림이 없거나 못 읽으면 없는 로고.
+ * PNG 는 파이프라인이 상자대로 잘라 둔 것이다. SVG 는 파이프라인이 못 그려 문서 그대로 두므로, 여기서 그림으로 바꾸고 상자(crop 칸)대로 자른다.
+ */
 async function ownLogo(ticker: string, size: number) {
   const code = krLogoCode(ticker);
   if (!code) return reply("missing");
   try {
-    const { data, error } = await getSupabaseAdminFresh().from("stock_logo_source").select("image").eq("code", code).maybeSingle();
-    const b64 = (data as { image?: string | null } | null)?.image;
-    if (error || !b64) return reply(error ? "error" : "missing");
-    const out = await shape(Buffer.from(b64, "base64"), size);
+    const { data, error } = await getSupabaseAdminFresh().from("stock_logo_source").select("image,crop").eq("code", code).maybeSingle();
+    const row = data as { image?: string | null; crop?: unknown } | null;
+    if (error || !row?.image) return reply(error ? "error" : "missing");
+    let body: Buffer = Buffer.from(row.image, "base64");
+    let crop: ReturnType<typeof logoCrop> = null;
+    if (isSvg(body)) {
+      body = await svgToPng(body);
+      crop = logoCrop(row.crop);
+    }
+    const out = await shape(body, size, crop);
     if (out === "blank") return reply("missing");
     return out ? image(out) : reply("error");
   } catch {

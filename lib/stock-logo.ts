@@ -36,13 +36,61 @@ export function isLogoSize(n: number): n is LogoSize {
  * logo.dev 가 받는 티커. KRX 는 접미사가 거래소와 맞아야 한다(KOSPI=.KS / KOSDAQ=.KQ).
  * 틀리면 에러가 아니라 조용히 폴백 이미지가 와서(에코프로비엠에 .KS 를 주면 "2"가 그려진다),
  * 시장을 모르면 아예 요청하지 않는다(null → 머리글자 배지). 미국 상장은 접미사 없이 티커
- * 그대로(NVDA·AAPL·TSM 실측).
+ * 그대로(NVDA·AAPL·TSM 실측). 국장 스팩은 이름(name)으로 만든 증권사의 로고를 쓴다(spacSponsorTicker).
  */
-export function logoTicker(code: string, market: string | null): string | null {
-  if (market === "KOSPI") return `${commonShareCode(code)}.KS`;
-  if (market === "KOSDAQ") return `${commonShareCode(code)}.KQ`;
+export function logoTicker(code: string, market: string | null, name?: string): string | null {
+  if (market === "KOSPI" || market === "KOSDAQ") {
+    const sponsor = name ? spacSponsorTicker(name) : null;
+    if (sponsor) return sponsor;
+    return `${commonShareCode(code)}.${market === "KOSPI" ? "KS" : "KQ"}`;
+  }
   if (market === "US") return code.toUpperCase();
   return null;
+}
+
+/**
+ * 스팩 이름 앞머리 → 만든 증권사(또는 그 금융지주)의 로고 티커. 시장은 증권사 쪽 것이다(스팩은 코스닥, 증권사는 대개 코스피).
+ * 2026-10-20 국장 스팩 76곳의 앞머리 23가지를 모두 담았고, 영문 · 한글 표기를 둘 다 적는다(KB · 케이비).
+ */
+const SPAC_SPONSORS: readonly (readonly [string, string])[] = [
+  ["교보", "030610.KS"], // 교보증권
+  ["대신", "003540.KS"], // 대신증권
+  ["DB", "016610.KS"], // DB증권
+  ["디비", "016610.KS"],
+  ["메리츠", "138040.KS"], // 메리츠금융지주
+  ["미래에셋", "006800.KS"], // 미래에셋증권
+  ["BNK", "138930.KS"], // BNK금융지주
+  ["비엔케이", "138930.KS"],
+  ["삼성", "016360.KS"], // 삼성증권
+  ["신영", "001720.KS"], // 신영증권
+  ["신한", "055550.KS"], // 신한지주
+  ["SK", "001510.KS"], // SK증권
+  ["에스케이", "001510.KS"],
+  ["현대차", "001500.KS"], // 현대차증권(옛 HMC투자증권)
+  ["에이치엠씨", "001500.KS"],
+  ["NH", "005940.KS"], // NH투자증권
+  ["엔에이치", "005940.KS"],
+  ["LS", "078020.KQ"], // LS증권(옛 이베스트투자증권)
+  ["엘에스", "078020.KQ"],
+  ["이베스트", "078020.KQ"],
+  ["유안타", "003470.KS"], // 유안타증권
+  ["유진", "001200.KS"], // 유진투자증권
+  ["IBK", "024110.KS"], // 기업은행(IBK투자증권은 상장 안 됨)
+  ["KB", "105560.KS"], // KB금융(KB증권은 상장 안 됨)
+  ["케이비", "105560.KS"],
+  ["키움", "039490.KS"], // 키움증권
+  ["하나", "086790.KS"], // 하나금융지주
+  ["한국", "071050.KS"], // 한국금융지주(한국투자증권)
+  ["한화", "003530.KS"], // 한화투자증권
+];
+
+/**
+ * 스팩이면 만든 증권사의 로고 티커, 아니면 null. 스팩은 합병용 회사라 제 로고가 없다 — 국장 스팩 76곳 중 54곳이 배지였고,
+ * logo.dev 에 그림이 있던 22곳도 대개 증권사 로고였지만 몇은 흐리거나 다른 회사 그림이었다(2026-10-20). 모르는 앞머리면 null(배지).
+ */
+export function spacSponsorTicker(name: string): string | null {
+  if (!name.includes("스팩")) return null;
+  return SPAC_SPONSORS.find(([prefix]) => name.startsWith(prefix))?.[1] ?? null;
 }
 
 /**

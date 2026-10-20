@@ -317,3 +317,25 @@ def test_pick_targets_only_codes():
     existing = {c: {"domain": "a.co.kr", "source": "ticker", "checked_at": "2026-10-18T00:00:00+00:00"} for c in ("000001", "000002")}
     picked = R.pick_targets(stocks, existing, {"000001": "a.co.kr", "000002": "a.co.kr"}, NOW, 10, only={"000002"})
     assert [t["code"] for t in picked] == ["000002"]
+
+
+def test_own_image_keeps_svg_document(monkeypatch):
+    """SVG 는 Pillow 가 못 그려 문서 그대로 둔다(/api/logo 가 그림으로 바꿔 상자대로 자른다)."""
+    import base64
+    svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>'
+
+    class Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self, n=-1):
+            return svg
+
+    monkeypatch.setattr(R.urllib.request, "urlopen", lambda *a, **k: Resp())
+    got = R.own_image("https://x.example/logo.svg", [0, 0, 0.5, 1])
+    assert got is not None and base64.b64decode(got[0]) == svg
+    monkeypatch.setattr(R, "SVG_MAX", 10)
+    assert R.own_image("https://x.example/logo.svg", None) is None

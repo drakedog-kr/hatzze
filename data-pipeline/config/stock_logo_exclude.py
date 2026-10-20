@@ -8,6 +8,7 @@ scripts/refresh_stock_logo_sources.py 가 읽어 `stock_logo_source.source` 를 
 """
 
 EXCLUDE: dict[str, str] = {
+    "0001A0": "남의 손에 넘어간 도메인(덕양에너젠 → 동광마켓 · 2026-10-20)",
     "037350": "집 모양 기본 아이콘(성도이엔지)",
     "052260": "로고가 아니라 사진(현대바이오랜드)",
     "125210": "워드프레스 로고(아모그린텍)",

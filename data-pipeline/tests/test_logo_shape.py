@@ -52,3 +52,9 @@ def test_square_png_pads_to_square_with_transparent_margin():
     out = Image.open(io.BytesIO(S.square_png(body, 128)))
     assert out.size == (128, 128)
     assert out.getpixel((0, 0))[3] == 0  # 모서리는 투명
+
+
+def test_is_svg_reads_head_only():
+    assert S.is_svg(b'<?xml version="1.0"?>\n<!-- tool -->\n<svg xmlns="http://www.w3.org/2000/svg"></svg>')
+    assert not S.is_svg(b"<!doctype html><html><body><svg></svg></body></html>")
+    assert not S.is_svg(png(lambda d: d.rectangle([0, 0, 10, 10], fill=(0, 0, 0, 255))))

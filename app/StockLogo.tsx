@@ -158,7 +158,7 @@ export function StockLogo({
   lazy?: boolean;
 }) {
   // ⚠️ null 이면 "시장을 몰라 요청하지 않는다"는 뜻이다(lib/stock-logo.ts 의 접미사 규칙).
-  const ticker = logoTicker(code, market);
+  const ticker = logoTicker(code, market, name);
   const [failed, setFailed] = useState(false);
   const [tile, setTile] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);

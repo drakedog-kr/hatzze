@@ -202,6 +202,26 @@ function emblem(m: InkMeasure): boolean {
   return m.box.width >= 2 * m.box.height;
 }
 
+/** SVG 를 그림으로 바꿀 때의 긴 변(px). logo.dev 에서 자를 그림을 받는 크기(LOGO_SHAPE_SIZE)와 같다 — 상자로 잘라도 뭉개지지 않게. */
+export const SVG_RASTER = 512;
+
+/**
+ * SVG 문서인가(앞 1KB 에 <svg 가 있고 HTML 이 아니다). 홈페이지 로고가 SVG 뿐인 회사는 파이프라인(Pillow)이 못 그려 문서 그대로
+ * 판정표에 둔다(data-pipeline/common/logo_shape.py is_svg 와 같은 판정).
+ */
+export function isSvg(body: Buffer): boolean {
+  const head = body.subarray(0, 1024).toString("utf8").toLowerCase();
+  return head.includes("<svg") && !head.includes("<html");
+}
+
+/** SVG 를 긴 변 SVG_RASTER 의 PNG 로. 문서에 적힌 크기(72dpi 기준)에 맞춰 dpi 를 정한다 — 작게 적힌 로고도 크게 그린다. */
+export async function svgToPng(body: Buffer): Promise<Buffer> {
+  const m = await sharp(body).metadata();
+  const long = Math.max(m.width ?? 0, m.height ?? 0) || SVG_RASTER;
+  const density = Math.min(72 * 32, Math.max(1, (72 * SVG_RASTER) / long));
+  return sharp(body, { density }).png().toBuffer();
+}
+
 /** 그림을 비율만 지켜 size × size 칸에 채운다(바탕을 칠한 그림 · 다듬지 못한 그림). */
 export function containWebp(body: Buffer, size: number): Promise<Buffer> {
   return sharp(body).resize(size, size, { fit: "contain", background: TRANSPARENT }).webp({ quality: 90 }).toBuffer();
