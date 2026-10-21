@@ -150,7 +150,7 @@ export function Treemap({
    * v2 에서 한때 걷었다가(2026-10-03 '설명 문장을 두지 않는다') 2026-10-05 운영자 판단으로 되살렸다 — 칸이 링크라는 건 눌러 보기 전엔
    * 모르고 폰엔 호버도 없다. 좌표는 칸과 같은 퍼센트라 상자가 늘어나도 같이 움직인다.
    */
-  hint?: { id: string; order?: number; text: (label: string) => string };
+  hint?: { id: string; order?: number; together?: boolean; text: (label: string) => string };
 }) {
   const H = W / aspect;
   const rects = squarify(
@@ -237,6 +237,7 @@ export function Treemap({
         <V2Hint
           id={hint.id}
           order={hint.order}
+          together={hint.together}
           text={hint.text(byKey.get(biggest.key)!.label)}
           target=".hz-tm-tile"
           // 곁줄('언급 상위 종목')이 있으면 그 아래로 — 56 이면 쪽지가 곁줄을 통째로 덮었다(2026-10-08 마지막 점검).

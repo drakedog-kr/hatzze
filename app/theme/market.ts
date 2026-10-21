@@ -25,6 +25,8 @@ export type ThemeMarket = {
   reasonRateNote: string;
   /** '이 테마는' 도움말에 드는 시장 낱말. */
   marketWord: string;
+  /** 급부상 첫 종목 밑 안내 쪽지 — 종목을 누르면 가는 화면이 시장마다 달라(국장 종목 화면 · 미장 내부자 종목 화면) 카더라 종목 쪽지와 같은 말을 쓴다. */
+  stockHint: string;
 };
 
 export const KR_MARKET: ThemeMarket = {
@@ -37,6 +39,7 @@ export const KR_MARKET: ThemeMarket = {
   quotesCaption: (date) => (date ? `${fmtKoDate(date)} 종가` : "종가"),
   reasonRateNote: "그날 종가 등락률",
   marketWord: "국내",
+  stockHint: "종목을 누르면 언급 추이와 요즘 도는 얘기가 나옵니다",
 };
 
 export const US_MARKET: ThemeMarket = {
@@ -50,4 +53,5 @@ export const US_MARKET: ThemeMarket = {
   quotesCaption: (date) => (date ? `${fmtKoDate(date)} 미국장` : "미국장 최근 시세"),
   reasonRateNote: "그날 미국장 등락률",
   marketWord: "미국",
+  stockHint: "종목을 누르면 월가 거물·임원 매매까지 함께 나옵니다",
 };

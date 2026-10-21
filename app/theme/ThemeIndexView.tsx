@@ -206,8 +206,10 @@ export function ThemeIndexView({
                 tiles={themeTiles(themes, market.key)}
                 ariaLabel="테마별 최근 3일 언급 점유율"
                 aspect={3}
-                // 폰은 지도가 숨어 같은 id 의 쪽지가 아래 테마 흐름 첫 줄에 선다(한 번 보면 둘 다 끝).
-                hint={{ id: "theme-tap", text: (label) => `${label} 칸을 누르면 이 테마의 상세 정보가 열립니다` }}
+                // 지도 · 흐름 표 · 급부상 쪽지 셋은 따로 닫고 차례 없이 같이 뜬다(together) — 차례를 두면 위 쪽지를 닫아야 아래가 떠서 아래 둘을 못 봤다
+                // (카더라 테마 · 종목 쪽지와 같은 까닭). id 는 2026-10-21 새로 땄다 — 옛 'theme-tap'을 닫은 재방문자에게도 한 번 더 뜬다(운영자 지시).
+                // 폰은 지도가 숨어 이 쪽지도 안 보인다.
+                hint={{ id: "theme-map-tap", order: 1, together: true, text: (label) => `${label} 칸을 누르면 이 테마의 상세 정보가 열립니다` }}
               />
             </div>
             {/* 거래대금 지도 — 넓이 3일 평균 거래대금 · 색 1주 전 대비(흐름 표 거래대금 칸과 같은 수). 쪽지는 언급 지도 한 곳에만. */}
@@ -251,8 +253,8 @@ export function ThemeIndexView({
         // 지도 범례 맨 앞('1주 전 대비')이 말한다. 점유율 칸 머리는 '최근 3일 점유율' 한 줄(2026-10-20) — 10-05 엔 두 줄이라 머리 줄만 높았다.
         // 날짜 범위는 뺐다 — 열흘 값처럼 읽혔다(2026-10-04 점검).
         meta={`점유율 상위 ${FLOW_ROWS}`}
-        // 폰 전용 쪽지 — 넓은 화면은 지도 칸 쪽지(같은 id)가 같은 말을 한다(v2.css .v2-hint-phone).
-        hint={themes?.length ? { id: "theme-tap", anchor: ".v2-tbody > li:first-child", className: "v2-hint-phone", text: "테마를 누르면 종목과 이유가 함께 나옵니다" } : undefined}
+        // 첫 줄 밑 쪽지 — 한때 폰 전용이었다(넓은 화면은 지도 칸 쪽지가 같은 말을 했다). 2026-10-21 넓은 화면에도 세운다(운영자 지시 "트리맵과 같이").
+        hint={themes?.length ? { id: "theme-flow-tap", order: 2, together: true, anchor: ".v2-tbody > li:first-child", text: "테마를 누르면 종목과 이유가 함께 나옵니다" } : undefined}
       >
         {themes === null || themes.length === 0 ? (
           <p className="v2-empty">{themes === null ? "테마 집계를 지금 불러오지 못했습니다." : "아직 집계된 테마가 없습니다."}</p>
@@ -339,6 +341,12 @@ export function ThemeIndexView({
         // '최근 3일'은 뺐다 — 표 머리 '최근 3일 언급'이 말한다(2026-10-20 운영자 판단).
         meta={`${risersAsOf ? `${Number(risersAsOf.slice(5, 7))}/${Number(risersAsOf.slice(8, 10))} 기준 · ` : ""}3일 전 대비`}
         ai
+        // 첫 종목 밑 쪽지(2026-10-21). 줄 전체가 아니라 종목 칸을 가리킨다 — 줄 안 테마 이름은 테마 화면으로 간다. 이유 글도 같은 종목 링크라 눌러도 '봤음'.
+        hint={
+          risers?.length
+            ? { id: "theme-riser-stock", order: 3, together: true, anchor: ".v2-tbody > li:first-child .v2-td-stock", target: ".v2-tm-risertbl :is(.v2-td-stock, .v2-td-text)", text: market.stockHint }
+            : undefined
+        }
       >
         {risers === null ? (
           <p className="v2-empty">테마 요약을 지금 불러오지 못했습니다. 잠시 뒤 다시 열어 주십시오.</p>
@@ -369,7 +377,10 @@ export function ThemeIndexView({
                       <span className="v2-td-name">{r.name}</span>
                       <span className={`hz-theme-tag ${toneForRatio(riserMultiple(r), r.recent)}`}>{riserDelta(r)}</span>
                     </Link>
-                    <span className="v2-td-text">{r.reason}</span>
+                    {/* 이유 글도 같은 종목으로 간다(2026-10-21) — 올리면 종목 칸처럼 줄이 칠해지는데 눌러서 아무 일이 없으면 칠한 뜻이 어긋난다. */}
+                    <Link href={market.stockHref(r.code)} className="v2-td-text" data-ga="theme_riser_reason_click">
+                      {r.reason}
+                    </Link>
                     <span className="v2-td-num v2-td-two">
                       {r.recent.toLocaleString("ko-KR")}회
                       {/* '그 전 3일' — 태그('3일 전 대비 9배')가 견준 사흘. '새로 등장'(그 전 3일 0회)이면 태그가 이미 말해 적지 않는다(2026-10-05 점검). */}

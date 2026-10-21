@@ -170,10 +170,8 @@
   .v2-hint-mouse { display: none; }
   .v2-hint-touch { display: inline; }
 }
-/* 폰에서만 서는 쪽지(테마 판세 흐름 표 — 넓은 화면은 지도 칸이 같은 말을 한다). */
-.v2-hint-phone { display: none; }
+/* 폰에서만 서던 쪽지(.v2-hint-phone · 테마 판세 흐름 표)는 2026-10-21 넓은 화면에도 세우며 걷었다. */
 @container kd (max-width: 679px) {
-  .v2-hint-phone:not([hidden]) { display: block; }
   /* ✕ 는 24 그대로 두고 누르는 자리만 44 로 — 빗나가면 쪽지 밑 줄이 눌려 화면을 떠났다(2026-10-05 모바일 점검). */
   .v2-hint-x::after { content: ""; position: absolute; inset: -10px; }
 }
@@ -2182,10 +2180,11 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 }
 .v2-tm-risertbl .v2-td-theme { word-break: keep-all; }
 .v2-tm-risertbl .v2-tr:hover { background: none; }
-/* 종목 칸에 올리면 그 줄을 칠한다 — 테마 흐름 줄 호버(a.v2-tr:hover)와 같은 면(2026-10-21 운영자 지시). 줄은 링크 둘(테마 · 종목)을 품은 상자라
-   줄 전체가 아니라 종목 링크가 기준이다. 폰은 누른 뒤 :hover 가 남아 면이 붙어 있으니 마우스가 있는 화면만. */
+/* 종목 칸에 올리면 그 줄을 칠한다 — 테마 흐름 줄 호버(a.v2-tr:hover)와 같은 면(2026-10-21 운영자 지시). 줄은 링크 셋(테마 · 종목 · 이유)을 품은 상자라
+   줄 전체가 아니라 종목으로 가는 링크 둘(종목 칸 · 채널이 말한 이유)이 기준이다. 테마 이름은 다른 화면으로 가서 칠하지 않는다.
+   폰은 누른 뒤 :hover 가 남아 면이 붙어 있으니 마우스가 있는 화면만. */
 @media (hover: hover) {
-  .v2-tm-risertbl .v2-tr:has(> .v2-td-stock:hover) { background: var(--t-tint); }
+  .v2-tm-risertbl .v2-tr:has(> :is(.v2-td-stock, .v2-td-text):hover) { background: var(--t-tint); }
 }
 /* 순위 칸이 앞에 서서 문장 머리('채널이 말한 이유')가 넷째다 — 공통 규칙(넷째부터 숫자 · 오른쪽)을 되돌린다. */
 .v2-tm-risertbl .v2-th > :nth-child(4) { text-align: left; }
@@ -3663,7 +3662,7 @@ a.v2-isd-row:hover { background: var(--t-tint); }
   .v2-tm-risertbl .v2-tr { grid-template-columns: 20px minmax(0, 1fr) auto; grid-template-areas: "rank theme theme" ".    stock num" ".    text text"; }
   .v2-tm-risertbl .v2-td-rank { grid-area: rank; align-self: start; }
   .v2-tm-risertbl .v2-td-theme { justify-self: start; padding: 8px; margin: -8px -8px -4px; }
-  /* 종목 링크 누르는 자리 22 → 34 — 아래 이유 글은 링크가 아니라 덮어도 된다(2026-10-08 마지막 점검). */
+  /* 종목 링크 누르는 자리 22 → 34 — 아래 이유 글을 덮어도 된다(2026-10-08 마지막 점검). 이유 글도 같은 종목으로 가는 링크다(2026-10-21). */
   .v2-tm-risertbl .v2-td-stock { position: relative; }
   .v2-tm-risertbl .v2-td-stock::after { content: ""; position: absolute; inset: 0 0 -12px; }
   /* 30일 막대는 80 — 56 이면 납작해 날마다의 차이가 안 보였다(종목 판 폭 112 와 같은 생각). */
