@@ -124,9 +124,10 @@ export const LOGO_TICKER_RE = /^[A-Z0-9][A-Z0-9.\-]{0,11}$/;
  *   9 — 같은 날. 아침 파이프라인의 로고 잡이 머지 전 코드(손 설정 없음)로 돌아 손 보충 판정을 되돌렸고, 그사이 판 8 48px 그림
  *       24장이 되돌린 판정으로 CDN 에 들어갔다. ⚠️ 라우트 캐시 비우기(revalidatePath)로는 CDN 의 이 응답이 안 버려진다 — 주소를 바꾼다.
  *  10 — 넓은 로고를 칸 폭 끝까지 얹고 KT&G 상자를 걷음(같은 날). 판 9 그림(KT&G 첫 글자 K)이 브라우저에 7일 남는다.
+ *  11 — 미장 긴 글자 로고를 자르기 시작(2026-10-21 · US_LOGO_CROP). 판 10 의 긴 글자 그림(화면이 배지로 돌림)이 브라우저에 7일 남는다.
  * ⚠️ 판정표가 바뀌어도(파이프라인이 새 길 · 상자를 찾음) 같은 주소라 브라우저는 최대 7일 옛 그림을 쓴다. 큰 규칙을 바꿀 때만 올린다.
  */
-export const LOGO_PATH_VERSION = 10;
+export const LOGO_PATH_VERSION = 11;
 
 export function stockLogoPath(ticker: string, size: LogoSize): string {
   return `/api/logo/${encodeURIComponent(ticker)}?s=${size}&v=${LOGO_PATH_VERSION}`;
@@ -198,6 +199,19 @@ export function logoCrop(crop: unknown): [number, number, number, number] | null
   if (w <= 0 || h <= 0 || x + w > 1.001 || y + h > 1.001) return null;
   return [x, y, w, h];
 }
+
+/**
+ * 미장 종목의 자를 상자([x, y, w, h] · logo.dev LOGO_SHAPE_SIZE 그림 안 비율). 국장은 판정표(stock_logo_source.crop)가 들고 있지만
+ * 미장은 판정표가 없어 여기 손으로 적는다. 가로로 아주 긴 글자 로고(가로세로 5배 넘게)는 22px 칸에서 얼룩이 돼 화면이 배지로
+ * 돌린다(app/StockLogo.tsx unreadableMark) — 국장 손 설정(data-pipeline/config/stock_logo_shape.py CROP_OVERRIDE)처럼 심볼이나
+ * 브랜드 첫 글자만 남긴다. 상자는 data-pipeline/common/logo_shape.py piece_box 로 찾고 그림을 보며 정했다(2026-10-21 테마 화면).
+ */
+export const US_LOGO_CROP: Record<string, [number, number, number, number]> = {
+  LITE: [0.043, 0.375, 0.1172, 0.1738], // 루멘텀 — 빗금 심볼
+  XOM: [0.0605, 0.418, 0.084, 0.125], // 엑슨모빌 — 빨간 E
+  CDNS: [0.0938, 0.4238, 0.1758, 0.1543], // 케이던스 — cā(빨간 막대까지)
+  CPNG: [0.166, 0.4238, 0.0801, 0.1094], // 쿠팡 — 갈색 c
+};
 
 /** 로고 티커가 국장 종목이면 종목코드('058470.KQ' → '058470'), 아니면 null(미국은 판정표가 없다). */
 export function krLogoCode(ticker: string): string | null {

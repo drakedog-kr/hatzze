@@ -9,6 +9,7 @@ import {
   LOGO_CACHE,
   LOGO_SIZES,
   LOGO_TICKER_RE,
+  US_LOGO_CROP,
   isLogoSize,
   krLogoCode,
   logoCrop,
@@ -110,7 +111,7 @@ describe("LOGO_TICKER_RE", () => {
 
 describe("stockLogoPath", () => {
   it("라우트 주소에 크기와 판을 붙인다 — 판이 바뀌면 브라우저 캐시의 옛 '없음'을 건너뛴다", () => {
-    assert.equal(stockLogoPath("005930.KS", 48), "/api/logo/005930.KS?s=48&v=10");
+    assert.equal(stockLogoPath("005930.KS", 48), "/api/logo/005930.KS?s=48&v=11");
   });
 });
 
@@ -174,5 +175,12 @@ describe("긴 로고 다듬기(logoCrop · own)", () => {
   });
   it("우리 그림(own)은 logo.dev 에 묻지 않는다", () => {
     assert.equal(logoUpstreamPath("011780.KS", { source: "own", domain: "kkpc.com" }), null);
+  });
+  it("미장 손 상자(US_LOGO_CROP)는 모두 쓸 수 있는 꼴이고 티커 꼴이다 — 라우트가 판정표 없이 이 값으로 자른다", () => {
+    for (const [ticker, box] of Object.entries(US_LOGO_CROP)) {
+      assert.ok(LOGO_TICKER_RE.test(ticker), ticker);
+      assert.equal(krLogoCode(ticker), null, ticker); // 국장 티커면 판정표가 상자를 든다
+      assert.deepEqual(logoCrop(box), box, ticker);
+    }
   });
 });
