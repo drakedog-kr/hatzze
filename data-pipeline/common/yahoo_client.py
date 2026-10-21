@@ -42,6 +42,7 @@ import time
 import math
 from datetime import date, datetime, time as dtime
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -387,3 +388,60 @@ def fetch_last_session_quote(symbol: str) -> tuple[str, float, float | None] | N
 
     high52 = meta.get("fiftyTwoWeekHigh")
     return session_date, _round(price), _round(high52) if isinstance(high52, (int, float)) else None
+
+
+# ─── 미국 종목 일봉(종가 · 거래량) — 테마 화면 거래대금 ─────────────────────────────
+
+NY = ZoneInfo("America/New_York")
+# 미국 정규장 마감(16:00 ET)에 30분 여유 — 위 MARKET_CLOSE_KST 와 같은 뜻이다. 그 전의 오늘 바는 거래량이 덜 찼다.
+US_CLOSE_SETTLED = dtime(16, 30)
+
+
+def fetch_us_daily_bars(symbol: str, days: int, now: datetime | None = None) -> list[dict] | None:
+    """미국 종목의 최근 `days` 일 일봉 — [{date(뉴욕 세션 날짜), close, volume}]. 요청이 실패하면 None, 바가 없으면 [].
+
+    테마 화면의 거래대금(종가 × 거래량, scripts/fetch_us_price_history.py)이 쓴다. 지수 함수들과 다른 점 셋:
+
+    1. **날짜는 뉴욕 날짜다.** 미국장 마감은 KST 로 다음 날 새벽이라 _kst_date 를 쓰면 세션이 하루 밀린다
+       (lib/yahoo-history.ts exchangeDate 주석의 NVDA 08-10 → 08-11).
+    2. **진행 중인 날(뉴욕 오늘 16:30 전)은 버린다.** 그 바의 거래량은 그때까지 찬 만큼이라 하루 값이 아니다
+       — 위 fetch_index_closes 주석의 '오늘 바는 장중 시세가 실려 온다'와 같은 함정이다.
+    3. **끝난 맨 끝 바가 비어 오면 meta 로 메운다.** 야후가 끝난 날의 마지막 바를 한동안 비워 준다(위 주석).
+       meta 의 regularMarketTime 이 그 바와 같은 날이고 값이 밴드 안일 때만이다. meta 거래량은 일봉 거래량과
+       2% 안팎 다르다(2026-10-20 NVDA 7,745만 대 7,897만) — 다음 실행이 일봉 값으로 갈아 끼운다.
+    """
+    now_ny = (now or datetime.now(NY)).astimezone(NY)
+    open_day = now_ny.date().isoformat() if now_ny.time() < US_CLOSE_SETTLED else None
+    stamp = int(now_ny.timestamp())
+    result = _get(symbol, {"interval": "1d", "period1": stamp - max(days, 1) * 24 * 60 * 60, "period2": stamp})
+    if result is None:
+        return None
+
+    meta = result.get("meta") or {}
+    timestamps = result.get("timestamp") or []
+    quote_block = ((result.get("indicators") or {}).get("quote") or [{}])[0]
+    closes = quote_block.get("close") or []
+    volumes = quote_block.get("volume") or []
+
+    bars: list[dict] = []
+    for i, ts in enumerate(timestamps):
+        d = datetime.fromtimestamp(ts, NY).date().isoformat()
+        if d == open_day:
+            continue
+        close = closes[i] if i < len(closes) else None
+        volume = volumes[i] if i < len(volumes) else None
+        if (close is None or volume is None) and i == len(timestamps) - 1:
+            mt, mp, mv = meta.get("regularMarketTime"), meta.get("regularMarketPrice"), meta.get("regularMarketVolume")
+            if (
+                isinstance(mt, (int, float))
+                and datetime.fromtimestamp(mt, NY).date().isoformat() == d
+                and isinstance(mp, (int, float))
+                and not _price_is_stale(meta, float(mp))
+            ):
+                close = mp if close is None else close
+                volume = mv if volume is None else volume
+        close = finite_close(close)
+        if close is None or close <= 0 or not isinstance(volume, (int, float)) or volume < 0:
+            continue
+        bars.append({"date": d, "close": round(close, 4), "volume": int(volume)})
+    return bars

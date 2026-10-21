@@ -5,6 +5,7 @@ import { fmtKoDate } from "@/lib/stock-page";
 import { stockTone, usualDeltaText, usualDeltaTip } from "@/lib/stock-usual";
 import { KADERA_WINDOW_DAYS, addDaysISO } from "@/lib/telegram-data";
 import { THEME_TREND_DAYS, type ThemePageData, type ThemeReasonRow, type ThemeTrendPoint } from "@/lib/theme-page";
+import { TRADE_WINDOW, fmtTrade, fmtTradeChange } from "@/lib/theme-trade";
 
 import { StockLogo } from "../StockLogo";
 import { CoverMeta, Module, dayPill } from "../kadera/V2Modules";
@@ -21,7 +22,7 @@ import { BackTrail } from "@/components/back-trail";
  * "이 테마를 두고 채널에서 요즘 무슨 얘기가 도나." 전부 서술이고 판단·예측·점수는 없다.
  *
  * ## v2(2026-10-03) — 카더라 · MDD · 배당에 쓴 규칙으로
- * 뒤로 가기 줄 → 첫 줄 띠(테마 종목 · 최근 3일 점유율 · 시세 반응 · 기준일) → [요즘 도는 얘기 | 30일 점유율 추이]
+ * 뒤로 가기 줄 → 첫 줄 띠(테마 종목 · 최근 3일 점유율 · 3일 평균 거래대금 · 시세 반응 · 기준일) → [요즘 도는 얘기 | 30일 점유율 추이]
  * → [언급 상위 종목(줄마다 요즘 도는 얘기) | 다가오는 일정 · 함께 거론되는 테마] → 등락의 이유(최근 7일).
  * - 걷은 것: 회색 타일 히어로, 큰 구간 제목 셋(01 · 02 · 03), 시트 머리 아이콘 타일 · 설명 문장, 등락의 이유 '이전 7일' 단추(쪽 넘김),
  *   '채널에서 오간 글' 카드 여섯 장 + 더 보기 — 카더라 v2 에서 화제 글을 걷은 것과 같은 까닭(눌린 비율 2~5%).
@@ -113,6 +114,7 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
   }
   const recentSet = new Set(d.recentDays);
   const today = todayKst();
+  const tradeChg = fmtTradeChange(d.trade?.change ?? null);
 
   /* 일정 — 날짜가 짚인 것(앞으로 5주)을 먼저, 그 뒤에 달 · 분기 · 연만 짚인 것을 가까운 순으로. 달 · 분기는 놓을 날짜 칸이 없어
      예전엔 달력 아래 따로 적었다 — 같은 줄 꼴에 알약 글자만 '10월 중'으로 다르게 둔다. */
@@ -213,8 +215,9 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
       {/* 목록으로 돌아가는 줄 — v2 에선 화면 제목이 걷혀 이 줄이 테마 이름을 말하는 자리다. */}
       <BackTrail parent={{ name: market.indexLabel, href: market.indexHref }} current={theme} />
 
-      {/* 첫 줄 — 테마 종목 · 최근 사흘 점유율 · 시세 반응 · 기준일 */}
-      <div className="v2-cover">
+      {/* 첫 줄 — 테마 종목 · 최근 사흘 점유율 · 3일 평균 거래대금 · 시세 반응 · 기준일.
+          v2-tm-cover 는 1,150~1,299 머리말 쌓기(v2.css) — 거래대금 칸이 있을 때만이다(없으면 칸 셋이 예전처럼 한 줄 꼴로 든다). */}
+      <div className={`v2-cover${d.trade ? " v2-tm-cover" : ""}`}>
         <div className="v2-cover-cell">
           <span className="v2-cover-k">테마 종목</span>
           <span className="v2-cover-v">
@@ -249,6 +252,22 @@ export function ThemeDetailView({ market, d }: { market: ThemeMarket; d: ThemePa
             )}
           </span>
         </div>
+        {/* 3일 평균 거래대금 — 테마 종목의 최근 거래일 셋 하루 평균(국장 KRX 원 · 미장 종가 × 거래량 달러). 점유율 칸과 같은 꼴로 1주 전 대비를
+            값 뒤에 둔다(lib/theme-trade.ts). 못 읽었거나 거래일이 셋이 안 되면 칸째 걷는다. */}
+        {d.trade && (
+          <div className="v2-cover-cell">
+            <span className="v2-cover-k">{TRADE_WINDOW}일 평균 거래대금</span>
+            <span className="v2-cover-v">
+              <b>{fmtTrade(d.trade.avg, market.key)}</b>
+              {tradeChg && (
+                <>
+                  <em>1주 전 대비</em>
+                  <span className={`v2-cover-chg ${tradeChg.tone}`}>{tradeChg.text}</span>
+                </>
+              )}
+            </span>
+          </div>
+        )}
         {/* 시세 반응 — 최근 거래일 테마 종목의 평균 등락과 오른 · 내린 종목 수. 언급(말) 옆에 시세(값)를 두면 값이 말을 따라왔는지가 보인다. */}
         {d.quotes.avgChange != null && (
           <div className="v2-cover-cell">

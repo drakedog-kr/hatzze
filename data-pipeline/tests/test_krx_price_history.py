@@ -1,4 +1,4 @@
-"""fetch_krx_price_history — KRX 응답을 표의 행으로 옮기는 자리와 '반쪽 날' 거르기."""
+"""fetch_krx_price_history — KRX 응답을 표의 행으로 옮기는 자리와 '반쪽 날' 거르기 · 거래대금 칸(마이그레이션 106)."""
 
 import fetch_krx_price_history as m
 
@@ -16,7 +16,7 @@ class _Resp:
 def test_parse_rows_drops_blank_code_and_close():
     rows = m.parse_rows(
         [
-            {"ISU_CD": "005930", "TDD_CLSPRC": "276,000", "FLUC_RT": "-0.19"},
+            {"ISU_CD": "005930", "TDD_CLSPRC": "276,000", "FLUC_RT": "-0.19", "ACC_TRDVAL": "3515884197247"},
             {"ISU_CD": "", "TDD_CLSPRC": "1,000", "FLUC_RT": "0"},
             # 거래 정지 등으로 종가가 비어 오는 줄 — 0 원 선을 그리면 안 된다.
             {"ISU_CD": "123456", "TDD_CLSPRC": "", "FLUC_RT": ""},
@@ -24,7 +24,25 @@ def test_parse_rows_drops_blank_code_and_close():
         ],
         "2026-10-02",
     )
-    assert rows == [{"code": "005930", "date": "2026-10-02", "close": 276000, "change_rate": -0.19}]
+    assert rows == [{"code": "005930", "date": "2026-10-02", "close": 276000, "change_rate": -0.19, "trade_value": 3515884197247}]
+
+
+def test_parse_rows_trade_value_blank_and_zero():
+    # 비어 오면 None(모름), '0' 이면 0(거래 없음) — 0 으로 메우면 '거래가 없었다'로 읽힌다.
+    rows = m.parse_rows(
+        [
+            {"ISU_CD": "000001", "TDD_CLSPRC": "100", "FLUC_RT": "0", "ACC_TRDVAL": ""},
+            {"ISU_CD": "000002", "TDD_CLSPRC": "100", "FLUC_RT": "0", "ACC_TRDVAL": "0"},
+        ],
+        "2026-10-02",
+    )
+    assert [r["trade_value"] for r in rows] == [None, 0]
+
+
+def test_parse_rows_without_value_column():
+    # 마이그레이션 106 전 — 없는 칸을 upsert 하면 요청이 통째로 거절된다. 칸을 뺀 예전 행을 낸다.
+    rows = m.parse_rows([{"ISU_CD": "005930", "TDD_CLSPRC": "1", "FLUC_RT": "0", "ACC_TRDVAL": "5"}], "2026-10-02", with_value=False)
+    assert rows == [{"code": "005930", "date": "2026-10-02", "close": 1, "change_rate": 0.0}]
 
 
 def test_fetch_day_skips_half_day(monkeypatch):

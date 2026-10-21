@@ -1,8 +1,10 @@
-"""국장 일별 종가 이력 — KRX 일별매매정보를 날짜별로 받아 stock_price_daily 에 쌓는다.
+"""국장 일별 종가 · 거래대금 이력 — KRX 일별매매정보를 날짜별로 받아 stock_price_daily 에 쌓는다.
 
 종목 상세(`/stock/005930`)의 '커뮤니티 관심 추이'가 언급 막대 위에 같은 날의 종가 선을 겹친다.
 `stocks` 는 가장 최근 하루치 종가만 들고 있어(fetch_krx_stocks.py) 날짜별 값을 따로 쌓는다.
 화면은 야후를 부르지 않는다 — 까닭은 lib/stock-page.ts 머리말 ①.
+테마 화면(`/theme` · 테마 상세)의 '3일 평균 거래대금'도 이 표의 trade_value 를 테마 사전으로 더한다
+(마이그레이션 106 · lib/theme-trade.ts). 미장 짝은 fetch_us_price_history.py.
 
 엔드포인트는 fetch_krx_stocks.py 와 같다(stk_bydd_trd · ksq_bydd_trd). 날짜 하나에 그날 전 종목이
 오므로 하루치가 호출 두 번이다. 지난 날짜도 그대로 받힌다(2026-10-10 실측).
@@ -10,7 +12,8 @@
 ## 빠진 날만 받는다
 
 최근 WINDOW_DAYS 일의 평일 중 표에 없는 날만 받는다. 첫 실행이 기간을 통째로 채우고, 그 뒤로는
-새로 공표된 하루씩 붙는다. 휴장일 · 아직 공표 전인 날(KRX 는 그날 종가를 다음 날 08:00 에 올린다)은
+새로 공표된 하루씩 붙는다. 마이그레이션 106 뒤로는 **거래대금이 빈 날**도 받을 날로 센다 — 106 전에 종가만
+쌓인 날을 다시 받아 채운다(같은 행을 덮어쓸 뿐이다). 106 전이면 거래대금 없이 예전처럼 돈다(has_column). 휴장일 · 아직 공표 전인 날(KRX 는 그날 종가를 다음 날 08:00 에 올린다)은
 빈 응답이라 아무것도 안 쓰고 넘어간다 — 다음 실행이 다시 본다(코스피 한 번 0.2초).
 
 ⚠️ common/timeutil.days_to_backfill 을 쓰지 않는다. 그 함수는 표에 행이 하나라도 있으면 최근 15영업일만
@@ -40,7 +43,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.krx_client import krx_get  # noqa: E402
-from common.supabase_client import execute_with_retry, get_client  # noqa: E402
+from common.supabase_client import execute_with_retry, get_client, has_column  # noqa: E402
 from common.timeutil import business_days, today_kst  # noqa: E402
 
 KOSPI_URL = "http://data-dbg.krx.co.kr/svc/apis/sto/stk_bydd_trd"
@@ -68,15 +71,23 @@ def _to_float(value) -> float | None:
         return None
 
 
-def parse_rows(out_block: list[dict], day: str) -> list[dict]:
-    """KRX OutBlock_1 → 표의 행. 코드나 종가가 없는 줄(거래 정지 등으로 비어 오는 값)은 뺀다."""
+def parse_rows(out_block: list[dict], day: str, with_value: bool = True) -> list[dict]:
+    """KRX OutBlock_1 → 표의 행. 코드나 종가가 없는 줄(거래 정지 등으로 비어 오는 값)은 뺀다.
+
+    거래대금(ACC_TRDVAL, 원)은 비어 오면 None 이다 — 0 으로 두면 '거래가 없었다'로 읽힌다. 종가가 있고
+    거래가 없는 날(거래 정지 풀린 첫날 등)은 KRX 가 '0' 을 주므로 그때만 0 이다.
+    with_value=False 는 마이그레이션 106 전(칸이 없다) — 칸을 빼고 예전 행을 낸다.
+    """
     rows: dict[str, dict] = {}
     for d in out_block:
         code = (d.get("ISU_CD") or "").strip()
         close = _to_int(d.get("TDD_CLSPRC"))
         if not code or not close:
             continue
-        rows[code] = {"code": code, "date": day, "close": close, "change_rate": _to_float(d.get("FLUC_RT"))}
+        row = {"code": code, "date": day, "close": close, "change_rate": _to_float(d.get("FLUC_RT"))}
+        if with_value:
+            row["trade_value"] = _to_int(d.get("ACC_TRDVAL"))
+        rows[code] = row
     return list(rows.values())
 
 
@@ -103,11 +114,18 @@ def fetch_day(bas_dd: str) -> list[dict] | None:
     return out
 
 
-def stored_dates(db, days: list[date]) -> set[str]:
-    """그중 표에 이미 있는 날. 날짜마다 행 수만 센다(행을 안 받는다 — 하루가 2,700행이다)."""
+def stored_dates(db, days: list[date], with_value: bool = True) -> set[str]:
+    """그중 표에 이미 있는 날. 날짜마다 행 수만 센다(행을 안 받는다 — 하루가 2,700행이다).
+
+    with_value 면 거래대금이 든 행만 센다 — 마이그레이션 106 전에 종가만 쌓인 날은 '없는 날'이 되어 다시 받는다.
+    하루는 통째로 한 번에 쓰므로(main) 그날 거래대금이 든 행이 하나라도 있으면 그날 전체가 들었다.
+    """
     have: set[str] = set()
     for d in days:
-        res = execute_with_retry(db.table(TABLE).select("code", count="exact", head=True).eq("date", d.isoformat()))
+        q = db.table(TABLE).select("code", count="exact", head=True).eq("date", d.isoformat())
+        if with_value:
+            q = q.not_.is_("trade_value", "null")
+        res = execute_with_retry(q)
         if res.count:
             have.add(d.isoformat())
     return have
@@ -121,8 +139,11 @@ def main() -> None:
     today = today_kst()
     db = get_client()
     window = list(business_days(today - timedelta(days=WINDOW_DAYS), today))
+    with_value = has_column(db, TABLE, "trade_value")
+    if not with_value:
+        print(f"[경고] {TABLE}.trade_value 가 없습니다(마이그레이션 106 전) — 거래대금 없이 종가만 받습니다")
     try:
-        existing = stored_dates(db, window)
+        existing = stored_dates(db, window, with_value)
     except Exception as exc:  # noqa: BLE001 — 표가 없을 때(마이그레이션 전)를 알아보게 찍고 멈춘다
         print(f"[오류] {TABLE} 를 못 읽었습니다(마이그레이션 093 을 실행했는지 확인): {exc}")
         sys.exit(1)
@@ -142,7 +163,7 @@ def main() -> None:
         if got is None:
             print(f"[중단] {bas_dd} KRX 호출 실패 — 남은 날은 다음 실행이 받습니다")
             break
-        rows = parse_rows(got, d.isoformat())
+        rows = parse_rows(got, d.isoformat(), with_value)
         if not rows:
             skipped += 1
             continue

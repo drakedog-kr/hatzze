@@ -4,6 +4,7 @@ import { KADERA_WINDOW_DAYS } from "@/lib/telegram-data";
 import { formatKstUpdate } from "@/lib/format";
 import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_FLOW_DAYS, THEME_FLOW_TOP, type ThemeOverview, type ThemeRiser } from "@/lib/theme-page";
+import { TRADE_WINDOW, fmtTrade, fmtTradeChange } from "@/lib/theme-trade";
 
 import { StockLogo } from "../StockLogo";
 import { CoverLinkCell, CoverMeta, Module, type CoverLink } from "../kadera/V2Modules";
@@ -17,6 +18,7 @@ import { Treemap, TreemapLegend, themeTiles, toneForRatio } from "./Treemap";
  *
  * ## v2(2026-10-03) — 카더라 · MDD · 배당에 쓴 규칙으로
  * 첫 줄 띠(가장 많이 늘어난 · 가장 많이 줄어든 · 새로 상위에 오른 테마 · 업데이트) → 점유율 지도(판 폭 전체, 3:1) → 테마 흐름 → 테마별 급부상 종목.
+ * 테마 흐름 표엔 '3일 평균 거래대금' 칸이 있다(2026-10-21 "테마마다 거래대금을 포함해서") — 언급(말) 옆에 돈이 얼마나 오갔는지.
  * - 걷은 것: 화면 제목 · 부제(셸이 v2 화면에서 걷는다), 회색 타일 히어로('관심 변화' · '상위권'), 시트 머리의 아이콘 타일 · 설명 문장,
  *   지도 위 안내 말풍선, '오늘의 브리핑' 문단 — 같은 사실을 세 번 말했다('반도체 59.8%'가 브리핑 · 지도 · 흐름 표에, 급부상 종목이
  *   브리핑 태그 · 급부상 표에).
@@ -88,6 +90,8 @@ export function ThemeIndexView({
 }) {
   const all = themes ?? [];
   const flowDates = all[0]?.flowDates ?? [];
+  // 거래대금이 한 줄도 없으면(마이그레이션 106 전 · 조회 실패) 칸째 걷는다 — 열 줄이 다 '-'면 빈 칸이다.
+  const hasTrade = all.some((t) => t.trade);
 
   /* 첫 줄 띠 — 오늘 무엇이 달라졌나. 칸마다 다른 테마를 세운다(옛 히어로 '같은 테마를 두 번 세우지 않는다'와 같은 규칙).
      관심 변화 둘(가장 많이 늘어난 · 줄어든, 1주 전 대비) + 상위권의 문 하나(새로 상위에 오른 → 없으면 상위에서 내려간 → 순위가 가장 오른). */
@@ -223,18 +227,21 @@ export function ThemeIndexView({
         {themes === null || themes.length === 0 ? (
           <p className="v2-empty">{themes === null ? "테마 집계를 지금 불러오지 못했습니다." : "아직 집계된 테마가 없습니다."}</p>
         ) : (
-          <div className="v2-tbl v2-tm-flowtbl">
+          <div className={`v2-tbl v2-tm-flowtbl${hasTrade ? " has-trade" : ""}`}>
             <div className="v2-tr v2-th" aria-hidden="true">
               <span />
               <span>테마 · 언급 상위 종목</span>
               <span>요즘 도는 얘기</span>
               <span>최근 {KADERA_WINDOW_DAYS}일 점유율</span>
+              {/* 하루 평균이다 — '최근 3일 거래대금'이면 사흘 합으로, '일평균'만이면 며칠 평균인지 물어야 했다. */}
+              {hasTrade && <span>{TRADE_WINDOW}일 평균 거래대금</span>}
               <span>최근 {flowDates.length || THEME_FLOW_DAYS}일</span>
             </div>
             <ol className="v2-tbody">
               {themes.slice(0, FLOW_ROWS).map((t) => {
                 const cap = flowCaption(t);
                 const d = t.shareDelta;
+                const tc = fmtTradeChange(t.trade?.change ?? null);
                 return (
                   <li key={t.theme}>
                     {/* 날마다의 순위는 툴팁(줄 title)에 — 줄에는 열흘의 뜻 한 조각만(순위 칸 띠 · 색 띠 · 스파크라인 셋 다 "복잡하다"였다, 2026-09-19). */}
@@ -267,6 +274,13 @@ export function ThemeIndexView({
                         {t.sharePct.toFixed(1)}%
                         {d != null && Math.abs(d) >= 0.05 && <em className={d > 0 ? "is-up" : "is-down"}>{pp(d)}</em>}
                       </span>
+                      {/* 3일 평균 거래대금 · 그 아래 1주 전 대비(점유율 칸과 같은 꼴 · 같은 '1주 전' — 모듈 머리가 말한다). 국장 원 · 미장 달러. */}
+                      {hasTrade && (
+                        <span className="v2-td-num v2-td-two v2-td-trade">
+                          {t.trade ? fmtTrade(t.trade.avg, market.key) : "-"}
+                          {tc && <em className={tc.tone}>{tc.text}</em>}
+                        </span>
+                      )}
                       {/* 열흘 — 지속 · 첫 등장 · 간헐 한 조각. ⛔ 'n일째 오르는 중'은 걷었다 — 바로 옆 '-3.0%p'(1주 전 대비)와 잣대가 달라
                           한 줄에 반대말로 섰다(2026-10-05 점검). 날마다의 방향은 테마 한 장 30일 추이의 몫이다. */}
                       <span className="v2-td-two v2-td-flow2">

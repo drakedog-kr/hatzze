@@ -4,7 +4,7 @@ import { cache } from "react";
 
 import { getSupabaseAdmin } from "./supabase-server";
 import { LLM_TEXT_CARRY_DAYS, addDaysISO, channelMeta, fetchAllRows } from "./telegram-data";
-import { US_WINDOW_DAYS, getUsThemeRotation, usKaderaBaseDate, usQuotes } from "./us-telegram-data";
+import { US_WINDOW_DAYS, getUsThemeRotation, usKaderaBaseDate, usNameMap, usQuotes } from "./us-telegram-data";
 import { US_THEMES } from "./us-stock-themes";
 import { getUsEventsForTickers } from "./kadera-us-why";
 import { prevWindowRanks, thinDays, usableDays, withTodayRank } from "./theme-flow";
@@ -12,12 +12,14 @@ import { themeDetailWindow } from "./theme-window";
 import { verifiedChangesOnce } from "./quoted-change";
 import { RISER_FALLBACK_DAYS, risersWithFallback } from "./theme-risers";
 import { fetchDailyHistory, yahooSymbol } from "./yahoo-history";
+import { themeTrades } from "./theme-trade";
 import {
   THEME_FLOW_DAYS,
   THEME_TREND_DAYS,
   briefFirstSentence,
   buildHotStocks,
   flowStats,
+  loadTradeRows,
   parseBriefRow,
   talkOf,
   themeDayTotals,
@@ -45,6 +47,8 @@ import {
  *             테마 하나가 최대 30종목이라 요청 30개, 카더라 미장이 같은 함수로 같은 양을 부른다.
  *   등락의 이유  change_rate 대신 **채널이 적은 등락률**(quoted_change_rate)이다(마이그레이션 069 머리말 — 미국장 하루와
  *             메시지 날짜가 어긋나 확정 종가를 안 붙인다). 화면이 그 사정을 툴팁에 적는다.
+ *   거래대금  KRX 거래대금이 아니라 야후 종가 × 거래량(달러)이다 — us_stock_price_daily(마이그레이션 106 · 파이프라인
+ *             fetch_us_price_history.py). 셈은 국장과 같은 lib/theme-trade.ts.
  */
 
 /** 미장 테마 사전의 이름 목록(사전 순서). 주소·셸은 lib/theme-href.ts 의 US_THEME_NAMES 를 본다(같은 사전). */
@@ -72,7 +76,7 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
   const [members, baseDate] = await Promise.all([usThemeMembers(theme), usKaderaBaseDate()]);
   if (members === null) {
     return {
-      theme, members: [], quotes: themeQuotes([]), baseDate, recentDays: [], recentShare: null, recentRank: null, shareDelta: null, rankChange: null,
+      theme, members: [], quotes: themeQuotes([]), trade: null, baseDate, recentDays: [], recentShare: null, recentRank: null, shareDelta: null, rankChange: null,
       trend: [], hotStocks: [], reasons: [], events: [], brief: null, loadFailed: true,
     };
   }
@@ -87,7 +91,7 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
   type ReasonRow = { date: string; ticker: string; reason: string | null; quoted_change_rate: number | string | null; channel_count: number | null };
 
   let stockDailyFailed = false;
-  const [themeDaily, stockDaily, reasonRows, events, rotation, briefRow, meta, quoteMap, dayTotals] = await Promise.all([
+  const [themeDaily, stockDaily, reasonRows, events, rotation, briefRow, meta, quoteMap, dayTotals, tradeRows] = await Promise.all([
     db.from("telegram_us_theme_daily").select("date,share_pct,rank,mention_count").eq("theme", theme).gte("date", first).lte("date", baseDate).order("date"),
     fetchAllRows<StockDailyRow>(
       "id",
@@ -122,6 +126,7 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
     }),
     // '평소 대비'의 분모 — 날마다의 미장 테마 대화 총량(국장 getThemePage 와 같은 규칙 · lib/stock-usual.ts).
     themeDayTotals("telegram_us_theme_daily", first, baseDate),
+    loadTradeRows("us", tickers),
   ]);
 
   let loadFailed = false;
@@ -206,12 +211,20 @@ export const getUsThemePage = cache(async (theme: string): Promise<ThemePageData
 
   const brief = parseBriefRow((briefRow.data ?? null) as BriefRow | null, meta, (t) => t in US_THEMES);
 
-  return { theme, members, quotes, baseDate, recentDays, recentShare, recentRank, shareDelta, rankChange, trend, hotStocks, reasons, events, brief, loadFailed };
+  const trade = tradeRows ? (themeTrades(tradeRows, { [theme]: tickers }).get(theme) ?? null) : null;
+
+  return { theme, members, quotes, trade, baseDate, recentDays, recentShare, recentRank, shareDelta, rankChange, trend, hotStocks, reasons, events, brief, loadFailed };
 });
 
 /** 미장 테마 목록 — 국장 listThemeOverview 와 같은 꼴. 흐름은 기준일을 **포함한** 열흘. */
 export async function listUsThemeOverview(): Promise<ThemeOverview[] | null> {
   const db = getSupabaseAdmin();
+  // 거래대금은 따로 서는 조회라 먼저 띄워 두고 맨 끝에서 받는다(국장 listThemeOverview 와 같다).
+  // 앞에서 일찍 돌아가도(집계 실패) 이 조회의 실패가 떠돌지 않게 여기서 받아 둔다.
+  const tradesP = usThemeTrades().catch((e) => {
+    console.error("[listUsThemeOverview] 거래대금을 못 읽었습니다", e);
+    return null;
+  });
   const [rotation, baseDate] = await Promise.all([getUsThemeRotation(100), usKaderaBaseDate()]);
   if (rotation.date === null) return null;
 
@@ -254,6 +267,7 @@ export async function listUsThemeOverview(): Promise<ThemeOverview[] | null> {
   }
 
   const prevRank3 = prevWindowRanks(shareOn, dates, Object.keys(US_THEMES), US_WINDOW_DAYS);
+  const trades = await tradesP;
   return rotation.rows
     .filter((r) => r.theme in US_THEMES)
     .map((r) => {
@@ -276,9 +290,21 @@ export async function listUsThemeOverview(): Promise<ThemeOverview[] | null> {
         topStocks: r.stocks.slice(0, 3).map((s) => ({ code: s.ticker, name: s.name, mentions: s.mentions })),
         stockCount: r.stockCount,
         briefLine: briefFirstSentence(briefOf.get(r.theme)),
+        trade: trades?.get(r.theme) ?? null,
       };
     })
     .sort((a, b) => a.rank - b.rank);
+}
+
+/**
+ * 미장 테마마다 3일 평균 거래대금(목록). 테마 종목은 상세(usThemeMembers)와 같이 us_stocks 에 있는 티커만 — 목록과 상세가 같은 합을 낸다.
+ * 못 읽으면 null.
+ */
+async function usThemeTrades() {
+  const names = await usNameMap();
+  const members = Object.fromEntries(Object.entries(US_THEMES).map(([t, ts]) => [t, ts.filter((x) => names.has(x))]));
+  const rows = await loadTradeRows("us", [...new Set(Object.values(members).flat())]);
+  return rows ? themeTrades(rows, members) : null;
 }
 
 /** 미장 '테마별 급부상 종목' — 요약 행의 riser(파이프라인 common/us_theme_risers.py 가 고른 것)를 읽어 줄만 세운다. */

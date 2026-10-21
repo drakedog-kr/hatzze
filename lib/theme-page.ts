@@ -26,6 +26,7 @@ import { RISER_FALLBACK_DAYS, risersWithFallback, type RiserRow, type ThemeRiser
 import { quoteChangeRate } from "./krx-gap";
 import { fetchYahooQuote } from "./yahoo-quote";
 import { reasonContradictsMove } from "./move-sign";
+import { TRADE_LOOKBACK_DAYS, themeTrades, type ThemeTrade, type TradeRow } from "./theme-trade";
 
 /**
  * 테마 실주소 화면(`/theme/반도체`)과 테마 목록(`/theme`)이 쓰는 자료.
@@ -45,6 +46,7 @@ import { reasonContradictsMove } from "./move-sign";
  *   telegram_stock_event        앞날의 일정
  *   telegram_theme_brief        요즘 무슨 얘기(LLM 두세 문장)·함께 언급된 테마·발췌 — 마이그레이션 080
  *                               + 갑자기 많이 언급된 종목과 까닭(riser jsonb) — 마이그레이션 081
+ *   stock_price_daily           종목별 KRX 거래대금(trade_value) — '3일 평균 거래대금'(마이그레이션 106 · lib/theme-trade.ts)
  *
  * ⚠️ **발췌를 렌더 때 telegram_messages 에서 고르지 않는다.** 처음엔 "최근 사흘 · 이 테마 종목이
  *    태그된 글 · 조회순 15건"을 조인 한 번으로 받았는데, 반도체는 50ms 인 그 조회가 로봇에서는
@@ -74,6 +76,7 @@ export const THEME_REASON_DAYS = THEME_TREND_DAYS;
 // 주소 만들기·되돌리기는 lib/theme-href.ts 에 있다(셸도 읽어야 해서 server-only 밖이다).
 export { THEME_NAMES, themeFromParam, themeHref, themeSlug } from "./theme-href";
 export { RISER_MAX, RISER_MIN_MENTIONS, RISER_MIN_RATIO, parseRisers, type RiserRow, type ThemeRiser } from "./theme-risers";
+export type { ThemeTrade } from "./theme-trade";
 
 export type ThemeMember = { code: string; name: string; market: string | null };
 
@@ -170,6 +173,8 @@ export type ThemePageData = {
   members: ThemeMember[];
   /** 최근 거래일 테마 종목의 등락 묶음(위 ThemeQuotes). */
   quotes: ThemeQuotes;
+  /** 3일 평균 거래대금과 1주 전 대비(lib/theme-trade.ts). 못 읽었거나 거래일이 셋이 안 되면 null — 띠가 그 칸을 걷는다. */
+  trade: ThemeTrade | null;
   baseDate: string;
   /** 최근 사흘(기준일 포함). 히어로 점유율(테마 로테이션)과 같은 창이다(lib/theme-window.ts). */
   recentDays: string[];
@@ -408,7 +413,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
   if (members === null) {
     // 종목 코드를 못 읽으면 아래 조회를 하나도 못 만든다. 빈 화면을 사본에 담지 않게 실패로 표시한다.
     return {
-      theme, members: [], quotes: themeQuotes([]), baseDate, recentDays: [], recentShare: null, recentRank: null, shareDelta: null, rankChange: null,
+      theme, members: [], quotes: themeQuotes([]), trade: null, baseDate, recentDays: [], recentShare: null, recentRank: null, shareDelta: null, rankChange: null,
       trend: [], hotStocks: [], reasons: [], events: [], brief: null, loadFailed: true,
     };
   }
@@ -427,7 +432,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
   type ReasonRow = { date: string; stock_code: string; reason: string | null; quoted_change_rate: number | string | null; change_rate: number | string | null; close_price: number | string | null; channel_count: number | null };
 
   let stockDailyFailed = false;
-  const [themeDaily, stockDaily, reasonRows, events, rotation, briefRow, meta, dayTotals] = await Promise.all([
+  const [themeDaily, stockDaily, reasonRows, events, rotation, briefRow, meta, dayTotals, tradeRows] = await Promise.all([
     db.from("telegram_theme_daily").select("date,share_pct,rank,mention_count").eq("theme", theme).gte("date", first).lte("date", last).order("date"),
     codes.length
       ? fetchAllRows<StockDailyRow>(
@@ -464,6 +469,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
     channelMeta(),
     // '평소 대비'의 분모 — 날마다의 테마 대화 총량(모든 테마). 종목 언급을 몫으로 견줘 요일을 지운다.
     themeDayTotals("telegram_theme_daily", first, last),
+    loadTradeRows("kr", codes),
   ]);
 
   let loadFailed = false;
@@ -556,6 +562,7 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
     theme,
     members: members.map((m) => ({ code: m.code, name: m.name, market: m.market })),
     quotes,
+    trade: tradeRows ? (themeTrades(tradeRows, { [theme]: codes }).get(theme) ?? null) : null,
     baseDate,
     recentDays,
     recentShare,
@@ -570,6 +577,64 @@ export const getThemePage = cache(async (theme: string): Promise<ThemePageData |
     loadFailed,
   };
 });
+
+// ─── 거래대금(/theme · 테마 상세) ─────────────────────────────────────────
+
+/** 열쇠를 이만큼씩 끊어 읽는다 — 50 × 거래일 16(달력 TRADE_LOOKBACK_DAYS 일 안의 평일 최대) = 800행이라 1,000행 캡 안이다. */
+const TRADE_KEY_CHUNK = 50;
+
+/**
+ * 종목별 거래대금 행 — 최근 TRADE_LOOKBACK_DAYS 일. 국장은 stock_price_daily(코드), 미장은 us_stock_price_daily(티커).
+ * 어느 조각이든 실패하면 null(덜 읽은 합을 '줄었다'로 적지 않는다). 칸 · 표가 없으면(마이그레이션 106 전) 로그 없이 null.
+ */
+export async function loadTradeRows(market: "kr" | "us", keys: string[]): Promise<TradeRow[] | null> {
+  if (!keys.length) return [];
+  const db = getSupabaseAdmin();
+  const [table, keyCol] = market === "us" ? ["us_stock_price_daily", "ticker"] : ["stock_price_daily", "code"];
+  const since = addDaysISO(todayKst(), -TRADE_LOOKBACK_DAYS);
+  const chunks: string[][] = [];
+  for (let i = 0; i < keys.length; i += TRADE_KEY_CHUNK) chunks.push(keys.slice(i, i + TRADE_KEY_CHUNK));
+  const got = await Promise.all(
+    chunks.map((chunk) => db.from(table).select(`${keyCol},date,trade_value`).in(keyCol, chunk).gte("date", since).not("trade_value", "is", null)),
+  );
+  const out: TradeRow[] = [];
+  for (const { data, error } of got) {
+    if (error) {
+      // 42703 = 칸이 없다 · PGRST205 = 표가 없다(마이그레이션 106 전). 그땐 예전 화면이 정답이라 로그를 남기지 않는다.
+      if (error.code !== "42703" && error.code !== "PGRST205") console.error(`[loadTradeRows] ${table} 거래대금을 못 읽었습니다`, error);
+      return null;
+    }
+    // select 글이 표마다 달라 타입 추론이 안 된다(열은 위 select 그대로다).
+    for (const r of (data ?? []) as unknown as Record<string, string | number | null>[]) out.push({ key: String(r[keyCol]), date: String(r.date), value: r.trade_value });
+  }
+  return out;
+}
+
+/** 사전 전체의 테마 → 종목코드. 이름을 80개씩 끊어 stocks 에서 찾는다(themeMembers 와 같은 규칙 · 사전에 있어도 stocks 에 없는 이름은 빠진다). */
+async function krThemeCodes(): Promise<Record<string, string[]> | null> {
+  const db = getSupabaseAdmin();
+  const names = [...new Set(Object.values(THEMES).flat())];
+  const chunks: string[][] = [];
+  for (let i = 0; i < names.length; i += 80) chunks.push(names.slice(i, i + 80));
+  const got = await Promise.all(chunks.map((chunk) => db.from("stocks").select("code,name").in("name", chunk)));
+  const codeOf = new Map<string, string>();
+  for (const { data, error } of got) {
+    if (error) {
+      console.error("[krThemeCodes] 테마 종목 코드를 못 읽었습니다", error);
+      return null;
+    }
+    for (const r of data ?? []) codeOf.set(r.name as string, r.code as string);
+  }
+  return Object.fromEntries(Object.entries(THEMES).map(([t, ns]) => [t, ns.map((n) => codeOf.get(n)).filter((c): c is string => Boolean(c))]));
+}
+
+/** 국장 테마마다 3일 평균 거래대금(목록). 못 읽으면 null. */
+async function krThemeTrades(): Promise<Map<string, ThemeTrade> | null> {
+  const members = await krThemeCodes();
+  if (!members) return null;
+  const rows = await loadTradeRows("kr", [...new Set(Object.values(members).flat())]);
+  return rows ? themeTrades(rows, members) : null;
+}
 
 // ─── 테마 목록(/theme) ────────────────────────────────────────────────────
 
@@ -604,6 +669,8 @@ export type ThemeOverview = {
   stockCount: number;
   /** '요즘 무슨 얘기'(telegram_theme_brief)의 첫 문장. 아직 없으면 null. */
   briefLine: string | null;
+  /** 3일 평균 거래대금과 1주 전 대비(lib/theme-trade.ts). 못 읽었으면 null — 표가 '-'를 적고, 모든 줄이 null 이면 칸째 걷는다. */
+  trade: ThemeTrade | null;
 };
 
 /**
@@ -665,6 +732,12 @@ export async function themeUpdatedAt(market: "kr" | "us"): Promise<string | null
  */
 export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
   const db = getSupabaseAdmin();
+  // 거래대금은 언급 집계와 따로 서는 조회라 먼저 띄워 두고 맨 끝에서 받는다(못 읽으면 칸만 빈다).
+  // 앞에서 일찍 돌아가도(집계 실패) 이 조회의 실패가 떠돌지 않게 여기서 받아 둔다.
+  const tradesP = krThemeTrades().catch((e) => {
+    console.error("[listThemeOverview] 거래대금을 못 읽었습니다", e);
+    return null;
+  });
   const [rotation, baseDate] = await Promise.all([getThemeRotation(100), kaderaBaseDate()]);
   if (isLoadFailed(rotation)) return null;
 
@@ -712,6 +785,7 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
   }
 
   const prevRank3 = prevWindowRanks(shareOn, dates, Object.keys(THEMES), KADERA_WINDOW_DAYS);
+  const trades = await tradesP;
   return rotation
     .filter((r) => r.theme in THEMES)
     .map((r) => {
@@ -734,6 +808,7 @@ export async function listThemeOverview(): Promise<ThemeOverview[] | null> {
         topStocks: r.stocks.slice(0, 3).map((s) => ({ code: s.code, name: s.name, mentions: s.mentions })),
         stockCount: r.stockCount,
         briefLine: briefFirstSentence(briefOf.get(r.theme)),
+        trade: trades?.get(r.theme) ?? null,
       };
     })
     .sort((a, b) => a.rank - b.rank);
