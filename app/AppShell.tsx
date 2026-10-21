@@ -218,19 +218,9 @@ type NavItem = {
   children?: NavChild[];
 };
 
-/* 시장 브리핑에 새 지표가 들어왔다는 소식 — 사이드바(넓은 화면)는 '시장 브리핑' 줄 오른쪽, 폰 메뉴는 그 줄 밑에 한 번 띄운다(app/V2Hint.tsx).
-   2026-10-06 운영자 지시. 투자자예탁금(10-06 열림) · 신용융자 잔고 · 기업 체감 경기 · 주식 쇼츠 수(10-08) · 레버리지 대 인버스(10-08). 시효가 있는 소식이라 until 이 지나면 안 뜬다.
-   '시장 브리핑' 줄을 누르거나 ✕ 를 누르면 '봤음'. together — 본문 쪽지(구간 · 지표 이름)의 차례를 막지도, 그 차례에 막히지도 않는다.
-   ⚠️ 다음 소식은 id 를 새로 딴다(같은 id 면 이번 소식을 닫은 사람에게 안 뜬다). 문구만 고칠 땐 그대로 둔다.
-   10-08 레버리지 대 인버스를 더하며 -b 로 새로 땄다 — 앞 소식(3·4개)을 닫은 분께도 한 번 더 뜬다. */
-const NEW_INDICATORS_HINT: Omit<HintSpec, "at"> = {
-  id: "news-indicators-2026-10-b",
-  text: "새 지표 5개가 추가됐습니다. 투자자예탁금 · 신용융자 잔고 · 기업 체감 경기 · 주식 쇼츠 수 · 레버리지 대 인버스",
-  anchor: 'a[data-label="시장 브리핑"]',
-  together: true,
-  icon: "new_releases",
-  until: "2026-10-27T00:00:00+09:00",
-};
+/* 시장 브리핑 '새 지표 5개' 소식 쪽지(사이드바 '시장 브리핑' 줄 오른쪽 · 폰 메뉴 그 줄 밑, id news-indicators-2026-10-b)는 2026-10-21 걷었다
+   (운영자 지시 — until 10-27 전에). 다음 소식을 띄울 땐 그 커밋에서 꼴을 가져오고 id 는 새로 딴다(같은 id 면 닫은 사람에게 안 뜬다).
+   쪽지를 놓는 자리 · 꼴은 app/V2Hint.tsx(at="right" 사이드바 · at="below" 폰 메뉴, together 로 본문 쪽지 차례와 따로 논다). */
 
 /* themeNav 가 무엇이고 왜 서버가 정하는지는 app/shell-env.tsx 에. 배포에서 안 연 화면은 COMING_SOON 의
    눌리지 않는 '준비 중' 줄로 남는다(2026-08-30 에 그 줄이 눌려 404 가 났다 — COMING_SOON 머리 주석). */
@@ -913,7 +903,6 @@ function Sidebar() {
             </Link>
           );
         })}
-        <V2Hint {...NEW_INDICATORS_HINT} at="right" />
       </nav>
       {/* 예고 항목에 대하여(위 map 의 kind === "soon" 가지).
           <a href> 가 아니라 <div> 인 게 "못 누른다"의 유일한 보장이다 — href 만 뺀 <a> 는
@@ -969,7 +958,7 @@ function Sidebar() {
       </div>
       {/* 세로는 텔레그램 단추 가운데, 가로는 줄 전체(.hz-side-foot) 끝 + 16 — 단추 끝에 붙이면 펼친 막대에서 바로 옆
           다크 모드 단추를 덮는다. 줄 전체를 anchor 로 삼으면 접힌 막대(두 단추가 세로로 쌓인다)에서 꼭지가 두 단추 사이를 가리켰다.
-          가로가 줄 끝이라 위 '새 지표' 쪽지와 같은 세로줄에 선다. */}
+          가로가 줄 끝이라 사이드바 줄 쪽지(옛 '새 지표' 소식)와 같은 세로줄에 선다. */}
       <V2Hint {...TELEGRAM_HINT} edge=".hz-side-foot" at="right" />
     </aside>
   );
@@ -1149,7 +1138,6 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
           <Icon name={TELEGRAM.icon} style={{ fontSize: "var(--fs-20)" }} />
           <span style={{ fontSize: "var(--fs-15)" }}>{TELEGRAM.label}</span>
         </a>
-        <V2Hint {...NEW_INDICATORS_HINT} at="below" />
         <V2Hint {...TELEGRAM_HINT} at="below" />
       </nav>
     </>

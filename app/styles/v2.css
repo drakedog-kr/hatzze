@@ -2177,6 +2177,11 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 }
 .v2-tm-risertbl .v2-td-theme { word-break: keep-all; }
 .v2-tm-risertbl .v2-tr:hover { background: none; }
+/* 종목 칸에 올리면 그 줄을 칠한다 — 테마 흐름 줄 호버(a.v2-tr:hover)와 같은 면(2026-10-21 운영자 지시). 줄은 링크 둘(테마 · 종목)을 품은 상자라
+   줄 전체가 아니라 종목 링크가 기준이다. 폰은 누른 뒤 :hover 가 남아 면이 붙어 있으니 마우스가 있는 화면만. */
+@media (hover: hover) {
+  .v2-tm-risertbl .v2-tr:has(> .v2-td-stock:hover) { background: var(--t-tint); }
+}
 /* 순위 칸이 앞에 서서 문장 머리('채널이 말한 이유')가 넷째다 — 공통 규칙(넷째부터 숫자 · 오른쪽)을 되돌린다. */
 .v2-tm-risertbl .v2-th > :nth-child(4) { text-align: left; }
 

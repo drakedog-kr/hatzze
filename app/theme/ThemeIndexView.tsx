@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import { KADERA_WINDOW_DAYS } from "@/lib/telegram-data";
 import { formatKstUpdate } from "@/lib/format";
-import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_FLOW_DAYS, THEME_FLOW_TOP, type ThemeOverview, type ThemeRiser } from "@/lib/theme-page";
 import { TRADE_WINDOW, fmtTrade, fmtTradeChange } from "@/lib/theme-trade";
 
@@ -276,20 +275,9 @@ export function ThemeIndexView({
                 const tc = fmtTradeChange(t.trade?.change ?? null);
                 return (
                   <li key={t.theme}>
-                    {/* 날마다의 순위는 툴팁(줄 title)에 — 줄에는 열흘의 뜻 한 조각만(순위 칸 띠 · 색 띠 · 스파크라인 셋 다 "복잡하다"였다, 2026-09-19). */}
-                    <Link
-                      href={market.themeHref(t.theme)}
-                      className="v2-tr"
-                      // 마지막 칸은 칸 글자처럼 표의 순위(최근 3일)다 — 하루 순위를 적으면 칸('n일째 5위 안')과 어긋났다.
-                      title={`최근 ${t.flowDates.length}일 순위 ${t.flow
-                        .map((r, i) =>
-                          i === t.flow.length - 1
-                            ? `${fmtKoDate(t.flowDates[i])}(최근 3일) ${t.rank}위`
-                            : `${fmtKoDate(t.flowDates[i])} ${r == null ? "집계 없음" : `${r}위`}`,
-                        )
-                        .join(" · ")}`}
-                      data-ga="theme_flow_click"
-                    >
+                    {/* 줄에는 열흘의 뜻 한 조각만(순위 칸 띠 · 색 띠 · 스파크라인 셋 다 "복잡하다"였다, 2026-09-19). 날마다의 순위를 줄 title 툴팁으로
+                        띄우던 것은 걷었다(2026-10-21 운영자 지시) — 날짜 열 개가 넉 줄 말풍선으로 줄을 덮었다. */}
+                    <Link href={market.themeHref(t.theme)} className="v2-tr" data-ga="theme_flow_click">
                       <span className="v2-td-rank">{t.rank}</span>
                       <span className="v2-td-theme2">
                         {/* 폰은 열흘 한 조각을 이름 줄 옆에 붙인다(오른쪽 칸은 숨긴다) — 네 층 줄이 한 줄 평균 118px 였다(2026-10-05 모바일 점검).
