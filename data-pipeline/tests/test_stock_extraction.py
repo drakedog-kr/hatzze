@@ -1088,3 +1088,36 @@ def test_cs_other_meanings_are_not_the_stock(text):
 )
 def test_cs_stock_mentions_survive(text):
     assert _cs(text) == {"065770"}
+
+
+# ── 2026-10-21: 동아제약(000640)의 옛 사명 ─────────────────────────────────────────────────────
+# stocks 가 새 사명으로 바뀌자 옛 표기로 적힌 지난 글 100건의 태그가 빠졌다. 근거는 config/stock_extraction.py 의 같은 날짜 주석.
+DONGA_DICT = {"동아제약": "000640", "동아에스티": "170900"}
+
+
+def _donga(text: str) -> set[str]:
+    from config.stock_extraction import ALIASES
+
+    match_to_code = dict(DONGA_DICT)
+    method = {k: "dict" for k in match_to_code}
+    for alias, official in ALIASES.items():
+        if official in DONGA_DICT and alias not in match_to_code:
+            match_to_code[alias] = DONGA_DICT[official]
+            method[alias] = "alias"
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = set(match_to_code) & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, method, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text, codes",
+    [
+        ("<동아쏘시오홀딩스[000640] 동아제약을 품고 다음 단계로> 다올투자증권 이지수", {"000640"}),
+        ("[특징주] 동아쏘시오홀딩스, 동아제약 흡수합병에 7%대 강세", {"000640"}),
+        ("(유가)동아제약 - 단일판매ㆍ공급계약체결 (자회사의 주요경영사항)", {"000640"}),
+        ("이후 동아제약과 동아쏘시오홀딩스, 동아에스티에서 연구개발 전략", {"000640", "170900"}),
+        ("동아쏘시오그룹, AI 신약개발 플랫폼 가동…후보물질 발굴 속도 높인다", set()),
+    ],
+)
+def test_donga_old_name_finds_new_code(text, codes):
+    assert _donga(text) == codes
