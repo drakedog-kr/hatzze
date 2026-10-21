@@ -31,6 +31,14 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 아침 · 저녁 화면 비우기 뒤에 운영 화면이 그린 국장 종목 중 판정표가 none 인 곳을 회사 홈페이지 그림으로 채운다
+    // (data-pipeline/scripts/fill_visible_logos.py · 홈페이지 후보를 Claude 가 보고 고른다 · 하루 5~15곳 · 1~2분). 자동 행은
+    // note 로 가르고 아침 로고 잡이 다시 묻지 않는다. 화면에 새 기능은 없어 Patch. 날짜는 머지하는 날로 고친다.
+    version: "2.15.1",
+    date: "2026-10-21",
+    changes: ["화면에 새로 오른 종목의 로고를 그날 채웁니다."],
+  },
+  {
     // 테마 판세 흐름 표 · 테마 상세 첫 줄 띠에 '3일 평균 거래대금'(최근 거래일 셋의 하루 평균)과 1주 전 대비. 국장은 KRX 거래대금
     // (stock_price_daily.trade_value), 미장은 야후 종가 × 거래량(us_stock_price_daily) — 마이그레이션 106 · lib/theme-trade.ts.
     // 테마 점유율 지도 머리 오른쪽에 언급률 · 거래대금 고르기(기본 언급률 · app/theme/MapMetric.tsx) — 거래대금 지도는 넓이 3일 평균 거래대금 · 색 1주 전 대비.

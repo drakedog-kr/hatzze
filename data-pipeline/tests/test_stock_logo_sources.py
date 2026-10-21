@@ -339,3 +339,22 @@ def test_own_image_keeps_svg_document(monkeypatch):
     assert got is not None and base64.b64decode(got[0]) == svg
     monkeypatch.setattr(R, "SVG_MAX", 10)
     assert R.own_image("https://x.example/logo.svg", None) is None
+
+
+def test_pick_targets_leaves_auto_filled_rows(monkeypatch):
+    """자동으로 채운 홈페이지 그림(scripts/fill_visible_logos.py)은 다시 묻지 않는다 — 다시 물으면 none 으로 지운다.
+    못 채운 표시(AUTO_MISS_PREFIX)는 사람이 뺀 것이 아니라 '바뀐 종목'으로 보지 않는다. 손으로 도메인을 고르면 다시 묻는다."""
+    monkeypatch.setattr(R, "EXCLUDE", {})
+    monkeypatch.setattr(R, "DOMAIN_OVERRIDE", {"000003": "c.co.kr"})
+    stocks = [{"code": c, "market": "KOSDAQ"} for c in ("000001", "000002", "000003")]
+    old = "2026-07-01T00:00:00+00:00"
+    existing = {
+        "000001": {"source": "own", "note": R.AUTO_OWN_NOTE, "domain": "a.co.kr", "checked_at": old},
+        "000002": {"source": "none", "note": R.AUTO_MISS_PREFIX + "로고 후보 없음 (2026-10-21)", "domain": "b.co.kr",
+                   "checked_at": "2026-10-17T00:00:00+00:00"},
+        "000003": {"source": "own", "note": R.AUTO_OWN_NOTE, "domain": "c.co.kr", "checked_at": old},
+    }
+    domains = {"000001": "a.co.kr", "000002": "b.co.kr", "000003": "c.co.kr"}
+    assert [t["code"] for t in R.pick_targets(stocks, existing, domains, NOW, 10)] == ["000003"]
+    assert R.is_auto_note(R.AUTO_MISS_PREFIX + "x (2026-10-21)") and R.is_auto_note(R.AUTO_OWN_NOTE)
+    assert not R.is_auto_note("다른 회사 로고(카페24 → Jewelline)")

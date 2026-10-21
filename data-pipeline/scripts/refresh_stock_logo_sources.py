@@ -105,6 +105,16 @@ PROBE_SIZE = 128
 STEEP_MIN = 45
 BLUR_SOURCE_NOTE = "흐린 원본(작은 그림을 키운 것)"
 AUTO_NOTES = (GENERIC_NOTE, BLUR_NOTE, BLUR_SOURCE_NOTE)
+# 화면에 뜬 종목을 홈페이지 그림으로 자동으로 채운 행(scripts/fill_visible_logos.py · 2026-10-21). 손 설정(OWN_LOGO)과 가르는
+# 표시다 — 이 잡은 이 행을 다시 묻지 않는다. 틀렸으면 config/stock_logo_exclude.py 에 적는다(다음 실행에 배지로 돌아간다).
+AUTO_OWN_NOTE = "자동 고름(홈페이지 그림)"
+# 자동으로 못 채운 종목의 note 머리 — 뒤에 이유와 날짜가 붙는다. 사람이 뺀 것이 아니라 다시 묻지 않는다.
+AUTO_MISS_PREFIX = "자동 못 고름: "
+
+
+def is_auto_note(note: str | None) -> bool:
+    """스크립트가 스스로 단 note 인가(사람이 뺀 EXCLUDE 이유가 아니다)."""
+    return note in AUTO_NOTES or note == AUTO_OWN_NOTE or (note or "").startswith(AUTO_MISS_PREFIX)
 
 
 def domain_of(homepage: str | None) -> str | None:
@@ -151,13 +161,15 @@ def pick_targets(
         if code in EXCLUDE or code in OWN_LOGO or (only is not None and code not in only):
             continue
         row = existing.get(code)
+        if row and row.get("note") == AUTO_OWN_NOTE and only is None and code not in DOMAIN_OVERRIDE and code not in PREFER_DOMAIN:
+            continue  # 자동으로 채운 홈페이지 그림 — 손 설정이 생기기 전엔 다시 묻지 않는다(다시 물으면 none 으로 지운다)
         dom = DOMAIN_OVERRIDE.get(code) or (domains.get(code) if domains is not None else (row or {}).get("domain"))
         t = {"code": code, "market": s["market"], "domain": dom}
         if row is None:
             fresh.append(t)
         elif domains is not None and dom != row.get("domain"):
             changed.append(t)
-        elif row.get("note") and row.get("note") not in AUTO_NOTES:
+        elif row.get("note") and not is_auto_note(row.get("note")):
             changed.append(t)  # 손으로 뺐다가 제외 목록에서 지운 종목 — 다시 묻는다
         elif row.get("source") == "own":
             changed.append(t)  # 우리 그림을 두었다가 OWN_LOGO 에서 지운 종목 — 다시 묻는다
