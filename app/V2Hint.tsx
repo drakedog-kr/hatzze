@@ -215,7 +215,7 @@ export function V2Hint({
         return;
       }
       // 가리킨 것이 판 오른쪽에 있으면(폰의 'N곳 중복' 표시) 쪽지가 판 밖으로 나간다 — 판 안으로 당기고 꼭지만 제자리를 가리키게 민다.
-      // 판 안에 드는 쪽지는 그대로 둔다(폰 메뉴의 새 지표 쪽지는 오른끝 7px 앞에서 멈춘다 — 당기면 자리가 바뀐다).
+      // 판 안에 드는 쪽지는 그대로 둔다(폰 메뉴의 옛 '새 지표' 쪽지는 오른끝 7px 앞에서 멈췄다 — 당기면 자리가 바뀐다).
       // 폭은 왼쪽 0 에서 잰다 — 오른쪽에 붙은 채 재면 남은 폭에 눌린 값이 나온다.
       slot.style.left = "0px";
       const w = (slot.firstElementChild as HTMLElement | null)?.offsetWidth ?? 0;

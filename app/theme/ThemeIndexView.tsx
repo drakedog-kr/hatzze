@@ -2,14 +2,15 @@ import Link from "next/link";
 
 import { KADERA_WINDOW_DAYS } from "@/lib/telegram-data";
 import { formatKstUpdate } from "@/lib/format";
-import { fmtKoDate } from "@/lib/stock-page";
 import { THEME_FLOW_DAYS, THEME_FLOW_TOP, type ThemeOverview, type ThemeRiser } from "@/lib/theme-page";
+import { TRADE_WINDOW, fmtTrade, fmtTradeChange } from "@/lib/theme-trade";
 
 import { StockLogo } from "../StockLogo";
 import { CoverLinkCell, CoverMeta, Module, type CoverLink } from "../kadera/V2Modules";
 import type { ThemeMarket } from "./market";
+import { MapMetric } from "./MapMetric";
 import { ShareBar } from "./ShareBar";
-import { Treemap, TreemapLegend, themeTiles, toneForRatio } from "./Treemap";
+import { Treemap, TreemapLegend, themeTiles, toneForRatio, tradeTiles } from "./Treemap";
 
 /**
  * 테마 목록의 본문 — **국장(/theme)과 미장(/theme/us)이 같이 쓴다.** 자료는 각자 읽어(lib/theme-page.ts · lib/us-theme-page.ts)
@@ -17,6 +18,7 @@ import { Treemap, TreemapLegend, themeTiles, toneForRatio } from "./Treemap";
  *
  * ## v2(2026-10-03) — 카더라 · MDD · 배당에 쓴 규칙으로
  * 첫 줄 띠(가장 많이 늘어난 · 가장 많이 줄어든 · 새로 상위에 오른 테마 · 업데이트) → 점유율 지도(판 폭 전체, 3:1) → 테마 흐름 → 테마별 급부상 종목.
+ * 테마 흐름 표엔 '3일 평균 거래대금' 칸이 있다(2026-10-21 "테마마다 거래대금을 포함해서") — 언급(말) 옆에 돈이 얼마나 오갔는지.
  * - 걷은 것: 화면 제목 · 부제(셸이 v2 화면에서 걷는다), 회색 타일 히어로('관심 변화' · '상위권'), 시트 머리의 아이콘 타일 · 설명 문장,
  *   지도 위 안내 말풍선, '오늘의 브리핑' 문단 — 같은 사실을 세 번 말했다('반도체 59.8%'가 브리핑 · 지도 · 흐름 표에, 급부상 종목이
  *   브리핑 태그 · 급부상 표에).
@@ -88,6 +90,8 @@ export function ThemeIndexView({
 }) {
   const all = themes ?? [];
   const flowDates = all[0]?.flowDates ?? [];
+  // 거래대금이 한 줄도 없으면(마이그레이션 106 전 · 조회 실패) 칸째 걷는다 — 열 줄이 다 '-'면 빈 칸이다.
+  const hasTrade = all.some((t) => t.trade);
 
   /* 첫 줄 띠 — 오늘 무엇이 달라졌나. 칸마다 다른 테마를 세운다(옛 히어로 '같은 테마를 두 번 세우지 않는다'와 같은 규칙).
      관심 변화 둘(가장 많이 늘어난 · 줄어든, 1주 전 대비) + 상위권의 문 하나(새로 상위에 오른 → 없으면 상위에서 내려간 → 순위가 가장 오른). */
@@ -131,6 +135,27 @@ export function ThemeIndexView({
           : null,
   ].filter((c): c is NonNullable<typeof c> => c !== null);
 
+  /* 폰 막대(지도 대신) — 앞 다섯 + 나머지, 그 아래 '나머지' 알약 줄. 범례 이름은 그 테마 화면 링크, '나머지'는 알약 줄로 다 편다 — 지도가 없는
+     폰에서 흐름 표(열 줄) 밖 테마로 갈 길이 없었다(2026-10-05 모바일 점검 P1, 국장 16 · 미장 6). 알약 꼴은 테마 화면 '함께 거론되는 테마'와 같다.
+     언급률 · 거래대금 두 벌을 그린다(지도 기준 고르기). */
+  const shareBar = (items: { theme: string; value: number }[], ariaLabel: string, only: string) => (
+    <div className={`v2-tm-map-bar${only ? ` ${only}` : ""}`}>
+      <ShareBar stocks={items.map((x) => ({ code: x.theme, name: x.theme, mentions: x.value }))} ariaLabel={ariaLabel} unit="테마" hrefOf={market.themeHref} />
+      {items.length > 5 && (
+        <div className="v2-tm-pills v2-tm-restpills">
+          {[...items]
+            .sort((a, b) => b.value - a.value)
+            .slice(5)
+            .map((x) => (
+              <Link key={x.theme} href={market.themeHref(x.theme)} className="v2-tm-pill" data-ga="theme_rest_click">
+                {x.theme}
+              </Link>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="hz-tx v2-kd v2-tm">
       {/* 첫 줄 — 오늘 무엇이 달라졌나(링크 칸 셋) · 언제 · 무엇을 셌나 */}
@@ -155,7 +180,19 @@ export function ThemeIndexView({
             <span className="v2-tm-title-phone">테마 점유율</span>
           </>
         }
-        meta={`최근 ${KADERA_WINDOW_DAYS}일 언급 점유율`}
+        // 언급률 · 거래대금 고르기(2026-10-21) — 지도 · 폰 막대 · 이 근거 글을 두 벌 그려 두고 고른 쪽만 보인다(app/theme/MapMetric.tsx).
+        // 거래대금을 하나도 못 읽은 날은 고르기 없이 예전 한 벌이다.
+        meta={
+          hasTrade ? (
+            <>
+              <span className="v2-tm-only-mention">최근 {KADERA_WINDOW_DAYS}일 언급 점유율</span>
+              <span className="v2-tm-only-trade">{TRADE_WINDOW}일 평균 거래대금</span>
+            </>
+          ) : (
+            `최근 ${KADERA_WINDOW_DAYS}일 언급 점유율`
+          )
+        }
+        aside={hasTrade ? <MapMetric /> : undefined}
         className="v2-tm-map"
       >
         {themes === null ? (
@@ -164,7 +201,7 @@ export function ThemeIndexView({
           <p className="v2-empty">아직 집계된 테마가 없습니다.</p>
         ) : (
           <>
-            <div className="v2-tm-map-in">
+            <div className="v2-tm-map-in v2-tm-only-mention">
               <Treemap
                 tiles={themeTiles(themes, market.key)}
                 ariaLabel="테마별 최근 3일 언급 점유율"
@@ -173,33 +210,30 @@ export function ThemeIndexView({
                 hint={{ id: "theme-tap", text: (label) => `${label} 칸을 누르면 이 테마의 상세 정보가 열립니다` }}
               />
             </div>
-            {/* 색은 1주 전 대비 변화 — '변화 ±0.3%p 안'은 무엇과 견준 변화인지 안 읽혔다(2026-10-04 점검). */}
+            {/* 거래대금 지도 — 넓이 3일 평균 거래대금 · 색 1주 전 대비(흐름 표 거래대금 칸과 같은 수). 쪽지는 언급 지도 한 곳에만. */}
+            {hasTrade && (
+              <div className="v2-tm-map-in v2-tm-only-trade">
+                <Treemap tiles={tradeTiles(themes, market.key)} ariaLabel={`테마별 ${TRADE_WINDOW}일 평균 거래대금`} aspect={3} />
+              </div>
+            )}
+            {/* 색은 1주 전 대비 변화 — '변화 ±0.3%p 안'은 무엇과 견준 변화인지 안 읽혔다(2026-10-04 점검). 범례 하나가 두 지도를 다 말한다
+                (언급률은 점유율 %p, 거래대금은 금액 % — 같은 색 단 · lib/theme-trade.ts tradeTone). */}
             <div className="v2-tm-map-legend">
               <TreemapLegend basis="1주 전 대비" up="늘어난 테마" flat="비슷" down="줄어든 테마" />
             </div>
-            {/* 폰은 지도 대신 막대 하나(앞 다섯 + 나머지) — 3:2 지도에선 26칸 중 이름이 든 칸이 하나뿐이었다(2026-10-04 점검).
-                범례 이름은 그 테마 화면 링크, '나머지'는 아래 알약 줄로 다 편다 — 지도가 없는 폰에서 흐름 표(열 줄) 밖 테마로 갈 길이
-                없었다(2026-10-05 모바일 점검 P1, 국장 16 · 미장 6). 알약 꼴은 테마 화면 '함께 거론되는 테마'와 같다. */}
-            <div className="v2-tm-map-bar">
-              <ShareBar
-                stocks={themes.map((t) => ({ code: t.theme, name: t.theme, mentions: t.sharePct }))}
-                ariaLabel="테마별 최근 3일 언급 점유율"
-                unit="테마"
-                hrefOf={market.themeHref}
-              />
-              {themes.length > 5 && (
-                <div className="v2-tm-pills v2-tm-restpills">
-                  {[...themes]
-                    .sort((a, b) => b.sharePct - a.sharePct)
-                    .slice(5)
-                    .map((t) => (
-                      <Link key={t.theme} href={market.themeHref(t.theme)} className="v2-tm-pill" data-ga="theme_rest_click">
-                        {t.theme}
-                      </Link>
-                    ))}
-                </div>
+            {/* 폰은 지도 대신 막대 하나(앞 다섯 + 나머지) — 3:2 지도에선 26칸 중 이름이 든 칸이 하나뿐이었다(2026-10-04 점검). 링크 · 알약은 위 shareBar. */}
+            {shareBar(
+              themes.map((t) => ({ theme: t.theme, value: t.sharePct })),
+              "테마별 최근 3일 언급 점유율",
+              hasTrade ? "v2-tm-only-mention" : "",
+            )}
+            {/* 거래대금 막대 — 몫은 테마 합 안의 몫이다(언급 막대도 테마 합 안의 몫이다 · ShareBar). '나머지' 알약도 거래대금 차례로. */}
+            {hasTrade &&
+              shareBar(
+                themes.flatMap((t) => (t.trade ? [{ theme: t.theme, value: t.trade.avg }] : [])),
+                `테마별 ${TRADE_WINDOW}일 평균 거래대금`,
+                "v2-tm-only-trade",
               )}
-            </div>
           </>
         )}
       </Module>
@@ -213,44 +247,37 @@ export function ThemeIndexView({
         title="테마 흐름"
         // 요즘 도는 얘기 첫 문장이 AI 글이라 고지는 모듈 머리에 둔다(카더라 네 표와 같은 자리, 2026-10-04 점검).
         ai
-        // 점유율 아래 +%p 가 견준 기간('1주 전 대비')은 모듈 머리가 말하고, 점유율 칸 머리는 '최근 3일 점유율' 한 줄이다(2026-10-20 운영자 판단).
-        // 10-05 엔 칸 머리 두 줄(최근 3일 점유율 / 1주 전 대비)이었는데 머리 줄만 두 줄로 높았다. 폰도 같은 머리라 따로 꼬리를 달지 않는다.
+        // 머리는 '점유율 상위 10' 한 마디(2026-10-21 운영자 판단 — '1주 전 대비'를 걷었다). 점유율 · 거래대금 아래 변화가 견준 기간은 같은 화면
+        // 지도 범례 맨 앞('1주 전 대비')이 말한다. 점유율 칸 머리는 '최근 3일 점유율' 한 줄(2026-10-20) — 10-05 엔 두 줄이라 머리 줄만 높았다.
         // 날짜 범위는 뺐다 — 열흘 값처럼 읽혔다(2026-10-04 점검).
-        meta={`1주 전 대비 점유율 상위 ${FLOW_ROWS}`}
+        meta={`점유율 상위 ${FLOW_ROWS}`}
         // 폰 전용 쪽지 — 넓은 화면은 지도 칸 쪽지(같은 id)가 같은 말을 한다(v2.css .v2-hint-phone).
         hint={themes?.length ? { id: "theme-tap", anchor: ".v2-tbody > li:first-child", className: "v2-hint-phone", text: "테마를 누르면 종목과 이유가 함께 나옵니다" } : undefined}
       >
         {themes === null || themes.length === 0 ? (
           <p className="v2-empty">{themes === null ? "테마 집계를 지금 불러오지 못했습니다." : "아직 집계된 테마가 없습니다."}</p>
         ) : (
-          <div className="v2-tbl v2-tm-flowtbl">
+          <div className={`v2-tbl v2-tm-flowtbl${hasTrade ? " has-trade" : ""}`}>
             <div className="v2-tr v2-th" aria-hidden="true">
               <span />
               <span>테마 · 언급 상위 종목</span>
               <span>요즘 도는 얘기</span>
               <span>최근 {KADERA_WINDOW_DAYS}일 점유율</span>
-              <span>최근 {flowDates.length || THEME_FLOW_DAYS}일</span>
+              {/* 하루 평균이다 — '최근 3일 거래대금'이면 사흘 합으로, '일평균'만이면 며칠 평균인지 물어야 했다. */}
+              {hasTrade && <span>{TRADE_WINDOW}일 평균 거래대금</span>}
+              {/* '추이'를 붙인다(2026-10-21 운영자 판단) — 칸 글('3일째 5위 안')이 열흘 동안의 흐름이라는 뜻. */}
+              <span>최근 {flowDates.length || THEME_FLOW_DAYS}일 추이</span>
             </div>
             <ol className="v2-tbody">
               {themes.slice(0, FLOW_ROWS).map((t) => {
                 const cap = flowCaption(t);
                 const d = t.shareDelta;
+                const tc = fmtTradeChange(t.trade?.change ?? null);
                 return (
                   <li key={t.theme}>
-                    {/* 날마다의 순위는 툴팁(줄 title)에 — 줄에는 열흘의 뜻 한 조각만(순위 칸 띠 · 색 띠 · 스파크라인 셋 다 "복잡하다"였다, 2026-09-19). */}
-                    <Link
-                      href={market.themeHref(t.theme)}
-                      className="v2-tr"
-                      // 마지막 칸은 칸 글자처럼 표의 순위(최근 3일)다 — 하루 순위를 적으면 칸('n일째 5위 안')과 어긋났다.
-                      title={`최근 ${t.flowDates.length}일 순위 ${t.flow
-                        .map((r, i) =>
-                          i === t.flow.length - 1
-                            ? `${fmtKoDate(t.flowDates[i])}(최근 3일) ${t.rank}위`
-                            : `${fmtKoDate(t.flowDates[i])} ${r == null ? "집계 없음" : `${r}위`}`,
-                        )
-                        .join(" · ")}`}
-                      data-ga="theme_flow_click"
-                    >
+                    {/* 줄에는 열흘의 뜻 한 조각만(순위 칸 띠 · 색 띠 · 스파크라인 셋 다 "복잡하다"였다, 2026-09-19). 날마다의 순위를 줄 title 툴팁으로
+                        띄우던 것은 걷었다(2026-10-21 운영자 지시) — 날짜 열 개가 넉 줄 말풍선으로 줄을 덮었다. */}
+                    <Link href={market.themeHref(t.theme)} className="v2-tr" data-ga="theme_flow_click">
                       <span className="v2-td-rank">{t.rank}</span>
                       <span className="v2-td-theme2">
                         {/* 폰은 열흘 한 조각을 이름 줄 옆에 붙인다(오른쪽 칸은 숨긴다) — 네 층 줄이 한 줄 평균 118px 였다(2026-10-05 모바일 점검).
@@ -267,6 +294,13 @@ export function ThemeIndexView({
                         {t.sharePct.toFixed(1)}%
                         {d != null && Math.abs(d) >= 0.05 && <em className={d > 0 ? "is-up" : "is-down"}>{pp(d)}</em>}
                       </span>
+                      {/* 3일 평균 거래대금 · 그 아래 1주 전 대비(점유율 칸과 같은 꼴 · 같은 '1주 전' — 지도 범례가 말한다). 국장 원 · 미장 달러. */}
+                      {hasTrade && (
+                        <span className="v2-td-num v2-td-two v2-td-trade">
+                          {t.trade ? fmtTrade(t.trade.avg, market.key) : "-"}
+                          {tc && <em className={tc.tone}>{tc.text}</em>}
+                        </span>
+                      )}
                       {/* 열흘 — 지속 · 첫 등장 · 간헐 한 조각. ⛔ 'n일째 오르는 중'은 걷었다 — 바로 옆 '-3.0%p'(1주 전 대비)와 잣대가 달라
                           한 줄에 반대말로 섰다(2026-10-05 점검). 날마다의 방향은 테마 한 장 30일 추이의 몫이다. */}
                       <span className="v2-td-two v2-td-flow2">
