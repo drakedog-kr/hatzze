@@ -377,6 +377,7 @@ const THEME_ROWS = 10;
 /**
  * 셋째 줄 격자(.v2-grid) 클래스 — 짝 모듈(급부상 | 테마 점유율 · 크게 움직인 | 이슈 키워드)이 줄 트랙을 나눠 쓰는 꼴(is-sub, v2.css)은
  * 네 모듈이 다 열 줄일 때만 건다. 트랙 수(머리 + 표 머리 + 열 줄)를 CSS 가 못 박아 두기 때문이다 — 줄 수가 다른 날은 지금처럼 따로 쌓고 짧은 쪽이 늘어난다.
+ * 표 줄 수는 남는 자리 칸까지 친 값이다(KaderaBoard.tsx filledRows) — 움직인 종목이 다섯 줄이어도 그 칸이 나머지 다섯 트랙을 덮어 열 줄로 선다.
  */
 export function pairGridClass(surging: number, why: number, themes: number, keywords: number): string {
   return surging === 10 && why === 10 && Math.min(themes, THEME_ROWS) === 10 && Math.min(keywords, 10) === 10 ? "v2-grid is-sub" : "v2-grid";
