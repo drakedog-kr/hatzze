@@ -187,6 +187,8 @@ CROP_OVERRIDE: dict[str, list[float]] = {
     "353190": [],  # 휴럼
     "266690": [0.1289, 0.3691, 0.2617, 0.248],  # 덕산넵코어스 — DS 와 빨간 획(뒤 Navcours 는 뺀다)
     "278650": [0.0234, 0.2266, 0.9531, 0.375],  # HLB바이오스텝 — HLB 타원(글자 줄은 뺀다)
+    # 2026-10-21 — 테마 화면에 배지로 남은 종목. 자동 첫 덩어리가 이탤릭 KoMi 를 한 덩어리로 읽어 상자가 없었다.
+    "183300": [0.0723, 0.4141, 0.293, 0.1719],  # 코미코 — KoMiCo 에서 Ko(K 만 자르면 이탤릭 팔이 잘린다)
 }
 
 OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
@@ -497,6 +499,13 @@ OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
     "368970": ("https://www.osppetfood.com/kor/main/images/logo.svg", None),  # 오에스피
     "440290": ("https://www.hbvc.co.kr/img/svg/logo.svg", [0, 0, 0.2383, 1]),  # HB인베스트먼트
     "452190": ("https://www.hblaser.co.kr/default/img/onepixel/images/logo-dark.svg", [0.0303, 0, 0.457, 1]),  # 한빛레이저
+    # 2026-10-21 — 테마 화면에 배지로 남은 종목(logo.dev 에 없다 · 그림은 눈으로 봄).
+    "089890": ("http://www.koses.co.kr/images/logo.jpg", [0.22, 0.1, 0.58, 0.7]),  # 코세스 — 파란 방울 KOSES(https 는 호스팅 403 이라 http)
+    "024060": (  # 흥구석유 — 글자 로고 통째(가로세로 2.7 이라 칸에서 읽힌다 · 홈페이지 hunggu.kr 이 쓰는 그림)
+        "https://lh3.googleusercontent.com/m2L83qwzW33NjZweDNhGNx4S5UkQVWbh9US8SxFjHxT17f_npNLn45WOWcqb_L6l20kpYNjpWkAEqA1_EohEUql6GFx2CDKph2e0LOvYbUiy6zhKMG8A0ns",
+        [0, 0, 1, 1],
+    ),
+    "226340": ("https://bonnekorea.co.kr/images/common/logo.png", [0, 0, 0.1911, 0.6111]),  # 본느 — BONNE 의 B(거래소 목록에 홈페이지가 없고 네이버의 bonne.co.kr 은 닫힘)
 }
 
 PREFER_DOMAIN: set[str] = {

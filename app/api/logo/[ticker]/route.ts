@@ -5,6 +5,7 @@ import {
   LOGO_FETCH_SIZE,
   LOGO_SHAPE_SIZE,
   LOGO_TICKER_RE,
+  US_LOGO_CROP,
   isLogoSize,
   krLogoCode,
   logoCrop,
@@ -60,7 +61,8 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/logo/[ticker
   if (row?.source === "own") return ownLogo(ticker, size);
   const path = logoUpstreamPath(ticker, row);
   if (path === null) return reply("none");
-  const crop = logoCrop(row?.crop);
+  // 미장은 판정표가 없어 손으로 적은 상자(US_LOGO_CROP)를 쓴다.
+  const crop = logoCrop(row?.crop ?? US_LOGO_CROP[ticker]);
 
   let upstream: Response;
   try {
