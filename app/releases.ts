@@ -31,6 +31,13 @@ export type Release = {
 /** 최신이 맨 앞. 화면도 이 순서 그대로 그린다. */
 export const RELEASES: Release[] = [
   {
+    // 테마 판세(국장 · 미장) 점유율 지도 머리의 언급률 · 거래대금 고르기에 첫 안내 쪽지(theme-map-metric · 꼭지는 거래대금 단추).
+    // 작은 화면 변화라 Patch. 날짜는 머지하는 날로 고친다.
+    version: "2.15.5",
+    date: "2026-10-21",
+    changes: ["테마 점유율 지도의 언급률과 거래대금 고르기에도 첫 안내를 띄웁니다."],
+  },
+  {
     // 테마 화면(목록 둘 · 상세 42)에 배지로 남은 8종목 — 국장은 손 설정(코세스 · 흥구석유 · 본느 홈페이지 그림 · 코미코 Ko 상자 ·
     // data-pipeline/config/stock_logo_shape.py), 미장은 판정표가 없어 긴 글자 로고 자르기 표(lib/stock-logo.ts US_LOGO_CROP · 루멘텀 ·
     // 엑슨모빌 · 케이던스 · 쿠팡)를 라우트가 쓴다. 판 11. 고치기만이라 Patch. 날짜는 머지하는 날로 고친다.
