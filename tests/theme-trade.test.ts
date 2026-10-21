@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { fmtTrade, fmtTradeChange, themeTrades, tradingDays, type TradeRow } from "../lib/theme-trade.ts";
+import { fmtTrade, fmtTradeChange, themeTrades, tradeTone, tradingDays, type TradeRow } from "../lib/theme-trade.ts";
 
 const row = (key: string, date: string, value: TradeRow["value"]): TradeRow => ({ key, date, value });
 
@@ -38,8 +38,16 @@ describe("themeTrades", () => {
   it("최근 거래일 셋의 하루 평균 · 1주 앞 같은 요일과 견준 변화", () => {
     const t = themeTrades(rows, members);
     // 최근 16 · 19 · 20 → 1주 앞 09(휴장, 빠짐) · 12 · 13 — 그 둘의 평균 30 과 견준다.
-    assert.deepEqual(t.get("반도체"), { avg: 40, change: 40 / 30 - 1, end: "2026-10-20" });
-    assert.deepEqual(t.get("조선"), { avg: 1, change: 0, end: "2026-10-20" });
+    assert.deepEqual(t.get("반도체"), { avg: 40, change: 40 / 30 - 1, end: "2026-10-20", top: ["A", "B"] });
+    assert.deepEqual(t.get("조선"), { avg: 1, change: 0, end: "2026-10-20", top: ["C"] });
+  });
+
+  it("곁줄 상위 종목 — 최근 사흘 합 순 · 이름으로", () => {
+    const names = new Map([["A", "에이"], ["B", "비"]]);
+    // 최근 사흘 A 20 · B 20 동률이면 열쇠 순.
+    assert.deepEqual(themeTrades(rows, members, (k) => names.get(k)).get("반도체")?.top, ["에이", "비"]);
+    const more = [...rows, ...DAYS.slice(-3).map((d) => row("B", d, 50))];
+    assert.deepEqual(themeTrades(more, members, (k) => names.get(k)).get("반도체")?.top, ["비", "에이"]);
   });
 
   it("테마 종목 값이 하나도 없으면 빠진다", () => {
@@ -86,5 +94,17 @@ describe("fmtTradeChange", () => {
     assert.deepEqual(fmtTradeChange(12.5), { text: "+1,250%", tone: "is-up" });
     assert.equal(fmtTradeChange(0.004), null);
     assert.equal(fmtTradeChange(null), null);
+  });
+});
+
+describe("tradeTone", () => {
+  it("5% 안은 비슷 · 15% · 40% 에서 한 단씩", () => {
+    assert.equal(tradeTone(null), "is-flat");
+    assert.equal(tradeTone(0.04), "is-flat");
+    assert.equal(tradeTone(-0.049), "is-flat");
+    assert.equal(tradeTone(0.05), "is-up-1");
+    assert.equal(tradeTone(-0.15), "is-down-2");
+    assert.equal(tradeTone(0.6), "is-up-3");
+    assert.equal(tradeTone(-0.31), "is-down-2");
   });
 });

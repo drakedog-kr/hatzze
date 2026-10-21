@@ -610,8 +610,10 @@ export async function loadTradeRows(market: "kr" | "us", keys: string[]): Promis
   return out;
 }
 
-/** 사전 전체의 테마 → 종목코드. 이름을 80개씩 끊어 stocks 에서 찾는다(themeMembers 와 같은 규칙 · 사전에 있어도 stocks 에 없는 이름은 빠진다). */
-async function krThemeCodes(): Promise<Record<string, string[]> | null> {
+/**
+ * 사전 전체의 테마 → 종목코드와 코드 → 이름. 이름을 80개씩 끊어 stocks 에서 찾는다(themeMembers 와 같은 규칙 · 사전에 있어도 stocks 에 없는 이름은 빠진다).
+ */
+async function krThemeCodes(): Promise<{ members: Record<string, string[]>; nameOf: Map<string, string> } | null> {
   const db = getSupabaseAdmin();
   const names = [...new Set(Object.values(THEMES).flat())];
   const chunks: string[][] = [];
@@ -625,15 +627,18 @@ async function krThemeCodes(): Promise<Record<string, string[]> | null> {
     }
     for (const r of data ?? []) codeOf.set(r.name as string, r.code as string);
   }
-  return Object.fromEntries(Object.entries(THEMES).map(([t, ns]) => [t, ns.map((n) => codeOf.get(n)).filter((c): c is string => Boolean(c))]));
+  return {
+    members: Object.fromEntries(Object.entries(THEMES).map(([t, ns]) => [t, ns.map((n) => codeOf.get(n)).filter((c): c is string => Boolean(c))])),
+    nameOf: new Map([...codeOf].map(([n, c]) => [c, n])),
+  };
 }
 
 /** 국장 테마마다 3일 평균 거래대금(목록). 못 읽으면 null. */
 async function krThemeTrades(): Promise<Map<string, ThemeTrade> | null> {
-  const members = await krThemeCodes();
-  if (!members) return null;
-  const rows = await loadTradeRows("kr", [...new Set(Object.values(members).flat())]);
-  return rows ? themeTrades(rows, members) : null;
+  const got = await krThemeCodes();
+  if (!got) return null;
+  const rows = await loadTradeRows("kr", [...new Set(Object.values(got.members).flat())]);
+  return rows ? themeTrades(rows, got.members, (c) => got.nameOf.get(c)) : null;
 }
 
 // ─── 테마 목록(/theme) ────────────────────────────────────────────────────

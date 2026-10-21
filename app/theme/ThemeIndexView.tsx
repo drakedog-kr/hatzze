@@ -9,8 +9,9 @@ import { TRADE_WINDOW, fmtTrade, fmtTradeChange } from "@/lib/theme-trade";
 import { StockLogo } from "../StockLogo";
 import { CoverLinkCell, CoverMeta, Module, type CoverLink } from "../kadera/V2Modules";
 import type { ThemeMarket } from "./market";
+import { MapMetric } from "./MapMetric";
 import { ShareBar } from "./ShareBar";
-import { Treemap, TreemapLegend, themeTiles, toneForRatio } from "./Treemap";
+import { Treemap, TreemapLegend, themeTiles, toneForRatio, tradeTiles } from "./Treemap";
 
 /**
  * 테마 목록의 본문 — **국장(/theme)과 미장(/theme/us)이 같이 쓴다.** 자료는 각자 읽어(lib/theme-page.ts · lib/us-theme-page.ts)
@@ -135,6 +136,27 @@ export function ThemeIndexView({
           : null,
   ].filter((c): c is NonNullable<typeof c> => c !== null);
 
+  /* 폰 막대(지도 대신) — 앞 다섯 + 나머지, 그 아래 '나머지' 알약 줄. 범례 이름은 그 테마 화면 링크, '나머지'는 알약 줄로 다 편다 — 지도가 없는
+     폰에서 흐름 표(열 줄) 밖 테마로 갈 길이 없었다(2026-10-05 모바일 점검 P1, 국장 16 · 미장 6). 알약 꼴은 테마 화면 '함께 거론되는 테마'와 같다.
+     언급률 · 거래대금 두 벌을 그린다(지도 기준 고르기). */
+  const shareBar = (items: { theme: string; value: number }[], ariaLabel: string, only: string) => (
+    <div className={`v2-tm-map-bar${only ? ` ${only}` : ""}`}>
+      <ShareBar stocks={items.map((x) => ({ code: x.theme, name: x.theme, mentions: x.value }))} ariaLabel={ariaLabel} unit="테마" hrefOf={market.themeHref} />
+      {items.length > 5 && (
+        <div className="v2-tm-pills v2-tm-restpills">
+          {[...items]
+            .sort((a, b) => b.value - a.value)
+            .slice(5)
+            .map((x) => (
+              <Link key={x.theme} href={market.themeHref(x.theme)} className="v2-tm-pill" data-ga="theme_rest_click">
+                {x.theme}
+              </Link>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="hz-tx v2-kd v2-tm">
       {/* 첫 줄 — 오늘 무엇이 달라졌나(링크 칸 셋) · 언제 · 무엇을 셌나 */}
@@ -159,7 +181,19 @@ export function ThemeIndexView({
             <span className="v2-tm-title-phone">테마 점유율</span>
           </>
         }
-        meta={`최근 ${KADERA_WINDOW_DAYS}일 언급 점유율`}
+        // 언급률 · 거래대금 고르기(2026-10-21) — 지도 · 폰 막대 · 이 근거 글을 두 벌 그려 두고 고른 쪽만 보인다(app/theme/MapMetric.tsx).
+        // 거래대금을 하나도 못 읽은 날은 고르기 없이 예전 한 벌이다.
+        meta={
+          hasTrade ? (
+            <>
+              <span className="v2-tm-only-mention">최근 {KADERA_WINDOW_DAYS}일 언급 점유율</span>
+              <span className="v2-tm-only-trade">{TRADE_WINDOW}일 평균 거래대금</span>
+            </>
+          ) : (
+            `최근 ${KADERA_WINDOW_DAYS}일 언급 점유율`
+          )
+        }
+        aside={hasTrade ? <MapMetric /> : undefined}
         className="v2-tm-map"
       >
         {themes === null ? (
@@ -168,7 +202,7 @@ export function ThemeIndexView({
           <p className="v2-empty">아직 집계된 테마가 없습니다.</p>
         ) : (
           <>
-            <div className="v2-tm-map-in">
+            <div className="v2-tm-map-in v2-tm-only-mention">
               <Treemap
                 tiles={themeTiles(themes, market.key)}
                 ariaLabel="테마별 최근 3일 언급 점유율"
@@ -177,33 +211,30 @@ export function ThemeIndexView({
                 hint={{ id: "theme-tap", text: (label) => `${label} 칸을 누르면 이 테마의 상세 정보가 열립니다` }}
               />
             </div>
-            {/* 색은 1주 전 대비 변화 — '변화 ±0.3%p 안'은 무엇과 견준 변화인지 안 읽혔다(2026-10-04 점검). */}
+            {/* 거래대금 지도 — 넓이 3일 평균 거래대금 · 색 1주 전 대비(흐름 표 거래대금 칸과 같은 수). 쪽지는 언급 지도 한 곳에만. */}
+            {hasTrade && (
+              <div className="v2-tm-map-in v2-tm-only-trade">
+                <Treemap tiles={tradeTiles(themes, market.key)} ariaLabel={`테마별 ${TRADE_WINDOW}일 평균 거래대금`} aspect={3} />
+              </div>
+            )}
+            {/* 색은 1주 전 대비 변화 — '변화 ±0.3%p 안'은 무엇과 견준 변화인지 안 읽혔다(2026-10-04 점검). 범례 하나가 두 지도를 다 말한다
+                (언급률은 점유율 %p, 거래대금은 금액 % — 같은 색 단 · lib/theme-trade.ts tradeTone). */}
             <div className="v2-tm-map-legend">
               <TreemapLegend basis="1주 전 대비" up="늘어난 테마" flat="비슷" down="줄어든 테마" />
             </div>
-            {/* 폰은 지도 대신 막대 하나(앞 다섯 + 나머지) — 3:2 지도에선 26칸 중 이름이 든 칸이 하나뿐이었다(2026-10-04 점검).
-                범례 이름은 그 테마 화면 링크, '나머지'는 아래 알약 줄로 다 편다 — 지도가 없는 폰에서 흐름 표(열 줄) 밖 테마로 갈 길이
-                없었다(2026-10-05 모바일 점검 P1, 국장 16 · 미장 6). 알약 꼴은 테마 화면 '함께 거론되는 테마'와 같다. */}
-            <div className="v2-tm-map-bar">
-              <ShareBar
-                stocks={themes.map((t) => ({ code: t.theme, name: t.theme, mentions: t.sharePct }))}
-                ariaLabel="테마별 최근 3일 언급 점유율"
-                unit="테마"
-                hrefOf={market.themeHref}
-              />
-              {themes.length > 5 && (
-                <div className="v2-tm-pills v2-tm-restpills">
-                  {[...themes]
-                    .sort((a, b) => b.sharePct - a.sharePct)
-                    .slice(5)
-                    .map((t) => (
-                      <Link key={t.theme} href={market.themeHref(t.theme)} className="v2-tm-pill" data-ga="theme_rest_click">
-                        {t.theme}
-                      </Link>
-                    ))}
-                </div>
+            {/* 폰은 지도 대신 막대 하나(앞 다섯 + 나머지) — 3:2 지도에선 26칸 중 이름이 든 칸이 하나뿐이었다(2026-10-04 점검). 링크 · 알약은 위 shareBar. */}
+            {shareBar(
+              themes.map((t) => ({ theme: t.theme, value: t.sharePct })),
+              "테마별 최근 3일 언급 점유율",
+              hasTrade ? "v2-tm-only-mention" : "",
+            )}
+            {/* 거래대금 막대 — 몫은 테마 합 안의 몫이다(언급 막대도 테마 합 안의 몫이다 · ShareBar). '나머지' 알약도 거래대금 차례로. */}
+            {hasTrade &&
+              shareBar(
+                themes.flatMap((t) => (t.trade ? [{ theme: t.theme, value: t.trade.avg }] : [])),
+                `테마별 ${TRADE_WINDOW}일 평균 거래대금`,
+                "v2-tm-only-trade",
               )}
-            </div>
           </>
         )}
       </Module>

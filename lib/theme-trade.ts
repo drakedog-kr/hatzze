@@ -33,6 +33,8 @@ export type ThemeTrade = {
   change: number | null;
   /** 최근 창의 마지막 거래일(YYYY-MM-DD). */
   end: string;
+  /** 최근 창 거래대금이 가장 큰 테마 종목 셋(이름 — 이름을 못 찾으면 열쇠). 거래대금 지도의 큰 칸 곁줄이 쓴다. */
+  top: string[];
 };
 
 /** 표의 한 행 — key 는 국장 종목코드 · 미장 티커. */
@@ -49,10 +51,14 @@ export function tradingDays(rows: TradeRow[]): string[] {
     .sort();
 }
 
+/** 거래대금 지도 곁줄에 세우는 종목 수 — 언급 지도 곁줄(언급 상위 셋)과 같은 수. */
+const TOP_N = 3;
+
 /**
- * 테마마다 거래대금. members 는 테마 → 종목 열쇠(코드 · 티커). 최근 거래일이 셋이 안 되거나 테마 종목 값이 하나도 없으면 그 테마는 빠진다.
+ * 테마마다 거래대금. members 는 테마 → 종목 열쇠(코드 · 티커), nameOf 는 열쇠 → 이름(top 에 쓴다).
+ * 최근 거래일이 셋이 안 되거나 테마 종목 값이 하나도 없으면 그 테마는 빠진다.
  */
-export function themeTrades(rows: TradeRow[], members: Record<string, string[]>): Map<string, ThemeTrade> {
+export function themeTrades(rows: TradeRow[], members: Record<string, string[]>, nameOf?: (key: string) => string | undefined): Map<string, ThemeTrade> {
   const out = new Map<string, ThemeTrade>();
   const days = tradingDays(rows);
   if (days.length < TRADE_WINDOW) return out;
@@ -79,13 +85,34 @@ export function themeTrades(rows: TradeRow[], members: Record<string, string[]>)
     }
     return seen ? sum / dates.length : null;
   };
+  const recentSum = (key: string) => recent.reduce((a, d) => a + (on.get(d)?.get(key) ?? 0), 0);
   for (const [theme, keys] of Object.entries(members)) {
     const avg = avgOf(recent, keys);
     if (avg == null) continue;
     const before = prior.length ? avgOf(prior, keys) : null;
-    out.set(theme, { avg, change: before != null && before > 0 ? avg / before - 1 : null, end: recent[recent.length - 1] });
+    // 같은 값이면 열쇠 순 — 렌더마다 곁줄 차례가 흔들리지 않게.
+    const top = [...new Set(keys)]
+      .map((k) => [k, recentSum(k)] as const)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+      .slice(0, TOP_N)
+      .map(([k]) => nameOf?.(k) ?? k);
+    out.set(theme, { avg, change: before != null && before > 0 ? avg / before - 1 : null, end: recent[recent.length - 1], top });
   }
   return out;
+}
+
+/**
+ * 거래대금 지도 칸 색 — 1주 전 대비 변화(%)의 단. 언급 지도(점유율 %p · 0.3 / 1 / 3)와 문턱이 다르다 — 금액의 변화라 폭이 크다.
+ * 2026-10-21 국장 열 테마가 −40% ~ +60%, 미장이 −7% ~ +52% 였다. 5% 안은 '비슷', 15% · 40% 에서 한 단씩.
+ * 클래스 이름은 언급 지도와 같은 색 단(kadera.css .hz-tm-tile.is-*)이라 범례 하나가 두 지도를 다 말한다.
+ */
+export function tradeTone(change: number | null): string {
+  if (change == null) return "is-flat";
+  const a = Math.abs(change);
+  if (a < 0.05) return "is-flat";
+  const step = a >= 0.4 ? 3 : a >= 0.15 ? 2 : 1;
+  return change > 0 ? `is-up-${step}` : `is-down-${step}`;
 }
 
 /**

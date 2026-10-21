@@ -304,7 +304,7 @@ async function usThemeTrades() {
   const names = await usNameMap();
   const members = Object.fromEntries(Object.entries(US_THEMES).map(([t, ts]) => [t, ts.filter((x) => names.has(x))]));
   const rows = await loadTradeRows("us", [...new Set(Object.values(members).flat())]);
-  return rows ? themeTrades(rows, members) : null;
+  return rows ? themeTrades(rows, members, (t) => names.get(t)) : null;
 }
 
 /** 미장 '테마별 급부상 종목' — 요약 행의 riser(파이프라인 common/us_theme_risers.py 가 고른 것)를 읽어 줄만 세운다. */

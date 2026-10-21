@@ -4,13 +4,14 @@ import { marketThemeHref, themeStockHref, type ThemeMarketKey } from "@/lib/them
 import type { ThemeHotStock, ThemeOverview } from "@/lib/theme-page";
 import { stockTone, usualDeltaText } from "@/lib/stock-usual";
 import { squarify } from "@/lib/treemap";
+import { fmtTrade, fmtTradeChange, tradeTone } from "@/lib/theme-trade";
 
 import { MONO } from "../ui";
 import { V2Hint } from "../V2Hint";
 
 /**
  * 점유율 지도(트리맵). **칸의 크기가 최근 사흘 언급, 색이 변화 방향과 크기**다. 테마 목록은 테마를
- * 칸으로(themeTiles), 테마 화면은 그 테마의 종목을 칸으로(stockTiles) 그린다 — 그림은 한 벌이다.
+ * 칸으로(themeTiles · 거래대금으로 고르면 tradeTiles), 테마 화면은 그 테마의 종목을 칸으로(stockTiles) 그린다 — 그림은 한 벌이다.
  *
  * 서버 컴포넌트다 — squarify 는 순수 함수라 서버에서 돌고, 칸은 퍼센트 좌표의 절대 배치 div 라
  * 자바스크립트 없이 그려진다. 크롤러도 테마 이름과 점유율을 첫 HTML 에서 읽는다.
@@ -84,6 +85,31 @@ export function themeTiles(themes: ThemeOverview[], market: ThemeMarketKey = "kr
     delta: t.shareDelta != null && Math.abs(t.shareDelta) >= 0.05 ? { up: t.shareDelta > 0, text: `${Math.abs(t.shareDelta).toFixed(1)}%p` } : undefined,
     sub: t.topStocks.length ? t.topStocks.map((x) => x.name).join(" · ") : undefined,
   }));
+}
+
+/**
+ * 테마 목록의 거래대금 지도 칸(2026-10-21 "언급률 · 거래대금 토글") — 넓이는 3일 평균 거래대금, 색은 1주 전 대비 변화(%, lib/theme-trade.ts tradeTone).
+ * 값 · 변화는 흐름 표 거래대금 칸과 같은 수다('11.9조 ▼31%'). 큰 칸 곁줄은 거래대금 상위 종목 셋. 거래대금이 없는 테마는 칸이 없다.
+ */
+export function tradeTiles(themes: ThemeOverview[], market: ThemeMarketKey = "kr"): TreemapTile[] {
+  return themes.flatMap((t) => {
+    if (!t.trade) return [];
+    const amount = fmtTrade(t.trade.avg, market);
+    const chg = fmtTradeChange(t.trade.change);
+    return [
+      {
+        key: t.theme,
+        label: t.theme,
+        value: t.trade.avg,
+        tone: tradeTone(t.trade.change),
+        href: marketThemeHref(market, t.theme),
+        tip: `${t.theme} · 3일 평균 거래대금 ${amount} · ${chg ? `1주 전 대비 ${chg.text}` : t.trade.change == null ? "변화 자료 없음" : "1주 전 대비 0%"}`,
+        valueText: amount,
+        delta: chg ? { up: chg.tone === "is-up", text: chg.text.slice(1) } : undefined,
+        sub: t.trade.top.length ? t.trade.top.join(" · ") : undefined,
+      },
+    ];
+  });
 }
 
 /**

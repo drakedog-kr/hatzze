@@ -2030,6 +2030,14 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 /* 점유율 지도 — 판 폭 전체에 낮게. 배치는 부르는 쪽이 준 비율(3:1)로 계산하고 상자도 그 비율로 선다(Treemap.tsx --tm-aspect).
    한때 [지도 | 테마 순위] 짝이었는데 테마 흐름 표를 되살리며 순위 칸을 걷었다(2026-10-03). */
 .v2-tm-map-in { padding: 12px 14px 0; }
+/* 지도 기준 고르기(언급률 · 거래대금 · app/theme/MapMetric.tsx) — 고르지 않은 쪽만 숨긴다. 고른 쪽은 제 자리의 display 를 그대로 따른다
+   (폰에선 지도가 숨고 막대가 선다). 단추가 모듈 상자에 data-metric 을 단다 — 자바스크립트가 없으면 언급률 한 벌이다. */
+.v2-tm-map:not([data-metric="trade"]) .v2-tm-only-trade,
+.v2-tm-map[data-metric="trade"] .v2-tm-only-mention { display: none !important; }
+/* 머리 오른쪽 고르기 — ETF 화면 머리 고르기(.v2-kd.v2-etf .hz-seg)와 같은 꼴 · 같은 키 24(위아래 −2 라야 머리가 42 로 선다). */
+.v2-kd.v2-tm .v2-mod-head .hz-seg { display: inline-flex; height: 24px; margin: -2px 0; padding: 2px; gap: 2px; border: 1px solid var(--t-frame); border-radius: 6px; background: var(--t-card); align-items: stretch; }
+.v2-kd.v2-tm .v2-mod-head .hz-seg > button { flex: none; padding: 0 8px; border-radius: 4px; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--t-ink3); }
+.v2-kd.v2-tm .v2-mod-head .hz-seg > button[aria-pressed="true"] { background: var(--t-tint); color: var(--t-ink); font-weight: 600; box-shadow: none; }
 .v2-tm-map-bar { display: none; padding: 12px 14px 14px; }
 /* 폰 막대 밑 '나머지' 알약 줄 — 막대 상자(.v2-tm-map-bar)가 이미 안쪽 14 를 품어 알약 줄 자신의 안쪽은 걷는다. */
 .v2-tm-map-bar .v2-tm-restpills { padding: 12px 0 0; }
@@ -3598,6 +3606,9 @@ a.v2-isd-row:hover { background: var(--t-tint); }
   .v2-dv .dv-more-btn::before { content: ""; position: absolute; inset: -10px 0; } /* ::after 는 꺾쇠(›) 자리라 ::before 로. */
   .v2-dv .dv-tcheck::after { content: ""; position: absolute; inset: -6px; }
   .v2-tm-map-bar .hz-sharebar-link { position: relative; }
+  /* 지도 기준 고르기(키 24) — 겉은 그대로, 누르는 자리만 위아래로 48(ETF 머리 고르기와 같은 ::after). */
+  .v2-kd.v2-tm .v2-mod-head .hz-seg > button { position: relative; }
+  .v2-kd.v2-tm .v2-mod-head .hz-seg > button::after { content: ""; position: absolute; inset: -12px 0; }
   .v2-tm-map-bar .hz-sharebar-link::after { content: ""; position: absolute; inset: -8px -6px; }
   .v2-kd .cn-breadcrumb-link { position: relative; }
   .v2-kd .cn-breadcrumb-link::after { content: ""; position: absolute; inset: -8px -4px; }
