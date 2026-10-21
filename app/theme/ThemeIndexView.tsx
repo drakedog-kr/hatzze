@@ -264,9 +264,19 @@ export function ThemeIndexView({
               <span />
               <span>테마 · 언급 상위 종목</span>
               <span>요즘 도는 얘기</span>
-              <span>최근 {KADERA_WINDOW_DAYS}일 점유율</span>
+              {/* 폰은 머리 줄을 다시 세우고 짧은 이름만 단다 — 숫자 칸 둘이 이름 없이 서서 점유율인지 거래대금인지 안 읽혔다(2026-10-21 운영자 지적).
+                  기간(최근 3일 · 3일 평균)은 위 점유율 모듈 머리가 말한다. 긴 이름이면 칸이 그만큼 넓어져 테마 칸이 눌린다. */}
+              <span>
+                <span className="v2-tm-title-wide">최근 {KADERA_WINDOW_DAYS}일 점유율</span>
+                <span className="v2-tm-title-phone">점유율</span>
+              </span>
               {/* 하루 평균이다 — '최근 3일 거래대금'이면 사흘 합으로, '일평균'만이면 며칠 평균인지 물어야 했다. */}
-              {hasTrade && <span>{TRADE_WINDOW}일 평균 거래대금</span>}
+              {hasTrade && (
+                <span>
+                  <span className="v2-tm-title-wide">{TRADE_WINDOW}일 평균 거래대금</span>
+                  <span className="v2-tm-title-phone">거래대금</span>
+                </span>
+              )}
               {/* '추이'를 붙인다(2026-10-21 운영자 판단) — 칸 글('3일째 5위 안')이 열흘 동안의 흐름이라는 뜻. */}
               <span>최근 {flowDates.length || THEME_FLOW_DAYS}일 추이</span>
             </div>
@@ -282,12 +292,8 @@ export function ThemeIndexView({
                     <Link href={market.themeHref(t.theme)} className="v2-tr" data-ga="theme_flow_click">
                       <span className="v2-td-rank">{t.rank}</span>
                       <span className="v2-td-theme2">
-                        {/* 폰은 열흘 한 조각을 이름 줄 옆에 붙인다(오른쪽 칸은 숨긴다) — 네 층 줄이 한 줄 평균 118px 였다(2026-10-05 모바일 점검).
-                            넓은 화면은 이 조각을 숨기고 오른쪽 칸을 그대로 쓴다. */}
-                        <span className="v2-td-theme2-top">
-                          <b>{t.theme}</b>
-                          <span className={`v2-td-flow v2-td-flowinline${cap.on ? " is-on" : ""}`}>{cap.text}</span>
-                        </span>
+                        {/* 폰엔 열흘 한 조각을 싣지 않는다 — 이름 옆에 붙였던 '10일째 5위 안'을 걷었다(2026-10-21 운영자 지시). 넓은 화면은 오른쪽 칸(flow2). */}
+                        <b>{t.theme}</b>
                         <span className="v2-td-sub">{t.topStocks.length ? t.topStocks.map((x) => x.name).join(" · ") : "최근 언급 없음"}</span>
                       </span>
                       <span className={`v2-td-text${t.briefLine ? "" : " is-pending"}`}>{t.briefLine ?? "-"}</span>
