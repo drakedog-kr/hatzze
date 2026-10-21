@@ -24,6 +24,10 @@
 메시지 하나, 그리고 선택적으로 구조화 출력. 그 밖의 모양(대화 여러 턴, 도구, 온도)은
 구독 경로로 안 보내고 API 로 넘긴다. 배치 API 는 구독에 없어서 여기서 안 다룬다.
 
+user 메시지에 그림 블록(`{"type": "image", "source": {"type": "base64", ...}}`)이 있으면 CLI 에
+stream-json 으로 메시지를 통째로 넘긴다(scripts/fill_visible_logos.py 의 로고 판정 · 2026-10-21).
+글로만 넘기면 그림이 조용히 빠진다.
+
 ## 알아 둘 것
 
 - **CLI 에는 `max_tokens` 에 해당하는 플래그가 없다.** 길이는 시스템 프롬프트가 잡는다.
@@ -158,7 +162,7 @@ def _cli_env(model: str) -> dict[str, str]:
 
 
 def _run_cli(
-    *, model: str, system: str | None, user: str, schema: dict | None
+    *, model: str, system: str | None, user: str, schema: dict | None, blocks: list | None = None
 ) -> _Response:
     argv = [
         "claude",
@@ -180,9 +184,13 @@ def _run_cli(
         # 구조화 출력이 도구 호출 한 턴을 더 쓴다. 1 이면 무조건 실패한다.
         "--max-turns",
         "3",
-        "--output-format",
-        "json",
     ]
+    if blocks:
+        # 그림이 든 메시지는 stream-json 으로만 넘길 수 있고, 그러면 출력도 stream-json 이어야 한다(CLI 제약).
+        argv += ["--input-format", "stream-json", "--output-format", "stream-json", "--verbose"]
+        user = json.dumps({"type": "user", "message": {"role": "user", "content": blocks}}, ensure_ascii=False) + "\n"
+    else:
+        argv += ["--output-format", "json"]
     effort = _effort(model)
     if effort:
         argv += ["--effort", effort]
@@ -205,10 +213,7 @@ def _run_cli(
     except subprocess.TimeoutExpired as exc:
         raise SubscriptionUnavailable(f"{_TIMEOUT_SEC}초 초과") from exc
 
-    try:
-        out = json.loads(proc.stdout) if proc.stdout.strip() else {}
-    except json.JSONDecodeError:
-        out = {}
+    out = _result_of(proc.stdout) if blocks else _json_or_empty(proc.stdout)
 
     if proc.returncode != 0:
         # 한도 초과·인증 만료 같은 실패는 stderr 가 비고 stdout 의 JSON `result` 에 이유가 온다.
@@ -246,6 +251,26 @@ def _run_cli(
     return _Response(content=[_TextBlock(text=text)], usage=u)
 
 
+def _json_or_empty(stdout: str) -> dict:
+    try:
+        return json.loads(stdout) if stdout.strip() else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+def _result_of(stdout: str) -> dict:
+    """stream-json 출력(한 줄에 사건 하나)에서 마지막 result 사건. --output-format json 의 본문과 같은 칸을 가진다."""
+    found: dict = {}
+    for line in stdout.splitlines():
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(ev, dict) and ev.get("type") == "result":
+            found = ev
+    return found
+
+
 class _Messages:
     def __init__(self, owner: "SubscriptionClient") -> None:
         self._owner = owner
@@ -263,6 +288,7 @@ class _Messages:
                     system=_system_text(kw.get("system")),
                     user=_user_text(kw["messages"]),
                     schema=_schema_of(kw),
+                    blocks=_user_blocks(kw["messages"]) if _has_image(kw) else None,
                 )
             except SubscriptionUnavailable as exc:
                 owner.note_failure(str(exc))
@@ -357,6 +383,17 @@ def _user_text(messages: Any) -> str:
     return "\n\n".join(
         b.get("text", "") for b in content if isinstance(b, dict)
     ).strip()
+
+
+def _user_blocks(messages: Any) -> list:
+    content = messages[0]["content"]
+    return [{"type": "text", "text": content}] if isinstance(content, str) else list(content)
+
+
+def _has_image(kw: dict) -> bool:
+    msgs = kw.get("messages") or []
+    content = msgs[0].get("content") if msgs else None
+    return isinstance(content, list) and any(isinstance(b, dict) and b.get("type") == "image" for b in content)
 
 
 def _schema_of(kw: dict) -> dict | None:
