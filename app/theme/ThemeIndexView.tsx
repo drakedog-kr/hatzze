@@ -193,6 +193,9 @@ export function ThemeIndexView({
           )
         }
         aside={hasTrade ? <MapMetric /> : undefined}
+        // 고르기 쪽지(2026-10-21 운영자 지시) — 꼭지가 '거래대금' 단추를 가리킨다(마지막 단추). 둘 중 어느 쪽을 눌러도 '봤음'이다(target 은
+        // anchor 에서 :last-child 를 뗀 것). 지도 · 흐름 · 급부상 쪽지와 같이 차례 없이 뜬다. 폰도 머리 띠에 고르기가 있어 같이 선다.
+        hint={hasTrade && themes?.length ? { id: "theme-map-metric", order: 0, together: true, anchor: ".v2-mod-aside .hz-seg button:last-child", text: "거래대금을 누르면 지도가 거래대금 기준으로 바뀝니다" } : undefined}
         className="v2-tm-map"
       >
         {themes === null ? (
