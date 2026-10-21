@@ -2119,7 +2119,6 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   .v2-tm-flowsizer i { flex-shrink: 0; width: 22px; }
 }
 .v2-tm-flowtbl .v2-th > * { white-space: nowrap; }
-.v2-tm-flowtbl .v2-th { min-height: 44px; }
 /* 순위는 테마 이름 줄에 — 이름 · 종목 두 줄 칸이 줄 가운데를 정해 순위가 둘 사이에 떠 보였다(2026-10-05 점검). 테마 칸 위 여백 7 과 같은 줄. */
 .v2-tm-flowtbl .v2-tbody .v2-td-rank { align-self: start; margin-top: 7px; }
 /* 숫자 · 문장 칸 첫 줄도 이름 줄에 — 가운데 맞춤이면 9px 엇갈렸다(2026-10-08 점검). 1,000 미만은 두 층이라 따로. */
@@ -2330,6 +2329,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
 .v2-tm-share { padding: 12px 14px; border-bottom: 1px solid var(--t-line); }
 .v2-tm-hottbl .v2-tr { grid-template-columns: 20px 252px minmax(0, 1fr) 64px; min-height: 44px; }
 /* 머리 줄은 다른 표처럼 30 — 위 두 줄 규칙(0,2,0)의 44 가 머리까지 키웠다. 두 줄 머리인 흐름 표(44)는 그대로. */
+/* 테마 표 머리 줄은 공통 30(.v2-th) — 줄 최소 키(52 · 44)가 머리 줄에도 걸려 따로 적는다. 테마 흐름은 한때 44 였다(머리가 '최근 3일 점유율 /
+   1주 전 대비' 두 줄이던 10-05). 10-20 에 한 줄이 된 뒤에도 남아 바로 아래 급부상 표와 머리 줄 키가 달랐다(2026-10-21 운영자 지적). */
+.v2-tm-flowtbl .v2-tr.v2-th,
 .v2-tm-risertbl .v2-tr.v2-th,
 .v2-tm-hottbl .v2-tr.v2-th { min-height: 30px; }
 /* 이유 칸이 없으면 셋째 칸이 숫자(언급 · 채널)다 — 머리 줄 공통 규칙(셋째 = 문장)을 되돌린다. */
@@ -2413,6 +2415,9 @@ button.v2-dd-row:focus-visible { outline: 2px solid var(--t-down); outline-offse
   /* 거래대금 칸은 점유율 바로 뒤(위층). 거래대금이 없으면(.has-trade 없음) 위 네 칸 그대로. */
   .v2-tm-flowtbl.has-trade .v2-tr { grid-template-columns: 20px minmax(0, 1fr) 88px 96px 108px; grid-template-areas: "rank theme share trade flow" ".    text  text  text  text"; }
   .v2-tm-flowtbl .v2-td-trade { grid-area: trade; }
+  /* 머리 줄은 한 층 — 문장 칸 머리가 숨어도 둘째 층(text)이 남아 30 을 24.5 · 4.5 로 나눠 글자가 가운데보다 3px 위에 섰다(2026-10-21).
+     칸 이름표는 자리 이름이 없어 차례대로 첫 층 칸에 든다. 위 has-trade 규칙과 같은 무게라 뒤에 둔다. */
+  .v2-tm-flowtbl .v2-tr.v2-th { grid-template-areas: none; }
   .v2-tm-risertbl { grid-template-columns: 34px 88px minmax(220px, max-content) minmax(0, 1fr) 94px; }
   .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px minmax(0, 1fr) 80px 64px 72px; }
   .v2-tm-days.no-close .v2-tm-reasonrows .v2-tr { grid-template-columns: 200px minmax(0, 1fr) 72px 72px; }
