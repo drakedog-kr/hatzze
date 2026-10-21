@@ -24,7 +24,7 @@ import { pageMetadata } from "../../seo";
 import { US_KADERA_CARD } from "../../og-copy";
 import { ThemeVsUsualRows, highlightTerms, termsFor } from "../parts";
 import { CoverLinkCell, CoverMeta, CoverUsIndexCell, EventsModule, KeywordTable, Module, SentimentModule, ThemeShares, pairGridClass } from "../V2Modules";
-import { SignalTable } from "../KaderaBoard";
+import { SignalTable, filledRows } from "../KaderaBoard";
 import { loadUsCover } from "../cover-chips";
 import type { BoardRow, BoardSection } from "../KaderaBoard";
 
@@ -179,6 +179,8 @@ export default async function UsKaderaPage() {
       heads: ["", "종목", sessionDay ? `${sessionDay} 등락` : "등락", "움직인 이유"],
       aiText: true,
       rows: moveRows,
+      // 줄이 열에 못 미치는 날 남는 자리를 한 칸으로(KaderaBoard.tsx rest). '오늘'은 안 쓴다 — 날은 머리의 장 마감 날짜가 말한다.
+      rest: { slots: MAX_ROWS, text: `위 ${moveRows.length}개 종목 외에 큰 등락을 보인 종목이 없습니다.` },
       empty: whyFailed ? "이유를 불러오지 못했습니다." : "저녁 집계가 끝나면 채워집니다.",
     },
     {
@@ -245,7 +247,7 @@ export default async function UsKaderaPage() {
       </div>
 
       {/* 셋째 줄 — [급부상 | 테마 점유율] · [크게 움직인 | 이슈 키워드] · [많이 언급(판 폭 전체)]. 자리는 v2.css .v2-grid 의 영역 이름이 정한다. */}
-      <div className={pairGridClass(sections.find((s) => s.id === "surging")?.rows.length ?? 0, sections.find((s) => s.id === "why")?.rows.length ?? 0, themes.rows.length, keywords.length)}>
+      <div className={pairGridClass(filledRows(sections.find((s) => s.id === "surging")), filledRows(sections.find((s) => s.id === "why")), themes.rows.length, keywords.length)}>
         {sections.map((sec) => (
           <SignalTable key={sec.id} sec={sec} />
         ))}

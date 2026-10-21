@@ -51,15 +51,28 @@ export type BoardSection = {
   empty: string;
   /** 처음 온 사람에게 한 번 띄우는 쪽지(app/V2Hint.tsx) — 첫 줄 밑. 줄이 링크인데 화살표가 없어서다. */
   hint?: { id: string; text: string; order?: number; together?: boolean };
+  /**
+   * 줄이 slots 에 못 미치는 날 남는 자리를 한 칸으로 묶어 이 글을 싣는다(2026-10-21). 짝 칸(이슈 키워드 열 줄)에 키를 맞추느라
+   * 미장 움직인 종목 다섯 줄이 한 줄 88px 로 늘었다. 줄은 44px 그대로 두고 남는 키는 이 칸이 받는다. 폰 · 한 줄기에선 한 줄 높이다.
+   */
+  rest?: { slots: number; text: string };
 };
 
-const pct = (r: number) => `${r > 0 ? "+" : r < 0 ? "-" : ""}${Math.abs(r).toFixed(2)}%`;
+/** 표가 차지하는 줄 자리 — 남는 자리 칸이 서면 slots 를 다 쓴다. 짝 격자(pairGridClass)가 열 줄인지 볼 때 쓴다. */
+export function filledRows(sec: BoardSection | undefined): number {
+  return sec ? sec.rows.length + restSpan(sec) : 0;
+}
+
+const restSpan = (sec: BoardSection) => (sec.rest && sec.rows.length > 0 && sec.rows.length < sec.rest.slots ? sec.rest.slots - sec.rows.length : 0);
+
+const pct =(r: number) => `${r > 0 ? "+" : r < 0 ? "-" : ""}${Math.abs(r).toFixed(2)}%`;
 const chgCls = (r: number | null) => (r === null ? "" : r > 0 ? " is-up" : r < 0 ? " is-down" : "");
 
 export function SignalTable({ sec }: { sec: BoardSection }) {
   const last = sec.heads.length - 1;
   // 머리 칸 차례 — 순위 · 종목 · 문장(heads 의 마지막) · 숫자들 · 등락(heads[2]). 등락을 끝에 둬야 위아래 표의 등락 칸이 한 x 에 선다.
   const headOrder = [0, 1, last, ...Array.from({ length: Math.max(0, last - 3) }, (_, k) => k + 3), 2];
+  const rest = restSpan(sec);
   return (
     /* AI 표시는 모듈 제목 앞에 둔다(네 표 같은 자리). 머리 칸에 두면 폰(머리 줄을 숨긴다)에서 고지가 사라졌다(2026-10-04 점검). */
     <Module
@@ -78,8 +91,8 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
               <span key={i}>{sec.heads[i]}</span>
             ))}
           </div>
-          {/* 짝지은 칸보다 짧으면 줄이 고르게 늘어난다(v2.css .v2-grid .v2-tbody). */}
-          <ol className="v2-tbody">
+          {/* 짝지은 칸보다 짧으면 줄이 고르게 늘어난다(v2.css .v2-grid .v2-tbody). 남는 자리 칸이 서면 그 칸만 늘어난다(has-rest). */}
+          <ol className={`v2-tbody${rest ? " has-rest" : ""}`}>
             {sec.rows.map((r, i) => (
               <li key={r.code}>
                 <Link
@@ -114,6 +127,12 @@ export function SignalTable({ sec }: { sec: BoardSection }) {
                 </Link>
               </li>
             ))}
+            {/* 짝 격자(is-sub)에선 남은 줄 트랙을 다 덮는다. 그 밖(flex)에선 grid-row 가 안 먹고 flex 로 남는 키를 받는다. */}
+            {rest > 0 && (
+              <li className="v2-tb-rest" style={{ gridRow: `span ${rest}` }}>
+                {sec.rest?.text}
+              </li>
+            )}
           </ol>
         </div>
       )}
