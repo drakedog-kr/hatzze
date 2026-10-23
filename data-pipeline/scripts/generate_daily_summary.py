@@ -232,7 +232,7 @@ HOT_FACTS_NOTE = (
 )
 YEORON_FACTS_NOTE = (
     "방금 쓴 문장이 자료와 어긋납니다. 분위기는 [여론] 줄에 적힌 것만 쓰고, 숫자·지표 이름·자료 안쪽 말은 "
-    "쓰지 말고, 같은 뜻으로"
+    "쓰지 말고, 다른 날에 기대는 시점 말 없이 이 한 줄만 읽어도 뜻이 통하게, 같은 뜻으로"
 )
 # 전체나 시장 지표 안의 1등이 표시에 걸려 빠진 날에만 HOT_SYSTEM 끝에 붙는다(skipped_hotter). 모델은 목록에서 이름을 쓸 수 있는 첫
 # 지표를 버릇처럼 "가장 뜨거운 ○○"라 부르는데 그날은 거짓이다.
@@ -528,8 +528,15 @@ def yeoron_digest(tone: str, story: str) -> str:
     return "\n".join(lines)
 
 
+# 다른 날에 기대는 시점 말. 여론 줄은 홈에 혼자 놓이는데, 재료(총평 둘째 대목)는 요일 순으로 이어지는 글이라
+# 앞 문장을 기준으로 삼는 말이 섞여 있다. 한 가지만 떼어 오면 기준이 사라진다 — 10-23 "수출 증가 소식 뒤 전날 반응이
+# 과했다는 풀이"는 둘째 대목의 '목요일에는 전날 반응이 과했다'에서 왔고, 무슨 반응인지 아무도 모른다.
+# 09-28~10-23 저장된 여론 줄 26개에 대 보면 이것 하나만 걸린다. 'FOMC 이후'처럼 사건에 매인 말은 혼자 읽혀 뺐다.
+_RELATIVE_DAY_RE = re.compile(r"전날|그날|이튿날|다음\s*날|당일|같은\s*날|그\s*뒤|그\s*이후")
+
+
 def yeoron_problems(text: str, tone: str, names: list[str]) -> list[str]:
-    """여론 줄이 다른 분위기를 말했거나, 숫자·지표 이름·자료 안쪽 말을 옮겼으면."""
+    """여론 줄이 다른 분위기를 말했거나, 숫자·지표 이름·자료 안쪽 말·다른 날에 기대는 시점 말을 옮겼으면."""
     plain = text.replace("**", "")
     found = [f"분위기 {t}" for t, pat in _TONE_PATTERNS.items() if t != tone and pat.search(plain)]
     if re.search(r"\d\s*(?:%|건|회|개)", plain):
@@ -539,6 +546,8 @@ def yeoron_problems(text: str, tone: str, names: list[str]) -> list[str]:
     # 재료 이름을 옮기는 것도 안쪽 말이다("카더라 총평에 따르면") — 읽는 사람에겐 출처가 두 겹이 된다.
     if INNER_WORDS_RE.search(plain) or re.search(r"총평|발췌", plain):
         found.append("안쪽 말")
+    if _RELATIVE_DAY_RE.search(plain):
+        found.append("상대 시점")
     return found
 
 

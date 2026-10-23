@@ -240,6 +240,18 @@ def test_yeoron_problems():
     assert yeoron_problems("카더라에서는 낙관과 비관이 팽팽하고 **옵션 풋/콜 비율** 이야기가 많습니다.", "중립", NAMES) == ["지표 이름"]
 
 
+def test_yeoron_problems_relative_day():
+    # 10-23 저장된 줄. 둘째 대목의 '목요일에는 전날 반응이 과했다'에서 '전날'만 떼어 와 기준이 사라졌다.
+    line = "카더라에서는 비관이 우세한 가운데 수출 증가 소식 뒤 전날 반응이 과했다는 풀이가 자주 언급됐습니다."
+    assert yeoron_problems(line, "비관 우세", NAMES) == ["상대 시점"]
+    assert yeoron_problems("카더라에서는 비관이 우세하고, 그날 외국인 매도가 이유로 꼽혔습니다.", "비관 우세", NAMES) == ["상대 시점"]
+    assert yeoron_problems("카더라에서는 비관이 우세하고, 다음 날 반등 이야기가 나왔습니다.", "비관 우세", NAMES) == ["상대 시점"]
+    # 사건에 매인 시점과 혼자 읽히는 줄은 그대로 둔다.
+    assert yeoron_problems("카더라에서는 비관이 우세하고, FOMC 이후 금리 이야기가 많았습니다.", "비관 우세", NAMES) == []
+    mlcc = "카더라에서는 비관이 우세한 가운데 MLCC 공급 부족으로 고객 대기와 납기가 길어졌다는 해외 보도가 눈에 띕니다."
+    assert yeoron_problems(mlcc, "비관 우세", NAMES) == []
+
+
 def test_hot_fallback_is_true_and_josa_free():
     rows = [_row("경제 베스트셀러 비중", "감성", 94), _row("옵션 풋/콜 비율", "시장", 64, rest=True),
             _row("금 대비 코스피 상대강도", "시장", 63), _row("코스피 상승 속도", "시장", 0), _row("고점권 외국인 매도", "시장", 0)]
