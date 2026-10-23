@@ -1063,21 +1063,30 @@ def shared_terms(a: str, b: str, names: list[str]) -> list[str]:
     마세요'를 적는 것보다 코드가 재는 편이 확실하다 — 넷째 대목의 schedule_like 와 같은 자리다.
     """
     a, b = a or "", b or ""
+    longest_first = sorted({n for n in names if n and len(n) >= SHARED_NAME_MIN}, key=len, reverse=True)
 
     def latin(t: str) -> set[str]:
         return {w.upper() for w in _LATIN_TERM.findall(t)} - _GENERIC_LATIN
 
-    found = latin(a) & latin(b)
-    found |= {n for n in names if n and len(n) >= SHARED_NAME_MIN and n in a and n in b}
-    return sorted(found)
+    def companies(t: str) -> set[str]:
+        # 긴 이름부터 찾고 그 자리를 지운다. 'SK하이닉스' 안의 '이닉스'(다른 상장사)를 따로 세면 로그가
+        # 'SK하이닉스, 이닉스'로 찍히고(10-16~10-23), 셋째가 SK하이닉스를 쓴 날 둘째의 이닉스가 겹침으로 잡힌다.
+        hits = set()
+        for n in longest_first:
+            if n in t:
+                hits.add(n)
+                t = t.replace(n, "\0")
+        return hits
+
+    return sorted((latin(a) & latin(b)) | (companies(a) & companies(b)))
 
 
 # 둘째 대목을 다시 쓰게 하는 횟수. 숫자·앞날을 고치다 셋째와 겹치는 이름이 새로 들어올 수 있어 두 번까지 본다.
 FLOW_FIX_RETRIES = 2
 
 
-def flow_fix_note(text: str, news: str, names: list[str]) -> str:
-    """둘째 대목을 다시 쓰게 할 이유 — 숫자 · 시장의 앞날 · 셋째 대목(먼저 쓴다)과 겹친 이름. 없으면 빈 문자열.
+def flow_fix_parts(text: str, news: str, names: list[str]) -> list[str]:
+    """둘째 대목을 다시 쓰게 할 이유들 — 숫자 · 시장의 앞날 · 셋째 대목(먼저 쓴다)과 겹친 이름. 없으면 빈 목록.
 
     국장 · 미장이 같이 쓴다. 다시 써도 앞날을 말하면 호출부가 그 대목을 뺀다 — 시장 전망은 이 화면이
     안 하는 말이라 없는 편이 낫다. 숫자와 겹친 이름은 남아도 그대로 둔다(읽는 데 해가 작다).
@@ -1091,7 +1100,19 @@ def flow_fix_note(text: str, news: str, names: list[str]) -> str:
         notes.append(
             f"'{', '.join(shared)}' 이야기는 다음 대목이 이미 썼습니다. 그 이름은 빼고 시장 전체 이야기로 쓰세요"
         )
-    return " · ".join(notes)
+    return notes
+
+
+def flow_retry_system(system: str, now: list[str], before: list[str]) -> str:
+    """둘째 대목을 다시 쓰게 할 지시문 — 이번에 걸린 이유(now)에 **앞서 걸린 이유(before)를 모두** 붙인다.
+
+    이번 이유만 적으면 하나를 고치다 앞서 고친 것이 돌아온다. 10-23 국장: 첫 답이 앞날('바닥')에 걸려 다시 쓰자
+    셋째 대목의 이름을 되풀이했고, 그 이름만 짚어 다시 쓰자 앞날이 돌아와 그날 둘째 대목이 빠졌다.
+    """
+    extra = f"\n\n[다시 쓰기] 방금 쓴 문장에서 {' · '.join(now)}."
+    if earlier := [p for p in before if p not in now]:
+        extra += f" 그 전에 쓴 문장에서 짚은 것도 그대로 지키세요: {' · '.join(earlier)}."
+    return system + extra
 
 
 def schedule_digest(brief_digest: str) -> str:
@@ -1977,6 +1998,7 @@ def flow_block(db, rows: list[dict], latest: str, market: str) -> list[str]:
     # '목요일'로, 목요일 반등을 '금요일'로 썼다(2026-10-15 점검). 머리에 그날 아침까지 끝난 미국장을 사실로 붙인다.
     sessions = us_sessions(db, days) if market == "us" else {}
     seen: set[str] = set()
+    outlook = 0
     body_lines: list[str] = []
     for d in days:
         picked = []
@@ -1986,11 +2008,20 @@ def flow_block(db, rows: list[dict], latest: str, market: str) -> list[str]:
             if len(body) < FLOW_MIN_CHARS or body[:60] in seen:
                 continue
             seen.add(body[:60])
-            picked.append(f"- [{FLOW_KIND_LABEL[r['kind']]}] {readable_counts(body)[:FLOW_CHARS]}")
+            excerpt = readable_counts(body)[:FLOW_CHARS]
+            # 시장의 앞날을 말한 글은 싣지 않고 다음 순위로 채운다. 둘째 대목은 앞날을 쓰면 빠지는데(flow_outlook),
+            # 그날 1위 글이 전망이면 모델은 그걸 흐름으로 옮긴다 — 10-23 국장 오늘 1위가 '이번 바닥도 한국에서 먼저'라는
+            # 해외 투자자 말이라 세 번 다 걸려 대목이 빠졌다. 못 보는 재료는 못 옮긴다(schedule_digest 와 같은 수).
+            if flow_outlook(excerpt):
+                outlook += 1
+                continue
+            picked.append(f"- [{FLOW_KIND_LABEL[r['kind']]}] {excerpt}")
             if len(picked) >= FLOW_PER_DAY:
                 break
         if picked:
             body_lines += [md_with_weekday(d) + (" · 오늘" if d == latest else "") + us_session_note(sessions.get(d))] + picked
+    if outlook:
+        print(f"[시장 흐름] 앞날을 말한 글 {outlook}건은 싣지 않고 다음 순위로 채웁니다")
     if not body_lines:
         return []
     span = "오늘" if days == [latest] else f"{days[0][5:]}~{days[-1][5:]}"
@@ -2581,7 +2612,7 @@ def main() -> None:
             # 첫째·셋째 대목은 [시장 흐름]을 뺀 재료를 본다(without_flow 주석).
             base_digest = without_flow(brief_digest)
             # 셋째 대목을 둘째보다 **먼저** 쓴다 — 둘째가 셋째가 쓴 회사·사건을 되풀이하면 그 이름을 짚어
-            # 다시 쓰게 하려고(flow_fix_note). 화면에 놓이는 차례는 아래 BRIEF_ORDER 대로다.
+            # 다시 쓰게 하려고(flow_fix_parts). 화면에 놓이는 차례는 아래 BRIEF_ORDER 대로다.
             slots = [
                 ("tone", BRIEF_TONE_SYSTEM, BRIEF_TONE_LEN),
                 ("news", BRIEF_NEWS_SYSTEM, BRIEF_NEWS_LEN),
@@ -2621,17 +2652,20 @@ def main() -> None:
                         digest_for, length, BRIEF_SENTENCE_CAP[key], key,
                     )
                 if key == "flow":
+                    asked: list[str] = []  # 앞서 걸린 이유 — 다시 쓸 때마다 모두 싣는다(flow_retry_system)
                     for _ in range(FLOW_FIX_RETRIES):
-                        note = flow_fix_note(text, written.get("news", ""), stock_names)
-                        if not note:
+                        parts = flow_fix_parts(text, written.get("news", ""), stock_names)
+                        if not parts:
                             break
-                        print(f"[WARNING] 둘째 대목을 다시 씁니다({note}): {text[:50]}…")
+                        print(f"[WARNING] 둘째 대목을 다시 씁니다({' · '.join(parts)}): {text[:50]}…")
                         text = ask_brief_sentence(
-                            system + f"\n\n[다시 쓰기] 방금 쓴 문장에서 {note}.",
+                            flow_retry_system(system, parts, asked),
                             digest_for, length, BRIEF_SENTENCE_CAP[key], key,
                         )
+                        asked += [p for p in parts if p not in asked]
                     if flow_outlook(text):
-                        print(f"[WARNING] 둘째 대목이 여전히 시장의 앞날을 말해 뺍니다: {text[:50]}…")
+                        # 버린 문장은 통째로 찍는다 — 어떤 말이 걸렸는지 로그만으로 가르려고(10-23 은 50자에서 잘려 못 봤다).
+                        print(f"[WARNING] 둘째 대목이 여전히 시장의 앞날({', '.join(flow_outlook(text))})을 말해 뺍니다: {text}")
                         text = ""
                 if key == "schedule" and not schedule_like(text):
                     # 일정 재료를 두고 요약을 되풀이한 것이다(schedule_like 주석). 한 번 더 시키고,

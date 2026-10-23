@@ -105,8 +105,9 @@ from generate_telegram_narratives import (  # noqa: E402
     first_sentences,
     flow_block,
     flow_digest,
-    flow_fix_note,
+    flow_fix_parts,
     flow_outlook,
+    flow_retry_system,
     has_flow_block,
     has_schedule_block,
     kst_date,
@@ -881,17 +882,19 @@ def main() -> None:
                         digest_for, length, BRIEF_SENTENCE_CAP[key], key,
                     )
                 if key == "flow":
+                    asked: list[str] = []  # 앞서 걸린 이유 — 다시 쓸 때마다 모두 싣는다(flow_retry_system)
                     for _ in range(FLOW_FIX_RETRIES):
-                        note = flow_fix_note(text, written.get("news", ""), us_names)
-                        if not note:
+                        parts = flow_fix_parts(text, written.get("news", ""), us_names)
+                        if not parts:
                             break
-                        print(f"[WARNING] 둘째 대목을 다시 씁니다({note}): {text[:50]}…")
+                        print(f"[WARNING] 둘째 대목을 다시 씁니다({' · '.join(parts)}): {text[:50]}…")
                         text = ask_brief_sentence(
-                            system + f"\n\n[다시 쓰기] 방금 쓴 문장에서 {note}.",
+                            flow_retry_system(system, parts, asked),
                             digest_for, length, BRIEF_SENTENCE_CAP[key], key,
                         )
+                        asked += [p for p in parts if p not in asked]
                     if flow_outlook(text):
-                        print(f"[WARNING] 둘째 대목이 여전히 시장의 앞날을 말해 뺍니다: {text[:50]}…")
+                        print(f"[WARNING] 둘째 대목이 여전히 시장의 앞날({', '.join(flow_outlook(text))})을 말해 뺍니다: {text}")
                         text = ""
                 if key == "schedule" and not schedule_like(text):
                     # 일정 재료를 두고 요약을 되풀이한 것이다(schedule_like 주석). 한 번 더 시키고,
