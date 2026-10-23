@@ -108,12 +108,52 @@ def test_shared_terms_ignores_generic_words():
     assert KR.shared_terms(news, flow, names) == []
 
 
-def test_flow_fix_note():
-    assert KR.flow_fix_note("외국인 매도가 이어졌습니다.", "", []) == ""
-    note = KR.flow_fix_note("코스피가 6400선을 내줬고 바닥 이야기가 나왔습니다.", "", [])
-    assert "6400선" in note and "바닥" in note
-    note = KR.flow_fix_note("CXMT 추격이 이유로 꼽혔습니다.", "CXMT가 신제품을 냈습니다.", [])
-    assert "'CXMT'" in note and "다음 대목" in note
+def test_shared_terms_does_not_count_name_inside_longer_name():
+    # '이닉스'는 따로 상장한 회사지만 'SK하이닉스' 안에 들어 있다. 긴 이름에 먹힌 자리는 세지 않는다.
+    names = ["SK하이닉스", "이닉스", "삼성전자"]
+    news = "SK하이닉스가 해명 공시를 냈고 삼성전자 이야기도 오갔습니다."
+    assert KR.shared_terms(news, "SK하이닉스 하락이 지수를 눌렀습니다.", names) == ["SK하이닉스"]
+    assert KR.shared_terms(news, "이닉스가 공급 계약을 맺었습니다.", names) == []
+    assert KR.shared_terms("이닉스가 계약을 맺었습니다.", "이닉스 이야기가 나왔습니다.", names) == ["이닉스"]
+
+
+def test_flow_fix_parts():
+    assert KR.flow_fix_parts("외국인 매도가 이어졌습니다.", "", []) == []
+    parts = KR.flow_fix_parts("코스피가 6400선을 내줬고 바닥 이야기가 나왔습니다.", "", [])
+    assert len(parts) == 2 and "6400선" in parts[0] and "바닥" in parts[1]
+    parts = KR.flow_fix_parts("CXMT 추격이 이유로 꼽혔습니다.", "CXMT가 신제품을 냈습니다.", [])
+    assert len(parts) == 1 and "'CXMT'" in parts[0] and "다음 대목" in parts[0]
+
+
+def test_flow_retry_system_keeps_earlier_reasons():
+    # 10-23 국장: 앞날 → 이름 겹침 → 앞날이 돌아와 대목이 빠졌다. 둘째 다시 쓰기에도 앞날 이유가 남아 있어야 한다.
+    outlook = KR.flow_fix_parts("바닥 이야기가 나왔습니다.", "", [])
+    shared = KR.flow_fix_parts("CXMT 추격이 꼽혔습니다.", "CXMT가 신제품을 냈습니다.", [])
+    first = KR.flow_retry_system("SYS", outlook, [])
+    assert first == f"SYS\n\n[다시 쓰기] 방금 쓴 문장에서 {outlook[0]}."
+    second = KR.flow_retry_system("SYS", shared, outlook)
+    assert second.startswith(f"SYS\n\n[다시 쓰기] 방금 쓴 문장에서 {shared[0]}.")
+    assert outlook[0] in second and "그 전에 쓴 문장" in second
+    # 같은 이유가 또 걸리면 두 번 적지 않는다.
+    assert KR.flow_retry_system("SYS", outlook, outlook) == first
+
+
+def test_flow_block_skips_outlook_posts(monkeypatch):
+    texts = {
+        1: "해외 투자자 말로는 이번 증시의 바닥 역시 한국에서 먼저 형성될 가능성이 높다는 이야기가 나왔습니다.",
+        2: "코스피가 외국인 매도에 밀렸고 반도체 대형주 약세가 이유로 꼽혔다는 마감 시황이 올라왔습니다.",
+        3: "유가 하락과 미국 이란 협상 기대가 겹치며 지수가 올랐다는 기사가 나왔습니다 그 뒤로 매수 유입.",
+        4: "채널들 사이에서 경기침체와 버블 이야기를 하는 사람이 크게 늘었다는 말이 나왔습니다 시장 심리.",
+    }
+    monkeypatch.setattr(KR, "attach_texts", lambda _db, rs: [r.update(text=texts[r["id"]]) for r in rs])
+    msgs = [
+        {"id": i, "date": "2026-10-23", "kind": "opinion", "kr": "negative", "us": "none", "views": 1000 - i}
+        for i in texts
+    ]
+    block = "\n".join(KR.flow_block(None, msgs, "2026-10-23", "kr"))
+    # 도달 1위가 전망 글이라 빼고, 그 아래 세 건으로 채운다.
+    assert "바닥" not in block
+    assert all(texts[i][:20] in block for i in (2, 3, 4))
 
 
 def test_brief_order_puts_flow_second():
