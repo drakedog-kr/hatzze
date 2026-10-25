@@ -212,7 +212,7 @@ type NavItem = {
   badge?: string;
   /**
    * 라벨 옆 빨간 N — 새로 생긴 화면이라는 표식. 기한이 없어(푸터 배지처럼 저절로 안 꺼진다) 켤 땐 NAV 항목에 이 값을 직접 적고, 뗄 땐 그 줄을 지운다.
-   * 테마 리포트에 2026-09-23 오픈부터 달았다가 2026-10-04 뗐다(v2.0.0).
+   * 테마 리포트에 2026-09-23 오픈부터 달았다가 2026-10-04 뗐다(v2.0.0). ETF 자금 흐름엔 2026-10-12 달아 10-13 오픈 뒤 2026-10-26 뗐다.
    */
   isNew?: boolean;
   children?: NavChild[];
@@ -230,8 +230,7 @@ function buildNav(themeNav: boolean): NavItem[] {
   { href: "/", label: "시장 브리핑", icon: "monitoring", sub: "지표 28개로 잰 오늘의 시장 온도" },
   // ETF 자금 흐름(/etf) — '오늘 시장' 묶음에서 국장 미리보기 아래(2026-10-15 자리 바꿈). 메뉴 차례는 이 배열이 아니라 NAV_GROUPS 가 정한다.
   // ⛔ 여는 것은 `app/screen-flags.ts` 의 ETF_PUBLIC 한 줄이다. 안 연 동안은 개발 서버에서만 선다(ETF_NAV) — 배포엔 예고 줄도 없다.
-  // 라벨 옆 빨간 N(isNew) — 새로 생긴 화면이라는 표식(2026-10-12 · 테마 리포트가 오픈부터 열하루 달았던 것과 같다). 기한이 없으니 연 뒤 두 주쯤 지나 이 값을 지운다.
-  ...(ETF_NAV ? [{ href: ETF_PAGE.href, label: ETF_PAGE.label, icon: ETF_PAGE.icon, sub: ETF_PAGE.sub, isNew: true }] : []),
+  ...(ETF_NAV ? [{ href: ETF_PAGE.href, label: ETF_PAGE.label, icon: ETF_PAGE.icon, sub: ETF_PAGE.sub }] : []),
   // 카더라가 국장·미장 둘로 갈린다. **부모는 그대로 두고 밑에 서브 항목을 단다** —
   // 부모를 국장으로 바꿔 버리면 카더라라는 이름이 사이드바에서 사라지고, 나중에 시장을
   // 하나 더 붙일 자리도 없어진다.
