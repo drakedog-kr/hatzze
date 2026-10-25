@@ -8,7 +8,10 @@
  * 돌리는 법: `npm test`.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
@@ -287,6 +290,67 @@ describe("요약표", () => {
     const outs = s.body.match(/outcomes=\((.+)\)\n/)![1].match(/"[^"]*"/g)!;
     assert.equal(names.length, outs.length);
     assert.ok(!s.body.includes("telegram_morning"), "다른 잡으로 옮긴 스텝을 가리킨다");
+  });
+
+  // 베스트셀러는 그날 행이 사흘 연속 빈 때만 알림에 센다(2026-10-25 #793). 요약 스텝 본문을 그대로 bash 로 돌려 본다.
+  // 스텝 결과는 fail 에 적은 id 만 failure, 나머지는 success 다.
+  function summarize(fail: string[], days: string): { status: number | null; env: string; summary: string } {
+    const s = update.find((x) => x.name === "Summarize results")!;
+    const script = s.body
+      .split("run: |\n")[1]
+      .replace(/^ {10}/gm, "")
+      .replace(/\$\{\{ steps\.(\w+)\.outcome \}\}/g, (_, id: string) => (fail.includes(id) ? "failure" : "success"));
+    const dir = mkdtempSync(join(tmpdir(), "summarize-"));
+    const env = join(dir, "env");
+    const summary = join(dir, "summary");
+    writeFileSync(env, "");
+    const r = spawnSync("bash", ["--noprofile", "--norc", "-eo", "pipefail", "-c", script], {
+      env: { NODE_ENV: "test", PATH: process.env.PATH ?? "/usr/bin:/bin", GITHUB_ENV: env, GITHUB_STEP_SUMMARY: summary, BESTSELLER_MISSING_DAYS: days },
+      encoding: "utf8",
+    });
+    return { status: r.status, env: readFileSync(env, "utf8"), summary: readFileSync(summary, "utf8") };
+  }
+
+  it("베스트셀러 빈 날 세기는 베스트셀러 실패 바로 뒤에서 돌고, 요약이 그 일수를 env 로 받는다", () => {
+    const i = idx(update, (s) => s.id === "bestseller_ratio", "베스트셀러");
+    const gate = update[i + 1];
+    assert.equal(gate.id, "bestseller_missing");
+    assert.equal(gate.if, "steps.bestseller_ratio.outcome == 'failure'");
+    assert.match(gate.body, /continue-on-error: true/);
+    assert.match(gate.body, /days=\$\(python data-pipeline\/scripts\/bestseller_missing_days\.py\)\n\s+echo "days=\$days" >> "\$GITHUB_OUTPUT"/);
+    const s = update.find((x) => x.name === "Summarize results")!;
+    assert.match(s.body, /\n {10}BESTSELLER_MISSING_DAYS: \$\{\{ steps\.bestseller_missing\.outputs\.days \}\}\n/);
+  });
+
+  it("베스트셀러만 실패하고 빈 날이 3일 아래면 알리지 않는다 — 저녁만 실패한 날(0) · 오늘 하루(1) · 이틀(2)", () => {
+    for (const d of ["0", "1", "2"]) {
+      const r = summarize(["bestseller_ratio"], d);
+      assert.equal(r.status, 0, d);
+      assert.equal(r.env, "", d);
+      assert.match(r.summary, new RegExp(`\\| fetch_bestseller_ratio\\.py \\| failure \\(빈 날 ${d}일 · 3일부터 알림\\) \\|`), d);
+    }
+  });
+
+  it("빈 날이 3일째면 알린다 — 실패 목록에 일수를 붙인다", () => {
+    const r = summarize(["bestseller_ratio"], "3");
+    assert.equal(r.status, 1);
+    assert.equal(r.env, "FAILED_SCRIPTS=fetch_bestseller_ratio.py (빈 날 3일 연속)\n");
+  });
+
+  it("일수를 못 쟀으면(빈 값 · 숫자 아님) 알린다", () => {
+    for (const d of ["", "x"]) {
+      const r = summarize(["bestseller_ratio"], d);
+      assert.equal(r.status, 1, d);
+      assert.equal(r.env, "FAILED_SCRIPTS=fetch_bestseller_ratio.py\n", d);
+    }
+  });
+
+  it("다른 스크립트 실패는 그대로 알린다 — 베스트셀러를 보류해도 목록에서만 빠진다", () => {
+    assert.equal(summarize(["gold_ratio"], "").env, "FAILED_SCRIPTS=fetch_gold_ratio.py\n");
+    const r = summarize(["gold_ratio", "bestseller_ratio"], "1");
+    assert.equal(r.status, 1);
+    assert.equal(r.env, "FAILED_SCRIPTS=fetch_gold_ratio.py\n");
+    assert.equal(summarize([], "").status, 0);
   });
 });
 
