@@ -1121,3 +1121,64 @@ def _donga(text: str) -> set[str]:
 )
 def test_donga_old_name_finds_new_code(text, codes):
     assert _donga(text) == codes
+
+
+# ── 2026-10-26: 미장 애보트(ABT) ← 텍사스 주지사 · 스카이댄스(SKYD) ← 다른 파라마운트(이슈 #796) ──────────────────────
+# 사례는 전 기간 코퍼스의 실제 문장이다. 근거와 수치는 config/us_stock_extraction.py 머리말의 같은 날짜 절.
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "텍사스를 인공지능(AI) 발전의 진원지로 추켜세웠던 그렉 애보트(Greg Abbott) 텍사스 주지사가 재선 가도에서",
+        "그레그 애보트 텍사스 주지사, 지역 사회 지지 확보 실패한 데이터 센터 기업 비판",
+        "데이터 센터 붐에 대한 애보트 주지사의 태도 변화",
+        "텍사스 Greg Abbott 주지사도 8월 3일 신규 데이터센터 건설을 일시 중단하고",
+        "공화당이 상원 지키고 Abbott 텍사스 주지사 연임된다면 AI 자본지출 지속될 것",
+        "1. Abbott 주지사는 9월 21일 ERCOT 감사 완료 전 데이터센터가 신청한 TCEQ 허가",
+        "폴 애보트(Paul Abbott) 아멕스 GBT 최고경영자(CEO)는 “이번 이정표로",
+        # '애벗'은 사전에 없다 — 대개 이 주지사다
+        "그레그 애벗 텍사스 주지사는 ERCOT 계통연계 대기열에 포함된 모든 데이터센터에 대한 감사를 지시",
+    ],
+)
+def test_texas_governor_is_not_abbott(us_tagger, text):
+    assert "ABT" not in us_tagger(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "머크(-2.62%), 브리스톨마이어스(-4.03%), 애보트(-3.42%), 보스턴사이언티픽(-4.52%)",
+        "• 애보트 래버러토리스 (ABT) — 울프리서치, 투자의견 Outperform으로 상향하고 목표주가 130달러",
+        "제목 : [美특징주]애보트래보라토리스, 매출 성장률 전망치 하향에 하락 *이데일리FX*",
+        "▶ Abbott, 세계 최초 혈당·케톤 동시 측정 센서 Libre Duo FDA 승인",
+        "Dexcom G7·Abbott Libre와의 직접 경쟁에서 차별화되나",
+    ],
+)
+def test_abbott_company_stays(us_tagger, text):
+    assert "ABT" in us_tagger(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "• 스카이댄스 (SKYD) — 일론 머스크가 데이비드 엘리슨의 스카이댄스에 10억 달러를 투자한 것으로 세마포가 보도.",
+        "[스카이댄스(-23.8%)] 수요일 배당락 이후 급락.",
+        "이 날 파라마운트 320억달러 회사채 발행",
+        "[美특징주]파라마운트스카이댄스, 워너브라더스 인수 마무리…주가는 하락",
+        "• SKYD (-23.84%): Skydance가 Warner Bros. Discovery 인수 후 Class B 주주에게 배당한",
+    ],
+)
+def test_skydance_and_paramount_are_skyd(us_tagger, text):
+    assert "SKYD" in us_tagger(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "파라마운트 골드 네바다는 네바다주 윈무카에 본사를 두고 있으며",
+        "온폴리오 홀딩스가 파라마운트 헬륨(Paramount Helium, LLC)을 인수하기로 했던 계획을 철회",
+        "SRFM (+7.14%) Skydance Air와 운항 계약 체결",
+    ],
+)
+def test_other_paramounts_are_not_skyd(us_tagger, text):
+    assert "SKYD" not in us_tagger(text)

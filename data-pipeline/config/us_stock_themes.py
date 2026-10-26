@@ -73,7 +73,7 @@ US_THEMES: dict[str, list[str]] = {
     # 쓰는 '대표성' 순서라, 이틀짜리 급등으로 맨 앞자리를 주지 않는다.
     "바이오·헬스케어": [
         "LLY", "MRNA", "NVO", "MRK", "PFE", "ABBV", "AZN", "NVS",
-        "JNJ", "UNH", "ISRG", "MDGL", "CVS", "CAH", "AMGN", "MDT", "EVMN",
+        "JNJ", "UNH", "ISRG", "MDGL", "CVS", "CAH", "AMGN", "MDT", "EVMN", "ABT",
     ],
     "금융": ["GS", "JPM", "MS", "BAC", "BRK", "BX", "SCHW", "MA", "AXP", "PYPL", "SOFI", "UPST", "C", "WFC"],
     # 코인 시세와 함께 움직이는 묶음. 금융과 갈라 둔 이유는 그날 오가는 얘기가
@@ -83,7 +83,7 @@ US_THEMES: dict[str, list[str]] = {
         "KO", "WMT", "COST", "SBUX", "MCD", "NKE", "CMG", "PEP", "PM",
         "DIS", "DKNG", "ORLY", "DECK", "LUV", "DHI", "PLD", "WELL",
         "CPNG", "MELI", "URI", "ABNB", "BKNG", "CAT", "VZ",
-        "HD", "BBY", "DLTR", "EBAY", "LULU", "KR", "CCL", "SPOT",
+        "HD", "BBY", "DLTR", "EBAY", "LULU", "KR", "CCL", "SPOT", "SKYD",
     ],
     "에너지·원자재": ["XOM", "CVX", "KMI", "VLO", "FCX", "NEM", "NUE", "ALB"],
     # 아직 작지만(합쳐 170회) 뜰 때 한꺼번에 뜨는 묶음이라 따로 둔다.
