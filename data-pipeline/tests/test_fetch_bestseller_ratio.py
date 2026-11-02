@@ -73,7 +73,18 @@ def test_since_fills_each_day_with_its_week(monkeypatch):
     upserts, fetched = [], []
 
     class FakeClient:
+        data = []  # upsert_details 가 먼저 읽는 기존 행 — 없다
+
         def table(self, _):
+            return self
+
+        def select(self, *_):
+            return self
+
+        def eq(self, *_):
+            return self
+
+        def in_(self, *_):
             return self
 
         def upsert(self, rows, **_):
@@ -100,3 +111,40 @@ def test_since_fills_each_day_with_its_week(monkeypatch):
         ("2026-11-03", 1192, 12.0),  # 오늘
     ]
     assert fetched == [1191, 1192]  # 한 주는 한 번만 받는다
+
+
+def test_keeps_hot_threshold_that_calculate_score_wrote(monkeypatch):
+    # details 는 calculate_score 가 같은 행에 hot_threshold(카드의 기준선)를 쓰는 공유 칸이다. 저녁 실행이 아침 행을 다시 써도
+    # 그 키가 남아야 한다 — 그 사이 점수 계산이 끊기면 카드 기준선이 비었다(2026-07-20 괴리 카드와 같은 꼴).
+    upserts = []
+
+    class FakeClient:
+        def __init__(self):
+            self.data = []
+
+        def table(self, _):
+            return self
+
+        def select(self, *_):
+            self.data = [{"date": "2026-11-03", "details": {"hot_threshold": 17.0, "source_date": 20261025}}]
+            return self
+
+        def eq(self, *_):
+            return self
+
+        def in_(self, *_):
+            return self
+
+        def upsert(self, rows, **_):
+            upserts.extend(rows)
+            return self
+
+        def execute(self):
+            return self
+
+    monkeypatch.setattr(bs, "get_client", lambda: FakeClient())
+    monkeypatch.setattr(bs, "ensure_indicator", lambda *_: "ind")
+    monkeypatch.setattr(bs, "today_kst", lambda: date(2026, 11, 3))
+    monkeypatch.setattr(bs, "latest_week", lambda day: (1192, 10.0, 10))
+    bs.main()
+    assert upserts[0]["details"] == {"hot_threshold": 17.0, "source": "yes24_week", "week_no": 1192, "source_date": 20261101}

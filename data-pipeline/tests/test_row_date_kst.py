@@ -33,16 +33,20 @@ class FakeClient:
     def eq(self, *_):
         return self
 
+    def in_(self, *_):
+        return self
+
     def update(self, *_):
         return self
 
     def upsert(self, row, **_):
-        self.upserts.append(row)
+        # 한 행(dict)이거나, details 를 병합해 쓰는 upsert_details 처럼 여러 행(list)이다.
+        self.upserts.extend(row if isinstance(row, list) else [row])
         return self
 
     def execute(self):
         class R:
-            data = [{"id": "ind-1"}]
+            data = [{"id": "ind-1", "date": "2026-10-17", "details": None}]
 
         return R()
 
