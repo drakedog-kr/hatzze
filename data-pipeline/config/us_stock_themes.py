@@ -50,7 +50,7 @@ US_THEMES: dict[str, list[str]] = {
     "소프트웨어": [
         "CRM", "NOW", "ADBE", "SNOW", "DDOG", "NET", "PANW", "CRWD",
         "TEAM", "APP", "TTD", "RDDT", "RBLX", "SHOP", "ZBRA", "APH",
-        "OKTA", "WDAY", "INTU", "ZS", "MDB",
+        "OKTA", "WDAY", "INTU", "ZS", "MDB", "FTNT",
     ],
     # ⚠️ 스텔란티스로 12개가 됐다. MDD 바스켓은 자기 자신을 빼고 앞에서 열까지라
     #    (US_MDD_PEER_MAX) 맨 뒤 하나가 빠진다. 그래서 30일 언급이 가장 적은 앱티브(4건·
@@ -83,7 +83,7 @@ US_THEMES: dict[str, list[str]] = {
         "KO", "WMT", "COST", "SBUX", "MCD", "NKE", "CMG", "PEP", "PM",
         "DIS", "DKNG", "ORLY", "DECK", "LUV", "DHI", "PLD", "WELL",
         "CPNG", "MELI", "URI", "ABNB", "BKNG", "CAT", "VZ",
-        "HD", "BBY", "DLTR", "EBAY", "LULU", "KR", "CCL", "SPOT", "SKYD",
+        "HD", "BBY", "DLTR", "EBAY", "LULU", "KR", "CCL", "SPOT", "SKYD", "DASH", "CHRW",
     ],
     "에너지·원자재": ["XOM", "CVX", "KMI", "VLO", "FCX", "NEM", "NUE", "ALB"],
     # 아직 작지만(합쳐 170회) 뜰 때 한꺼번에 뜨는 묶음이라 따로 둔다.

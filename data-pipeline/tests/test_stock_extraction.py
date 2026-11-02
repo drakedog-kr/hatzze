@@ -1182,3 +1182,40 @@ def test_skydance_and_paramount_are_skyd(us_tagger, text):
 )
 def test_other_paramounts_are_not_skyd(us_tagger, text):
     assert "SKYD" not in us_tagger(text)
+
+
+# ── 2026-11-02: 미장 C.H. 로빈슨(CHRW) ← 맨 '로빈슨'은 사람 이름 · 도어대시 · 포티넷(이슈 #799) ────────────────────
+# 사례는 전 기간 코퍼스의 실제 문장이다. 근거와 수치는 config/us_stock_extraction.py 머리말의 같은 날짜 절.
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "[C.H.로빈슨(-10.9%), RXO(+22.5%)] C.H.로빈슨이 RXO를 인수하는 합병",
+        "제목 : [美특징주]CH로빈슨월드와이드, 급락…트럭 사고 6억달러 배상 평결 *이데일리FX*",
+        "Bottom5: 레녹스 인터내셔널(-23.1%), CH 로빈슨 월드와이드(-20.8%), 버티브 홀딩스(-16.8%)",
+        "제목 : [AI시그널] 로빈슨 월드와이드, 하락세 지속 및 매도 압력 강해 *이데일리FX*",
+        "» RXO(+22.5%) / C.H. Robinson(-10.9%)",
+        "[C.H 로빈슨(-11.1%)] 3Q26 실적은 예상을 상회했지만",
+    ],
+)
+def test_ch_robinson_company_stays(us_tagger, text):
+    assert "CHRW" in us_tagger(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "패라지와 거리를 두는 대신 반이민 운동가 토미 로빈슨과 신생 정당 ‘Restore Britain’을",
+        "린지 클랜시, 타일러 로빈슨, 션 콤스 등 주요 사건에서",
+        "유엔은 로빈슨 도법을 사용해왔으나",
+        "최근의 상업적 성과로 로빈슨 언맨드(Robinson Unmanned)와의 협력 기회",
+    ],
+)
+def test_bare_robinson_is_not_chrw(us_tagger, text):
+    assert "CHRW" not in us_tagger(text)
+
+
+def test_doordash_and_fortinet(us_tagger):
+    assert us_tagger("1. 인스타카트 (+7.83%) / 도어대시 (-6.12%)") == {"DASH"}
+    assert us_tagger("크라우드스트라이크(-0.51%), 팔로알토(-1.79%), 포티넷(-5.90%) 등 사이버보안 기업들도 동반 하락") >= {"FTNT"}
+    assert "FTNT" in us_tagger("*FORTINET SHARES PLUNGE 27%, SET FOR WORST DAY ON RECORD")

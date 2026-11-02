@@ -157,12 +157,23 @@ def fetch_sec_master() -> dict[str, tuple[str, str]]:
     req = Request(SEC_URL, headers={"User-Agent": SEC_UA})
     with urlopen(req, timeout=30) as resp:
         raw = json.load(resp)
+    return listed_master(raw)
+
+
+def listed_master(raw: dict) -> dict[str, tuple[str, str]]:
+    """company_tickers_exchange.json 을 티커 → (정식 영문명, 거래소)로. **거래소 칸이 빈 줄은 버린다.**
+
+    상장 목록에도 거래소가 비어 있는 줄이 있다(2026-11-02 기준 10,423줄 중 167줄 — 상장 신고만 하고 아직 거래되지
+    않는 회사 · 스팩). 앤트로픽이 `ANT · Anthropic, PBC · None` 으로 실려 이슈 #799 에 소득 1,685건으로 올라왔는데
+    야후에 시세가 없다. 거래소가 생기면 그날부터 후보로 올라온다(SCAN_IGNORE 의 UNLISTED_REASON 검사도 같은 목록을 본다).
+    """
     idx = {f: i for i, f in enumerate(raw["fields"])}
     out: dict[str, tuple[str, str]] = {}
     for row in raw["data"]:
         ticker = str(row[idx["ticker"]] or "").upper()
-        if ticker:
-            out.setdefault(ticker, (str(row[idx["name"]]), str(row[idx["exchange"]] or "")))
+        exchange = str(row[idx["exchange"]] or "")
+        if ticker and exchange:
+            out.setdefault(ticker, (str(row[idx["name"]]), exchange))
     return out
 
 
