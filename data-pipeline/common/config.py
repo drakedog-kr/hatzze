@@ -19,7 +19,6 @@ FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
 # 공공데이터포털(금융위원회) 키. 국내 배당 기록(fetch_kr_dividends.py)이 쓴다. 처음엔 서학개미 장부의 예탁원 결제에 붙였다.
 KSD_API_KEY = os.environ.get("KSD_API_KEY")
 ECOS_API_KEY = os.environ.get("ECOS_API_KEY")
-ALADIN_TTB_KEY = os.environ.get("ALADIN_TTB_KEY")
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
 KMA_API_KEY = os.environ.get("KMA_API_KEY")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")  # 선택 — 없으면 비인증으로 호출(rate limit만 낮음)

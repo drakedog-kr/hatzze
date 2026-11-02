@@ -88,7 +88,7 @@ const SOURCE_GROUPS: { label: string; items: string }[] = [
      한국예탁결제원 — SEIBro ETF종합정보(총보수 · 설정일 · 운용사 · 분류) · 분배금지급현황. 안 연 동안은 숨긴다(위 배당과 같은 이유). */
   ...(ETF_PUBLIC ? [{ label: "ETF", items: "한국거래소 통계정보 · 한국예탁결제원" }] : []),
   { label: "검색·뉴스", items: "네이버 · 유튜브" },
-  { label: "커뮤니티·소비", items: "텔레그램 · 디시인사이드 · 알라딘" },
+  { label: "커뮤니티·소비", items: "텔레그램 · 디시인사이드 · 예스24" },
   { label: "가상자산·기타", items: "업비트 · GitHub · 앱스토어" },
 ];
 

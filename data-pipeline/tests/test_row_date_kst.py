@@ -50,7 +50,7 @@ class FakeClient:
 @pytest.mark.parametrize(
     "mod,stub",
     [
-        (bs, {"fetch_bestseller_list": lambda: [{"categoryName": "국내도서>경제경영"}] * 9 + [{"categoryName": "소설"}] * 91}),
+        (bs, {"latest_week": lambda day: (1192, 9.0, 9)}),
         (br, {"fetch_brokerage_froth": lambda: (400.0, [{"name": "증권 앱", "rank": 3}])}),
         (yt, {"search_finance_video_ids": lambda: ["a"], "fetch_view_counts": lambda ids: [1_000_000]}),
     ],
