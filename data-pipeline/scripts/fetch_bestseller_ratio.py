@@ -44,6 +44,7 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.details import upsert_details  # noqa: E402
 from common.retry import backoff_delay  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
@@ -180,7 +181,8 @@ def main(since: str | None = None, dry_run: bool = False) -> None:
         client = get_client()
         indicator_id = ensure_indicator(client, INDICATOR_META)
         # 행 날짜는 KST 다. 러너가 UTC 라 date.today() 를 쓰면 09:00 KST 전에 도는 아침 실행이 전날 행을 덮어썼다(2026-10-16 전수 검사 4).
-        client.table("indicator_values").upsert(row_for(indicator_id, today, week_no, ratio), on_conflict="indicator_id,date").execute()
+        # details 는 calculate_score 가 같은 행에 hot_threshold(카드의 기준선)를 쓰는 공유 칸이라 병합해서 쓴다(common/details.py).
+        upsert_details(client, indicator_id, [row_for(indicator_id, today, week_no, ratio)])
         print(f"[Supabase] indicator_values upsert 완료: date={today}, raw_value={ratio}")
         return
 
@@ -209,7 +211,7 @@ def main(since: str | None = None, dry_run: bool = False) -> None:
     print(f"[YES24] {days[0]} ~ {days[-1]} {len(rows)}행 · {len(weeks)}주")
     if dry_run:
         return
-    client.table("indicator_values").upsert(rows, on_conflict="indicator_id,date").execute()
+    upsert_details(client, indicator_id, rows)
     print(f"[Supabase] indicator_values {len(rows)}행 upsert 완료")
 
 
