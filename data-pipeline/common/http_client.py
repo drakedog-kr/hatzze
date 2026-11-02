@@ -59,7 +59,7 @@ def request_with_retry(
     바로 읽히도록 필수로 받는다 — 스크립트 하나가 여러 호스트를 두드리는 경우가 있다.
 
     timeout 을 안 주면 DEFAULT_TIMEOUT_SEC 를 쓴다. 호출자가 준 값이 있으면 그대로 존중한다
-    (알라딘처럼 이미 넉넉히 잡아 둔 곳이 있다).
+    (베스트셀러처럼 이미 넉넉히 잡아 둔 곳이 있다).
     """
     kwargs.setdefault("timeout", DEFAULT_TIMEOUT_SEC)
     last_error: Exception | None = None

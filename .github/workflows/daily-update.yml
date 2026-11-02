@@ -93,7 +93,6 @@ env:
   #    .env.local 로 잘 돌아서 안 보인다.
   KSD_API_KEY: ${{ secrets.KSD_API_KEY }}
   ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
-  ALADIN_TTB_KEY: ${{ secrets.ALADIN_TTB_KEY }}
   YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
   KMA_API_KEY: ${{ secrets.KMA_API_KEY }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1302,8 +1301,8 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_bestseller_ratio.py
 
-      # 알라딘이 가끔 403 을 내고 거의 늘 다음 실행에서 돌아온다. 그래서 Summarize results 는 그날 행이 사흘 연속 빈 때만
-      # 베스트셀러 실패를 알림에 센다(2026-10-25 #793 · 근거는 스크립트 머리말). 이 스텝은 그 일수만 잰다.
+      # 베스트셀러 원천은 가끔 막히고 거의 늘 다음 실행에서 돌아온다(알라딘 때 실측 · 2026-11-02 부터 예스24). 그래서 Summarize
+      # results 는 그날 행이 사흘 연속 빈 때만 베스트셀러 실패를 알림에 센다(2026-10-25 #793 · 근거는 스크립트 머리말). 이 스텝은 그 일수만 잰다.
       # 못 재면 출력이 비고, 빈 값은 '알린다'로 읽힌다.
       - name: 베스트셀러 빈 날 세기 (사흘 연속일 때만 알림)
         id: bestseller_missing

@@ -62,8 +62,9 @@ ALLOWANCE = {
     "consumer_sentiment_index": 45,
     # 기업 체감 경기도 한국은행 월 1회(매달 말)다. 행 날짜가 조사한 달 1일이라 공표 직전엔 40영업일 가까이 된다.
     "business_outlook": 45,
-    # 알라딘 베스트셀러는 주 단위로 갱신돼 같은 값이 며칠 이어진다.
-    "bestseller_finance_ratio": 5,
+    # 베스트셀러는 예스24 주간 순위다(월~일). 자료 날짜는 그 주의 일요일(details.source_date)이라 한 주 내내 늘고,
+    # 다음 월요일 아침에 새 주가 아직 안 열렸으면 6이 된다. 하루 더 여유를 둬 7(알라딘 때는 5).
+    "bestseller_finance_ratio": 7,
     # kospi_asia_relative_strength 는 2026-09-27 까지 7이었다. 네 나라 날짜 교집합만 쓰던 것을
     # 코스피 거래일마다 다른 나라의 앞 거래일 값을 붙이도록 바꿔 기본값으로 돌렸다
     # (fetch_asia_relative_strength 머리말).

@@ -176,7 +176,7 @@ python -m pytest tests -q                  # 파이프라인 단위 테스트
 |---|---|
 | `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY` | 프론트 읽기 · 파이프라인 쓰기 · 카더라 조회 |
 | `KRX_API_KEY` · `ECOS_API_KEY` · `KSD_API_KEY` | 거래소 시세 · 한국은행 · 공공데이터포털(예탁결제원 국내 배당 기록 · 금융투자협회 예탁금·신용융자) |
-| `NAVER_HUB_KEY_ID` / `NAVER_HUB_KEY` · `YOUTUBE_API_KEY` · `ALADIN_TTB_KEY` | 검색어트렌드·뉴스 · 유튜브 · 베스트셀러 |
+| `NAVER_HUB_KEY_ID` / `NAVER_HUB_KEY` · `YOUTUBE_API_KEY` | 검색어트렌드·뉴스 · 유튜브 |
 | `ANTHROPIC_API_KEY` | 오늘의 요약 · 카더라 총평 · 테마 요약 · 채널 글. 구독 경로가 막히면 이 키로 부릅니다 |
 | `CLAUDE_CODE_OAUTH_TOKEN` | 선택. 있으면 LLM 호출을 Claude Code 구독(`claude -p`)으로 먼저 보냅니다 |
 | `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` / `TELEGRAM_SESSION` · `TELEGRAM_CHANNELS_SHEET_ID` | 카더라 메시지 수집 · 채널 목록 |
@@ -242,6 +242,6 @@ Vercel이 같은 예약을 두 번 부를 수 있어서, 크론은 던지기 전
 
 ## 데이터 출처
 
-KRX Open API · 한국거래소 KIND · 한국은행 ECOS · 한국예탁결제원 · 금융투자협회 · 미 연준 FRED · 유럽중앙은행 ECB(환율) · SEC EDGAR · 미 하원 공시 · stockanalysis.com · NAVER API HUB · YouTube Data API · 알라딘 · GitHub Search API · Apple App Store · DCInside · Upbit · Yahoo Finance · Finnhub · Hyperliquid · Telegram(공개 채널)
+KRX Open API · 한국거래소 KIND · 한국은행 ECOS · 한국예탁결제원 · 금융투자협회 · 미 연준 FRED · 유럽중앙은행 ECB(환율) · SEC EDGAR · 미 하원 공시 · stockanalysis.com · NAVER API HUB · YouTube Data API · 예스24 · GitHub Search API · Apple App Store · DCInside · Upbit · Yahoo Finance · Finnhub · Hyperliquid · Telegram(공개 채널)
 
 국내 시장 데이터는 KRX에서 받되, **KRX가 종가를 다음 날 08:00에 올리는 탓에** 지수 종가와 당일 종가는 야후에서 받습니다.
