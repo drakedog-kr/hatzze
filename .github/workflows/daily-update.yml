@@ -2103,6 +2103,13 @@ jobs:
             || echo "담당자 지정에 실패했습니다 — 이슈는 열려 있습니다"
           exit 1
 
+  # ⭐ 수집 스텝마다 시간 상한을 둔다(2026-11-03). finalize 가 이 잡을 기다리고 아침 발송(morning_post)이 finalize 를
+  #    기다린다. 아침엔 이 잡이 08:00 대기 뒤 KRX 몫을 받느라 update 보다 늦게 끝나는 날이 절반이다(10-21~11-03 아침 14번 중
+  #    7번 · 가장 늦은 날 11분). 잡에는 상한이 없어(기본 360분) 한 스텝이 멈추면 아침 글이 그만큼 개장 뒤로 밀린다.
+  #    상한은 09-27~11-03 실행 80번 실측 최대의 두세 배다 — 미국 배당주 21.8분(일요일 SEC) → 45 · ETF 분배금 14.8분 → 30 ·
+  #    예탁원 4.7 · KRX 종가 이력 4.7 · 미국 ETF 설정·환매 6.0 → 15 · 나머지(1분 안쪽) → 10.
+  #    상한에 걸린 스텝은 결과가 failure 라 아래 '배당주 수집' 요약 · 알림이 그대로 잡는다(continue-on-error).
+  # ⚠️ 기다리기 스텝(미리보기 · 08:00 · 카더라 집계)엔 안 둔다. 기다리는 시간은 저마다 상한이 있거나(45 · 120분) 시각으로 정해진다.
   dividend:
     needs: [guard, krx_master]
     if: ${{ !cancelled() && needs.guard.outputs.skip != 'true' }}
@@ -2147,6 +2154,7 @@ jobs:
         id: us_dividends
         if: ${{ !cancelled() }}
         continue-on-error: true
+        timeout-minutes: 45
         run: python data-pipeline/scripts/fetch_us_dividends.py
 
       # 미장 테마 종목 일별 종가 · 거래량(us_stock_price_daily) — 미장 테마 화면 '3일 평균 거래대금'의 재료다(마이그레이션 106).
@@ -2157,6 +2165,7 @@ jobs:
         id: us_price_history
         if: ${{ !cancelled() }}
         continue-on-error: true
+        timeout-minutes: 10
         run: python data-pipeline/scripts/fetch_us_price_history.py
 
 
@@ -2205,6 +2214,7 @@ jobs:
         id: krx_price_history
         if: ${{ !cancelled() }}
         continue-on-error: true
+        timeout-minutes: 15
         run: python data-pipeline/scripts/fetch_krx_price_history.py
 
       # 등락 이유(테마 화면 '등락의 이유')의 국장 등락률 · 종가 — 위에서 막 받은 어제 종가로 채운다. 까닭 스텝(update 잡) 안의
@@ -2215,6 +2225,7 @@ jobs:
         id: move_reason_rates
         if: ${{ !cancelled() && steps.krx_price_history.outcome == 'success' }}
         continue-on-error: true
+        timeout-minutes: 10
         run: |
           set -o pipefail
           python data-pipeline/scripts/generate_move_reasons.py --fill-only | tee /tmp/move_reason_rates.log
@@ -2231,6 +2242,7 @@ jobs:
       - name: Fetch 예탁원 배당 기록 (배당주)
         id: kr_dividends
         continue-on-error: true
+        timeout-minutes: 15
         run: python data-pipeline/scripts/fetch_kr_dividends.py
 
       # 거래소 '현금·현물배당 결정' 공시 최근 열흘치 — 확정 배당(1주당 금액·기준일·지급예정일)과 감액배당(비과세) 문장.
@@ -2239,6 +2251,7 @@ jobs:
         id: kr_dividend_notices
         if: ${{ !cancelled() }}
         continue-on-error: true
+        timeout-minutes: 10
         run: python data-pipeline/scripts/fetch_kr_dividend_notices.py
 
       # 기록을 종목 한 줄로 접는다(12개월 합·수익률·지급월·연속 배당·확정 배당·감액배당). 화면은 이 표만 읽는다.
@@ -2247,6 +2260,7 @@ jobs:
         id: kr_dividend_stats
         if: ${{ !cancelled() }}
         continue-on-error: true
+        timeout-minutes: 10
         run: python data-pipeline/scripts/calculate_kr_dividend_stats.py
 
       # 고배당기업(배당소득 분리과세 대상) 목록 — KIND 페이지 POST 한 번. ⚠️ 거래소 사이트라 미국 러너에서 막힐 수 있다.
@@ -2256,6 +2270,7 @@ jobs:
         id: kr_high_dividend
         if: ${{ !cancelled() }}
         continue-on-error: true
+        timeout-minutes: 10
         run: python data-pipeline/scripts/fetch_kr_high_dividend.py
 
       # 배당성향(KIND 배당정보, 지난 사업연도 한 줄씩) — POST 한 번. 위와 같은 사이트.
@@ -2263,6 +2278,7 @@ jobs:
         id: kr_dividend_payout
         if: ${{ !cancelled() }}
         continue-on-error: true
+        timeout-minutes: 10
         run: python data-pipeline/scripts/fetch_kr_dividend_payout.py
 
       # ETF 분배금 — 미국은 stockanalysis, 국내는 예탁결제원 SEIBro 분배금지급현황(전 운용사 · 열다섯 달치 · 150여 회 요청 · 2분 반). 시세·환율도 여기서.
@@ -2270,6 +2286,7 @@ jobs:
         id: etf_dividends
         if: ${{ !cancelled() }}
         continue-on-error: true
+        timeout-minutes: 30
         run: python data-pipeline/scripts/fetch_etf_dividends.py
 
       # 국내 상장 미국 ETF 의 설정·환매(좌수 변화 × NAV) → seohak_etf_daily. 배당 화면 '국내 ETF' 줄이
@@ -2280,6 +2297,7 @@ jobs:
         id: etf_flows
         if: ${{ !cancelled() }}
         continue-on-error: true
+        timeout-minutes: 15
         run: python data-pipeline/scripts/fetch_seohak_etf.py
 
       # ⭐ 배당 표가 다 바뀐 뒤 **/dividend 만** 먼저 비운다(PR #543 의 규칙 — 자료가 쓰인 직후에 그 화면만). 저녁만이다.
@@ -2300,6 +2318,7 @@ jobs:
       - name: 배당 화면만 먼저 비우고 데우기
         if: ${{ !cancelled() && github.event.inputs.slot != 'morning' }}
         continue-on-error: true
+        timeout-minutes: 10
         env:
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: bash scripts/revalidate.sh /dividend
@@ -2366,7 +2385,8 @@ jobs:
       # ⭐ 이 잡 맨 끝에 둔다(2026-10-12) — 갱신 시각이 덜 중요한 화면이라 배당 화면 비우기 · 배당 알림을 먼저 끝낸다.
       #    위 'KRX 공표(08:00 KST) 대기' 뒤라 아침 실행이 전 거래일 값을 받는다. 같은 엔드포인트(etp/etf_bydd_trd)를
       #    위 fetch_seohak_etf 가 이미 쓴다. 화면 사본은 finalize 의 전체 비우기가 새로 그린다(finalize 는 이 잡을 기다린다).
-      #    update 잡이 훨씬 길어 이 몇 분이 finalize 를 늦추지 않는다.
+      #    저녁엔 update 잡이 훨씬 길어 이 몇 분이 finalize 를 늦추지 않는다. 아침엔 이 잡이 더 늦게 끝나는 날이 절반이라
+      #    (잡 머리 주석) 이 몇 분이 그대로 아침 화면 · 발송을 늦춘다 — 30초 안팎이라 여기 둔다.
       # 셋 다 스스로 양을 줄인다 — 흐름은 최근 이레만 다시 받아 덮고(KRX 일곱 번 + 1년 뷰 새로 고침), 기본 정보는 이레 넘게 묵은
       # 것만 한 번에 400개까지(세이브로), 달 말일 스냅숏은 표에 없는 달만(보통 0번 · 달이 바뀐 첫 실행에 한 번).
       # ⚠️ 배당 알림이 실패해 `exit 1` 해도 돈다(`!cancelled()`). KRX 에 막힌 날 재시도가 길어지지 않게 스텝마다 시간 상한을 둔다.
@@ -2806,3 +2826,69 @@ jobs:
           fi
           gh issue edit "${number:-$existing}" --add-assignee "${{ github.repository_owner }}" >/dev/null \
             || echo "담당자 지정에 실패했습니다 — 이슈는 열려 있습니다"
+
+  # ── 알림 없이 죽은 잡 찾기(2026-11-03) ──────────────────────────────────────
+  # 잡마다 알림 스텝은 그 잡 **안에** 있다. 러너가 끊긴 잡(#301 배당 잡 — "The hosted runner lost communication with the
+  # server")이나 시간 상한에 걸려 취소된 잡은 알림 스텝까지 같이 사라진다. #301 은 이슈가 안 열려 Actions 목록을 보고서야
+  # 알았다. 실행이 붉게 끝나는 건 평소에도 넷에 하나꼴이라(알림 스텝이 이슈를 열고 일부러 exit 1 한다) 그것만으로는 신호가
+  # 못 된다. 그래서 모든 잡이 끝난 뒤 같은 실행의 잡 목록을 읽어 그런 잡만 고른다(scripts/dead-jobs.sh — 고르는 규칙은 거기).
+  # ⭐ 맨 끝 잡이다. 이 잡을 기다리는 잡이 없어 화면 · 발송 시각은 그대로다. 발송 잡까지 본다 — 발송 잡의 `failure()`
+  #    알림도 러너가 끊기면 안 돈다.
+  # ⭐ 손으로 취소한 실행(`!cancelled()`)과 게이트가 막은 실행은 안 본다.
+  # ⚠️ 잡 목록을 못 읽으면 요약에만 적고 지나간다 — 이 잡이 따로 알림을 만들지는 않는다.
+  dead_jobs:
+    needs: [guard, krx_master, kr_preview, update, insider, dividend, logos, finalize, logo_fill, morning_post, evening_post]
+    if: ${{ !cancelled() && needs.guard.outputs.skip != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      actions: read   # 같은 실행의 잡 목록을 읽는다
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: 알림 없이 죽은 잡 찾기
+        id: find
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          dead=$(bash scripts/dead-jobs.sh) && rc=0 || rc=$?
+          if [ "$rc" -ne 0 ]; then
+            echo "⚠️ 잡 목록을 못 읽었습니다(종료 코드 $rc) — 이번 실행은 보지 못했습니다" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ -z "$dead" ]; then
+            echo "알림 없이 죽은 잡 없음"
+            exit 0
+          fi
+          printf '## 알림 없이 죽은 잡\n\n%s\n' "$(printf '%s\n' "$dead" | sed 's/^/- /')" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "dead<<EOF_DEAD"
+            printf '%s\n' "$dead"
+            echo "EOF_DEAD"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Alert on 죽은 잡 (open/update GitHub issue)
+        if: ${{ steps.find.outputs.dead != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEAD: ${{ steps.find.outputs.dead }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          title="⚠️ 데일리 파이프라인 실패"
+          list=$(printf '%s\n' "$DEAD" | sed 's/^/- /')
+          note=$(printf '러너가 끊겼거나 시간 상한에 걸려 알림 없이 끝난 잡이 있습니다. 그 잡의 남은 스텝과 잡 안의 알림은 돌지 않았습니다.\n\n%s\n\n- 시각(UTC): %s\n- 로그/요약: %s\n\n수집 잡은 대부분 다음 실행이 다시 받아 메웁니다. 발송 잡(morning_post · evening_post)이면 그날 글이 안 나갔을 수 있습니다 — 재실행은 발송하지 않습니다(run_attempt 조건).' \
+            "$list" "$(date -u '+%Y-%m-%d %H:%M')" "$run_url")
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$note"
+            echo "기존 알림 이슈 #$existing 에 코멘트 추가"
+          else
+            number=$(gh issue create --title "$title" --body "$note" | sed 's#.*/##')
+            echo "새 알림 이슈 #$number 생성"
+          fi
+          gh issue edit "${number:-$existing}" --add-assignee "${{ github.repository_owner }}" >/dev/null \
+            || echo "담당자 지정에 실패했습니다 — 이슈는 열려 있습니다"
+          exit 1
