@@ -65,7 +65,7 @@ from common.config import FINNHUB_API_KEY  # noqa: E402
 from common.fx import usdkrw  # noqa: E402
 from common.krx_client import krx_get  # noqa: E402
 from common.stockanalysis import PageChanged, dividend_page, trailing  # noqa: E402
-from common.supabase_client import get_client, load_all  # noqa: E402
+from common.supabase_client import execute_with_retry, get_client, load_all  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from common.young_etf import CADENCE, MIN_LISTED_YEAR_AGO, PER_YEAR, YEAR_DAYS, estimate, listed_within_year, per_year_from_gaps  # noqa: E402
 from config.etf_dividends import US_ETFS  # noqa: E402
@@ -301,7 +301,7 @@ def stored_taxable(db) -> dict[tuple[str, str], float]:
 def stored_estimated(db) -> set[str]:
     """어제 표에서 1년치로 어림했던 국내 ETF 코드. 1년 전 KRX 목록을 못 받은 날 그 판정을 잇는다. 못 읽으면 빈 set."""
     try:
-        rows = db.table(TABLE).select("code").eq("market", "KR").eq("estimated", True).execute().data
+        rows = execute_with_retry(db.table(TABLE).select("code").eq("market", "KR").eq("estimated", True)).data
     except Exception as exc:  # noqa: BLE001
         print(f"[ETF] 어제 어림한 국내 ETF 를 못 읽었습니다 — 오늘은 국내를 어림하지 않습니다: {exc}")
         return set()
@@ -480,7 +480,7 @@ def main() -> None:
         print("[ETF] --dry-run: DB 에 쓰지 않았습니다")
         return
     for i in range(0, len(rows), 200):
-        db.table(TABLE).upsert(rows[i : i + 200], on_conflict="code").execute()
+        execute_with_retry(db.table(TABLE).upsert(rows[i : i + 200], on_conflict="code"))
     print(f"[Supabase] {TABLE} upsert 완료: {len(rows)}행")
     # 이번에 안 나온 행은 지운다 — 지난 1년 지급이 끊긴 국내 ETF, 목록에서 뺀 미국 ETF. 원천 한쪽이 죽은 날은
     # (국내 0 · 미국만) 지우면 안 되므로 시장별로, 그 시장이 이번에 채워졌을 때만.
@@ -492,9 +492,9 @@ def main() -> None:
             # ⚠️ 페이지를 못 받아 건너뛴 ETF 는 '이번에 안 나온 행'이 아니다 — 지우면 다음 실행까지 화면에서 사라진다.
             #    어제 행을 둔다. 404(없는 티커)도 None 이라 여기 들지만 목록에서 빼면 다음 실행에 지워진다.
             keep |= sa_missed
-        stale = [r["code"] for r in db.table(TABLE).select("code").eq("market", market).execute().data if r["code"] not in keep]
+        stale = [r["code"] for r in execute_with_retry(db.table(TABLE).select("code").eq("market", market)).data if r["code"] not in keep]
         if stale:
-            db.table(TABLE).delete().in_("code", stale).execute()
+            execute_with_retry(db.table(TABLE).delete().in_("code", stale))
             print(f"[Supabase] {market} 에서 이번에 안 나온 {len(stale)}행 삭제: {stale[:8]}{' …' if len(stale) > 8 else ''}")
 
 

@@ -65,7 +65,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import KSD_API_KEY  # noqa: E402
 from common.retry import backoff_delay  # noqa: E402
-from common.supabase_client import get_client, load_all  # noqa: E402
+from common.supabase_client import execute_with_retry, get_client, load_all  # noqa: E402
 
 ENDPOINT = (
     "https://apis.data.go.kr/1160100/GetStocDiviInfoService_V2/getDiviInfo_V2"
@@ -210,12 +210,11 @@ def to_row(x: dict) -> dict | None:
 
 
 def newest_snapshot(db) -> date | None:
-    res = (
+    res = execute_with_retry(
         db.table(TABLE)
         .select("snapshot_date")
         .order("snapshot_date", desc=True)
         .limit(1)
-        .execute()
     )
     return date.fromisoformat(res.data[0]["snapshot_date"]) if res.data else None
 
@@ -298,19 +297,18 @@ def main() -> None:
         return
 
     for i in range(0, len(rows), CHUNK):
-        db.table(TABLE).upsert(rows[i : i + CHUNK], on_conflict="isin,record_date").execute()
+        execute_with_retry(db.table(TABLE).upsert(rows[i : i + CHUNK], on_conflict="isin,record_date"))
     print(f"[Supabase] {TABLE} upsert 완료: {len(rows):,}행")
 
     if not complete:
         print("  ⚠️ 전량이 아니라 사라진 행 정리는 건너뜁니다")
         return
     # 이번 스냅숏에 안 실린 행 = 원천이 지운 것. 너무 많으면 원천 사고라 지우지 않는다.
-    stale_rows = (
+    stale_rows = execute_with_retry(
         db.table(TABLE)
         .select("isin", count="exact")
         .lt("snapshot_date", snapshot)
         .limit(1)
-        .execute()
     )
     vanished = stale_rows.count or 0
     if vanished == 0:
@@ -320,7 +318,7 @@ def main() -> None:
             f"이번 스냅숏에 없는 행이 {vanished:,}건({vanished / len(rows) * 100:.1f}%) — "
             "원천 쪽 사고로 보고 지우지 않았다"
         )
-    db.table(TABLE).delete().lt("snapshot_date", snapshot).execute()
+    execute_with_retry(db.table(TABLE).delete().lt("snapshot_date", snapshot))
     print(f"  원천에서 사라진 행 {vanished}건을 지웠습니다")
 
 

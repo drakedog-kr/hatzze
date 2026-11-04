@@ -46,7 +46,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.krx_client import krx_get  # noqa: E402
-from common.supabase_client import get_client  # noqa: E402
+from common.supabase_client import execute_with_retry, get_client  # noqa: E402
 
 # 담는 낱말. `미국` 과 미국 대표기업 이름.
 US_MARKERS = (
@@ -101,14 +101,14 @@ def main() -> None:
     start = 0
     while True:
         page = (
-            db.table("seohak_etf_daily")
-            .select("trade_date, isu_cd, list_shares")
-            .gte("trade_date", since)
-            .order("trade_date")
-            .order("isu_cd")
-            .range(start, start + 999)
-            .execute()
-            .data
+            execute_with_retry(
+                db.table("seohak_etf_daily")
+                .select("trade_date, isu_cd, list_shares")
+                .gte("trade_date", since)
+                .order("trade_date")
+                .order("isu_cd")
+                .range(start, start + 999)
+            ).data
             or []
         )
         prev.extend(page)
@@ -189,14 +189,12 @@ def main() -> None:
         #    길면 이번 실행이 빈손일 수 있는데, 이레를 되돌아보므로 다음 실행이
         #    메운다. 잣대를 **표의 최신 거래일**로 옮긴다 — 하루 실패마다 알람을
         #    켜면 며칠이면 아무도 그 알람을 안 보게 되고 진짜 고장이 거기 묻힌다.
-        newest = (
+        newest = execute_with_retry(
             db.table("seohak_etf_daily")
             .select("trade_date")
             .order("trade_date", desc=True)
             .limit(1)
-            .execute()
-            .data
-        )
+        ).data
         if not newest:
             raise RuntimeError("ETF 자료를 하나도 못 받았고 표도 비어 있다")
         seen = date.fromisoformat(newest[0]["trade_date"])
@@ -212,9 +210,9 @@ def main() -> None:
         )
 
     for i in range(0, len(rows), CHUNK):
-        db.table("seohak_etf_daily").upsert(
-            rows[i : i + CHUNK], on_conflict="trade_date,isu_cd"
-        ).execute()
+        execute_with_retry(
+            db.table("seohak_etf_daily").upsert(rows[i : i + CHUNK], on_conflict="trade_date,isu_cd")
+        )
 
     latest = max(r["trade_date"] for r in rows)
     last = [r for r in rows if r["trade_date"] == latest]

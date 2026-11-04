@@ -170,7 +170,7 @@ def main() -> None:
         if args.dry_run:
             print(f"[dry-run] {d} {len(rows)}종목")
         else:
-            db.table(TABLE).upsert(rows, on_conflict="code,date").execute()
+            execute_with_retry(db.table(TABLE).upsert(rows, on_conflict="code,date"))
             print(f"[Supabase] {d} {len(rows)}종목")
         written += 1
 
