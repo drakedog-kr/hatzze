@@ -32,6 +32,13 @@ def test_gateway_502_is_retried():
     assert sc.execute_with_retry(q) == "ok" and q.calls == 3
 
 
+def test_gateway_502_with_string_code_is_retried():
+    # 11-04 #804 의 모양 그대로 — 본문을 못 읽은 postgrest 가 코드를 문자열 '502' 로 담았다.
+    exc = APIError({"message": "Bad Gateway", "code": "502", "hint": None, "details": "<html><center>cloudflare</center></html>"})
+    q = _Q([exc])
+    assert sc.execute_with_retry(q) == "ok" and q.calls == 2
+
+
 def test_transport_error_still_retried():
     q = _Q([httpx.RemoteProtocolError("ConnectionTerminated")])
     assert sc.execute_with_retry(q) == "ok" and q.calls == 2

@@ -86,7 +86,7 @@ from common.carry_quote import carry_close, fx_or_last, load_last_quotes  # noqa
 from common.config import FINNHUB_API_KEY  # noqa: E402
 from common.fx import usdkrw  # noqa: E402
 from common.stockanalysis import PageChanged, dividend_page, trailing  # noqa: E402
-from common.supabase_client import get_client, load_all  # noqa: E402
+from common.supabase_client import execute_with_retry, get_client, load_all  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from config.us_dividend_universe import EXTRA_US_DIVIDEND  # noqa: E402
 from config.us_sp500 import SP500  # noqa: E402
@@ -576,7 +576,7 @@ def main() -> None:
         print("[SEC] --dry-run: DB 에 쓰지 않았습니다")
         return
     for i in range(0, len(rows), CHUNK):
-        db.table(TABLE).upsert(rows[i : i + CHUNK], on_conflict="ticker").execute()
+        execute_with_retry(db.table(TABLE).upsert(rows[i : i + CHUNK], on_conflict="ticker"))
     print(f"[Supabase] {TABLE} upsert 완료: {len(rows)}행 (기준일 {today})")
     # ⭐ 죽는 자리는 저장 다음이다(fetch_us_analyst.py 와 같은 판단). 앞에서 죽으면 그날 받은 것까지 잃는다.
     if rows and len(sa_fail) / len(rows) * 100 > SA_FAIL_PCT_MAX:

@@ -42,7 +42,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.kind import UA, post_list  # noqa: E402
-from common.supabase_client import get_client  # noqa: E402
+from common.supabase_client import execute_with_retry, get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
 TABLE = "kr_dividend_notice"
@@ -214,7 +214,9 @@ def main() -> None:
         # 이미 받은 접수번호는 건너뛴다 — 공시는 안 바뀌니(정정은 새 접수번호) 매일 새 건만 세 번씩 요청하면 된다. 열흘치 목록이
         # 결산 시즌(2~3월)엔 수백 건이라 다 다시 받으면 10분이 넘는다. 백필도 끊겼다 다시 돌리면 이어 간다.
         for frm in range(0, 100_000, 1000):
-            chunk = db.table(TABLE).select("acptno").gte("filed_at", since.isoformat()).order("acptno").range(frm, frm + 999).execute().data
+            chunk = execute_with_retry(
+                db.table(TABLE).select("acptno").gte("filed_at", since.isoformat()).order("acptno").range(frm, frm + 999)
+            ).data
             known.update(r["acptno"] for r in chunk)
             if len(chunk) < 1000:
                 break
@@ -245,7 +247,7 @@ def main() -> None:
             print(f"  … {i}/{len(filings)}")
         time.sleep(PAUSE_SEC)
         if db and len(rows) >= 100:
-            db.table(TABLE).upsert(rows, on_conflict="acptno").execute()
+            execute_with_retry(db.table(TABLE).upsert(rows, on_conflict="acptno"))
             rows = []
     tf = taxfree_rows
     print(f"[KIND 배당공시] 읽음 {read}건(이미 있던 것 {len(known & {f['acptno'] for f in filings})} 건너뜀) · 못 읽음 {failed} · 감액배당 문장 {len(tf)}건")
@@ -257,7 +259,7 @@ def main() -> None:
         print("[KIND 배당공시] --dry-run: DB 에 쓰지 않았습니다")
         return
     if rows:
-        db.table(TABLE).upsert(rows, on_conflict="acptno").execute()
+        execute_with_retry(db.table(TABLE).upsert(rows, on_conflict="acptno"))
     print(f"[Supabase] {TABLE} upsert 완료")
 
 

@@ -30,7 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.kind import code_lookup, norm, num, post_list, rows_of  # noqa: E402
-from common.supabase_client import get_client, load_all_keyset  # noqa: E402
+from common.supabase_client import execute_with_retry, get_client, load_all_keyset  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
 TABLE = "kr_dividend_payout"
@@ -102,12 +102,12 @@ def main() -> None:
         print("[배당성향] --dry-run: DB 에 쓰지 않았습니다")
         return
     for i in range(0, len(rows), 200):
-        db.table(TABLE).upsert(rows[i : i + 200], on_conflict="code").execute()
+        execute_with_retry(db.table(TABLE).upsert(rows[i : i + 200], on_conflict="code"))
     keep = {r["code"] for r in rows}
     stale = [r["code"] for r in load_all_keyset(db, TABLE, "code", key="code") if r["code"] not in keep]
     if stale:
         for i in range(0, len(stale), 200):
-            db.table(TABLE).delete().in_("code", stale[i : i + 200]).execute()
+            execute_with_retry(db.table(TABLE).delete().in_("code", stale[i : i + 200]))
     print(f"[Supabase] {TABLE} upsert {len(rows)}행 · 이번 표에 없는 {len(stale)}행 삭제")
 
 

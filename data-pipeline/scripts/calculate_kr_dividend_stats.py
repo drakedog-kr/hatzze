@@ -384,7 +384,7 @@ def main() -> None:
         print("[배당 요약] --dry-run: DB 에 쓰지 않았습니다")
         return
     for i in range(0, len(rows), CHUNK):
-        db.table(TABLE).upsert(rows[i : i + CHUNK], on_conflict="code").execute()
+        execute_with_retry(db.table(TABLE).upsert(rows[i : i + CHUNK], on_conflict="code"))
     print(f"[Supabase] {TABLE} upsert 완료: {len(rows):,}행 (기준일 {today})")
 
 
