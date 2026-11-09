@@ -1249,3 +1249,83 @@ def test_doordash_and_fortinet(us_tagger):
     assert us_tagger("1. 인스타카트 (+7.83%) / 도어대시 (-6.12%)") == {"DASH"}
     assert us_tagger("크라우드스트라이크(-0.51%), 팔로알토(-1.79%), 포티넷(-5.90%) 등 사이버보안 기업들도 동반 하락") >= {"FTNT"}
     assert "FTNT" in us_tagger("*FORTINET SHARES PLUNGE 27%, SET FOR WORST DAY ON RECORD")
+
+
+# ── 2026-11-09: 미장 페르미(FRMI) · 에코스타(ECHO) · 페덱스(FDX) ← 페르미 왕 · 엔리코 페르미 · 페덱스 프레이트(이슈 #808) ────
+# 사례는 전 기간 코퍼스의 실제 문장이다. 근거와 수치는 config/us_stock_extraction.py 머리말의 같은 날짜 절.
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "현대건설 일감도 늘어날까..美 원전 파트너 페르미, 텍사스 전력 인프라 11GW→17GW로 확대",
+        "전력 & AIDC: AMD와의 개발 지원 계약 소식에 페르미(+14.46%)가 폭등했고",
+        "현대건설(HDEC)은 하반기 팔리세이즈, 불가리아(2차 ESC), 페르미아메리카(텐서웨이브 임대계약 체결로 EPC수주에 근접)",
+        "» Fermi(+14.5%) AMD와 신용지원 계약 및 최대 650MW 전력 인프라 확장 협력 발표.",
+        "1단계 임대계약 종결 - Fermi America는 Texas Project Matador의 발전용량을 기존 11GW에서 17GW로",
+    ],
+)
+def test_fermi_company_stays(us_tagger, text):
+    assert "FRMI" in us_tagger(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "보유 자금은 총 2억 7230만 달러로 집계됐다. 페르미 왕(Fermi Wang) 암바렐라 사장 겸 최고경영자(CEO)는",
+        "1987년 국민투표 이후 Caorso와 Enrico Fermi 원전을 영구정지했던 이탈리아가",
+        "엔리코 페르미가 설계한 시카고 파일-1",
+        "Fermilab은 CERN 과 함께",
+        # 퍼미언 분지 · 퍼미언 리소시스(PR)도 '페르미안'으로 적는다. 뒤에 한글이 붙어 경계에서 빠진다.
+        "에너지: 레인지 리소시스, 페르미안 리소시스, 타르가 리소시스, 엑슨모빌",
+        "페르미안 분지 등에서 석유 및 천연가스 탐사와 개발 사업을 영위하고 있다.",
+    ],
+)
+def test_other_fermis_are_not_frmi(us_tagger, text):
+    assert "FRMI" not in us_tagger(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "스페이스X(+1.22%)는 통신사인 에코스타(+1.33%)의 무선 서비스 사업부인 부스트 모바일을 인수하거나",
+        "제목 : 모건스탠리, 에코스타 '비중확대' 추천…\"스페이스X 지분 할인 효과\"",
+        "▶ AT&T closes $23 billion deal to acquire spectrum from Echostar",
+        "• ASTS (-11.33%): 워싱턴포스트, SpaceX가 EchoStar의 Boost Mobile 인수 협상 중이라고 보도",
+    ],
+)
+def test_echostar_is_echo(us_tagger, text):
+    assert "ECHO" in us_tagger(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "페덱스(FDX)는 실적 개선과 가이던스 상향에도 시간외 하락.",
+        "제목 : [실적공시] 페덱스, 실적·가이던스 호조에도 시간외 하락",
+        "📈 FedEx (+40) 매출 12% 증가, EPS 예상치 상회",
+        "▶️FedEx margins decline, shares fall despite bigger than expected quarterly profit",
+    ],
+)
+def test_fedex_company_stays(us_tagger, text):
+    assert "FDX" in us_tagger(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "제목 : 페덱스 프레이트, 독립법인 전환 후 첫 4개월 매출 33억 달러…전년比 9.2% 증가 *이데일리FX*",
+        "[페덱스 프레이트(+14.9%)] 독립 상장 이후 첫 실적 발표.",
+        "▶FedEx Freight forecasts quarterly earnings above estimates on improving volumes",
+        "[+14.9%] (18.8B)FedEx Freight Holding Company - 화물 운송 및 물류 서비스 제공업체",
+        "FEDEX FREIGHT HOLDING CO 지분 신규 편입",
+    ],
+)
+def test_fedex_freight_is_not_fdx(us_tagger, text):
+    assert "FDX" not in us_tagger(text)
+
+
+def test_honorific_ssi_is_not_sea():
+    # '씨'는 사전에 넣지 않았다(SCAN_IGNORE). 넣으면 사람 이름 뒤 존칭이 전부 Sea Ltd 가 된다.
+    from config.us_stock_extraction import SCAN_IGNORE, US_NAMES
+
+    assert "씨" not in US_NAMES and "SE" in SCAN_IGNORE

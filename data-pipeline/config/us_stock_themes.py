@@ -58,7 +58,7 @@ US_THEMES: dict[str, list[str]] = {
     "전기차·자율주행": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "STLA", "UBER", "CVNA", "LI", "APTV"],
     "전력·원자력": [
         "SMR", "OKLO", "CEG", "VST", "NRG", "NEE", "GEV", "PWR",
-        "ETN", "CCJ", "HON", "FSLR", "ENPH", "BE",
+        "ETN", "CCJ", "HON", "FSLR", "ENPH", "BE", "FRMI",
     ],
     # 스페이스X 가 맨 앞인 이유는 이 테마에서 가장 많이 불려서다 — 전량 코퍼스
     # 216,020건에서 언급 2,673회로 사전 전체 5위다(2026-08-31 실측). 2026-06-12 나스닥
@@ -67,7 +67,9 @@ US_THEMES: dict[str, list[str]] = {
     # ⚠️ 이걸로 11개가 됐다. MDD 바스켓은 자기 자신을 빼고 앞에서 열까지라
     #    (US_MDD_PEER_MAX) 아직 잘리는 종목이 없다 — 열둘째를 더하는 순간 맨 뒤가
     #    조용히 빠진다.
-    "우주·방산": ["SPCX", "RKLB", "ASTS", "RDW", "LMT", "RTX", "NOC", "GD", "HII", "BA", "AXON"],
+    # ⚠️ 에코스타(이슈 #808)로 12개가 됐다. MDD 바스켓은 자기를 빼고 앞에서 열까지라 맨 뒤 하나가 빠진다. 그래서 30일 언급이
+    #    가장 적은 레드와이어(6건)를 맨 뒤로 옮겼다(에코스타 34 · 액손 12 · 제너럴다이내믹스 12, 2026-11-09).
+    "우주·방산": ["SPCX", "RKLB", "ASTS", "LMT", "RTX", "NOC", "GD", "HII", "BA", "AXON", "ECHO", "RDW"],
     # MRNA 를 1위가 아니라 2위에 둔 이유: 코퍼스 전체로는 477건으로 LLY(422)보다 많은데
     # 그중 341건이 08-19~20 이틀치(머크와의 흑색종 백신 3상 성공)다. 이 순서는 카드가
     # 쓰는 '대표성' 순서라, 이틀짜리 급등으로 맨 앞자리를 주지 않는다.
@@ -83,7 +85,7 @@ US_THEMES: dict[str, list[str]] = {
         "KO", "WMT", "COST", "SBUX", "MCD", "NKE", "CMG", "PEP", "PM",
         "DIS", "DKNG", "ORLY", "DECK", "LUV", "DHI", "PLD", "WELL",
         "CPNG", "MELI", "URI", "ABNB", "BKNG", "CAT", "VZ",
-        "HD", "BBY", "DLTR", "EBAY", "LULU", "KR", "CCL", "SPOT", "SKYD", "DASH", "CHRW",
+        "HD", "BBY", "DLTR", "EBAY", "LULU", "KR", "CCL", "SPOT", "SKYD", "DASH", "CHRW", "FDX",
     ],
     "에너지·원자재": ["XOM", "CVX", "KMI", "VLO", "FCX", "NEM", "NUE", "ALB"],
     # 아직 작지만(합쳐 170회) 뜰 때 한꺼번에 뜨는 묶음이라 따로 둔다.
