@@ -14,8 +14,17 @@
 
   1) 표에 없는 종목(새 상장 · 처음 실행)
   2) KIND 홈페이지 도메인이 표와 달라진 종목
-  3) RECHECK_DAYS 넘게 안 물어본 종목(오래된 것부터) — logo.dev 가 나중에 로고를 얻기도 한다
+  3) RECHECK_DAYS 넘게 안 물어본 종목(오래된 것부터) — logo.dev 가 나중에 로고를 얻기도 한다.
+     자를 상자가 있는 행은 CROP_RECHECK_DAYS 만 지나도 다시 묻는다(아래).
 처음엔 국장 2,800종목 남짓이라 두 실행쯤 걸리고, 그 뒤로는 실행마다 수십 종목이다.
+
+## 자를 상자는 그 그림에만 맞는다(2026-11-09)
+
+상자는 그날 받은 그림 안의 비율이다. logo.dev 는 같은 티커의 그림을 예고 없이 바꾼다 — 10-18 에 상자를 잰 527종목 가운데
+3주 만에 159곳이 긴 글자 로고에서 정사각형 심볼로 바뀌었고(NHN 'NHN' 글자 → 'N'), 옛 상자를 새 그림에 대니 심볼의 한 조각
+(N 의 왼쪽 획 끝 · 검은 막대)이나 빈 칸이 나갔다. 긴 로고로 남은 곳도 28곳은 배치가 바뀌어 상자가 글자 가운데를 잘랐다.
+그래서 상자 있는 행은 일주일마다 다시 재고, 손 상자(CROP_OVERRIDE)도 지금 그림이 긴 로고가 아니면 쓰지 않는다(crop_for).
+/api/logo 도 상자가 지금 그림과 안 맞으면 자르지 않는다(lib/logo-image.ts cropFits) — 이 잡이 다시 재기 전까지의 몫이다.
 
 ## 거르는 것
 
@@ -79,6 +88,9 @@ CROP_BLUR_MAX = 0.02
 PACE_SEC = 0.8
 MAX_PROBES = 1500
 RECHECK_DAYS = 60
+# 자를 상자가 있는 행(긴 글자 로고)은 이만큼만 지나도 다시 묻는다 — logo.dev 가 그림을 바꾸면 상자가 엉뚱한 데를 자른다(위 독스트링).
+# 2026-11-09 상자 있는 행 527 → 하루 75곳 남짓 · 곳마다 그림 둘(128 · 512)이라 하루 150건쯤이다.
+CROP_RECHECK_DAYS = 7
 GENERIC_MIN = 3
 MARKETS = {"KOSPI": "KS", "KOSDAQ": "KQ"}
 # 홈페이지 칸에 블로그 · SNS 가 적힌 회사가 있다. 그 도메인으로 물으면 플랫폼 로고가 온다.
@@ -156,6 +168,7 @@ def pick_targets(
     """
     fresh, changed, stale = [], [], []
     cutoff = now - timedelta(days=RECHECK_DAYS)
+    crop_cutoff = now - timedelta(days=CROP_RECHECK_DAYS)
     for s in stocks:
         code = s["code"]
         if code in EXCLUDE or code in OWN_LOGO or (only is not None and code not in only):
@@ -175,12 +188,17 @@ def pick_targets(
             changed.append(t)  # 우리 그림을 두었다가 OWN_LOGO 에서 지운 종목 — 다시 묻는다
         elif code in PREFER_DOMAIN and row.get("source") != "domain":
             changed.append(t)  # 손으로 도메인 그림을 고른 종목 — 다시 묻는다
-        elif recheck_all or only is not None or _parse_ts(row.get("checked_at")) < cutoff:
+        elif recheck_all or only is not None or _parse_ts(row.get("checked_at")) < (crop_cutoff if _has_crop(row) else cutoff):
             stale.append((_parse_ts(row.get("checked_at")), t))
     stale.sort(key=lambda x: x[0])
     cap = {s["code"]: s.get("market_cap") or 0 for s in stocks}
     fresh.sort(key=lambda t: -cap[t["code"]])
     return (fresh + changed + [t for _ts, t in stale])[:limit]
+
+
+def _has_crop(row: dict) -> bool:
+    """logo.dev 그림을 상자로 잘라 쓰는 행인가(우리 그림 own 은 그림이 안 바뀌어 뺀다)."""
+    return row.get("source") in ("ticker", "domain") and bool(row.get("crop"))
 
 
 def _parse_ts(v: str | None) -> datetime:
@@ -368,10 +386,18 @@ def probe(path: str, key: str, measure: bool = False) -> tuple[int, str | None, 
 
 def crop_for(code: str, body: bytes | None, path: str, key: str) -> list[float] | None:
     """화면에 쓸 그림이 가로로 긴 로고면 잘라 쓸 상자, 아니면 [](자르지 않는다). 손 설정(CROP_OVERRIDE)이 먼저다.
-    긴 로고면 SHAPE_SIZE 그림을 한 번 더 받아 첫 덩어리를 잰다(common/logo_shape.piece_box). 못 재면 None — 다음 실행에 다시."""
-    if code in CROP_OVERRIDE:
-        return CROP_OVERRIDE[code]
+    긴 로고면 SHAPE_SIZE 그림을 한 번 더 받아 첫 덩어리를 잰다(common/logo_shape.piece_box). 못 재면 None — 다음 실행에 다시.
+
+    손 상자도 그 그림을 보고 적은 것이다. 지금 그림이 긴 로고가 아니면(logo.dev 가 심볼로 바꿈) 쓰지 않고 [] 를 주며, 설정에서
+    지우라고 로그를 남긴다(2026-11-09 유진테크 · 풍산 · 인바디 · 레이크머티리얼즈 · SK오션플랜트의 손 상자가 심볼 한 조각을 잘랐다).
+    그림을 못 읽으면 손 상자를 그대로 쓴다."""
     wide = is_wide(body) if body else None
+    if code in CROP_OVERRIDE:
+        box = CROP_OVERRIDE[code]
+        if box and wide is False:
+            print(f"[로고] {code} 손 상자가 지금 그림과 안 맞습니다(긴 로고가 아님) — 자르지 않습니다. config/stock_logo_shape.py CROP_OVERRIDE 에서 지울 것")
+            return []
+        return box
     if wide is None:
         return None
     if not wide:
@@ -508,13 +534,14 @@ def main() -> None:
             )[: max(0, limit - len(targets))]
             for r in todo:
                 c = r["code"]
-                if c in CROP_OVERRIDE:
-                    crop = CROP_OVERRIDE[c]
+                if c in CROP_OVERRIDE and not CROP_OVERRIDE[c]:
+                    crop = []
                 else:
+                    # 손 상자도 그림을 받아 본다 — 지금 그림이 긴 로고가 아니면 crop_for 가 [] 를 준다(손 상자를 다시 얹지 않는다).
                     st, body = fetch_logo(logo_path(r), key)
                     time.sleep(PACE_SEC)
                     crop = crop_for(c, body if st == 200 else None, logo_path(r), key) if st in (200, 404) else None
-                if crop is None:
+                if crop is None or crop == r.get("crop"):
                     continue
                 rows[c] = written[c] = {**r, "crop": crop}
                 counts["상자" if crop else "상자 없음"] += 1

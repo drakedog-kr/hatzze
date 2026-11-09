@@ -1,5 +1,5 @@
 """refresh_stock_logo_sources — 국장 종목 로고를 어떤 길로 물을지 판정하는 순수 함수들(2026-10-18)."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import refresh_stock_logo_sources as R
 
@@ -177,6 +177,44 @@ def test_crop_for_prefers_manual_box(monkeypatch):
     assert called == []  # 손 설정이면 logo.dev 에 다시 묻지 않는다
     # 그림을 못 읽으면 None(다음 실행에 다시)
     assert R.crop_for("005930", None, "ticker/005930.KS", "k") is None
+
+
+def _png(w: int, h: int) -> bytes:
+    """흰 바탕 512px 에 w × h 검은 상자 하나(가운데)."""
+    import io
+
+    import pytest
+
+    pytest.importorskip("PIL")
+    from PIL import Image, ImageDraw
+
+    im = Image.new("RGB", (512, 512), "white")
+    ImageDraw.Draw(im).rectangle([256 - w // 2, 256 - h // 2, 256 + w // 2, 256 + h // 2], fill="black")
+    out = io.BytesIO()
+    im.save(out, "PNG")
+    return out.getvalue()
+
+
+def test_crop_for_skips_manual_box_when_picture_is_no_longer_wide(monkeypatch):
+    # 손 상자는 적을 때 본 긴 로고에만 맞는다. logo.dev 가 정사각형 심볼로 바꾸면 그 상자는 심볼 한 조각을 자른다(2026-11-09 풍산 · 인바디).
+    monkeypatch.setattr(R, "CROP_OVERRIDE", {"103140": [0.14, 0.44, 0.2, 0.13]})
+    monkeypatch.setattr(R, "fetch_logo", lambda *a, **k: (_ for _ in ()).throw(AssertionError("다시 묻지 않는다")))
+    assert R.crop_for("103140", _png(200, 200), "ticker/103140.KS", "k") == []
+    assert R.crop_for("103140", _png(400, 100), "ticker/103140.KS", "k") == [0.14, 0.44, 0.2, 0.13]
+
+
+def test_pick_targets_rechecks_cropped_rows_weekly():
+    # 자를 상자가 있는 행은 CROP_RECHECK_DAYS 만 지나도 다시 묻는다 — logo.dev 가 그림을 바꾸면 상자가 엉뚱한 데를 자른다(NHN, 2026-11-09).
+    week_ago = (NOW - timedelta(days=R.CROP_RECHECK_DAYS + 1)).isoformat()
+    stocks = [{"code": c, "market": "KOSPI"} for c in ("000001", "000002", "000004")]
+    existing = {
+        "000001": {"domain": None, "source": "ticker", "crop": [0.1, 0.4, 0.1, 0.1], "checked_at": week_ago},  # 상자 · 일주일 넘음
+        "000002": {"domain": None, "source": "ticker", "crop": [], "checked_at": week_ago},  # 상자 없음 — 60일 주기
+        "000004": {"domain": None, "source": "ticker", "crop": [0.1, 0.4, 0.1, 0.1], "checked_at": NOW.isoformat()},  # 방금 잼
+    }
+    domains = {c: None for c in existing}
+    got = R.pick_targets(stocks, existing, domains, NOW, 10)
+    assert [t["code"] for t in got] == ["000001"]
 
 
 def test_logo_path_matches_route():
