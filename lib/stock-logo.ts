@@ -125,9 +125,11 @@ export const LOGO_TICKER_RE = /^[A-Z0-9][A-Z0-9.\-]{0,11}$/;
  *       24장이 되돌린 판정으로 CDN 에 들어갔다. ⚠️ 라우트 캐시 비우기(revalidatePath)로는 CDN 의 이 응답이 안 버려진다 — 주소를 바꾼다.
  *  10 — 넓은 로고를 칸 폭 끝까지 얹고 KT&G 상자를 걷음(같은 날). 판 9 그림(KT&G 첫 글자 K)이 브라우저에 7일 남는다.
  *  11 — 미장 긴 글자 로고를 자르기 시작(2026-10-21 · US_LOGO_CROP). 판 10 의 긴 글자 그림(화면이 배지로 돌림)이 브라우저에 7일 남는다.
+ *  12 — 그림과 안 맞는 자를 상자를 쓰지 않기 시작(2026-11-09 · lib/logo-image.ts cropFits). logo.dev 가 긴 로고를 심볼로 바꾼 종목에
+ *       옛 상자를 대 심볼 한 조각(NHN 의 검은 막대)이 나간 그림이 브라우저에 7일 남는다.
  * ⚠️ 판정표가 바뀌어도(파이프라인이 새 길 · 상자를 찾음) 같은 주소라 브라우저는 최대 7일 옛 그림을 쓴다. 큰 규칙을 바꿀 때만 올린다.
  */
-export const LOGO_PATH_VERSION = 11;
+export const LOGO_PATH_VERSION = 12;
 
 export function stockLogoPath(ticker: string, size: LogoSize): string {
   return `/api/logo/${encodeURIComponent(ticker)}?s=${size}&v=${LOGO_PATH_VERSION}`;

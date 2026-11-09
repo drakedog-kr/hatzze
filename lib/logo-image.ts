@@ -222,6 +222,69 @@ export async function svgToPng(body: Buffer): Promise<Buffer> {
   return sharp(body, { density }).png().toBuffer();
 }
 
+/**
+ * 판정표의 자를 상자가 이 그림에 맞는가. 상자는 파이프라인이 **그날 받은 그림**에서 잰 비율이라(data-pipeline/common/logo_shape.py
+ * piece_box), logo.dev 가 그림을 바꾸면 엉뚱한 데를 자른다. 2026-11-09 상자 있는 국장 527종목 중 159곳은 긴 글자 로고가 정사각형
+ * 심볼로 바뀌어 옛 상자가 심볼 한 조각(NHN 의 N 왼쪽 획 끝 · 검은 막대)이나 빈 칸을 잘라 냈다. 파이프라인이 다시 재기 전까지는
+ * 여기서 거른다 — 맞지 않으면 자르지 않고 그림 전체를 얹는다.
+ *
+ * 둘 다 맞아야 쓴다.
+ *   - 그림 전체가 아직 가로로 긴 로고다(잉크 상자 가로 ÷ 세로 ≥ CROP_MIN_ASPECT). 파이프라인은 1.6 넘는 그림에만 상자를 둔다.
+ *   - 상자 안에 로고가 꽉 차 있다(상자 안 잉크 상자 넓이 ÷ 상자 넓이 ≥ CROP_MIN_FILL). 상자는 첫 덩어리를 꼭 맞게 감싼 것이라
+ *     그림이 그대로면 1 에 가깝다. 빈 상자 · 글자 사이를 자른 상자는 작다.
+ * 잉크는 파이프라인과 같은 셈이다(불투명하고 흰색에서 CROP_INK 넘게 어두운 채널) — 옅은 바탕 동그라미(삼익악기)를 로고로 세지 않는다.
+ * 2026-11-09 실측(512px · 같은 셈): 맞는 상자 336곳 가로세로 1.61 이상 · 채움 0.93 이상(미장 손 상자 4곳 4.4 이상 · 1.0),
+ * 깨진 188곳 중 166곳이 걸린다. 남는 22곳은 긴 로고 그대로 배치만 바뀐 것이라 파이프라인이 일주일 안에 다시 잰다.
+ * 우리 그림(source = own)에는 쓰지 않는다 — 그 그림은 안 바뀌고, 세로로 쌓인 로고에서 심볼만 고른 손 상자가 있다.
+ */
+export const CROP_MIN_ASPECT = 1.4;
+export const CROP_MIN_FILL = 0.8;
+/** data-pipeline/common/logo_shape.py INK 와 같다. */
+const CROP_INK = 40;
+
+export async function cropFits(input: Buffer, crop: [number, number, number, number]): Promise<boolean> {
+  let raw: Raw;
+  try {
+    const { data, info } = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    raw = { data, width: info.width, height: info.height };
+  } catch {
+    return false;
+  }
+  const W = raw.width;
+  const H = raw.height;
+  const whole = pipelineInkBox(raw, { left: 0, top: 0, width: W, height: H });
+  if (!whole || whole.width < CROP_MIN_ASPECT * whole.height) return false;
+  const left = Math.min(W - 1, Math.max(0, Math.round(crop[0] * W)));
+  const top = Math.min(H - 1, Math.max(0, Math.round(crop[1] * H)));
+  const area = {
+    left,
+    top,
+    width: Math.max(1, Math.min(W - left, Math.round(crop[2] * W))),
+    height: Math.max(1, Math.min(H - top, Math.round(crop[3] * H))),
+  };
+  const piece = pipelineInkBox(raw, area);
+  return !!piece && piece.width * piece.height >= CROP_MIN_FILL * area.width * area.height;
+}
+
+/** 영역 안 잉크(파이프라인 셈)를 꼭 맞게 감싼 상자. 잉크가 없으면 null. */
+function pipelineInkBox({ data, width }: Raw, area: Box): Box | null {
+  const dark = 255 - CROP_INK;
+  let x0 = Infinity;
+  let x1 = -1;
+  let y0 = Infinity;
+  let y1 = -1;
+  for (let y = area.top; y < area.top + area.height; y++)
+    for (let x = area.left; x < area.left + area.width; x++) {
+      const i = (y * width + x) * 4;
+      if (data[i + 3] < 128 || Math.min(data[i], data[i + 1], data[i + 2]) >= dark) continue;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+  return x1 < 0 ? null : { left: x0, top: y0, width: x1 - x0 + 1, height: y1 - y0 + 1 };
+}
+
 /** 그림을 비율만 지켜 size × size 칸에 채운다(바탕을 칠한 그림 · 다듬지 못한 그림). */
 export function containWebp(body: Buffer, size: number): Promise<Buffer> {
   return sharp(body).resize(size, size, { fit: "contain", background: TRANSPARENT }).webp({ quality: 90 }).toBuffer();

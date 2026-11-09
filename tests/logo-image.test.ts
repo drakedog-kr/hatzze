@@ -8,7 +8,7 @@ import { describe, it } from "node:test";
 
 import sharp from "sharp";
 
-import { FIT, P, SVG_RASTER, fitLogoWebp, isSvg, svgToPng } from "../lib/logo-image.ts";
+import { FIT, P, SVG_RASTER, cropFits, fitLogoWebp, isSvg, svgToPng } from "../lib/logo-image.ts";
 
 /** 로고가 있는 그림만 넣으므로 늘 그림이 나와야 한다. */
 async function fit(...args: Parameters<typeof fitLogoWebp>): Promise<Buffer> {
@@ -193,6 +193,38 @@ describe("fitLogoWebp", () => {
     assert.equal(got.width, 64);
     assert.ok(Math.abs(got.w - (FIT * 64) / Math.cbrt(2)) <= 2, `조각 한 변 ${got.w}`);
     assert.ok(got.reach <= FIT + 0.04);
+  });
+});
+
+describe("cropFits — 판정표 상자가 지금 그림에 맞는가", () => {
+  const INK = { r: 20, g: 20, b: 20, alpha: 1 };
+  // 흰 바탕에 글자 넷이 나란한 긴 로고(512px). 상자는 첫 글자에 꼭 맞다.
+  const WORD = [40, 130, 220, 310].map((left) => ({ w: 60, h: 80, left, top: 216, color: INK }));
+  const FIRST: [number, number, number, number] = [40 / 512, 216 / 512, 60 / 512, 80 / 512];
+
+  it("그림이 그대로면 쓴다", async () => {
+    assert.equal(await cropFits(await canvas(512, WHITE, WORD), FIRST), true);
+    assert.equal(await cropFits(await canvas(512, CLEAR, WORD), FIRST), true);
+  });
+
+  it("긴 로고가 정사각형 심볼로 바뀌면 쓰지 않는다 — 옛 상자가 심볼 한 조각을 자른다(NHN, 2026-11-09)", async () => {
+    // 10-18 의 'NHN' 글자 로고에서 잰 첫 글자 상자와 지금의 'N' 하나
+    const symbol = await canvas(512, WHITE, [{ w: 230, h: 270, left: 140, top: 120, color: INK }]);
+    assert.equal(await cropFits(symbol, [0.1758, 0.4238, 0.1309, 0.1523]), false);
+  });
+
+  it("상자에 로고가 안 차면(빈 데 · 글자 사이를 자름) 쓰지 않는다", async () => {
+    const word = await canvas(512, WHITE, WORD);
+    assert.equal(await cropFits(word, [400 / 512, 40 / 512, 60 / 512, 60 / 512]), false);
+    assert.equal(await cropFits(word, [70 / 512, 216 / 512, 55 / 512, 80 / 512]), false); // 첫 글자 반쪽과 틈
+    // 두 글자에 걸친 상자는 잉크가 상자를 채워 여기서는 못 거른다 — 긴 로고 그대로 배치만 바뀐 곳은 파이프라인이 일주일 안에 다시 잰다.
+    assert.equal(await cropFits(word, [70 / 512, 216 / 512, 90 / 512, 80 / 512]), true);
+  });
+
+  it("옅은 바탕 동그라미는 로고로 세지 않는다 — 동그라미 속 긴 글자의 첫 글자 상자를 쓴다(삼익악기)", async () => {
+    const rects = WORD.map((b) => `<rect x="${b.left}" y="${b.top}" width="${b.w}" height="${b.h}" fill="rgb(20,20,20)"/>`).join("");
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#fff"/><circle cx="256" cy="256" r="250" fill="rgb(243,234,227)"/>${rects}</svg>`;
+    assert.equal(await cropFits(await sharp(Buffer.from(svg)).png().toBuffer(), FIRST), true);
   });
 });
 
