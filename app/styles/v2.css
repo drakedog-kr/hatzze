@@ -40,6 +40,9 @@
   --t-flat: rgba(7, 25, 76, 0.08);
   --t-base: rgba(2, 32, 59, 0.17);
   container: kd / inline-size;
+  /* 본문 안 z-index(쪽지 50 · 구간 목록 40 · 말풍선 30)를 이 묶음 안에 가둔다. container-type 은 쌓임 맥락을 만들지 않아서(Chrome 157 실측 —
+     z-index 50 자식이 묶음 밖 fixed 38 위에 그려졌다) 쪽지가 열린 폰 메뉴(38)와 고정 탑바(40) 위로 올라왔다(2026-11-11). */
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -99,7 +102,7 @@
 /* 폰 메뉴 판은 제자리(fixed · 좌우 8)를 지킨다 — relative 가 이기면 폭 390 그대로 오른쪽으로 8px 넘쳤다. fixed 도 쪽지 슬롯의 기준 상자다. */
 .v2-has-hint:not(.hz-menu-panel) { position: relative; }
 /* 층은 본문 안 맨 앞(50) — 시장 브리핑 구간 목록(.hz-dist-pop 40) · 말풍선(.hz-tip::after 30) 뒤에 깔려 쪽지가 팝오버에 가렸다(2026-10-05 지적).
-   본문 묶음(.v2-kd 의 container-type 이 쌓임 맥락을 만든다) 안의 값이라 사이드바 · 메뉴 위로는 안 올라간다. */
+   본문 묶음(.v2-kd 의 isolation: isolate 가 쌓임 맥락을 만든다) 안의 값이라 사이드바 · 메뉴 위로는 안 올라간다. */
 .v2-hint-slot { position: absolute; z-index: 50; pointer-events: none; max-width: calc(100% - 28px); }
 .v2-hint-slot[hidden] { display: none; }
 .v2-hint {
@@ -156,7 +159,8 @@
 .v2-hint-slot.is-above .v2-hint::before { top: auto; bottom: -5px; border-bottom: 0; border-top: 5px solid var(--t-ink); }
 /* 오른쪽에 띄우는 쪽지(at="right" · 사이드바 새 소식) — 화면 좌표(fixed)라 사이드바의 스크롤 영역에 안 잘리고 본문 위로 나온다.
    꼭지는 왼쪽 가운데에서 가리킨 줄을 향한다. 폭은 본문 쪽 여유를 보고 300 으로 묶는다(두 줄까지). */
-.v2-hint-slot.is-right { position: fixed; z-index: 60; max-width: 300px; }
+.v2-hint-slot.is-right { position: fixed; z-index: 45; max-width: 300px; }
+/* ↑ 60 이던 땐 검색 판(⌘K)과 확대 판의 흐린 배경(z-index 50) 위에 쪽지만 선명하게 남았다(2026-11-11 실측). 본문(.v2-kd 는 쌓임 맥락)보다는 위, 띄운 판보다는 아래. */
 /* 본문 밖(사이드바 · 폰 메뉴)의 쪽지 — 쪽지 색(--t-ink · --t-card)은 .v2-kd 아래에만 있어서, 밖에선 바탕이 비어 투명한 글자만 떴다
    (2026-10-06 "너무 흐리다"). 본문 쪽지와 같은 값을 여기서도 건다. */
 .hz-sidebar .v2-hint-slot,
@@ -997,6 +1001,10 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 }
 /* 시장 브리핑 셀 안쪽 여백 — 14 + 셀 선 1 = 글 시작선 15(카더라 · MDD · 배당 모듈과 같은 선). 큰 숫자 크기는 카드 코드가 직접 v2 눈금(20)을 쓴다. */
 .v2-bf { --hz-card-pad: 14px; }
+/* 홈 숫자색을 다른 화면과 같은 값으로(2026-11-11) — 카드는 온도 잉크(저온 #2371b2 · 상온 #1a72bd · 고온 · 초고온 #cd3945)를, 햇쩨 지수 칸과
+   '평소 대비' 숫자는 v2 내림 · 오름(#1466e2 · #d3212f)을 써서 이 화면만 숫자 파랑이 세 값 · 빨강이 두 값 · 차트 선 파랑이 네 값이었다.
+   어느 숫자가 파랑 · 빨강인지(50 을 경계로 한 온도)는 그대로고 값만 한 벌이 된다. 구간을 칠하는 면(--c-band-* · --c-dist-*)은 안 건드린다. */
+.v2-bf { --c-cold: var(--t-down); --c-neutral: var(--t-down); --c-hot: var(--t-up); --c-mania: var(--t-up); }
 
 /* 다크의 빨간 글자 — 카드 안 알약은 옅은 빨강 면 위에 서는데 --t-up(#f76b7c)이면 3.84 였다. 한 단 밝힌다. */
 [data-theme="dark"] .v2-bf,
@@ -1112,7 +1120,7 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 /* 칸 안 고온색 글자(여윳돈 '1.7배 ↑' 등)도 같은 이유 — 라이트 --c-hot(#cd3945)은 이 바탕 위 4.37 이었다(2026-10-08 프로덕션 점검).
    칸 안에서만 v2 오름 빨강(4.6)으로 바꾼다. 다크는 두 값이 같다.
    중립 파랑(코인 칸 갈림 막대 '+1.8%' 등)도 이 바탕 위 4.45 였다 — 한 단 짙은 파랑(--t-down-deep, 4.9)으로. */
-.v2-bf .hz-cards > .hz-cell-hot { --c-hot: var(--t-up); --c-mania: var(--t-up); --c-neutral: var(--t-down-deep); }
+.v2-bf .hz-cards > .hz-cell-hot { --c-hot: var(--t-up); --c-mania: var(--t-up); --c-neutral: var(--t-down-deep); --c-cold: var(--t-down-deep); }
 .v2-bf .hz-cell-icon,
 .v2-bf .hz-cell-desc,
 .v2-bf .hz-cell-foot { display: none !important; }
@@ -1138,6 +1146,10 @@ html[data-sidebar="icon"] .hz-sidebar .hz-side-search { justify-content: center;
 .v2-etf-hero .hz-big-unit { font-size: 13px; font-weight: 500; }
 .v2-bf .hz-big-sub { font-size: 12px !important; font-weight: 500 !important; color: var(--t-ink3) !important; }
 .v2-bf .hz-cell-graphic { min-height: 0; gap: 12px !important; }
+/* 목록 막대(shadcn.css .hz-hbar-* — 지금은 이 화면만 쓴다)도 카드 안 막대 한 벌(app/home/parts.tsx BAR_H · BAR_R)과 같은 굵기 8 · 둥근 끝으로(2026-11-11). */
+.v2-bf .hz-hbar-track { border-radius: 99px; }
+.v2-bf .hz-hbar-md { height: 8px; }
+.v2-bf .hz-hbar-fill { border-radius: 99px; }
 /* 같은 줄 셀은 키가 같다 — 짧은 셀은 바닥이 비었다(풋/콜 72px · 안전장치 57px). 마지막 그림(막대 · 차트 · 목록)을 셀 바닥에 붙여
    한 줄 넷의 그림 바닥선이 맞게 한다. 이름 · 큰 숫자는 위에, 그림은 아래 — 줄이 표처럼 읽힌다. */
 .v2-bf .hz-cell-graphic > :last-child:not(:first-child) { margin-top: auto; margin-bottom: 0; }
@@ -4087,3 +4099,85 @@ a.v2-etf-row:focus-visible { outline-offset: -2px; }
   .v2-etfd .v2-sk-id h1 { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
 }
 
+/* ── 눌림 반응(2026-11-11) ──────────────────────────────────────────────────────────────────────────────
+   누르는 동안 줄 · 칩 · 단추가 호버와 같은 면(--t-tint)으로 칠해진다. 이 저장소의 :hover 규칙은 165개인데 :active 는 둘뿐이라, 호버가 없는 폰에선
+   누른 줄에 브라우저 기본 반짝임만 서고 화면이 넘어갈 때까지 눌렸는지가 우리 꼴로 안 보였다(방문의 2/3 가 폰이다).
+   기본 반짝임(-webkit-tap-highlight-color)은 이 목록에서만 끈다 — 눌림 면이 없는 것(문장 속 링크 등)은 그 반짝임이 유일한 반응이라 남긴다.
+   고른 줄(.is-on · aria-pressed · aria-current)은 제 면(옅은 파랑)을 지킨다. 누르는 줄 · 칩을 새로 만들면 호버 규칙과 함께 여기도 한 줄 더할 것. */
+.v2-cover-go,
+.v2-more,
+a.v2-tr,
+a.v2-tsh-row,
+a.v2-ev-row,
+.v2-md-case[role="button"],
+button.v2-dd-row,
+.v2-dv .dv-cal-cell,
+.v2-dv .dv-chip,
+.v2-dv-goal-presets > button,
+.v2-dv-bk-row,
+.v2-dv-bk-st,
+.v2-tm-pill,
+.v2-tm .hz-tm-tile,
+.v2-tm-risertbl :is(.v2-td-stock, .v2-td-text),
+a.v2-pv-kr,
+a.v2-np-tr,
+.v2-nt-pager button,
+.v2-in-row,
+.v2-in .hz-trow,
+.v2-in .hz-more-btn,
+a.v2-isd-row,
+.v2-isd-chart .v2-mod-aside .hz-seg > a,
+.v2-etf-rail-row.is-link,
+.v2-etf-more > button,
+a.v2-etf-row,
+.hz-menu-panel .hz-nav-item,
+.hz-sidebar .hz-nav-item { -webkit-tap-highlight-color: transparent; }
+.v2-cover-go:active,
+.v2-more:active,
+a.v2-tr:active,
+a.v2-tsh-row:active,
+a.v2-ev-row:active,
+.v2-md-case[role="button"]:not(.is-on):active,
+button.v2-dd-row:active,
+.v2-dv .dv-cal-cell:not([aria-pressed="true"]):active,
+.v2-dv .dv-chip:active,
+.v2-dv-goal-presets > button:active,
+.v2-dv-bk-row:not(.is-on):active,
+.v2-dv-bk-st:active,
+.v2-tm-pill:active,
+.v2-tm-risertbl .v2-tr:has(> :is(.v2-td-stock, .v2-td-text):active),
+a.v2-pv-kr:active,
+a.v2-np-tr:active,
+.v2-nt-pager button:active,
+.v2-in-row:active,
+.v2-in .hz-trow:active,
+.v2-in .hz-more-btn:active,
+a.v2-isd-row:active,
+.v2-isd-chart .v2-mod-aside .hz-seg > a:not([aria-current]):active,
+.v2-etf-rail-row.is-link:not(.is-on):active,
+.v2-etf-more > button:active,
+a.v2-etf-row:active { background: var(--t-tint); }
+.hz-menu-panel .hz-nav-item:not(.hz-nav-active):active,
+.hz-sidebar .hz-nav-item:not(.hz-nav-active):active { background: var(--sd-tint); }
+/* 지도 칸은 면색이 곧 자료라 바탕을 못 바꾼다 — 호버와 같은 덧칠(안쪽 그림자)로 누른 칸을 짚는다. */
+.v2-tm .hz-tm-tile:active { box-shadow: inset 0 0 0 100vmax rgba(14, 33, 54, 0.07); }
+[data-theme="dark"] .v2-tm .hz-tm-tile:active { box-shadow: inset 0 0 0 100vmax rgba(255, 255, 255, 0.08); }
+
+/* ── 종목 로고 테두리 · 폰 탑바 단추 · 폰 메뉴 쪽지 자리(2026-11-11) ──────────────────────────────────────────────────────────────────────
+   종목 로고 원에 가는 테두리 — 로고 판 색은 그림 가장자리에서 뽑는다(StockLogo 의 readBandColor). 바탕이 흰 로고는 판도 흰색이라 흰 카드 위에서
+   원이 안 보였다(10개 화면 로고 256개 중 55개 · 대비 1.0). 다크는 같은 이유로 2026-08 에 안쪽 고리를 뒀다(mobile.css) — 라이트의 짝이다.
+   ⚠️ outline 이다. img 의 inset box-shadow 는 그림 밑에 깔려, 판을 꽉 채운 흰 로고에선 안 보인다. 값은 --c-shadow-strong 과 같다(판 테두리보다 한 톨 진하게 — 22px 원이라 1.17 로는 안 읽혔다). */
+:root:not([data-theme="dark"]) .v2-kd .hz-stock-logo { outline: 1px solid rgba(3, 31, 63, 0.09); outline-offset: -1px; }
+
+/* 폰 탑바 단추(검색 · 테마 · 메뉴) — 회색 바탕 + 테두리 상자를 걷고 아이콘만 둔다. 38 상자 셋(내부자 종목 화면은 통화까지 넷)이 로고 옆에 나란히 서
+   화면 맨 위가 무거웠다. 크기(38)와 누르는 자리(44 · layout.css ::before)는 그대로다. 인라인 style 을 이기는 자리라 !important.
+   누르는 동안은 호버 면이 깔린다(위 '눌림 반응'과 같은 뜻). 통화 고르기(.hz-cur-switch)는 고르는 부품이라 꼴을 지킨다. */
+@media (max-width: 560px) {
+  .hz-topbar .hz-menu-btn,
+  .hz-topbar .hz-theme-btn { border-color: transparent !important; background: transparent !important; -webkit-tap-highlight-color: transparent; }
+  .hz-topbar .hz-menu-btn:active,
+  .hz-topbar .hz-theme-btn:active { background: var(--c-hover) !important; }
+  /* 폰 메뉴 안 구독 쪽지 — 판 바닥에 자리가 없어 줄 위로 뒤집히며 윗줄 '내부자 리포트' 글자를 덮었다. 쪽지가 떠 있는 동안만 판 바닥을 쪽지 키만큼 늘려 줄 아래에 세운다
+     (8 + 쪽지 34 + 틈 4 + 숨 8). 자리를 잡는 place() 가 판 바닥을 넘는지로 뒤집기를 정하므로 여백만 주면 된다. */
+  .hz-menu-panel:has(> .v2-hint-slot:not([hidden])) { padding-bottom: 54px; }
+}

@@ -2,7 +2,7 @@
 
 import { formatIndicatorValue, formatSampleCount, sentimentTone, shortDate } from "@/lib/format";
 import { C, MONO, R } from "../ui";
-import { overheatColor, Shell, TitleRow, Big, Foot, HeatFill, HeatScale, AreaChart, SplitStats, RefChart, RefRows } from "./parts";
+import { overheatColor, Shell, TitleRow, Big, Foot, HeatFill, HeatScale, AreaChart, SplitStats, RefChart, RefRows, BAR_H, BAR_R } from "./parts";
 import type { Pick } from "./parts";
 import { CARD_NAME } from "./Hero";
 import type { IconName } from "@/lib/icon-names";
@@ -35,17 +35,17 @@ function VsAvg({ ratio, knob, showScale = true }: { ratio: number; knob: string;
   const fillWidth = Math.abs(pos - 50);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-      <div style={{ position: "relative", height: 12 }}>
-        <div style={{ height: "100%", borderRadius: R.pill, background: C.track }} />
+      <div style={{ position: "relative", height: BAR_H }}>
+        <div style={{ height: "100%", borderRadius: BAR_R, background: C.track }} />
         <span
           style={{
             position: "absolute",
             left: `${fillLeft}%`,
             top: 0,
-            height: 12,
+            height: BAR_H,
             width: `${fillWidth}%`,
             background: knob,
-            borderRadius: R.pill,
+            borderRadius: BAR_R,
           }}
         />
         {/* 1배 눈금. 채움이 없는 줄(평소 수준)에서도 축의 기준이 어디인지 보여야 한다. */}
@@ -53,7 +53,7 @@ function VsAvg({ ratio, knob, showScale = true }: { ratio: number; knob: string;
           style={{
             position: "absolute",
             left: "50%",
-            top: -3,
+            top: (BAR_H - 18) / 2,
             height: 18,
             width: 1.5,
             background: C.marker,
@@ -66,7 +66,7 @@ function VsAvg({ ratio, knob, showScale = true }: { ratio: number; knob: string;
           style={{
             position: "absolute",
             left: `clamp(7px, ${pos}%, 100% - 7px)`,
-            top: -4,
+            top: (BAR_H - 18) / 2,
             transform: "translateX(-50%)",
             width: 14,
             height: 18,
@@ -334,7 +334,7 @@ export function CardSentiment({
               자릿수가 늘면 이 여유 7px 이 바로 사라지므로(다섯 자리 248 ✗ · 여섯 자리 255 ✗)
               건수는 formatSampleCount 가 만 단위로 묶는다 — 폭이 자릿수에 안 딸리게 하는 게
               핵심이고, 그 함수 주석에 이 예산의 근거를 적어 뒀다. */}
-          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "4px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: MONO, fontSize: "var(--fs-12)", fontWeight: 600, color: C.sub, background: C.chip, borderRadius: R.pill, padding: "0 6px", whiteSpace: "nowrap" }}>
             {ratio.days > 1 ? `${ratio.days}일` : countNoun} {formatSampleCount(ratio.total)}건
           </span>
         </div>
@@ -342,7 +342,7 @@ export function CardSentiment({
         <Big disp={`${raw > 0 ? "+" : ""}${v.disp}`} unit={v.unit} color={v.color} size={32} sub="순감성" />
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ display: "flex", gap: 4, height: 12 }}>
+        <div style={{ display: "flex", gap: 4, height: BAR_H }}>
           {/* 풋/콜 카드와 같은 어법이다 — 과열 쪽(낙관·콜)이 초고온색, 반대쪽(비관·풋)이
               저온색. 두 카드가 같은 '한쪽으로 쏠렸나'를 묻는 그림이라 색도 같아야 한다. */}
           <div style={{ width: `${negW}%`, borderRadius: "99px 0 0 99px", background: C.cold }} />

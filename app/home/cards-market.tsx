@@ -5,7 +5,7 @@ import type { ClosePoint, StockHighGap } from "@/lib/data";
 import { formatEokMixed, formatIndicatorValue, shortDate } from "@/lib/format";
 import { stockHref } from "@/lib/stock-page";
 import { BLUE_SCALE, C, MONO, R } from "../ui";
-import { sourceDateBadge, Shell, TitleRow, Big, Foot, HeatKnob, HeatFill, HeatBar, HeatScale, AreaChart, SplitStats, RefChart, RefRows } from "./parts";
+import { sourceDateBadge, Shell, TitleRow, Big, Foot, HeatKnob, HeatFill, HeatBar, HeatScale, AreaChart, SplitStats, RefChart, RefRows, BAR_H, BAR_R } from "./parts";
 import type { Pick } from "./parts";
 
 export function CardBuffett({ v }: { v: Pick }) {
@@ -223,7 +223,7 @@ export function CardTurnover({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="pie_chart" name={v.name} />
       <Big disp={`${Math.round(share)}`} unit="%" color={v.color} size={32} sub="상위 10종목이 가져간 몫" />
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div className="hz-tip" data-tip={barTip} style={{ display: "flex", height: 14, borderRadius: 4, overflow: "hidden" }}>
+        <div className="hz-tip" data-tip={barTip} style={{ display: "flex", height: BAR_H, borderRadius: BAR_R, overflow: "hidden" }}>
           {segs.map((s2) => (s2.pct <= 0 ? null : <div key={s2.key} style={{ width: `${s2.pct}%`, background: s2.fill }} />))}
         </div>
         {/* 범례는 두 열 — 여섯 줄이 한 열이면 이 카드가 둘째 줄 높이를 정해 옆 카드 가운데가 비었다(1440 풋/콜 84px). */}
@@ -292,7 +292,7 @@ export function CardHighGap({ v, tops, failed = false }: { v: Pick; tops: StockH
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={`${gap > 0 ? "+" : ""}${v.disp}`} unit={v.unit} color={v.color} size={32} sub={gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"} />
         {typeof priorHigh === "number" && (
-          <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "4px 10px", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "0 6px", whiteSpace: "nowrap" }}>
             전고점 {num(priorHigh)}
           </span>
         )}
@@ -445,7 +445,7 @@ export function CardVkospi({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         {/* 곁말 '변동성지수'는 걷었다 — 지표 이름 'VKOSPI (변동성지수)'와 같은 말이다(v2, 2026-10-03). */}
         <Big disp={v.disp} color={v.color} size={32} />
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "4px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "0 6px", whiteSpace: "nowrap" }}>
           {verdict}
         </span>
       </div>
@@ -455,9 +455,9 @@ export function CardVkospi({ v }: { v: Pick }) {
         {pts.length >= 2 ? (
           <AreaChart points={pts} color={v.color} tip={(x) => `${shortDate(x.key)} · ${x.value.toFixed(1)}`} />
         ) : (
-        <div style={{ position: "relative", height: 10 }}>
-          <div style={{ height: "100%", borderRadius: R.pill, background: C.track, overflow: "hidden" }}>
-            <div style={{ width: `${pos * 100}%`, height: "100%", borderRadius: R.pill, background: knob }} />
+        <div style={{ position: "relative", height: BAR_H }}>
+          <div style={{ height: "100%", borderRadius: BAR_R, background: C.track, overflow: "hidden" }}>
+            <div style={{ width: `${pos * 100}%`, height: "100%", borderRadius: BAR_R, background: knob }} />
           </div>
           <HeatKnob left={pos * 100} color={knob} />
         </div>
@@ -550,9 +550,9 @@ export function CardAsia({ v }: { v: Pick }) {
                 </span>
                 <span style={{ fontSize: "var(--fs-11)", fontWeight: 500, color: C.sub }}>{b.sub}</span>
               </span>
-              {/* 막대 두께는 카드 안 목록 막대(10px, shadcn.css .hz-hbar-md)와 맞춘다(2026-09-27, 16 → 10). */}
-              <div style={{ position: "relative", flex: 1, minWidth: 0, height: 10 }}>
-                <div style={{ position: "absolute", inset: 0, borderRadius: 4, background: C.track }} />
+              {/* 막대 두께는 카드 안 막대 한 벌(parts.tsx BAR_H · 2026-11-11, 16 → 10 → 8)과 맞춘다. */}
+              <div style={{ position: "relative", flex: 1, minWidth: 0, height: BAR_H }}>
+                <div style={{ position: "absolute", inset: 0, borderRadius: BAR_R, background: C.track }} />
                 {/* 기준국만 진한 파랑. 넷을 다 같은 색으로 두면 "누가 기준인지"를 라벨
                     굵기로만 말하게 되는데, 그건 막대를 훑는 눈에 안 걸린다. */}
                 <div
@@ -562,7 +562,7 @@ export function CardAsia({ v }: { v: Pick }) {
                     top: 0,
                     bottom: 0,
                     width: pct(b.index),
-                    borderRadius: 4,
+                    borderRadius: BAR_R,
                     background: b.self ? "var(--c-blue-1)" : "var(--c-blue-4)",
                   }}
                 />
@@ -812,7 +812,7 @@ export function CardLevInv({ v }: { v: Pick }) {
           <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ width: 56, flexShrink: 0, fontSize: "var(--fs-12)", fontWeight: 500, color: C.sub2 }}>{r.label}</span>
             <div className={r.tip ? "hz-tip" : undefined} data-tip={r.tip} style={{ flex: 1, display: "flex", alignItems: "center", height: 18 }}>
-              <div style={{ flex: 1, display: "flex", height: 10, borderRadius: R.pill, overflow: "hidden", background: INV }}>
+              <div style={{ flex: 1, display: "flex", height: BAR_H, borderRadius: BAR_R, overflow: "hidden", background: INV }}>
                 <div style={{ width: `${r.lev ?? 0}%`, background: v.color }} />
               </div>
             </div>
@@ -881,7 +881,7 @@ export function CardNetBuy({ v }: { v: Pick }) {
               alignSelf: "flex-start",
               fontSize: "var(--fs-12)",
               fontWeight: 600,
-              padding: "4px 10px",
+              padding: "0 6px",
               borderRadius: R.pill,
               color: atHigh ? "var(--c-hot-ink)" : "var(--c-cold-ink)",
               background: atHigh ? "var(--c-mania-tint)" : "var(--c-blue-tint)",
@@ -914,7 +914,8 @@ export function CardNetBuy({ v }: { v: Pick }) {
                       borderRadius: 4,
                       // 방향은 0선 위 · 아래가 말한다. 색은 큰 숫자처럼 온도만 — 고점권에서 판 날만 카드 온도색, 나머지는 회색.
                       // 순매도를 빨강으로 칠하면 첫 줄 띠(+ 빨강)와 반대였고, 과열도 0 인 날도 카드가 뜨거워 보였다(2026-10-04 점검).
-                      background: atHigh && !buy ? v.color : C.sub2,
+                      // 회색은 '꺼진 막대'라 옅게(C.hint) — 글자 회색(C.sub2 · 잉크 62%)이던 땐 꺼진 막대가 화면에서 가장 진한 막대였다(2026-11-11).
+                      background: atHigh && !buy ? v.color : C.hint,
                       ...(buy ? { bottom: "50%" } : { top: "50%" }),
                     }}
                   />
@@ -1017,7 +1018,7 @@ export function CardLimitUp({ v }: { v: Pick }) {
                   color: "var(--c-hot-ink)",
                   background: "var(--c-hot-tint)",
                   borderRadius: R.pill,
-                  padding: "3px 9px",
+                  padding: "0 6px",
                 }}
               >
                 {r.p === null ? r.label : `+${r.p.toFixed(1)}%`}
@@ -1070,12 +1071,12 @@ export function CardPutCall({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="casino" name={v.name} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <Big disp={ratio.toFixed(2)} color={v.color} size={32} sub="풋/콜" />
-        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "4px 10px", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: "var(--fs-12)", fontWeight: 600, color: "var(--card-accent-ink)", background: "var(--card-accent-tint)", borderRadius: R.pill, padding: "0 6px", whiteSpace: "nowrap" }}>
           {greedy ? "콜 우세" : "풋 우세"}
         </span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ display: "flex", gap: 4, height: 12 }}>
+        <div style={{ display: "flex", gap: 4, height: BAR_H }}>
           {/* 콜은 상승 베팅(탐욕) 쪽이라 초고온색, 풋은 하락 대비라 저온색이다. */}
           <div className="hz-tip" data-tip={tip("call")} style={{ width: `${callShare}%`, borderRadius: "99px 0 0 99px", background: C.mania }} />
           <div className="hz-tip" data-tip={tip("put")} style={{ width: `${100 - callShare}%`, borderRadius: "0 99px 99px 0", background: C.cold }} />
