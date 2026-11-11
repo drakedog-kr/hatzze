@@ -463,6 +463,14 @@ export function Foot({ text, color = C.sub }: { text: string; color?: string }) 
  */
 const KNOB_W = 14;
 
+/**
+ * 카드 안 가로 막대 한 벌(2026-11-11) — 굵기 8 · 끝은 둥글게(99). 카더라 테마 점유율 · MDD 업종 막대(v2 의 8px 둥근 끝)와 같은 꼴이다.
+ * 그전엔 이 화면만 굵기 10 · 12 · 14, 끝 모양 0 · 4 · 둥근 끝이 섞여 막대 31개가 네 꼴이었다. R.pill 을 쓰면 안 된다 —
+ * 홈 범위(.v2-bf)에서 --r-pill 은 꼬리표 모서리(4px)라 둥근 끝이 4 로 깎였다. 목록 막대(.hz-hbar-*)는 v2.css 가 같은 값으로 맞춘다.
+ */
+export const BAR_H = 8;
+export const BAR_R = 99;
+
 export function HeatKnob({ left, color }: { left: number; color: string }) {
   return (
     <span
@@ -471,7 +479,8 @@ export function HeatKnob({ left, color }: { left: number; color: string }) {
         // 양끝에서 노브가 트랙 밖으로 삐져나오지 않게 반 폭만큼 안으로 물린다.
         // 과열도 0·100 인 날에만 걸리는 자리라 눈으로는 못 잡는다 — clamp 로 못박는다.
         left: `clamp(${KNOB_W / 2}px, ${left}%, calc(100% - ${KNOB_W / 2}px))`,
-        top: -4,
+        // 손잡이(키 18)를 막대(BAR_H) 세로 가운데에 — (8 − 18) ÷ 2.
+        top: (BAR_H - 18) / 2,
         transform: "translateX(-50%)",
         width: KNOB_W,
         height: 18,
@@ -484,13 +493,13 @@ export function HeatKnob({ left, color }: { left: number; color: string }) {
   );
 }
 
-export function HeatFill({ pct, height = 10 }: { pct: number; height?: number }) {
+export function HeatFill({ pct, height = BAR_H }: { pct: number; height?: number }) {
   const w = Math.max(0, Math.min(100, pct));
   const c = overheatColor(w);
   return (
     <div style={{ position: "relative", height }}>
-      <div style={{ height: "100%", borderRadius: R.pill, background: C.track, overflow: "hidden" }}>
-        <div style={{ width: `${w}%`, height: "100%", borderRadius: R.pill, background: c }} />
+      <div style={{ height: "100%", borderRadius: BAR_R, background: C.track, overflow: "hidden" }}>
+        <div style={{ width: `${w}%`, height: "100%", borderRadius: BAR_R, background: c }} />
       </div>
       <HeatKnob left={w} color={c} />
     </div>
