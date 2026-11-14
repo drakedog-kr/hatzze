@@ -275,6 +275,46 @@ def test_seohan_stock_mentions_survive(text):
     assert _seohan(text) == {"011370"}
 
 
+# ── 2026-11-14: 코텍(052330) ← 코텍스(Cortex · Kotex)의 앞 두 글자(결 ①) · 이슈 #812 를 고친 뒤 카드 1위 ──────
+
+
+def _kotek(text: str) -> set[str]:
+    match_to_code = {"코텍": "052330"}
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = {"코텍"} & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, {"코텍": "dict"}, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "바일(+30.63%)은 예상을 상회한 실적과 함께 AI 기반 광고 최적화 플랫폼 코텍스의 성능 개선과 광고주 지출 증가가 실적을 견인",
+        "스노우플레이크(+1.50%)는 코텍스 AI 게이트웨이 공개에 힘입어 상승했으나 장중 고점 대비 상승폭 축소.",
+        "칩 연구 시설을 착공하고, 코텍스2(Cortex 2) 슈퍼컴퓨터 클러스터를 위한 첨단 반도체와 전력망 인프라에",
+        "킴벌리클라크는 하기스, 크리넥스, 스콧, 코텍스 등의 브랜드를 보유한 생활용품 기업으로",
+        "이외에도 휴먼 아카이브, 코텍스AI 등 해외 업체들도 인도로 속속 진출하고 있다.",
+    ],
+)
+def test_cortex_kotex_are_not_kotek(text):
+    assert _kotek(text) == set()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "(코스닥)코텍 - 연결재무제표기준영업(잠정)실적(공정공시)",
+        "코텍(052330)\n잠정실적(연결)\n\n[영업이익] 74 억원",
+        "[잠정실적]코텍, 올해 3Q 매출액 884억(-16%) 영업이익 73.5억(-11%) (연결)",
+        "카지노모니터 (전국)\n관련종목 : 코텍 / 토비스",
+        "엘앤씨바이오/ 98억/ 102억(-3.9%)\n코텍/ 74억/ (5분기 최저)",
+        "< 기업 공시 관련 코멘트 (코텍) > (10.11.)",
+        "* ㈜코텍\n2026-07-17/장내매수(+)/보통주/ 4,000주/-",
+    ],
+)
+def test_kotek_stock_mentions_survive(text):
+    assert _kotek(text) == {"052330"}
+
+
 # ── 2026-09-25: 나노(187790) ← 띄어 쓴 합성어의 앞자리(결 ⑧) ──────────────────────────────
 # 급부상 카드 3~4위에 오른 사흘 창(09-10~14)의 유령이 `나노 바나나`·`‘나노 장벽’`·`‘나노 숫자’`였다.
 
