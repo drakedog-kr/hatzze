@@ -227,6 +227,94 @@ def test_aurora_survives_self_driving_robot_in_movers_list():
     assert _aurora(text) == {"039830"}
 
 
+# ── 2026-11-14: 서한(011370) ← '편지'라는 뜻의 서한(이슈 #812) ──────────────────────────────
+# 사례는 전 기간 코퍼스의 실제 문장이다. 근거와 수치는 config/stock_extraction.py 의 HOMONYM_CUES["서한"] 주석.
+
+
+def _seohan(text: str) -> set[str]:
+    match_to_code = {"서한": "011370"}
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = {"서한"} & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, {"서한": "dict"}, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '💻코어위브(CRWV), 텍사스 민주당 주지사 당선인에 "데이터센터 협력" 서한\n\nhttps://www.bloomberg.com/news/articles/2026-11-07/coreweave',
+        "공시에 따르면 TMC USA는 지난 3일 NOAA로부터 서한을 받았다. 서한에서 NOAA는 오는 12월 중순까지 해당 통합 신청서의 인증에 대한 최종 결정을",
+        "샘 올트먼 사태를 그대로 복사한 듯한 연서명 서한이 전격 유출되었습니다.\n\n1. 전설적 핵심 두뇌들의 총집결\n서한의 서명자 명단에는 수석 과학자 빌 달리",
+        "엔비디아 ‘젠슨 황 복귀’ 서한은 가짜…오픈AI 직원 서한 짜깁기\n-서한에서 집단 사직·스페이스X 이직 주장",
+        "LTCM: 서한 발송(1998.09.01) 후 공매도했던 미국 국채가 한 달 내내 급등",
+        "엔비디아 최고 경영진이 서명자로 올라 있었다.\n\n서한은 젠슨 황의 해임에 충격을 표하며, 경영진이 스페이스X로 이직하겠다는",
+        "창출 및 미국 내 DRAM 40% 생산 목표\n서한 서명 의원 지역구: 인디애나·뉴욕·아이다호 등 SK하이닉스·마이크론 투자 지역과 일치",
+        "이글 캐피털의 2026년 3분기 투자자 서한(메르카도리브레 사례)이 던진 질문입니다.\n"
+        "물류비와 대손충당금 비중은 아직 오르고 있습니다. 서한의 컨센서스와 코호트 흑자 주장은 확인하지 못했습니다.",
+    ],
+)
+def test_letter_seohan_is_not_the_stock(text):
+    assert _seohan(text) == set()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "(코스닥)서한 - 단일판매ㆍ공급계약체결\nhttp://dart.fss.or.kr/api/link.jsp?rcpNo=2026",
+        "2026.10.21 14:37:23\n기업명: 서한(시가총액: 776억) A011370\n보고서명: 단일판매ㆍ공급계약체결",
+        "[실적속보]서한, 올해 2Q 매출액 1476억(-26%) 영업이익 222억(-34%) (연결)",
+        "✅ 서한(+16.49%)\n\n❗️ 52주 최대 거래량  돌파",
+        "40. 서한 거래정지(주식병합)\n41. 덕신이피씨 거래정지(주식병합)",
+        "[주요주주 지분공시]김병준 사내이사, 서한의 지분율 0.57% 확대",
+        # 회사 기사는 `서한은 · 서한이` 를 쓴다 — 그래서 이 둘은 단서로 걸지 않았다.
+        "제목 : 서한, 추석 앞두고 협력사 공사대금 359억원 조기 지급 *이데일리FX*\n[대구=이데일리 홍석천 기자] 지역 건설업체 "
+        "서한이 추석을 앞두고 협력업체의 자금 부담을 덜기 위해 공사·자재 대금 359억5465만원을 조기에 지급한다. 서한은 125개 협력업체에",
+        "(aidc) 서한\n(호실적) 캠시스",
+    ],
+)
+def test_seohan_stock_mentions_survive(text):
+    assert _seohan(text) == {"011370"}
+
+
+# ── 2026-11-14: 코텍(052330) ← 코텍스(Cortex · Kotex)의 앞 두 글자(결 ①) · 이슈 #812 를 고친 뒤 카드 1위 ──────
+
+
+def _kotek(text: str) -> set[str]:
+    match_to_code = {"코텍": "052330"}
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = {"코텍"} & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, {"코텍": "dict"}, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "바일(+30.63%)은 예상을 상회한 실적과 함께 AI 기반 광고 최적화 플랫폼 코텍스의 성능 개선과 광고주 지출 증가가 실적을 견인",
+        "스노우플레이크(+1.50%)는 코텍스 AI 게이트웨이 공개에 힘입어 상승했으나 장중 고점 대비 상승폭 축소.",
+        "칩 연구 시설을 착공하고, 코텍스2(Cortex 2) 슈퍼컴퓨터 클러스터를 위한 첨단 반도체와 전력망 인프라에",
+        "킴벌리클라크는 하기스, 크리넥스, 스콧, 코텍스 등의 브랜드를 보유한 생활용품 기업으로",
+        "이외에도 휴먼 아카이브, 코텍스AI 등 해외 업체들도 인도로 속속 진출하고 있다.",
+    ],
+)
+def test_cortex_kotex_are_not_kotek(text):
+    assert _kotek(text) == set()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "(코스닥)코텍 - 연결재무제표기준영업(잠정)실적(공정공시)",
+        "코텍(052330)\n잠정실적(연결)\n\n[영업이익] 74 억원",
+        "[잠정실적]코텍, 올해 3Q 매출액 884억(-16%) 영업이익 73.5억(-11%) (연결)",
+        "카지노모니터 (전국)\n관련종목 : 코텍 / 토비스",
+        "엘앤씨바이오/ 98억/ 102억(-3.9%)\n코텍/ 74억/ (5분기 최저)",
+        "< 기업 공시 관련 코멘트 (코텍) > (10.11.)",
+        "* ㈜코텍\n2026-07-17/장내매수(+)/보통주/ 4,000주/-",
+    ],
+)
+def test_kotek_stock_mentions_survive(text):
+    assert _kotek(text) == {"052330"}
+
+
 # ── 2026-09-25: 나노(187790) ← 띄어 쓴 합성어의 앞자리(결 ⑧) ──────────────────────────────
 # 급부상 카드 3~4위에 오른 사흘 창(09-10~14)의 유령이 `나노 바나나`·`‘나노 장벽’`·`‘나노 숫자’`였다.
 
