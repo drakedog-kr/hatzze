@@ -315,6 +315,49 @@ def test_kotek_stock_mentions_survive(text):
     assert _kotek(text) == {"052330"}
 
 
+# ── 2026-11-14: 로젠(033290) ← 미국 로펌 Wachtell, Lipton, Rosen & Katz · 인명 · 증권사 로젠블랫 ──────
+# 사례는 전 기간 코퍼스의 실제 문장이다. 근거와 수치는 config/stock_extraction.py 의 HOMONYM_CUES["로젠"] 주석.
+
+
+def _rosen(text: str) -> set[str]:
+    match_to_code = {"로젠": "033290"}
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = {"로젠"} & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, {"로젠": "dict"}, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "앨리스 황과의 불륜 관계를 인정한 이후 엔비디아 이사회는 로펌 왁텔 립튼 로젠 앤 카츠가 주도하는 조사에 착수.",
+        "이사회는 로펌 왁텔, 립턴, 로젠 앤 카츠(Wachtell, Lipton, Rosen & Katz)의 준 H",
+        "재무 자문은 PJT 파트너스가, 법률 자문은 왁텔, 립톤, 로젠 앤 캣츠가 맡았다.",
+        "앤디 로젠(Andy Rosen) 카플란 최고경영자(CEO)는 “중국 춘라이는",
+        "[美특징주]샌디스크, AI 인프라 핵심 부품 도약 '기대'…로젠블랫, 목표가 2400달러 *이데일리FX*",
+        "팔란티어, 미 연방항공청의 새 AI 안전 시스템 도입 '수혜'-로젠 블랫 *이데일리FX*",
+        "마이클 로젠 앤젤레스인베스트먼트 최고투자책임자(CIO)는 AI 기업들의 차입 확대",
+        "제목 : AIB 데이터센터, 에얄 로젠 최고운영책임자 사임 *이데일리FX*",
+        "로디움그룹의 공동창립자 대니얼 로젠은 “이렇게 큰 규모의 경제를 가진 나라에서",
+    ],
+)
+def test_rosen_law_firm_and_people_are_not_the_stock(text):
+    assert _rosen(text) == set()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "(코스닥)로젠 - 주주총회소집공고\nhttp://dart.fss.or.kr/api/link.jsp?rcpNo=2026",
+        "2026.11.13 14:05:23\n기업명: 로젠(시가총액: 884억) A033290\n보고서명: 분기보고서 (2026.09)",
+        "[실적속보]로젠, 매출액, 영업이익 모두 3년 최저 실적 기록 (연결)",
+        "▶ 로젠, 라이브커머스 써밋컴퍼니 인수…물류 넘어 커머스까지",
+        "    - CJ대한통운·한진: 14~15일\n    - 롯데·로젠: 14~17일(예정)\n    - 우체국: 14~18일",
+    ],
+)
+def test_rosen_stock_mentions_survive(text):
+    assert _rosen(text) == {"033290"}
+
+
 # ── 2026-09-25: 나노(187790) ← 띄어 쓴 합성어의 앞자리(결 ⑧) ──────────────────────────────
 # 급부상 카드 3~4위에 오른 사흘 창(09-10~14)의 유령이 `나노 바나나`·`‘나노 장벽’`·`‘나노 숫자’`였다.
 
