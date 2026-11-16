@@ -358,6 +358,64 @@ def test_rosen_stock_mentions_survive(text):
     assert _rosen(text) == {"033290"}
 
 
+# ── 2026-11-16: DB(012030) ← DB증권 리서치 표기 · 데이터베이스 · 도이체방크 · 확정급여형 연금(이슈 #816) ──────
+# 사례는 전 기간 DB 태그 196건의 실제 문장이다. 근거와 수치는 config/stock_extraction.py 의 HOUSE_GROUP_NAMES ·
+# HOMONYM_CUES["DB"] 주석.
+
+DB_DICT = {"DB": "012030", "DB하이텍": "000990", "HL홀딩스": "060980"}
+
+
+def _db(text: str) -> set[str]:
+    match_to_code = dict(DB_DICT)
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = set(match_to_code) & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, {k: "dict" for k in match_to_code}, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # DB증권 리서치 표기 — HOUSE_GROUP_NAMES 의 자리 규칙
+        "문홍철의 Concise (DB 26.11.16)\n\n헤지펀드의 기술주+미국채 페어 트레이딩의 손절은 대부분 마무리된 것으로",
+        "9. 화장품: 호황은 여전. 달라진 건 밸류에이션뿐 (DB 허제나)\n10. 인터로조: D2C 전환의 원년",
+        "<DB 안회수>3Q26 LG에너지솔루션 실적발표 컨퍼런스콜 \n\n연결매출  9.6조원(+28%qoq)",
+        "Stage Analysis 마스터하기 - DB 강현기\n\n📝 핵심적 본문 요약\nDB증권 강현기 팀장은",
+        "2027 주식 연간 전망 - DB 강현기, 생각 기록\n\n📝 핵심적 본문 요약",
+        # 애널리스트 채널 꼬리말 — NOT_MENTION_PHRASES
+        "2Q26 Review: 흑자 지속, ESS 증설 가능성\n\nhttps://buly.kr/GvpZkdb\n\n⭐️ DB 이차전지/철강 안회수\n⭐️ https://t.me/steelhoesoo",
+        # 다른 뜻 — HOMONYM_CUES
+        "- 파일 기반 라우팅으로 페이지와 공통 레이아웃을 정의\n- DB 조회가 필요한 페이지는 서버에서 렌더링…",
+        "- 25년 이상 축적된 유해 콘텐츠 데이터베이스(DB)와 대규모 트래픽 처리 기술 경쟁력을 바탕으로",
+        "10. UnitedHealth (UNH) 0.41%\n11. Deutsche Bank (DB) 0.13%\n\n비중 순위:",
+        "하지만 확정급여(DB)형 연금이 줄고 주식 투자가 확대되면서 장기채 수요가 약해지고 있다.",
+        "“같은 월급인데 퇴직금 2배 차이?”…DB·DC형 선택법\nhttps://www.sedaily.com/article/20102745",
+        "- Gemini 사용이 컴퓨트, 스토리지, DB, 보안 등 포트폴리오 전반 성장 견인",
+        # 원문은 `아니라` 뒤가 줄바꿈 없는 공백(\xa0)이라 앞 낱말 검사(modifier_context 의 [ \t])를 지나갔다
+        "기업의 Private Data 기반 AI Agent 도입을 지원. OCI 인프라뿐 아니라\xa0DB·Application까지 AI Monetization 확대 전략",
+    ],
+)
+def test_db_research_and_database_are_not_the_stock(text):
+    assert "012030" not in _db(text)
+
+
+@pytest.mark.parametrize(
+    "text, codes",
+    [
+        ("HL홀딩스 / 0.3조원(-1.6%) / 1.2조원(+0.2%)\nDB / 0.5조원(+5.9%) / 0.8조원(-0.7%)\nHS효성 / 0.2조원(-0.2%)",
+         {"060980", "012030"}),
+        ("[잠정실적]DB, 올해 3Q 매출액 2101억(+32%) 영업이익 137억(+5.1%) (연결)", {"012030"}),
+        ("(유가)DB하이텍 - 주식등의대량보유상황보고서(일반)\n보고자:DB\nhttp://dart.fss.or.kr", {"000990", "012030"}),
+        ("22. DB (13.65%) : DB그룹주, 시총4600억대, 지주사업, IT서비스와 정보보안 솔루션", {"012030"}),
+        ("✅ DB(+9.57%)\n\n- DB하이텍의 파운드리 단가가 최대 30% 인상되며 중국 주문 증가로", {"012030", "000990"}),
+        ("[ +6.4%/ 41억] DB\n[ +6.0%/ 51억] 제우스", {"012030"}),
+        # 그룹 이름 뒤 세 글자가 더 긴 종목명이면 애널리스트 자리가 아니다
+        ("8인치 파운드리(DB 하이텍) 단가 인상", {"000990"}),
+    ],
+)
+def test_db_stock_mentions_survive(text, codes):
+    assert _db(text) == codes
+
+
 # ── 2026-09-25: 나노(187790) ← 띄어 쓴 합성어의 앞자리(결 ⑧) ──────────────────────────────
 # 급부상 카드 3~4위에 오른 사흘 창(09-10~14)의 유령이 `나노 바나나`·`‘나노 장벽’`·`‘나노 숫자’`였다.
 
@@ -1460,3 +1518,48 @@ def test_honorific_ssi_is_not_sea():
     from config.us_stock_extraction import SCAN_IGNORE, US_NAMES
 
     assert "씨" not in US_NAMES and "SE" in SCAN_IGNORE
+
+
+# ── 2026-11-16 스캔(이슈 #817): 이뮤노반트 · 혼다 · 로우스(Lowe's) ──────────────────────────────
+# 사례는 코퍼스의 실제 문장이다. 근거와 수치는 config/us_stock_extraction.py 의 US_NAMES · NEGATIVE_CONTEXT · SCAN_IGNORE 주석.
+
+
+@pytest.mark.parametrize(
+    "text, ticker",
+    [
+        ("제목 : 이뮤노반트, 회계연도 2분기 순손실 9725만 달러…임상 결과 및 개발 현황 발표 *이데일리FX*", "IMVT"),
+        ("한올바이오파마의 미국 파트너사인 이뮤노반트(Immunovant)는 9일(현지시간) 2분기(7~9월) 실적을", "IMVT"),
+        ("• 이뮤노반트 (IMVT) — IMVT-1402 600mg이 난치성 류마티스관절염 임상에서", "IMVT"),
+        ("제목 : [美특징주]혼다, 美 신규 공장 건설에 30억弗 투자…주가 약세 *이데일리FX*", "HMC"),
+        ("4분기는 일회성 보상금 소멸 및 혼다 JV 등 신규 캐파 초기 가동에 따른 고정비로", "HMC"),
+        ("- 일본 혼다(Honda)가 오하이오주에 30억 달러를 투입해 연산 24만 대 규모의 하이브리드 공장을", "HMC"),
+        ("제목 : [美특징주]로우스, 스티펠 '매도' 하향에 약세 *이데일리FX*", "LOW"),
+        ("장전 실적: 타깃(TGT), 로우스(LOW), TJX(TJX), 포니AI(PONY)", "LOW"),
+        ("－ 홈디포와 로우스는 급등 후 상승 폭을 줄여 각각 약 5%, 7% 상승세를 보였습니다.", "LOW"),
+        ("아마존닷컴(NAS:AMZN), 월마트(NYS:WMT), 로우스(NYS:LOW) 등 제휴 브랜드의 카드 이용자들이", "LOW"),
+        ("JPMORGAN CUTS LOWE’S COMPANIES PRICE TARGET TO $252 FROM $279 ...", "LOW"),
+    ],
+)
+def test_scan_817_companies(us_tagger, text, ticker):
+    assert ticker in us_tagger(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Loews Corp(L) — 실적 일정표 · 티시 가문 지분 공시
+        "장전 실적: 매리어트(MAR), 에르티로더(EL), 로우스(L), 템퍼스AI(TEM), 체크포인트(CHKP)",
+        "제목 : 앤드류 티쉬, 로우스 지분 7.3% 보유 공시 *이데일리FX*\n총 1502만 4959주 보유…신탁 배분 등으로 지분 변동",
+        "미국의 다각화된 지주회사 로우스(LOEWS CORP, L)의 지분",
+        # 식료품 체인 Lowes Foods
+        "로우스 푸드(Lowes Foods)를 앵커 임차인으로 둔 시설이다.",
+    ],
+)
+def test_loews_and_lowes_foods_are_not_lowes(us_tagger, text):
+    assert "LOW" not in us_tagger(text)
+
+
+def test_loews_ticker_is_ignored_by_scan():
+    from config.us_stock_extraction import SCAN_IGNORE, US_NAMES
+
+    assert "L" in SCAN_IGNORE and "L" not in US_NAMES.values() and US_NAMES["로우스"] == "LOW"

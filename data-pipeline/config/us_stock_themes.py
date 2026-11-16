@@ -55,7 +55,10 @@ US_THEMES: dict[str, list[str]] = {
     # ⚠️ 스텔란티스로 12개가 됐다. MDD 바스켓은 자기 자신을 빼고 앞에서 열까지라
     #    (US_MDD_PEER_MAX) 맨 뒤 하나가 빠진다. 그래서 30일 언급이 가장 적은 앱티브(4건·
     #    3채널)를 맨 뒤로 옮겼다 — 빠지는 게 리오토(63건)나 스텔란티스(102건)면 안 된다.
-    "전기차·자율주행": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "STLA", "UBER", "CVNA", "LI", "APTV"],
+    # ⚠️ 혼다(이슈 #817)로 13개가 됐다. 이제 맨 뒤 둘이 빠진다. 30일 언급이 가장 적은 카바나(13건)와 앱티브(6건)를
+    #    맨 뒤로 두고 혼다(93건)를 그 앞에 넣었다(테슬라 1,954 · 우버 103 · 샤오펑 93 · 스텔란티스 83 · 리비안 67 · 리오토 48 ·
+    #    니오 44 · GM 39 · 루시드 18, 2026-11-16).
+    "전기차·자율주행": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "STLA", "UBER", "LI", "HMC", "CVNA", "APTV"],
     "전력·원자력": [
         "SMR", "OKLO", "CEG", "VST", "NRG", "NEE", "GEV", "PWR",
         "ETN", "CCJ", "HON", "FSLR", "ENPH", "BE", "FRMI",
@@ -75,7 +78,7 @@ US_THEMES: dict[str, list[str]] = {
     # 쓰는 '대표성' 순서라, 이틀짜리 급등으로 맨 앞자리를 주지 않는다.
     "바이오·헬스케어": [
         "LLY", "MRNA", "NVO", "MRK", "PFE", "ABBV", "AZN", "NVS",
-        "JNJ", "UNH", "ISRG", "MDGL", "CVS", "CAH", "AMGN", "MDT", "EVMN", "ABT",
+        "JNJ", "UNH", "ISRG", "MDGL", "CVS", "CAH", "AMGN", "MDT", "EVMN", "ABT", "IMVT",
     ],
     "금융": ["GS", "JPM", "MS", "BAC", "BRK", "BX", "SCHW", "MA", "AXP", "PYPL", "SOFI", "UPST", "C", "WFC"],
     # 코인 시세와 함께 움직이는 묶음. 금융과 갈라 둔 이유는 그날 오가는 얘기가
@@ -85,7 +88,7 @@ US_THEMES: dict[str, list[str]] = {
         "KO", "WMT", "COST", "SBUX", "MCD", "NKE", "CMG", "PEP", "PM",
         "DIS", "DKNG", "ORLY", "DECK", "LUV", "DHI", "PLD", "WELL",
         "CPNG", "MELI", "URI", "ABNB", "BKNG", "CAT", "VZ",
-        "HD", "BBY", "DLTR", "EBAY", "LULU", "KR", "CCL", "SPOT", "SKYD", "DASH", "CHRW", "FDX",
+        "HD", "BBY", "DLTR", "EBAY", "LULU", "KR", "CCL", "SPOT", "SKYD", "DASH", "CHRW", "FDX", "LOW",
     ],
     "에너지·원자재": ["XOM", "CVX", "KMI", "VLO", "FCX", "NEM", "NUE", "ALB"],
     # 아직 작지만(합쳐 170회) 뜰 때 한꺼번에 뜨는 묶음이라 따로 둔다.
