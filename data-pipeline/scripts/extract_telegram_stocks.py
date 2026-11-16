@@ -453,12 +453,18 @@ def group_house_context(prev: str, nxt: str, after: str, line_before: str) -> bo
     # 줄머리 목록(`- 한화`)은 앞이 비어 안 걸린다.
     if not after.split("\n", 1)[0].replace(MASK_CHAR, "").strip() and re.search(r"\S\s*[-–—]\s*$", line_before):
         return True
+    # 같은 줄 끝 귀속에 애널리스트 이름이 붙은 꼴(`Stage Analysis 마스터하기 - DB 강현기` · `… 전망 - DB 강현기, 생각 기록`).
+    if re.search(r"\S\s*[-–—]\s*$", line_before) and re.match(r"[ \t]+[가-힣]{3}\s*(?:[,，]|\n|$)", after):
+        return True
     # "(26.09.28 한화)" — 괄호 안에 날짜와 이름만
     if nxt and nxt in ")）" and re.search(r"[(（]\s*\d{2,4}[./-]\d{1,2}[./-]\d{1,2}\.?\s*$", line_before):
         return True
-    # "<한화 임혜윤 오늘 개장전 …>" · "(한화 이진협)" · "[한화 박제인]" — 이름 뒤 세 글자 애널리스트 이름.
+    # "(DB 26.11.16)" — 날짜가 이름 뒤에 오는 꼴(`문홍철의 Concise (DB 26.11.16)`, 2026-11-16 이슈 #816)
+    if prev and prev in "(（" and re.match(r"[ \t]+\d{2,4}[./-]\d{1,2}[./-]\d{1,2}\.?\s*[)）]", after):
+        return True
+    # "<한화 임혜윤 오늘 개장전 …>" · "<DB 안회수>" · "(한화 이진협)" · "[한화 박제인]" — 이름 뒤 세 글자 애널리스트 이름.
     # 두 글자는 안 본다(`(한화 기준)`·`[한화 방산 부문과 …]`).
-    if prev and prev in "<〈" and re.match(r"[ \t]+[가-힣]{3}[ \t]", after):
+    if prev and prev in "<〈" and re.match(r"[ \t]+[가-힣]{3}[ \t>〉]", after):
         return True
     if prev and prev in "(（[［" and re.match(r"[ \t]+[가-힣]{3}\s*[)）\]］]", after):
         return True
@@ -593,13 +599,17 @@ def extract(
             continue
         # 증권사 이름은 한 메시지에 여러 번 나오는 일이 흔하다(머리글의 발행처 표기 +
         # 본문의 진짜 언급). 자리마다 따로 보고, 발행처 자리면 이 자리만 건너뛴다.
-        if is_publisher_name(key) and publisher_context(
+        # 그룹 이름 뒤에 띄어 쓴 낱말을 붙여 더 긴 종목명이 되면(`(DB 하이텍)` · `(한화 솔루션)`) 발행처가 아니다 —
+        # 세 글자 애널리스트 이름 꼴(group_house_context)과 모양이 같다.
+        group = key in HOUSE_GROUP_NAMES
+        promoted = group and compound_key(text, m.end(), key, match_to_code) not in (key, None)
+        if is_publisher_name(key) and not promoted and publisher_context(
             text,
             m.start(),
             m.end(),
             trailing_word=key not in MEDIA_NAMES,
             media=key in MEDIA_NAMES,
-            group=key in HOUSE_GROUP_NAMES,
+            group=group,
         ):
             continue
         # 발행처 표기가 아니어도 증권사가 **말하는 쪽**이면(`…증권은 … 추산했다` `주관사 : …증권`)
