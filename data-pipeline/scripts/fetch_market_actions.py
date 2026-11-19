@@ -80,6 +80,11 @@ REQUEST_TIMEOUT_SEC = 20
 # ⛔ 이 인자를 "403 재시도는 무의미하다"며 지우지 말 것. 그 일반론은 맞지만 이 호스트는
 #    예외다. 지우면 다음 차단 물결에서 이 지표만 또 혼자 죽는다.
 KIND_RETRY_STATUSES = DEFAULT_RETRY_STATUSES | {403}
+# 시도 횟수도 common/kind.py · krx_client 와 같은 여섯 번이다(2·4·8·16·20초 백오프, 약 50초).
+# http_client 기본값 넷(약 14초)을 쓰던 때 이 스크립트만 혼자 403 에 죽었다 — 2026-11-15 저녁(#815) · 11-19 아침(#820).
+# 11-19 은 같은 실행의 로고 잡 KIND 요청이 세 시간 앞서 받았고 앞 네 실행엔 403 이 없었다. 짧은 차단은 이 길이로
+# 넘을 수 있다. 11-14~16 처럼 하루 반 이어지는 차단은 못 넘는다(그때는 다음 실행의 소급 기간이 채운다).
+KIND_MAX_RETRIES = 6
 PAGE_SIZE = 500
 # 넘길 쪽의 상한. 500 × 40 = 2만 건 — 1년치 '매매거래중단'이 그보다 많을 리 없다. 넘으면 멈추고 알린다
 # (끝 쪽을 못 알아보는 응답이 오는 경우다. 조용히 잘라 쓰면 1년치 지표가 틀린 채 덮인다).
@@ -163,6 +168,7 @@ def _search_page(kwd: str, from_date: date, to_date: date, page: int) -> str:
         headers={"User-Agent": "Mozilla/5.0"},
         timeout=REQUEST_TIMEOUT_SEC,
         retry_statuses=KIND_RETRY_STATUSES,
+        max_retries=KIND_MAX_RETRIES,
     )
     resp.raise_for_status()
     return resp.text
