@@ -1,0 +1,1299 @@
+{
+  "total_count": 12,
+  "jobs": [
+    {
+      "id": 136167338300,
+      "run_id": 44700473981,
+      "name": "guard",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-20T08:10:46Z",
+      "completed_at": "2026-11-20T08:11:12Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "이 슬롯을 이미 누가 처리했나",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        }
+      ]
+    },
+    {
+      "id": 136167541023,
+      "run_id": 44700473981,
+      "name": "krx_master",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-20T08:11:14Z",
+      "completed_at": "2026-11-20T08:11:55Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "(텔레그램) KRX 상장종목 마스터 갱신",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Post Set up Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        }
+      ]
+    },
+    {
+      "id": 136167541047,
+      "run_id": 44700473981,
+      "name": "insider",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-20T08:11:15Z",
+      "completed_at": "2026-11-20T10:11:22Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Fetch 미국 임원 공시 Form 4 (내부자 리포트)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Fetch 미 하원의원 매매 신고 (내부자 리포트)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Fetch 월가 거물 13F (내부자 리포트)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Fetch 애널리스트 컨센서스 (내부자 리포트)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "미장 일별 집계가 끝날 때까지 대기 (내부자 화면의 언급 수)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "내부자 리포트 화면만 먼저 비우고 데우기",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Summarize 내부자 리포트 수집",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Alert on 내부자 리포트 failure (open/update GitHub issue)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 12
+        },
+        {
+          "name": "Post Set up Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25
+        }
+      ]
+    },
+    {
+      "id": 136167541128,
+      "run_id": 44700473981,
+      "name": "kr_preview",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-11-20T08:11:15Z",
+      "completed_at": "2026-11-20T08:15:37Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 4
+        },
+        {
+          "name": "미장 종가 받기 전 대기 (아침 · 06:30 KST 까지)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 5
+        },
+        {
+          "name": "국장 미리보기 (간밤 미장 → 국내 종목)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6
+        },
+        {
+          "name": "미리보기 화면만 먼저 비우고 데우기",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 7
+        },
+        {
+          "name": "Summarize 미리보기",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 8
+        },
+        {
+          "name": "Alert on 미리보기 failure (open/update GitHub issue)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 9
+        },
+        {
+          "name": "Post Set up Python",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 17
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 18
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19
+        }
+      ]
+    },
+    {
+      "id": 136167543712,
+      "run_id": 44700473981,
+      "name": "logos",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-11-20T08:11:13Z",
+      "completed_at": "2026-11-20T08:11:12Z",
+      "steps": []
+    },
+    {
+      "id": 136167843640,
+      "run_id": 44700473981,
+      "name": "dividend",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-11-20T08:11:57Z",
+      "completed_at": "2026-11-20T10:11:51Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "핀허브를 쓰는 잡이 끝날 때까지 대기 (국장 미리보기)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Fetch 미국 배당주 요약 (배당주)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Fetch 미장 일별 거래대금 (테마)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "KRX 공표(08:00 KST) 대기 — 배당 전용",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Fetch KRX 일별 종가 이력 (종목 상세)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "등락 이유 등락률 채우기 (어제 종가)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Fetch 예탁원 배당 기록 (배당주)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Fetch 배당 결정 공시 (배당주)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Calculate 종목별 배당 요약 (배당주)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Fetch 고배당기업 목록 (배당주)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Fetch 배당성향 (배당주)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Fetch ETF 분배금 (배당주)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Fetch 국내 상장 미국 ETF 설정·환매 (배당주)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        },
+        {
+          "name": "카더라 일별 집계가 끝날 때까지 대기 (배당 화면 칩 순서)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18
+        },
+        {
+          "name": "배당 화면만 먼저 비우고 데우기",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19
+        },
+        {
+          "name": "Summarize 배당주 수집",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20
+        },
+        {
+          "name": "Alert on 배당주 failure (open/update GitHub issue)",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 21
+        },
+        {
+          "name": "Fetch ETF 일별 자금 흐름 (ETF)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22
+        },
+        {
+          "name": "Fetch ETF 기본 정보 · 총보수 (ETF)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23
+        },
+        {
+          "name": "Fetch ETF 달 말일 스냅숏 (ETF)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24
+        },
+        {
+          "name": "Summarize ETF 수집",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25
+        },
+        {
+          "name": "Alert on ETF 수집 failure (open/update GitHub issue)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 26
+        },
+        {
+          "name": "Post Set up Python",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 51
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 52
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 53
+        }
+      ]
+    },
+    {
+      "id": 136167843687,
+      "run_id": 44700473981,
+      "name": "update",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-20T08:11:57Z",
+      "completed_at": "2026-11-20T10:56:07Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install Claude Code CLI (LLM 구독 경로)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "개장 전 지금 값 — 08:00 에 뒤에서 시작 (아침)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6
+        },
+        {
+          "name": "Fetch KOSPI 52-week-high gap",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Fetch KOSDAQ-vs-KOSPI ratio",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "(텔레그램) 채널 동기화 + 구독자 스냅샷",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "(텔레그램) 메시지 수집",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "(텔레그램) 수집 커버리지 검사",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "(텔레그램) 메시지 LLM 분류 — 수거 + 제출",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "(텔레그램) 채널 영향력 점수",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "(텔레그램) 미국 종목 추출 — 뒤에서 시작",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "(텔레그램) 종목 추출",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "(텔레그램) 미장 갈래 나머지 — 뒤에서 시작",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "(텔레그램) 종목 일별 집계",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        },
+        {
+          "name": "(텔레그램) 급부상 카드 유령 감시",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18
+        },
+        {
+          "name": "(텔레그램) 미국 종목 추출",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19
+        },
+        {
+          "name": "(텔레그램) 발송 요일 판정",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20
+        },
+        {
+          "name": "(텔레그램) 앞날 일정 추출",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21
+        },
+        {
+          "name": "개장 전 지금 값 (하이퍼리퀴드 → 원화)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22
+        },
+        {
+          "name": "트렌딩 '오늘' 기준(07:00 KST) 대기",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23
+        },
+        {
+          "name": "(텔레그램) 트렌딩 메시지 선별",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24
+        },
+        {
+          "name": "(텔레그램) 테마 일별 집계",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25
+        },
+        {
+          "name": "(텔레그램) 메시지 LLM 분류 — 수거",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26
+        },
+        {
+          "name": "미장 갈래에 '수거 끝' 알리기",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27
+        },
+        {
+          "name": "(텔레그램) 센티먼트·화제어 집계",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 28
+        },
+        {
+          "name": "(텔레그램) 시장 전체 분위기 판정 + 집계",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29
+        },
+        {
+          "name": "미장 갈래에 '분위기 판정 끝' 알리기",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 30
+        },
+        {
+          "name": "(텔레그램) 미국 종목·채널 일별 집계",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 31
+        },
+        {
+          "name": "(텔레그램) 미국×국내 동시 언급",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 32
+        },
+        {
+          "name": "(텔레그램) 미장 트렌딩 메시지 선별",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 33
+        },
+        {
+          "name": "(텔레그램) 미장 테마 일별 집계",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 34
+        },
+        {
+          "name": "(텔레그램) 미장 센티먼트·화제어 집계",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 35
+        },
+        {
+          "name": "(텔레그램) 급부상 한 줄 요약 생성",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 36
+        },
+        {
+          "name": "(텔레그램) 등락 종목 까닭 생성",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 37
+        },
+        {
+          "name": "(텔레그램) 총평·종목 요약 생성",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 38
+        },
+        {
+          "name": "국장 카더라 화면만 먼저 비우고 데우기",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 39
+        },
+        {
+          "name": "(텔레그램) 미장 총평·종목 요약 생성",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 40
+        },
+        {
+          "name": "미장 카더라 화면만 먼저 비우고 데우기",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 41
+        },
+        {
+          "name": "미리보기 화면 다시 비우고 데우기 (지금 값 반영)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 42
+        },
+        {
+          "name": "(텔레그램) 테마 요약 생성",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 43
+        },
+        {
+          "name": "(텔레그램) 미장 테마 요약 생성",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 44
+        },
+        {
+          "name": "테마 리포트 화면만 먼저 비우고 데우기",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 45
+        },
+        {
+          "name": "KRX 공표(08:00 KST) 대기",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 46
+        },
+        {
+          "name": "개장 전 지금 값 (하이퍼리퀴드 → 원화) — 아침",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 47
+        },
+        {
+          "name": "Fetch Buffett index",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 48
+        },
+        {
+          "name": "Fetch consumer sentiment (CCSI · 실물 축)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 49
+        },
+        {
+          "name": "Fetch business outlook (기업 체감 경기)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 50
+        },
+        {
+          "name": "Fetch turnover concentration (거래대금 쏠림)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 51
+        },
+        {
+          "name": "Fetch Naver search trend",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 52
+        },
+        {
+          "name": "Fetch Naver luxury/import car search trend",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 53
+        },
+        {
+          "name": "Fetch Naver lifestyle search trend (fine dining, small business crisis)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 54
+        },
+        {
+          "name": "Fetch DCInside stock gallery sentiment",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 55
+        },
+        {
+          "name": "Fetch KOSPI trading value surge",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 56
+        },
+        {
+          "name": "Fetch VKOSPI",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 57
+        },
+        {
+          "name": "Fetch option put/call ratio",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 58
+        },
+        {
+          "name": "Fetch news headline sentiment",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 59
+        },
+        {
+          "name": "Fetch KOSPI-vs-gold ratio",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 60
+        },
+        {
+          "name": "Fetch USD/KRW volatility",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 61
+        },
+        {
+          "name": "Fetch leverage ETF trade value + KOSPI200 futures open interest",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 62
+        },
+        {
+          "name": "Fetch leverage vs inverse ratio (레버리지 대 인버스)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 63
+        },
+        {
+          "name": "Fetch bestseller finance book ratio",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 64
+        },
+        {
+          "name": "베스트셀러 빈 날 세기 (사흘 연속일 때만 알림)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 65
+        },
+        {
+          "name": "Fetch YouTube finance search views",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 66
+        },
+        {
+          "name": "Fetch YouTube stock shorts (주식 쇼츠)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 67
+        },
+        {
+          "name": "Fetch KOSPI-vs-Asia relative strength",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 68
+        },
+        {
+          "name": "Fetch Upbit speculation index",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 69
+        },
+        {
+          "name": "Fetch GitHub trading bot repo count",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 70
+        },
+        {
+          "name": "Fetch brokerage app store rank",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 71
+        },
+        {
+          "name": "Fetch foreign net selling at index highs",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 72
+        },
+        {
+          "name": "Fetch limit-up breadth (급등 종목 강도)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 73
+        },
+        {
+          "name": "Fetch investor deposit (투자자예탁금)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 74
+        },
+        {
+          "name": "Fetch credit loan growth (신용융자 잔고)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 75
+        },
+        {
+          "name": "Fetch market actions (sidecar/CB) index",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 76
+        },
+        {
+          "name": "Calculate overheating score",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 77
+        },
+        {
+          "name": "Check indicator freshness (자료 정체 감시)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 78
+        },
+        {
+          "name": "Generate daily AI summary (히어로 요약)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 79
+        },
+        {
+          "name": "브리핑 화면만 먼저 비우고 데우기",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 80
+        },
+        {
+          "name": "아침 화면 한 묶음 비우기 (홈 · 카더라 · 테마 — KRX 등락률 뒤)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 81
+        },
+        {
+          "name": "Summarize results",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 82
+        },
+        {
+          "name": "Alert on failure (open/update GitHub issue)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 83
+        },
+        {
+          "name": "Summarize 카더라 collection (텔레그램 수집 전용)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 84
+        },
+        {
+          "name": "Alert on 카더라 failure (open/update GitHub issue)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 85
+        },
+        {
+          "name": "Alert on 카더라 커버리지 저하 (open/update GitHub issue)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 86
+        },
+        {
+          "name": "Summarize 국장 집계 (카더라 화면을 채우는 스텝)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 87
+        },
+        {
+          "name": "Alert on 국장 집계 failure (open/update GitHub issue)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 88
+        },
+        {
+          "name": "Alert on 급부상 유령 의심 (open/update GitHub issue)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 89
+        },
+        {
+          "name": "Summarize 카더라 LLM 분류",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 90
+        },
+        {
+          "name": "Alert on 분류 failure (open/update GitHub issue)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 91
+        },
+        {
+          "name": "Summarize 미장 collection (미국 종목 전용)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 92
+        },
+        {
+          "name": "Alert on 미장 failure (open/update GitHub issue)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 93
+        },
+        {
+          "name": "Post Set up Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 185
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 186
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 187
+        }
+      ]
+    },
+    {
+      "id": 136244529242,
+      "run_id": 44700473981,
+      "name": "finalize",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-20T10:56:09Z",
+      "completed_at": "2026-11-20T10:56:32Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "화면 캐시 비우고 다시 데우기",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Alert on 화면 비우기 failure (open/update GitHub issue)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 4
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        }
+      ]
+    },
+    {
+      "id": 136244724466,
+      "run_id": 44700473981,
+      "name": "evening_post",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-20T10:56:34Z",
+      "completed_at": "2026-11-20T11:03:00Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install Claude Code CLI (LLM 구독 경로)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "(텔레그램) B 마감 리포트 발송 (평일 저녁)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Alert on failure (open/update GitHub issue)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 7
+        },
+        {
+          "name": "Post Set up Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        }
+      ]
+    },
+    {
+      "id": 136244724511,
+      "run_id": 44700473981,
+      "name": "logo_fill",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-20T10:56:34Z",
+      "completed_at": "2026-11-20T10:58:21Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Set up Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install Claude Code CLI (LLM 구독 경로)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "화면에 뜬 종목 로고 자동 채우기",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Post Set up Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        }
+      ]
+    },
+    {
+      "id": 136244726107,
+      "run_id": 44700473981,
+      "name": "morning_post",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-11-20T10:56:32Z",
+      "completed_at": "2026-11-20T10:56:32Z",
+      "steps": []
+    },
+    {
+      "id": 136247792203,
+      "run_id": 44700473981,
+      "name": "dead_jobs",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-20T11:03:03Z",
+      "completed_at": "2026-11-20T11:03:09Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "알림 없이 죽은 잡 찾기",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Alert on 죽은 잡 (open/update GitHub issue)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 4
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        }
+      ]
+    }
+  ]
+}
