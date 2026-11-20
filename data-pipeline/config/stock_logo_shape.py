@@ -468,7 +468,10 @@ OWN_LOGO: dict[str, tuple[str, list[float] | None]] = {
     "373110": ("https://www.xcell.co.kr/img/common/main_logo.png", [0, 0, 1, 1]),  # 엑셀세라퓨틱스
     "377330": ("http://www.egtronics.co.kr/html/_skin/img/common/logo_header_black.png", None),  # 이지트로닉스
     "010580": ("https://smbexel.com/images/intro_logo.png", [0.0681, 0.25, 0.3362, 0.5]),  # 에스엠벡셀 — SM(logo.dev 는 깨진 픽셀 그림)
-    "041510": ("https://cdn2.smentertainment.com/images/icon-196x196.jpg", None),  # 에스엠 — 홈페이지 앱 아이콘(검은 선 SM). logo.dev 는 티커 · 도메인 둘 다 어두운 바탕용 흰 윤곽선이라 밝은 칸에서 안 보였다(2026-11-20)
+    # 에스엠 — 홈페이지 앱 아이콘(icon-196x196.jpg)의 SM 마크를 선만 굵게 해 투명 바탕으로 둔 그림(public/logos/041510.png).
+    # logo.dev 는 티커 · 도메인 둘 다 어두운 바탕용 흰 윤곽선이고, 앱 아이콘 그대로는 22px 칸에서 선이 0.46px 라 흐렸다(2026-11-20).
+    # 우리 그림이라 운영 사이트 주소에서 받는다 — 배포 전에 아침 잡이 돌면 못 받고 예전 판정을 그대로 둔다.
+    "041510": ("https://hatzze.fun/logos/041510.png", None),
     "417200": ("https://www.lsmaterials.co.kr/ico/apple-icon-180x180.png", [0, 0, 1, 1]),  # LS머트리얼즈 — LS(logo.dev 는 긴 글자)
     "456160": ("https://www.g2gbio.com/images/common/header_logo_color.png", None),  # 지투지바이오
     "462520": ("https://www.chosunref.co.kr/assets/images/common/logo-gray.png", None),  # 조선내화
