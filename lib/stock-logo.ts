@@ -127,9 +127,13 @@ export const LOGO_TICKER_RE = /^[A-Z0-9][A-Z0-9.\-]{0,11}$/;
  *  11 — 미장 긴 글자 로고를 자르기 시작(2026-10-21 · US_LOGO_CROP). 판 10 의 긴 글자 그림(화면이 배지로 돌림)이 브라우저에 7일 남는다.
  *  12 — 그림과 안 맞는 자를 상자를 쓰지 않기 시작(2026-11-09 · lib/logo-image.ts cropFits). logo.dev 가 긴 로고를 심볼로 바꾼 종목에
  *       옛 상자를 대 심볼 한 조각(NHN 의 검은 막대)이 나간 그림이 브라우저에 7일 남는다.
- * ⚠️ 판정표가 바뀌어도(파이프라인이 새 길 · 상자를 찾음) 같은 주소라 브라우저는 최대 7일 옛 그림을 쓴다. 큰 규칙을 바꿀 때만 올린다.
+ *  13 — 에스엠(041510)을 logo.dev 흰 윤곽선(밝은 칸에서 빈칸)에서 선 굵힌 우리 그림(own)으로 바꾼 것을 그날 바로 보이게(2026-11-20).
+ *       판정표만 바꾸면 판 12 흰 그림이 CDN 에 하루 · 브라우저에 7일 남는다. 판정표를 먼저 바꾸고 판 13 주소를 데운 뒤 올렸다.
+ * ⚠️ 판정표가 바뀌어도(파이프라인이 새 길 · 상자를 찾음) 같은 주소라 브라우저는 최대 7일 옛 그림을 쓴다. 큰 규칙을 바꿀 때나
+ *    한 종목이라도 그날 바로 보여야 할 때 올린다 — 그땐 판정표를 먼저 바꾸고 새 판 주소를 데운 뒤에 올린다(순서가 거꾸로면 옛 그림이
+ *    새 주소로 CDN 에 들어간다 · 판 9).
  */
-export const LOGO_PATH_VERSION = 12;
+export const LOGO_PATH_VERSION = 13;
 
 export function stockLogoPath(ticker: string, size: LogoSize): string {
   return `/api/logo/${encodeURIComponent(ticker)}?s=${size}&v=${LOGO_PATH_VERSION}`;
