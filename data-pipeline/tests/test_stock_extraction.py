@@ -416,6 +416,47 @@ def test_db_stock_mentions_survive(text, codes):
     assert _db(text) == codes
 
 
+# ── 2026-11-20: 에스엠(041510) ← 특징주 봇이 에스엠 시세 줄에 에스엠벡셀(010580) 소식을 붙인 글 ──────────────
+# 사례는 11-18 원문 그대로다. 근거와 수치는 config/stock_extraction.py 의 HOMONYM_CUES["에스엠"] 주석.
+
+SM_DICT = {"에스엠": "041510", "에스엠벡셀": "010580", "하이브": "352820", "JYP Ent.": "035900"}
+
+
+def _sm(text: str) -> set[str]:
+    match_to_code = dict(SM_DICT)
+    pattern, caseless = build_pattern(list(match_to_code))
+    ambiguous = set(match_to_code) & AMBIGUOUS_NAMES
+    return set(extract(text, pattern, match_to_code, {k: "dict" for k in match_to_code}, ambiguous, caseless))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "✅️ 에스엠 : +14.7% 상승 중\n\n현재주가 : 88,200원\n시가총액 : 2.0조\n\n"
+        "- 에스엠벡셀의 군용 통신장비용 배터리 공급계약 체결 소식\n- 차세대 전고체 배터리 핵심 기술 확보에 따른 성장 기대감",
+        "에스엠 (2.0조) +14.3%\n- 에스엠벡셀, 군용 통신장비용 배터리 공급계약 체결 소식\n- 차세대 전고체 배터리 핵심 기술 확보에 따른 성장 기대감",
+        "📈 에스엠 (+40)\n애널리스트 뷰 상향 (긍정 강화) 포착, 에스엠벡셀의 군용 통신장비용 배터리 공급 계약 체결 및 "
+        "차세대 전고체 배터리 기대감, 엔터·레저산업 내년 반등 전망 및 외국인 관광객 증가",
+    ],
+)
+def test_vexcel_news_under_sm_line_is_not_sm(text):
+    assert _sm(text) == {"010580"}
+
+
+@pytest.mark.parametrize(
+    "text, codes",
+    [
+        ("<Top pick: 하이브(352820), 관심종목: 에스엠(041510)>", {"352820", "041510"}),
+        ("[리포트 브리핑]에스엠, '모든 세대가 ICONIC, 더 크게 뛰는 HEART' 목표가 110,000원 - 교보증권", {"041510"}),
+        ("엔터 업종도 강세. 한중 문화 컨텐츠 교류 논의에 따른 수혜 기대감 유효. 하이브(+7.7%), 에스엠(+15.6%), JYP Ent.(+8.8%) 등 상승",
+         {"352820", "041510", "035900"}),
+        ("- 에스엠 | +15.21% | 249.4억 원", {"041510"}),
+    ],
+)
+def test_sm_stock_mentions_survive(text, codes):
+    assert _sm(text) == codes
+
+
 # ── 2026-09-25: 나노(187790) ← 띄어 쓴 합성어의 앞자리(결 ⑧) ──────────────────────────────
 # 급부상 카드 3~4위에 오른 사흘 창(09-10~14)의 유령이 `나노 바나나`·`‘나노 장벽’`·`‘나노 숫자’`였다.
 
