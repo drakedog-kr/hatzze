@@ -1,6 +1,9 @@
 import json
 import os
+import re
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 import httpx  # supabase(postgrest)가 쓰는 HTTP 클라이언트. 전송 예외 타입만 빌려 온다.
@@ -11,6 +14,15 @@ from .config import SUPABASE_SECRET_KEY, SUPABASE_URL
 from .timeutil import KST
 
 PAGE_SIZE = 1000  # PostgREST 기본 상한
+
+# 표 전체를 키셋으로 읽을 때 uuid 키를 구간으로 나눠 함께 읽는 갈래 수(load_keyset 주석 '나눠 읽기').
+# 환경 변수 KEYSET_WORKERS 로 바꾼다. 1 이면 예전처럼 차례로만 읽는다(끄는 스위치).
+KEYSET_WORKERS_DEFAULT = 8
+KEYSET_WORKERS_MAX = 16
+UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+# uuid 첫 글자(0~f)로 자른 16구간의 경계. 첫 구간은 아래가, 끝 구간은 위가 열려 있어 어떤 값도 빠지지 않는다.
+_UUID_CUTS = [f"{h}0000000-0000-0000-0000-000000000000" for h in "123456789abcdef"]
+UUID_RANGES: list[tuple[str | None, str | None]] = list(zip([None, *_UUID_CUTS], [*_UUID_CUTS, None]))
 
 # 연결이 끊겼을 때 같은 페이지를 다시 받는 횟수와 그 사이 대기(초).
 TRANSPORT_RETRIES = 3
@@ -348,6 +360,25 @@ def load_keyset(db, table: str, columns: str, key: str = "id", narrow=None) -> l
 
     ⏸ load_all 자체를 이걸로 바꾸는 게 옳지만, 그 함수는 국장 파이프라인 스무 곳이
        쓰고 있어 아직 안 건드린다. **필요한 호출부만 명시적으로 옮긴다.**
+
+    ## 나눠 읽기 (2026-11-20)
+
+    페이지를 차례로 받으면 시간이 거의 **왕복 대기**다. 가벼운 페이지 한 장은 gzip 37KB 이고 서울에서 0.055초인데
+    깃헙 러너에서는 0.29~0.79초였다(서부~동부). 한 실행이 큰 표를 스텝마다 처음부터 다시 읽어 페이지 요청이
+    1만 번 안팎이고, 러너가 미국 동부에 걸린 날은 update 잡이 45분 더 걸렸다(10-22~11-20 59회 실측).
+
+    그래서 **조건 없이 표 전체를 읽고 키가 uuid 일 때**는 키를 첫 글자로 16구간(UUID_RANGES)으로 잘라 여러
+    갈래가 함께 읽는다(_load_keyset_split). 구간마다 하는 일은 위와 같은 키셋이고, 구간을 순서대로 이으면
+    차례로 읽은 것과 행도 순서도 같다. 실측(서울, 운영 표 여덟 개 · 합 2,266,427행): 행과 순서 전부 동일,
+    차례 299초 → 나눠 81초. telegram_messages(666,991행)는 190 → 62초, 나머지 일곱은 5~6배.
+    가장 큰 표를 나눠 읽는 것이 두 벌 겹쳐도(16갈래) 곁에서 던진 다른 조회의 응답은 그대로였다(중앙 31~34ms).
+
+    - 첫 페이지는 예전처럼 받는다. 그 장이 꽉 찼고 키가 uuid 꼴일 때만 나눠 읽는다. 한 장짜리 표, 키가 uuid 가
+      아닌 표(`code` · 테스트의 가짜 표)는 그대로 차례로 읽는다.
+    - ⚠️ `narrow` 가 있으면 나누지 않는다. 필터를 건 id 순 페이지는 기본키를 걸으며 거르느라 한 장이 수 초씩
+      걸릴 수 있다(load_window_keyset 주석). 그런 조회를 여덟 갈래로 겹치면 DB 가 그만큼 한꺼번에 일한다.
+      조건 없는 전체 읽기는 한 장이 0.05초라 갈래를 겹쳐도 가볍다.
+    - 갈래 수는 KEYSET_WORKERS(기본 8). 1 이면 이 길을 안 탄다.
     """
     rows: list[dict] = []
     last: str | None = None
@@ -364,11 +395,78 @@ def load_keyset(db, table: str, columns: str, key: str = "id", narrow=None) -> l
             raise ValueError(
                 f"키셋 페이징은 select 에 키 컬럼이 있어야 한다: key={key!r} columns={columns!r}"
             )
+        if (
+            last is None
+            and narrow is None
+            and len(page) == PAGE_SIZE
+            and keyset_workers() > 1
+            and _is_uuid(page[0][key])
+            and _is_uuid(page[-1][key])
+        ):
+            # 받은 첫 장은 버리고 구간마다 처음부터 읽는다. 요청 한 번을 더 쓰는 대신 이을 자리를 따질 일이 없다.
+            return _load_keyset_split(db, table, columns, key)
         rows += page
         last = page[-1][key]
         if len(page) < PAGE_SIZE:
             break
     return rows
+
+
+def keyset_workers() -> int:
+    """나눠 읽는 갈래 수. KEYSET_WORKERS 가 숫자가 아니면 기본값, 1~KEYSET_WORKERS_MAX 밖이면 그 안으로 당긴다."""
+    raw = (os.environ.get("KEYSET_WORKERS") or "").strip()
+    try:
+        n = int(raw) if raw else KEYSET_WORKERS_DEFAULT
+    except ValueError:
+        n = KEYSET_WORKERS_DEFAULT
+    return max(1, min(n, KEYSET_WORKERS_MAX))
+
+
+def _is_uuid(value) -> bool:
+    return isinstance(value, str) and UUID_RE.match(value) is not None
+
+
+def _load_keyset_split(db, table: str, columns: str, key: str) -> list[dict]:
+    """표 전체를 UUID_RANGES 구간으로 나눠 여러 갈래가 함께 읽는다. 결과는 차례로 읽은 것과 행 · 순서가 같다.
+
+    구간은 `[아래, 위)` 이고 첫 구간은 아래가, 끝 구간은 위가 없다 — 어느 구간에도 안 드는 값이 없다. 구간 안에서는
+    load_keyset 과 같은 키셋(`key > 마지막값`)이고, 구간을 0…f 순서로 이으면 전체가 키 순서다.
+
+    갈래마다 클라이언트를 따로 만든다(진짜 클라이언트일 때). 연결 하나를 여러 스레드가 나눠 쓰지 않으니 한 갈래의
+    연결이 끊겨도(execute_with_retry 주석의 GOAWAY) 다른 갈래는 그대로 간다. 테스트의 가짜 표는 그대로 넘겨 쓴다.
+    한 갈래라도 예외를 내면 그대로 올린다 — 일부 구간만 든 결과를 돌려주지 않는다.
+    """
+    local = threading.local()
+
+    def reader():
+        if not isinstance(db, Client):
+            return db
+        if not hasattr(local, "client"):
+            local.client = get_client()
+        return local.client
+
+    def read_range(bounds: tuple[str | None, str | None]) -> list[dict]:
+        lo, hi = bounds
+        client = reader()
+        part: list[dict] = []
+        last: str | None = None
+        while True:
+            q = client.table(table).select(columns).order(key).limit(PAGE_SIZE)
+            if last is not None:
+                q = q.gt(key, last)
+            elif lo is not None:
+                q = q.gte(key, lo)
+            if hi is not None:
+                q = q.lt(key, hi)
+            page = execute_with_retry(q).data or []
+            part += page
+            if len(page) < PAGE_SIZE:
+                return part
+            last = page[-1][key]
+
+    with ThreadPoolExecutor(max_workers=keyset_workers()) as pool:
+        parts = list(pool.map(read_range, UUID_RANGES))
+    return [row for part in parts for row in part]
 
 
 def load_all_keyset(db, table: str, columns: str, key: str = "id") -> list[dict]:
