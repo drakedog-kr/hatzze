@@ -198,21 +198,105 @@ def is_caseless(key: str) -> bool:
     return not HANGUL.search(key) and (len(key) > 2 or " " in key)
 
 
-def build_pattern(keys: list[str]) -> tuple[re.Pattern, dict[str, str]]:
+def _key_part(key: str) -> str:
+    """패턴 속 키 하나. 통짜 IGNORECASE 대신 해당 항목만 지역 플래그로 감싸 길이 우선순위를 유지한다."""
+    return f"(?i:{re.escape(key)})" if is_caseless(key) else re.escape(key)
+
+
+def joined_pattern(ordered: list[str]) -> re.Pattern:
+    """키를 적힌 순서대로 `|` 로 이은 통짜 패턴. KeyPattern 이 내야 하는 결과의 **기준**이다(아래 주석)."""
+    return re.compile("|".join(_key_part(k) for k in ordered))
+
+
+class KeyPattern:
+    """사전 키 전부를 본문에서 찾는다. `joined_pattern(ordered).finditer(text)` 와 **같은 자리를 같은 순서로** 낸다.
+
+    ## 왜 통짜 패턴을 안 쓰나 (2026-11-20)
+
+    파이썬 `re` 는 `a|b|c…` 를 묶어 주지 않는다. 글자 자리마다 대안을 앞에서부터 하나씩 대 본다. 사전이
+    2,725개라 본문 한 글자에 2,725번을 대 보는 셈이고, 이 한 줄이 extract() 계산의 95% 였다(본문 35,000건:
+    finditer 78.2초 · extract 전체 82.1초). 매 실행이 전 기록(55.7만 건)을 다시 훑으니 종목 추출 스텝의
+    스캔 구간이 러너에서 24~52분이었다.
+
+    ## 어떻게 같은 결과를 내나
+
+    어느 키든 **첫 글자가 그 자리 글자와 맞아야** 맞는다. 그래서
+      1) 키의 첫 글자가 될 수 있는 글자만 모은 문자 집합으로 다음 후보 자리를 찾고(_start),
+      2) 그 자리 글자로 시작할 수 있는 키만 **원래 순서 그대로** 이은 작은 패턴을 그 자리에 댄다(_by_char).
+    통짜 패턴이 그 자리에서 고르는 것은 '순서상 맨 앞의 맞는 키'이고, 첫 글자가 안 맞는 키는 어차피 못 맞으니
+    빼도 고르는 키가 같다. 맞으면 그 끝에서, 안 맞으면 다음 글자에서 잇는 것도 finditer 와 같다.
+
+    ⚠️ '첫 글자가 맞는가'를 **직접 따지지 않는다.** 대소문자를 무시하는 키는 엔진이 `ſ`(긴 s)를 s 로, `K`(켈빈
+       기호)를 k 로 본다. lower() 로 흉내 내면 이런 글자에서 갈린다. 키를 넣을 묶음은 엔진에게 한 글자짜리
+       `(?i:x)` 로 물어서 정한다. 1) 의 문자 집합은 넓게 잡혀도 된다 — 2) 가 못 맞히고 다음 글자로 갈 뿐이다.
+       좁게 잡히면 놓친다. tests/test_key_pattern.py 가 유니코드 전 글자로 그 자리를 본다.
+    ⚠️ 낸 매치는 작은 패턴의 것이라 `m.re` 는 통짜 패턴이 아니다. 쓰는 쪽은 group(0) · start() · end() 만 본다.
+    ⚠️ 키를 고치거나 순서를 바꾸는 최적화(접두사 묶기 · 트라이)는 여기 넣지 말 것. 길이 우선과 '같은 길이는
+       사전 순서'가 종목을 가른다(SK 대 SK하이닉스).
+
+    전량 대조(2026-11-20 · 본문 561,063건): 원문 매칭 1,131,291자리, 국장 extract 결과 449,137행, 미장 extract
+    결과 187,391행이 통짜 패턴과 한 건도 다르지 않았다. 국장 extract 전량 계산은 한 프로세스로 약 22분 → 76초.
+    """
+
+    def __init__(self, ordered: list[str]):
+        # 빈 키가 있거나 키가 하나도 없으면 통짜 패턴은 모든 자리에서 빈 매치를 낸다. 그 꼴까지 흉내 내지 않고 그대로 맡긴다.
+        self._joined = joined_pattern(ordered) if (not ordered or "" in ordered) else None
+        self._exact: dict[str, list[int]] = {}  # 첫 글자 → 대소문자를 가리는 키의 순번
+        self._loose: dict[str, list[int]] = {}  # 첫 글자 → 대소문자를 무시하는 키의 순번
+        self._ordered = ordered
+        for i, k in enumerate(ordered):
+            if k:
+                (self._loose if is_caseless(k) else self._exact).setdefault(k[0], []).append(i)
+        self._loose_first = {c: re.compile(f"(?i:{re.escape(c)})") for c in self._loose}
+        sets = []
+        if self._exact:
+            sets.append("[" + "".join(re.escape(c) for c in sorted(self._exact)) + "]")
+        if self._loose:
+            sets.append("(?i:[" + "".join(re.escape(c) for c in sorted(self._loose)) + "])")
+        self._start = re.compile("|".join(sets)) if sets else None
+        self._by_char: dict[str, re.Pattern | None] = {}
+
+    def _pattern_at(self, ch: str) -> re.Pattern | None:
+        """ch 로 시작할 수 있는 키만 원래 순서로 이은 패턴. 그런 키가 없으면 None."""
+        idx = list(self._exact.get(ch, ()))
+        for first, members in self._loose.items():
+            if self._loose_first[first].match(ch):
+                idx += members
+        pat = re.compile("|".join(_key_part(self._ordered[i]) for i in sorted(idx))) if idx else None
+        self._by_char[ch] = pat
+        return pat
+
+    def finditer(self, text: str):
+        if self._joined is not None:
+            yield from self._joined.finditer(text)
+            return
+        if self._start is None:
+            return
+        search, by_char, pos = self._start.search, self._by_char, 0
+        while True:
+            cand = search(text, pos)
+            if cand is None:
+                return
+            i = cand.start()
+            ch = text[i]
+            pat = by_char[ch] if ch in by_char else self._pattern_at(ch)
+            m = pat.match(text, i) if pat is not None else None
+            if m is None:
+                pos = i + 1
+            else:
+                yield m
+                pos = m.end()
+
+
+def build_pattern(keys: list[str]) -> tuple[KeyPattern, dict[str, str]]:
     """통합 패턴과, 대소문자 무시로 잡힌 표기를 사전 키로 되돌릴 역인덱스를 만든다."""
     # 긴 것 우선(겹칠 때 더 구체적인 종목명이 이기도록).
     ordered = sorted(keys, key=len, reverse=True)
-    parts: list[str] = []
     caseless: dict[str, str] = {}
     for k in ordered:
-        escaped = re.escape(k)
         if is_caseless(k):
-            # 통짜 IGNORECASE 대신 해당 항목만 지역 플래그로 감싸 길이 우선순위를 유지한다.
-            parts.append(f"(?i:{escaped})")
             caseless.setdefault(k.lower(), k)
-        else:
-            parts.append(escaped)
-    return re.compile("|".join(parts)), caseless
+    return KeyPattern(ordered), caseless
 
 
 def boundary_ok(text: str, start: int, end: int, is_ambiguous: bool) -> bool:
