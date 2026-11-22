@@ -61,17 +61,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.kind import request as kind_request  # noqa: E402
+from common.kind import request as kind_request, skip_blocked  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 
 KIND_SEARCH_URL = "https://kind.krx.co.kr/disclosure/searchtotalinfo.do"
 REQUEST_TIMEOUT_SEC = 20
 
-# ⚠️ KIND 는 해외 러너 IP 에 일시 차단 403 을 준다. 이 스크립트만 http_client 기본값(403 재시도 없음 → 넷)을 쓰던 때 혼자
-# 죽었고(2026-08-28 · 11-15 #815 · 11-19 #820), 여섯 번으로 맞춘 뒤에도(#821) 같은 러너라 못 넘는 날이 있었다(11-22 #832).
-# 그래서 다른 KIND 스크립트와 같은 common/kind.request 를 쓴다 — 서울 경유(사이트의 /api/kind)를 먼저 묻고, 안 되면 직접,
-# 403 · 5xx 는 여섯 번(2·4·8·16·20초). 다 실패하면 예외를 올리는 것은 그대로다(아래 _search_page).
+# ⚠️ KIND 는 클라우드 IP 에 일시 차단 403 을 준다(common/kind.py 주석). 이 스크립트만 http_client 기본값(403 재시도 없음 → 넷)을
+# 쓰던 때 혼자 죽었고(2026-08-28 · 11-15 #815 · 11-19 #820), 여섯 번으로 맞춘 뒤에도(#821) 같은 러너라 못 넘는 날이 있었다
+# (11-22 #832). 그래서 다른 KIND 스크립트와 같은 common/kind.request 를 쓴다(403 · 5xx 는 여섯 번, 2·4·8·16·20초). 다 실패하면
+# _search_page 가 예외를 올린다(반쪽 결과로 1년치를 덮지 않는다). 막혀서 못 받은 날은 main 이 마지막 행이 이틀 안이면 건너뛴다 —
+# 다음 실행이 소급 기간(365일)으로 빈 날을 채운다. 더 오래 막히면 실패로 끝나 알림이 열리고, check_freshness 도 잡는다.
 KIND_MAX_RETRIES = 6
 PAGE_SIZE = 500
 # 넘길 쪽의 상한. 500 × 40 = 2만 건 — 1년치 '매매거래중단'이 그보다 많을 리 없다. 넘으면 멈추고 알린다
@@ -137,6 +138,10 @@ def search_market_actions(kwd: str, from_date: date, to_date: date) -> list[tupl
     )
 
 
+class KindUnavailable(RuntimeError):
+    """KIND 검색 한 쪽을 못 받음. 막혀서인지는 common.kind.blocked() 로 가른다."""
+
+
 def _search_page(kwd: str, from_date: date, to_date: date, page: int) -> str:
     form = {
         "method": "searchTotalInfoSub",
@@ -159,7 +164,7 @@ def _search_page(kwd: str, from_date: date, to_date: date, page: int) -> str:
     )
     # ⛔ 반쪽 결과로 1년치를 덮지 않는다 — 한 쪽이라도 못 받으면 스텝을 실패시킨다(다음 실행의 소급 기간이 채운다).
     if body is None:
-        raise RuntimeError(f"[KIND] 시장조치 검색({kwd} · {page}쪽)을 못 받았습니다")
+        raise KindUnavailable(f"[KIND] 시장조치 검색({kwd} · {page}쪽)을 못 받았습니다")
     return body.decode("utf-8", "ignore")
 
 
@@ -197,6 +202,12 @@ def rolling_counts(dates: list[date], window_end: date) -> int:
     return sum(1 for d in dates if window_start <= d <= window_end)
 
 
+def _latest_row_date(client, indicator_id: str) -> date | None:
+    """이 지표의 마지막 행 날짜(러너 날짜로 쓴다 — 아래 main 의 today)."""
+    r = client.table("indicator_values").select("date").eq("indicator_id", indicator_id).order("date", desc=True).limit(1).execute().data
+    return date.fromisoformat(str(r[0]["date"])[:10]) if r else None
+
+
 def main() -> None:
     client = get_client()
     indicator_id = ensure_indicator(client, INDICATOR_META)
@@ -205,8 +216,13 @@ def main() -> None:
     today = date.today()
     fetch_start = today - timedelta(days=BACKFILL_DAYS + WINDOW_DAYS)
 
-    sidecar_entries = search_market_actions(SIDECAR_KEYWORD, fetch_start, today)
-    cb_entries = search_market_actions(CIRCUIT_BREAKER_SEARCH_KEYWORD, fetch_start, today)
+    try:
+        sidecar_entries = search_market_actions(SIDECAR_KEYWORD, fetch_start, today)
+        cb_entries = search_market_actions(CIRCUIT_BREAKER_SEARCH_KEYWORD, fetch_start, today)
+    except KindUnavailable:
+        if skip_blocked("시장 조치", today, lambda: _latest_row_date(client, indicator_id)):
+            return
+        raise
     # '매매거래중단' 검색엔 개별종목 매매정지(SPAC 합병 등)가 늘 섞여 나온다(모듈 docstring).
     # 1년 넘는 기간에 그것마저 0건이면 조용한 시장이 아니라 페이지를 못 읽은 것이다 — 점검
     # 안내 같은 200 응답이나 마크업 변경으로 정규식이 하나도 안 걸린 경우. 그대로 가면 366일치가

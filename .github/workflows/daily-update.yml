@@ -1369,12 +1369,6 @@ jobs:
       - name: Fetch market actions (sidecar/CB) index
         id: market_actions
         continue-on-error: true
-        # ⭐ KIND 는 서울 경유로 묻는다(2026-11-22 · app/api/kind · data-pipeline/common/kind.py). 해외 러너 IP 에 일시 차단 403 이
-        #    잦았다(#815 · #819 · #820 · #823 · #831 · #832). 경유가 안 되면 스크립트가 같은 시도 안에서 직접 묻는다.
-        #    KIND 를 부르는 스텝은 다섯이다(시장 조치 · 배당 공시 · 고배당 · 배당성향 · 로고 판정) — 새로 생기면 이 둘을 같이 넣는다.
-        env:
-          KIND_PROXY_URL: https://hatzze.fun/api/kind
-          KIND_PROXY_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: python data-pipeline/scripts/fetch_market_actions.py
 
       - name: Calculate overheating score
@@ -2258,10 +2252,6 @@ jobs:
         if: ${{ !cancelled() }}
         continue-on-error: true
         timeout-minutes: 10
-        # KIND 서울 경유 — 시장 조치 스텝 주석.
-        env:
-          KIND_PROXY_URL: https://hatzze.fun/api/kind
-          KIND_PROXY_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: python data-pipeline/scripts/fetch_kr_dividend_notices.py
 
       # 기록을 종목 한 줄로 접는다(12개월 합·수익률·지급월·연속 배당·확정 배당·감액배당). 화면은 이 표만 읽는다.
@@ -2281,10 +2271,6 @@ jobs:
         if: ${{ !cancelled() }}
         continue-on-error: true
         timeout-minutes: 10
-        # KIND 서울 경유 — 시장 조치 스텝 주석.
-        env:
-          KIND_PROXY_URL: https://hatzze.fun/api/kind
-          KIND_PROXY_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: python data-pipeline/scripts/fetch_kr_high_dividend.py
 
       # 배당성향(KIND 배당정보, 지난 사업연도 한 줄씩) — POST 한 번. 위와 같은 사이트.
@@ -2293,10 +2279,6 @@ jobs:
         if: ${{ !cancelled() }}
         continue-on-error: true
         timeout-minutes: 10
-        # KIND 서울 경유 — 시장 조치 스텝 주석.
-        env:
-          KIND_PROXY_URL: https://hatzze.fun/api/kind
-          KIND_PROXY_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: python data-pipeline/scripts/fetch_kr_dividend_payout.py
 
       # ETF 분배금 — 미국은 stockanalysis, 국내는 예탁결제원 SEIBro 분배금지급현황(전 운용사 · 열다섯 달치 · 150여 회 요청 · 2분 반). 시세·환율도 여기서.
@@ -2512,10 +2494,6 @@ jobs:
       - name: 국장 종목 로고 판정 (티커 · 홈페이지 도메인)
         id: stock_logos
         continue-on-error: true
-        # KIND 서울 경유 — 시장 조치 스텝 주석.
-        env:
-          KIND_PROXY_URL: https://hatzze.fun/api/kind
-          KIND_PROXY_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: python data-pipeline/scripts/refresh_stock_logo_sources.py
 
   finalize:

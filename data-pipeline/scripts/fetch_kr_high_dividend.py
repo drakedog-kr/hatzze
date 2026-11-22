@@ -35,7 +35,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.kind import code_lookup, norm, num, post_list, rows_of  # noqa: E402
+from common.kind import code_lookup, latest_computed_for, norm, num, post_list, rows_of, skip_blocked  # noqa: E402
 from common.supabase_client import execute_with_retry, get_client, load_all_keyset  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
@@ -76,6 +76,9 @@ def main() -> None:
         "marketType": "", "selYear": "", "searchCorpName": "", "repIsuSrtCd": "", "isurCd": "", "acntclsMm": "",
     })
     if page is None:
+        # KIND 가 러너를 막은 날은 마지막으로 받은 날이 이틀 안이면 건너뛴다 — 매 실행 전량을 다시 받는 표다(common/kind.py).
+        if skip_blocked("고배당기업", today, lambda: latest_computed_for(get_client(), TABLE)):
+            return
         print("[고배당] KIND 목록을 못 받았습니다")
         sys.exit(1)
     items = parse_list(page)
