@@ -4,6 +4,7 @@
 받아서, 그해 정지가 500건을 넘으면 뒤쪽(오래된 쪽)의 CB 발동이 조용히 빠질 수 있었다(#622 에서 찾음).
 KIND 에 실제로 묻지 않고 응답 HTML 을 흉내 낸다 — 마크업은 모듈의 정규식이 읽는 꼴 그대로다.
 """
+import urllib.parse
 from datetime import date
 
 import pytest
@@ -20,24 +21,16 @@ def _row(i: int, market: str = "코스닥시장", title: str = "매매거래정�
     )
 
 
-class _Resp:
-    def __init__(self, text: str):
-        self.text = text
-
-    def raise_for_status(self):
-        return None
-
-
 def serve(monkeypatch, pages: dict[int, str], beyond: str = ""):
     """pageIndex → HTML. 목록에 없는 쪽을 물으면 `beyond` 를 준다. 물은 쪽 번호를 모아 돌려준다."""
     asked: list[int] = []
 
-    def fake_post(url, label=None, data=None, **kw):
-        page = int(data["pageIndex"])
+    def fake_request(url, data=None, **kw):
+        page = int(urllib.parse.parse_qs(data.decode())["pageIndex"][0])
         asked.append(page)
-        return _Resp(pages.get(page, beyond))
+        return pages.get(page, beyond).encode()
 
-    monkeypatch.setattr(ma, "post_with_retry", fake_post)
+    monkeypatch.setattr(ma, "kind_request", fake_request)
     return asked
 
 
