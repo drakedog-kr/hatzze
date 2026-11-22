@@ -54,36 +54,24 @@ from __future__ import annotations
 
 import re
 import sys
+import urllib.parse
 from datetime import date, timedelta
 from pathlib import Path
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.http_client import DEFAULT_RETRY_STATUSES, post_with_retry  # noqa: E402
+from common.kind import request as kind_request  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 
 KIND_SEARCH_URL = "https://kind.krx.co.kr/disclosure/searchtotalinfo.do"
 REQUEST_TIMEOUT_SEC = 20
 
-# ⚠️ **이 호출만 403 을 재시도한다.** http_client 의 기본값에는 403 이 없고, 그 판단은
-# 맞다 — 대부분의 호스트에서 403 은 권한 문제라 다시 걸어도 결과가 같다. KIND 가 예외인
-# 이유는 **KRX 호스트라 일시 차단에 403 을 쓰기 때문**이다(common/krx_client.py 가 같은
-# 이유로 403 을 재시도 목록에 넣어 뒀다).
-#
-# 2026-08-28 실행에서 KRX 호출 아홉 스크립트가 한꺼번에 403 을 맞았다(로그 509줄).
-# `krx_get` 을 쓰는 여섯은 6회 백오프로 살아남았고, 이 스크립트만 **한 방에** 죽었다 —
-# 재시도가 없어서다. 같은 시각 한국 IP 에서는 같은 요청이 200 이었고, 직전 실행 세 건의
-# 로그에는 403 이 한 줄도 없었다. 승인 문제가 아니라 러너 IP 를 향한 간헐적 차단이다.
-#
-# ⛔ 이 인자를 "403 재시도는 무의미하다"며 지우지 말 것. 그 일반론은 맞지만 이 호스트는
-#    예외다. 지우면 다음 차단 물결에서 이 지표만 또 혼자 죽는다.
-KIND_RETRY_STATUSES = DEFAULT_RETRY_STATUSES | {403}
-# 시도 횟수도 common/kind.py · krx_client 와 같은 여섯 번이다(2·4·8·16·20초 백오프, 약 50초).
-# http_client 기본값 넷(약 14초)을 쓰던 때 이 스크립트만 혼자 403 에 죽었다 — 2026-11-15 저녁(#815) · 11-19 아침(#820).
-# 11-19 은 같은 실행의 로고 잡 KIND 요청이 세 시간 앞서 받았고 앞 네 실행엔 403 이 없었다. 짧은 차단은 이 길이로
-# 넘을 수 있다. 11-14~16 처럼 하루 반 이어지는 차단은 못 넘는다(그때는 다음 실행의 소급 기간이 채운다).
+# ⚠️ KIND 는 해외 러너 IP 에 일시 차단 403 을 준다. 이 스크립트만 http_client 기본값(403 재시도 없음 → 넷)을 쓰던 때 혼자
+# 죽었고(2026-08-28 · 11-15 #815 · 11-19 #820), 여섯 번으로 맞춘 뒤에도(#821) 같은 러너라 못 넘는 날이 있었다(11-22 #832).
+# 그래서 다른 KIND 스크립트와 같은 common/kind.request 를 쓴다 — 서울 경유(사이트의 /api/kind)를 먼저 묻고, 안 되면 직접,
+# 403 · 5xx 는 여섯 번(2·4·8·16·20초). 다 실패하면 예외를 올리는 것은 그대로다(아래 _search_page).
 KIND_MAX_RETRIES = 6
 PAGE_SIZE = 500
 # 넘길 쪽의 상한. 500 × 40 = 2만 건 — 1년치 '매매거래중단'이 그보다 많을 리 없다. 넘으면 멈추고 알린다
@@ -150,28 +138,29 @@ def search_market_actions(kwd: str, from_date: date, to_date: date) -> list[tupl
 
 
 def _search_page(kwd: str, from_date: date, to_date: date, page: int) -> str:
-    resp = post_with_retry(
+    form = {
+        "method": "searchTotalInfoSub",
+        "forward": "searchtotalinfo_detail",
+        "fdName": "all_mktact_idx",
+        "scn": "mktact",
+        "srchFd": "2",  # 시장조치 카테고리
+        "kwd": kwd,
+        "fromData": from_date.isoformat(),
+        "toData": to_date.isoformat(),
+        "pageIndex": str(page),
+        "currentPageSize": str(PAGE_SIZE),
+    }
+    body = kind_request(
         KIND_SEARCH_URL,
-        label="KIND",
-        data={
-            "method": "searchTotalInfoSub",
-            "forward": "searchtotalinfo_detail",
-            "fdName": "all_mktact_idx",
-            "scn": "mktact",
-            "srchFd": "2",  # 시장조치 카테고리
-            "kwd": kwd,
-            "fromData": from_date.isoformat(),
-            "toData": to_date.isoformat(),
-            "pageIndex": str(page),
-            "currentPageSize": str(PAGE_SIZE),
-        },
+        data=urllib.parse.urlencode(form).encode(),
         headers={"User-Agent": "Mozilla/5.0"},
         timeout=REQUEST_TIMEOUT_SEC,
-        retry_statuses=KIND_RETRY_STATUSES,
         max_retries=KIND_MAX_RETRIES,
     )
-    resp.raise_for_status()
-    return resp.text
+    # ⛔ 반쪽 결과로 1년치를 덮지 않는다 — 한 쪽이라도 못 받으면 스텝을 실패시킨다(다음 실행의 소급 기간이 채운다).
+    if body is None:
+        raise RuntimeError(f"[KIND] 시장조치 검색({kwd} · {page}쪽)을 못 받았습니다")
+    return body.decode("utf-8", "ignore")
 
 
 def _parse_entries(text: str) -> list[tuple[str, str, date]]:

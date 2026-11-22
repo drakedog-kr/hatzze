@@ -30,18 +30,17 @@
 from __future__ import annotations
 
 import html
-import http.client
 import re
 import sys
 import time
 import urllib.parse
-import urllib.request
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.kind import UA, post_list  # noqa: E402
+from common.kind import post_list  # noqa: E402
+from common.kind import request as kind_request  # noqa: E402
 from common.supabase_client import execute_with_retry, get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
@@ -67,19 +66,14 @@ TAXFREE_RE = re.compile(r"비과세|과세소득이 아닙|과세 소득이 아�
 
 
 def fetch(url: str, data: dict | None = None, referer: str | None = None) -> str | None:
-    headers = {"User-Agent": UA}
-    if referer:
-        headers["Referer"] = referer
-    body = urllib.parse.urlencode(data).encode() if data else None
-    for attempt in (1, 2, 3):
-        try:
-            with urllib.request.urlopen(urllib.request.Request(url, data=body, headers=headers), timeout=60) as r:
-                return r.read().decode("utf-8", "ignore")
-        except (OSError, http.client.HTTPException):
-            if attempt == 3:
-                return None
-            time.sleep(3 * attempt)
-    return None
+    """뷰어 · 본문 한 장. 서울 경유 · 재시도는 common/kind.request 몫이다(목록 post_list 와 같은 길)."""
+    body = kind_request(
+        url,
+        data=urllib.parse.urlencode(data).encode() if data else None,
+        headers={"Referer": referer} if referer else None,
+        timeout=60,
+    )
+    return None if body is None else body.decode("utf-8", "ignore")
 
 
 def list_filings(frm: date, to: date) -> list[dict] | None:
