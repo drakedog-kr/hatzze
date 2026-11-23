@@ -608,8 +608,21 @@ const KR_INFRA = new Set(["088980", "415640"]);
 /** 리츠·인프라 펀드에는 배당성향을 안 붙인다. 회계이익(EPS) 기준 성향은 감가상각 때문에 100% 를 훌쩍 넘어(리얼티인컴 237%)
     "번 것보다 많이 줬다"로 읽히는데, 리츠는 임대수익(FFO/AFFO) 기준으로 배당하므로 그 숫자가 뜻하는 게 다르다(2026-09-15 점검). */
 const isReitLike = (s: DividendStock) => s.isReit || KR_INFRA.has(s.code) || (s.currency === "USD" && US_REITS.includes(s.code));
-/** 미국 리츠·인프라 — SEC 에 업종 표시가 없어 손으로(config/us_dividend_universe.py 의 리츠 묶음과 같다). */
+/** 미국 리츠 손목록 — '리츠·인프라' 바스켓의 미국 후보이자 배당성향을 안 붙이는 열넷. 표(us_dividend_stock)에 리츠 표시가 없어 손으로 적는다.
+    수집 손목록(config/us_dividend_universe.py)의 '리츠·인프라' 묶음에서 리츠만 옮긴 것 — 같은 묶음의 MAIN·ARCC(BDC)와 EPD·ET·MPLX·WMB·OKE
+    (가스관·송유관 회사)는 리츠가 아니다. */
 const US_REITS = ["O", "VICI", "STAG", "ADC", "WPC", "SPG", "EPR", "OHI", "AMT", "CCI", "PSA", "EXR", "AGNC", "NLY"];
+/** S&P500 목록(config/us_sp500.py)으로 들어오는 리츠 스물하나. 손목록에 없어서 배당성향으로 거르는 바스켓에 섰다(2026-11-23 운영 화면:
+    '지금 배당수익률 우선' 미국 첫 자리에 ARE, '배당귀족'에 FRT).
+    가린 근거(2026-11-23) — 그 목록을 옮겨 온 위키백과 표에서 GICS 세부 업종이 'REITs' 로 끝나는 스물여덟 가운데 손목록의 일곱(O·VICI·SPG·AMT·
+    CCI·PSA·EXR)을 뺀 것이다. SEC 업종 코드(SIC 6798)와 맞대 봤다: INVH 만 6510 인데 분기보고서가 스스로 리츠라고 적는다. 같은 부동산 섹터의
+    CBRE·CSGP 는 중개·정보 회사라 리츠가 아니다. 업종 코드만으로 가르면 안 된다 — 카더라 사전의 페르미(FRMI)는 6798 인데 리츠 선택을 미뤘다.
+    ⚠️ S&P500 목록을 다시 옮기면 여기도 같은 표로 다시 맞춘다. tests/dividend-us-reits.test.ts 는 그 목록에서 빠진 티커만 잡고 새로 든 리츠는 못 잡는다.
+    ⚠️ '리츠·인프라' 바스켓과 배당성향 숨김(isReitLike)은 위 손목록만 본다. 여기까지 넓히면 바스켓의 미국 몫이 수익률 순으로 다시 서서
+       리얼티인컴·오메가헬스케어·WP캐리가 빠지고 ARE·HST·DOC 이 선다(같은 날 운영 표로 셈). */
+const US_SP500_REITS = ["ARE", "BXP", "CPT", "DLR", "DOC", "EQIX", "ESS", "FRT", "HST", "INVH", "IRM", "KIM", "MAA", "PLD", "REG", "SBAC", "UDR", "VMRK", "VTR", "WELL", "WY"];
+/** 배당성향으로 거르는 바스켓에 안 세우는 미국 리츠 — 두 목록을 합친 서른다섯. */
+const US_REIT_CODES: ReadonlySet<string> = new Set([...US_REITS, ...US_SP500_REITS]);
 /** 원금을 돌려주는 상품이 섞이는 선. 커버드콜·리츠 바스켓은 이 위를 뺀다(줄 안내도 30% 에서 켜진다). */
 const MAX_YIELD_ETF = 30;
 /** IRP 안전자산(채권형·채권혼합형 ETF)을 이름으로 가르는 규칙. 화면(DividendCalculator)의 isSafeAsset 과 같은 식. */
@@ -685,9 +698,11 @@ export function pickBaskets(kr: DividendStock[], us: DividendStock[], allEtfs: D
   const isReit = (s: DividendStock) => s.isReit || KR_INFRA.has(s.code);
   const common = pool.filter((s) => !isPref(s) && !isReit(s));
   const usPayersAll = us.filter((s) => s.dps > 0 && s.close != null && yieldOf(s) >= 1.5 && yieldOf(s) <= 10);
-  // 배당성향으로 거르는 바스켓(꾸준함·수익률·성장·귀족·배당성장)에는 미국 리츠를 안 세운다 — 리츠엔 성향을 안 붙이니(isReitLike)
-  // '성향 80% 이하' 문이 안 걸러 준다. 달마다 받기·미국 월배당은 리얼티인컴 같은 월배당 리츠가 주인공이라 usPayersAll 을 쓴다.
-  const usPayers = usPayersAll.filter((s) => !US_REITS.includes(s.code));
+  // 배당성향으로 거르는 바스켓(꾸준함·수익률·성장·귀족·배당성장)에는 미국 리츠를 안 세운다 — '성향 80% 이하' 문이 리츠를 못 가른다.
+  // 손목록 리츠는 성향을 안 붙여서(isReitLike) 문을 그냥 지나가고, S&P500 으로 들어온 리츠는 값이 비었거나(ARE) 리츠에선 뜻이 다른 EPS 기준
+  // 숫자다(FRT 93% 가 배당귀족의 100% 문을 지났다). 그래서 성향이 아니라 티커로 뺀다(US_REIT_CODES).
+  // 달마다 받기·미국 월배당은 리얼티인컴 같은 월배당 리츠가 주인공이라 usPayersAll 을 쓴다.
+  const usPayers = usPayersAll.filter((s) => !US_REIT_CODES.has(s.code));
   const etfByCode = new Map(etfs.map((s) => [s.code, s]));
   const usEtfs = (codes: string[]) => codes.map((c) => etfByCode.get(c)).filter((s): s is DividendStock => !!s && s.close != null);
   const krEtfs = (re: RegExp) => etfs.filter((s) => s.currency === "KRW" && s.dps > 0 && s.close != null && re.test(s.name) && yieldOf(s) >= 2 && yieldOf(s) <= MAX_YIELD_ETF).sort(byYield);
