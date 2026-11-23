@@ -178,7 +178,14 @@ describe("달러 주식의 세율 — 미국에 상장돼 있어도 본국 세�
   });
 
   it("14% 이상 떼면 그 세율 그대로다 — 국내에서 더 떼지 않고 넘는 몫을 돌려주지도 않는다", () => {
-    for (const rate of [0.15, 0.15315, 0.21, 0.25, 0.27, 0.35]) assert.equal(withDomesticTopUp(rate), rate);
+    for (const rate of [0.15, 0.15315, 0.21, 0.25, 0.27, 0.35, 0.47]) assert.equal(withDomesticTopUp(rate), rate);
+  });
+
+  it("미국 상장 파트너십의 분배금은 37% 에 10% 가 더 붙어 47%", () => {
+    // 외국 회사는 아니지만 미국 15% 가 아닌 줄이라 같은 표에 든다. 리츠 · 일반 미국 회사는 15% 그대로.
+    for (const code of ["EPD", "ET", "MPLX"]) assert.equal(usdTaxRate(usd(code)), 0.47);
+    assert.equal(usdTaxRate(usd("O")), 0.15);
+    assert.equal(usdTaxRate(usd("WMB")), 0.15);
   });
 
   it("나라별 — 영국 · 케이맨 · 버뮤다 0%, 일본 15.315%, 대만 21%, 아일랜드 25%, 덴마크 27%, 스위스 35%", () => {

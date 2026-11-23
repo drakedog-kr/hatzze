@@ -53,6 +53,7 @@ EXTRA_US_DIVIDEND: dict[str, str] = {
     "CCI": "크라운캐슬",
     "PSA": "퍼블릭스토리지",
     "EXR": "엑스트라스페이스",
+    # ⚠️ 아래 셋은 상장 파트너십(MLP) — 분배금에 미국 15% 가 아니라 47%(37% + 10%)를 뗀다. 더하면 app/dividend/calc.ts 의 SOURCE_TAX_GROUPS 에도 넣는다.
     "EPD": "엔터프라이즈프로덕츠",
     "ET": "에너지트랜스퍼",
     "MPLX": "MPLX",
