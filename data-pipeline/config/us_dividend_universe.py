@@ -36,6 +36,7 @@ UK_DIVIDEND: dict[str, str] = {
 
 EXTRA_US_DIVIDEND: dict[str, str] = {
     # 리츠·인프라 — 서학개미가 배당으로 가장 많이 찾는 쪽
+    # ⚠️ 이 묶음을 고치면 lib/dividend.ts 의 US_REITS(이 묶음의 리츠 열넷)도 같이 고친다 — tests/dividend-us-reits.test.ts 가 둘을 맞댄다.
     "O": "리얼티인컴",
     "MAIN": "메인스트리트캐피털",
     "ARCC": "아레스캐피털",
