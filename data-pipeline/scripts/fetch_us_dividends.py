@@ -45,8 +45,9 @@
 
 ⚠️ XBRL 은 기간만 있고 지급일이 없다. 8-K 본문("payable on …")을 긁어 봤더니 마흔 종목 중 열만
    네 달이 다 나왔다(2026-09-12). 그래서 지급 건은 stockanalysis 에서 받는다.
-⚠️ 외국 회사(20-F, ifrs-full 태그)와 ETF 는 이 태그가 없어 0 으로 나온다. 목록에 안 넣는다
-   (config/us_dividend_universe.py 머리말).
+⚠️ 외국 회사(20-F, ifrs-full 태그)는 이 태그가 없어 SEC 요약이 0 이다. 지급 건은 stockanalysis 에 있어 12개월 합·달력은
+   그쪽 값으로 서고(ttm_method='sa'), 연도 합은 그 페이지가 보여 주는 해만 선다(config/us_dividend_universe.py 머리말).
+   ETF 는 fetch_etf_dividends.py 가 맡는다.
 
 ## 대상과 주기
 

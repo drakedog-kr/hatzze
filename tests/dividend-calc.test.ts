@@ -4,9 +4,10 @@
  * 숫자가 어긋난다(2026-09-29 감사). 그 칸들이 같은 값을 내는지를 여기 붙박는다. 돌리는 법: `npm test`.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { expectedPays, goalBasis, monthlyOf, rankMatches, showsSepTax } from "../app/dividend/calc.ts";
+import { expectedPays, goalBasis, hasNoSourceTax, monthlyOf, NO_SOURCE_TAX, rankMatches, showsSepTax } from "../app/dividend/calc.ts";
 
 const round = (v: number[]) => v.map((x) => Math.round(x));
 const sum = (v: number[]) => v.reduce((t, x) => t + x, 0);
@@ -162,6 +163,33 @@ describe("showsSepTax — '분리과세' 알약(/dividend 의 줄 · 종목 페�
     const card = { payoutPct: 45, growthPct: 10, year: 2025 };
     assert.equal(showsSepTax({ highDiv: card, taxable: 0, dps: 1_500 }), false);
     assert.equal(showsSepTax({ highDiv: card, taxable: null, dps: 1_500 }), true);
+  });
+});
+
+describe("hasNoSourceTax — 미국에 상장된 영국 회사는 국내 세율(15.4%)", () => {
+  const usd = (code: string, kind: "stock" | "etf" = "stock") => ({ code, kind, currency: "USD" as const });
+
+  it("영국 회사 주식만 고른다", () => {
+    assert.equal(hasNoSourceTax(usd("BTI")), true);
+    assert.equal(hasNoSourceTax(usd("AZN")), true);
+    // 미국 회사와 영국 밖 외국 회사(대만)는 미국 15% 그대로.
+    assert.equal(hasNoSourceTax(usd("MO")), false);
+    assert.equal(hasNoSourceTax(usd("TSM")), false);
+  });
+
+  it("티커가 같아도 ETF 나 원화 종목은 아니다", () => {
+    assert.equal(hasNoSourceTax(usd("BP", "etf")), false);
+    assert.equal(hasNoSourceTax({ code: "BP", kind: "stock", currency: "KRW" }), false);
+  });
+
+  it("수집 목록의 영국 회사 묶음(UK_DIVIDEND)과 같은 티커다", () => {
+    // 한쪽만 고치면 새로 넣은 영국 회사가 미국 15% 로 세어진다. 카더라 사전으로 들어오는 AZN 은 수집 목록에 없다.
+    const py = readFileSync(new URL("../data-pipeline/config/us_dividend_universe.py", import.meta.url), "utf8");
+    const block = /UK_DIVIDEND[^=\n]*=\s*\{([^}]*)\}/.exec(py);
+    assert.ok(block, "UK_DIVIDEND 묶음을 못 찾았다");
+    const listed = [...block[1].matchAll(/"([A-Z.]+)":/g)].map((m) => m[1]).sort();
+    assert.ok(listed.length >= 10, `UK_DIVIDEND 에서 읽은 티커가 ${listed.length}개뿐이다`);
+    assert.deepEqual([...NO_SOURCE_TAX].filter((t) => t !== "AZN").sort(), listed);
   });
 });
 

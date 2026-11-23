@@ -123,6 +123,21 @@ export function showsSepTax(s: { highDiv: object | null; taxable: number | null;
   return s.highDiv != null && !fullyTaxFree;
 }
 
+/* ── 세율 ─────────────────────────────────────────────────────────── */
+/**
+ * 미국에 상장돼 있어도 본국이 배당에 세금을 안 떼는 회사(영국) — 미국 15% 가 아니라 국내 15.4% 다.
+ *
+ * 해외 배당의 세율은 상장한 시장이 아니라 회사의 국적을 따른다. 본국이 14% 보다 덜 떼면 모자란 만큼을 국내 증권사가
+ * 떼고 그 10% 를 지방소득세로 더 뗀다 — 영국은 0% 라 14% + 1.4% 다(증권사 해외주식 배당소득세 안내 · 2026-11-23 확인).
+ *
+ * 목록은 data-pipeline/config/us_dividend_universe.py 의 UK_DIVIDEND 와 카더라 사전으로 들어오는 아스트라제네카(AZN).
+ * ⚠️ 영국 밖 외국 회사(대만 · 스위스 · 덴마크 …)는 본국 세율이 제각각인데 아직 미국 15% 로 센다 — 나라별 세율 표가 없다.
+ */
+export const NO_SOURCE_TAX: ReadonlySet<string> = new Set(["AZN", "BP", "BTI", "DEO", "GSK", "HSBC", "NGG", "RIO", "SHEL", "UL", "VOD"]);
+
+/** 달러 종목 가운데 국내 세율(15.4%)로 세는 줄인가 — 영국 회사 주식. ETF 는 티커가 같아도 아니다. */
+export const hasNoSourceTax = (s: Pick<StockLite, "code" | "kind" | "currency">): boolean => s.currency === "USD" && s.kind === "stock" && NO_SOURCE_TAX.has(s.code);
+
 /* ── 검색 ─────────────────────────────────────────────────────────── */
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 
