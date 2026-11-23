@@ -3,6 +3,10 @@
 위키백과 "List of S&P 500 companies" 표를 2026-09-12 에 옮겼다(CC BY-SA). 편입·편출은 한 해에
 스무 건쯤이라 매일 받을 일이 아니다 — 분기에 한 번 다시 옮기면 된다(같은 페이지, 같은 표).
 
+2026-11-23 에 사라진 티커 셋만 고쳤다(SEC 티커 표에서 빠져 수집이 건너뛰던 것): 인수돼 상장폐지된 KVUE(켄뷰 → 킴벌리클라크) ·
+WBD(워너브러더스 디스커버리 → 스카이댄스)를 빼고, 이름과 티커를 바꾼 PSKY 를 SKYD 로 고쳤다. 그날 위키 표와의 나머지 차이는
+그대로 뒀다 — 편입 BE · ILMN · OKTA · P · TWLO · VYLR, 편출 BLDR · CTVA · TAP · TTD. 다음에 통째로 다시 옮길 때 반영한다.
+
 ⚠️ 한글 표기가 없는 종목은 여기 적힌 영문명이 화면 이름이 된다(카더라 사전·배당주 목록에 있으면 그쪽 한글이 이긴다).
 ⚠️ 티커의 점(BRK.B·BF.B)은 SEC 표에선 하이픈(BRK-B)이다. 스크립트가 바꿔 찾는다.
 ⚠️ 다시 옮길 때 리츠도 같이 본다. 이 목록엔 업종이 없어서 화면이 리츠를 티커 목록으로 가른다(lib/dividend.ts 의 US_REITS ·
@@ -279,7 +283,6 @@ SP500: dict[str, str] = {
     "JNJ": "Johnson & Johnson",
     "JCI": "Johnson Controls",
     "JPM": "JPMorgan Chase",
-    "KVUE": "Kenvue",
     "KDP": "Keurig Dr Pepper",
     "KEY": "KeyCorp",
     "KEYS": "Keysight Technologies",
@@ -368,7 +371,7 @@ SP500: dict[str, str] = {
     "PKG": "Packaging Corporation of America",
     "PLTR": "Palantir Technologies",
     "PANW": "Palo Alto Networks",
-    "PSKY": "Paramount Skydance Corporation",
+    "SKYD": "Skydance",  # 옛 PSKY(파라마운트 스카이댄스) — 2026-10 워너브러더스 디스커버리를 인수하며 이름과 티커를 바꿨다
     "PH": "Parker Hannifin",
     "PAYX": "Paychex",
     "PYPL": "PayPal",
@@ -494,7 +497,6 @@ SP500: dict[str, str] = {
     "WAB": "Wabtec",
     "WMT": "Walmart",
     "DIS": "Walt Disney Company (The)",
-    "WBD": "Warner Bros. Discovery",
     "WM": "Waste Management",
     "WAT": "Waters Corporation",
     "WEC": "WEC Energy Group",
