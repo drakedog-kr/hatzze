@@ -112,7 +112,7 @@ export type Line = {
   net: number;
   /** 1년 세전 배당(원). 미국은 환율을 곱한 값. */
   grossKrw: number;
-  /** 세금을 뗀 뒤(원). 국내 15.4%, 미국 15%. 세전 모드면 grossKrw 와 같다. */
+  /** 세금을 뗀 뒤(원). 국내 15.4%, 미국 15%, 미국에 상장된 외국 회사는 본국 세율. 세전 모드면 grossKrw 와 같다. */
   netKrw: number;
   /** 투자금(원). 평단을 넣었으면 평단 × 주수, 아니면 전일 종가 × 주수. 둘 다 없으면 null. */
   investKrw: number | null;
@@ -137,7 +137,7 @@ export type Line = {
 
 /**
  * 담은 종목 하나하나의 셈. 미국은 달러를 원으로 옮겨 국내와 한 줄에 더한다 — 환율은 FRED 의
- * 최근 값(1~2영업일 늦다). 세금은 종목마다 다르므로(국내 15.4%·미국 15%) 줄에서 뗀다.
+ * 최근 값(1~2영업일 늦다). 세금은 종목마다 다르므로(국내 15.4%·미국 15%·외국 회사는 본국 세율) 줄에서 뗀다.
  */
 /** mode 는 세전이면 "gross", 아니면 기본 계좌. base 는 기본 계좌(세전이어도 줄의 계좌 표시에 쓴다). */
 export function computeLines(holdings: Holding[], byCode: Map<string, StockLite>, fx: number, mode: TaxMode, base: Account): Line[] {
