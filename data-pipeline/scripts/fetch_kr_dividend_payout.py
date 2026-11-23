@@ -29,7 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.kind import code_lookup, norm, num, post_list, rows_of  # noqa: E402
+from common.kind import code_lookup, latest_computed_for, norm, num, post_list, rows_of, skip_blocked  # noqa: E402
 from common.supabase_client import execute_with_retry, get_client, load_all_keyset  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
@@ -77,6 +77,9 @@ def main() -> None:
         year -= 1
         items = fetch_year(year)
     if items is None:
+        # 고배당과 같은 규칙 — 막힌 날은 마지막으로 받은 날이 이틀 안이면 건너뛴다(common/kind.py).
+        if skip_blocked("배당성향", today, lambda: latest_computed_for(get_client(), TABLE)):
+            return
         print("[배당성향] KIND 배당정보를 못 받았습니다")
         sys.exit(1)
     if len(items) < MIN_ROWS:

@@ -39,7 +39,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.kind import post_list  # noqa: E402
+from common.kind import latest_computed_for, post_list, skip_blocked  # noqa: E402
 from common.kind import request as kind_request  # noqa: E402
 from common.supabase_client import execute_with_retry, get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
@@ -174,6 +174,13 @@ def parse_doc(page: str) -> dict | None:
     }
 
 
+def _skip_blocked(today: date) -> bool:
+    """KIND 가 러너를 막아 목록을 못 받은 날 건너뛰어도 되나. 이 표에는 '마지막으로 받은 날' 칸이 없어(새 접수번호만 쓴다)
+    같은 잡 · 같은 러너가 바로 뒤에서 KIND 를 받는 고배당 · 배당성향 표의 날짜를 쓴다. 목록은 매일 열흘 창이라 이틀 막혀도
+    다음 실행이 그 사이 공시를 다 받는다(common/kind.py · DEFAULT_DAYS)."""
+    return skip_blocked("배당 결정 공시", today, lambda: latest_computed_for(get_client(), "kr_high_dividend", "kr_dividend_payout"))
+
+
 def main() -> None:
     args = sys.argv[1:]
     dry_run = "--dry-run" in args
@@ -183,11 +190,15 @@ def main() -> None:
 
     filings = list_filings(since, today)
     if filings is None:
+        if _skip_blocked(today):
+            return
         print("[KIND 배당공시] 목록을 못 받았습니다")
         sys.exit(1)
     if not backfill and len(filings) < MIN_ROWS_DAILY:
         # 공시가 뜸한 때인지 페이지가 바뀐 것인지는 더 긴 기간으로 가른다(PROBE_DAYS 주석).
         probe = list_filings(today - timedelta(days=PROBE_DAYS), today)
+        if probe is None and _skip_blocked(today):
+            return
         if probe is None or len(probe) < MIN_ROWS_DAILY:
             got = "못 받음" if probe is None else f"{len(probe)}건"
             print(
