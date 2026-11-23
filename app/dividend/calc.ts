@@ -1,4 +1,4 @@
-// 배당으로 살기의 셈 가운데 React·세율표 없이 도는 조각. 한 화면의 여러 칸이 같은 담은 종목을 세므로, 칸마다 식을 따로 두면
+// 배당으로 살기의 셈 가운데 React·계좌 세율표(tax.tsx) 없이 도는 조각. 한 화면의 여러 칸이 같은 담은 종목을 세므로, 칸마다 식을 따로 두면
 // 숫자가 어긋난다(2026-09-29 감사). 테스트(tests/dividend-calc.test.ts)가 읽을 수 있게 .tsx 가 아니고, 값을 끌어오는 import 가 없다.
 
 import type { Line } from "./shared";
@@ -124,19 +124,81 @@ export function showsSepTax(s: { highDiv: object | null; taxable: number | null;
 }
 
 /* ── 세율 ─────────────────────────────────────────────────────────── */
-/**
- * 미국에 상장돼 있어도 본국이 배당에 세금을 안 떼는 회사(영국) — 미국 15% 가 아니라 국내 15.4% 다.
- *
- * 해외 배당의 세율은 상장한 시장이 아니라 회사의 국적을 따른다. 본국이 14% 보다 덜 떼면 모자란 만큼을 국내 증권사가
- * 떼고 그 10% 를 지방소득세로 더 뗀다 — 영국은 0% 라 14% + 1.4% 다(증권사 해외주식 배당소득세 안내 · 2026-11-23 확인).
- *
- * 목록은 data-pipeline/config/us_dividend_universe.py 의 UK_DIVIDEND 와 카더라 사전으로 들어오는 아스트라제네카(AZN).
- * ⚠️ 영국 밖 외국 회사(대만 · 스위스 · 덴마크 …)는 본국 세율이 제각각인데 아직 미국 15% 로 센다 — 나라별 세율 표가 없다.
- */
-export const NO_SOURCE_TAX: ReadonlySet<string> = new Set(["AZN", "BP", "BTI", "DEO", "GSK", "HSBC", "NGG", "RIO", "SHEL", "UL", "VOD"]);
+/** 국내 배당소득세율. 해외 배당에서 본국이 이보다 덜 떼면 모자란 만큼을 국내 증권사가 뗀다(소득세법 제129조 ④). */
+const KR_INCOME_TAX = 0.14;
+/** 지방소득세 — 국내에서 떼는 소득세의 10%. */
+const KR_LOCAL_SURTAX = 0.1;
+/** 미국 회사의 배당은 미국이 15% 를 떼고(한미 조세조약) 국내에서 더 떼지 않는다(금융소득 2천만원 아래). 아래 표에 없는 달러 종목은 이 값이다. */
+const US_SOURCE_TAX = 0.15;
 
-/** 달러 종목 가운데 국내 세율(15.4%)로 세는 줄인가 — 영국 회사 주식. ETF 는 티커가 같아도 아니다. */
-export const hasNoSourceTax = (s: Pick<StockLite, "code" | "kind" | "currency">): boolean => s.currency === "USD" && s.kind === "stock" && NO_SOURCE_TAX.has(s.code);
+/** 영국 묶음의 이름 — 테스트가 이 묶음을 수집 목록(UK_DIVIDEND)과 맞댄다. */
+export const HOME_UK = "영국";
+
+/**
+ * 달러 주식 가운데 미국 15% 가 아닌 줄 — [본국, 본국이 배당에서 떼는 세율, 티커들].
+ *
+ * 해외 배당의 세율은 상장한 시장이 아니라 회사의 국적(세무 거주지)을 따른다. 미국에 상장돼 있어도 주식예탁증서(ADR)와 외국 법인
+ * 주식은 본국 세율로 떼인 채 들어온다. 조세조약의 낮은 세율은 배당을 받은 뒤 환급을 신청해야 받는다(건마다 수수료 · 2~4년) — 그래서
+ * 조약 세율이 아니라 **지급 때 실제로 떼는 세율**을 적는다(증권사 해외주식 배당소득 원천징수 세율 안내 · 2026-11-23 확인).
+ *
+ * ⭐ 나라가 아니라 티커로 간다. 설립지만 보면 틀린다 — 아일랜드에 세운 회사 열다섯 가운데 셋은 세무 거주지가 영국 · 싱가포르라
+ *    아일랜드 25% 가 안 붙고, 스위스 회사 넷 가운데 셋은 자본준비금에서 배당해 스위스 35% 가 안 붙는다. 운영 표(us_dividend_stock)의
+ *    배당 있는 외국 법인 줄마다 회사 연차보고서(10-K · 20-F)에서 세무 거주지와 원천징수 문장을 확인한 것만 넣었다.
+ * ⚠️ 여기 없는 달러 주식은 미국 15% 로 센다. 확인을 못 해 뺀 줄 — 노키아(NOK · 핀란드: 회사 공시는 35%, 증권사 안내는 50%) ·
+ *    카메코(CCJ · 캐나다: 조약 15% 가 바로 적용되면 기본값과 같고 아니면 25%). 네덜란드(ASML · NXPI)는 15% 라 기본값과 같다.
+ * ⚠️ 대만은 21% 로 적었다. 한-대만 조세약정(2024)의 제한세율이 10% 라, 외국에서 낸 세금을 제한세율까지만 쳐 주면(소득세법 시행령
+ *    제117조 ①) 국내에서 4.4% 를 더 뗄 수 있다 — 증권사가 실제로 그렇게 떼는지는 확인하지 못했다.
+ * ⚠️ 영국 묶음은 data-pipeline/config/us_dividend_universe.py 의 UK_DIVIDEND + 카더라 사전으로 들어오는 아스트라제네카(AZN)다.
+ *    한쪽만 고치면 새로 넣은 영국 회사가 미국 15% 로 세어진다 — tests/dividend-calc.test.ts 가 둘을 맞댄다.
+ * ⚠️ 회사가 본사를 옮기거나 배당 재원을 바꾸면 값이 바뀐다(TE 커넥티비티는 2024년 스위스 → 아일랜드, 처브는 자본준비금이
+ *    2032~2036년에 바닥난다고 적는다). S&P500 목록을 다시 옮길 때 같이 본다.
+ */
+export const SOURCE_TAX_GROUPS: readonly (readonly [home: string, rate: number, codes: readonly string[]])[] = [
+  // ── 본국이 배당에 세금을 안 뗀다 → 국내 증권사가 14% + 1.4% ──
+  [HOME_UK, 0, ["AZN", "BP", "BTI", "DEO", "GSK", "HSBC", "NGG", "RIO", "SHEL", "UL", "VOD"]],
+  // 설립은 아일랜드(린데 · 펜테어) · 네덜란드(리온델바젤) · 저지(암코)인데 세무 거주지가 영국이다.
+  ["영국(세무 거주)", 0, ["AMCR", "LIN", "LYB", "PNR"]],
+  // 시게이트 — 설립은 아일랜드, 세무 거주지는 싱가포르(배당에 원천징수가 없다).
+  ["싱가포르(세무 거주)", 0, ["STX"]],
+  // 번지 · 처브 · 가민 — 주총이 자본준비금에서 주는 배당을 승인한다. 이익에서 주면 스위스 35% 가 붙는다.
+  ["스위스(자본준비금 배당)", 0, ["BG", "CB", "GRMN"]],
+  ["버뮤다", 0, ["CCL", "EG", "IVZ"]],
+  // 알리바바 · 징둥은 중국 거주 기업으로 분류되면 10% 를 뗄 수 있다고 적지만 지금은 안 뗀다(떼면 14.4%).
+  ["케이맨", 0, ["BABA", "GFS", "JD"]],
+  ["라이베리아", 0, ["RCL"]],
+  ["퀴라소", 0, ["SLB"]],
+  // ── 본국이 14% 넘게 뗀다 → 그 세율 그대로(국내에서 더 떼지 않고, 넘는 몫을 돌려주지도 않는다) ──
+  ["일본", 0.15315, ["HMC"]],
+  ["대만", 0.21, ["TSM"]],
+  // 조약국 거주자는 면제지만 서류를 미리 내야 하고, 안 내면 25% 를 뗀 뒤 환급을 신청해야 한다.
+  ["아일랜드", 0.25, ["ACN", "ALLE", "AON", "CRH", "ETN", "JCI", "MDT", "STE", "SW", "TEL", "TT", "WTW"]],
+  ["덴마크", 0.27, ["NVO"]],
+  ["스위스", 0.35, ["NVS"]],
+];
+
+/** 티커 → 본국과 그 세율. 위 묶음을 편 것. */
+export const SOURCE_TAX: ReadonlyMap<string, { home: string; rate: number }> = new Map(
+  SOURCE_TAX_GROUPS.flatMap(([home, rate, codes]) => codes.map((code) => [code, { home, rate }] as const)),
+);
+
+/** 달러 주식이 본국에서 떼이는 세금 — 표에 있으면 그 줄, 없으면 null(미국 회사). ETF 와 원화 종목은 티커가 같아도 아니다. */
+export function sourceTax(s: Pick<StockLite, "code" | "kind" | "currency">): { home: string; rate: number } | null {
+  return s.currency === "USD" && s.kind === "stock" ? (SOURCE_TAX.get(s.code) ?? null) : null;
+}
+
+/**
+ * 본국 세율에 국내에서 더 떼는 몫을 얹은 합계 세율. 본국이 14% 이상 떼면 그대로고, 덜 떼면 모자란 소득세와 그 10%(지방소득세)를
+ * 국내 증권사가 더 뗀다 — 0% → 15.4% · 10% → 14.4% · 15% → 15% · 25% → 25%.
+ * (더 떼는 소득세가 1,000원 미만이면 안 떼는 소액부징수는 셈에 안 넣는다 — 지급 건마다 갈려서다.)
+ */
+export function withDomesticTopUp(sourceRate: number): number {
+  if (sourceRate >= KR_INCOME_TAX) return sourceRate;
+  // 0.14 × 1.1 이 0.15400000000000003 으로 나와 국내 세율(0.154)과 어긋나지 않게 백만분의 일에서 끊는다.
+  return Math.round((sourceRate + (KR_INCOME_TAX - sourceRate) * (1 + KR_LOCAL_SURTAX)) * 1e6) / 1e6;
+}
+
+/** 달러 종목 한 줄에서 떼이는 세율(일반 계좌) — 표에 있으면 본국 세율, 없으면 미국 15%. */
+export const usdTaxRate = (s: Pick<StockLite, "code" | "kind" | "currency">): number => withDomesticTopUp(sourceTax(s)?.rate ?? US_SOURCE_TAX);
 
 /* ── 검색 ─────────────────────────────────────────────────────────── */
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
