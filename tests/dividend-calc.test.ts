@@ -1,5 +1,5 @@
 /**
- * app/dividend/calc.ts — 배당으로 살기(/dividend)의 셈 가운데 React·세율표 없이 도는 조각.
+ * app/dividend/calc.ts — 배당으로 살기(/dividend)의 셈 가운데 React·계좌 세율표(tax.tsx) 없이 도는 조각.
  * 한 화면의 여러 칸(히어로·표·달력·다가오는 일정·목표)이 같은 담은 종목을 서로 다른 식으로 세면
  * 숫자가 어긋난다(2026-09-29 감사). 그 칸들이 같은 값을 내는지를 여기 붙박는다. 돌리는 법: `npm test`.
  */
@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { expectedPays, goalBasis, hasNoSourceTax, monthlyOf, NO_SOURCE_TAX, rankMatches, showsSepTax } from "../app/dividend/calc.ts";
+import { expectedPays, goalBasis, HOME_UK, monthlyOf, rankMatches, showsSepTax, SOURCE_TAX, SOURCE_TAX_GROUPS, sourceTax, usdTaxRate, withDomesticTopUp } from "../app/dividend/calc.ts";
 
 const round = (v: number[]) => v.map((x) => Math.round(x));
 const sum = (v: number[]) => v.reduce((t, x) => t + x, 0);
@@ -166,20 +166,76 @@ describe("showsSepTax — '분리과세' 알약(/dividend 의 줄 · 종목 페�
   });
 });
 
-describe("hasNoSourceTax — 미국에 상장된 영국 회사는 국내 세율(15.4%)", () => {
+describe("달러 주식의 세율 — 미국에 상장돼 있어도 본국 세율을 따른다", () => {
   const usd = (code: string, kind: "stock" | "etf" = "stock") => ({ code, kind, currency: "USD" as const });
 
-  it("영국 회사 주식만 고른다", () => {
-    assert.equal(hasNoSourceTax(usd("BTI")), true);
-    assert.equal(hasNoSourceTax(usd("AZN")), true);
-    // 미국 회사와 영국 밖 외국 회사(대만)는 미국 15% 그대로.
-    assert.equal(hasNoSourceTax(usd("MO")), false);
-    assert.equal(hasNoSourceTax(usd("TSM")), false);
+  it("본국이 14% 보다 덜 떼면 모자란 소득세와 그 10%(지방소득세)를 국내에서 더 뗀다", () => {
+    // 0% 는 국내 세율(14% + 1.4%)과 똑같은 값이어야 한다 — 0.14 × 1.1 의 소수 오차(0.15400000000000003)가 남으면 안 된다.
+    assert.equal(withDomesticTopUp(0), 0.154);
+    // 10%(중국 · 브라질 — 표에는 아직 없다): 모자란 4% + 그 10% 인 0.4%.
+    assert.equal(withDomesticTopUp(0.1), 0.144);
+    assert.equal(withDomesticTopUp(0.14), 0.14);
   });
 
-  it("티커가 같아도 ETF 나 원화 종목은 아니다", () => {
-    assert.equal(hasNoSourceTax(usd("BP", "etf")), false);
-    assert.equal(hasNoSourceTax({ code: "BP", kind: "stock", currency: "KRW" }), false);
+  it("14% 이상 떼면 그 세율 그대로다 — 국내에서 더 떼지 않고 넘는 몫을 돌려주지도 않는다", () => {
+    for (const rate of [0.15, 0.15315, 0.21, 0.25, 0.27, 0.35, 0.47]) assert.equal(withDomesticTopUp(rate), rate);
+  });
+
+  it("미국 상장 파트너십의 분배금은 37% 에 10% 가 더 붙어 47%", () => {
+    // 외국 회사는 아니지만 미국 15% 가 아닌 줄이라 같은 표에 든다. 리츠 · 일반 미국 회사는 15% 그대로.
+    for (const code of ["EPD", "ET", "MPLX"]) assert.equal(usdTaxRate(usd(code)), 0.47);
+    assert.equal(usdTaxRate(usd("O")), 0.15);
+    assert.equal(usdTaxRate(usd("WMB")), 0.15);
+  });
+
+  it("나라별 — 영국 · 케이맨 · 버뮤다 0%, 일본 15.315%, 대만 21%, 아일랜드 25%, 덴마크 27%, 스위스 35%", () => {
+    assert.equal(usdTaxRate(usd("BTI")), 0.154);
+    assert.equal(usdTaxRate(usd("AZN")), 0.154);
+    assert.equal(usdTaxRate(usd("BABA")), 0.154);
+    assert.equal(usdTaxRate(usd("EG")), 0.154);
+    assert.equal(usdTaxRate(usd("RCL")), 0.154);
+    assert.equal(usdTaxRate(usd("SLB")), 0.154);
+    assert.equal(usdTaxRate(usd("HMC")), 0.15315);
+    assert.equal(usdTaxRate(usd("TSM")), 0.21);
+    assert.equal(usdTaxRate(usd("MDT")), 0.25);
+    assert.equal(usdTaxRate(usd("NVO")), 0.27);
+    assert.equal(usdTaxRate(usd("NVS")), 0.35);
+  });
+
+  it("설립지가 같아도 세무 거주지 · 배당 재원에 따라 갈린다", () => {
+    // 아일랜드에 세웠지만 세무 거주지가 영국(린데 · 펜테어) · 싱가포르(시게이트)면 아일랜드 25% 가 안 붙는다.
+    assert.equal(usdTaxRate(usd("ACN")), 0.25);
+    assert.equal(usdTaxRate(usd("LIN")), 0.154);
+    assert.equal(usdTaxRate(usd("PNR")), 0.154);
+    assert.equal(usdTaxRate(usd("STX")), 0.154);
+    // 스위스 회사라도 자본준비금에서 주는 배당(처브 · 가민 · 번지)은 스위스 35% 가 안 붙는다.
+    assert.equal(usdTaxRate(usd("CB")), 0.154);
+    assert.equal(usdTaxRate(usd("GRMN")), 0.154);
+    assert.equal(usdTaxRate(usd("BG")), 0.154);
+    // 네덜란드에 세웠지만 세무 거주지가 영국(리온델바젤).
+    assert.equal(usdTaxRate(usd("LYB")), 0.154);
+  });
+
+  it("표에 없는 달러 주식은 미국 15%", () => {
+    assert.equal(sourceTax(usd("MO")), null);
+    assert.equal(usdTaxRate(usd("MO")), 0.15);
+    assert.equal(usdTaxRate(usd("KO")), 0.15);
+  });
+
+  it("티커가 같아도 ETF 나 원화 종목은 표를 안 본다", () => {
+    assert.equal(sourceTax(usd("BP", "etf")), null);
+    assert.equal(usdTaxRate(usd("BP", "etf")), 0.15);
+    assert.equal(sourceTax({ code: "BP", kind: "stock", currency: "KRW" }), null);
+  });
+
+  it("표의 꼴 — 티커는 한 번씩만 나오고 세율은 0~50% 다", () => {
+    const codes = SOURCE_TAX_GROUPS.flatMap(([, , list]) => list);
+    // 두 묶음에 같은 티커가 들면 뒤 묶음의 세율이 말없이 이긴다.
+    assert.equal(new Set(codes).size, codes.length, `겹친 티커: ${codes.filter((c, i) => codes.indexOf(c) !== i).join(" · ")}`);
+    assert.equal(SOURCE_TAX.size, codes.length);
+    for (const code of codes) assert.match(code, /^[A-Z]+(\.[A-Z])?$/, `티커 꼴이 아니다: ${code}`);
+    // 세율을 0.25 가 아니라 25 로 적는 실수를 막는다.
+    for (const [home, rate] of SOURCE_TAX_GROUPS) assert.ok(rate >= 0 && rate <= 0.5, `${home} 세율 ${rate}`);
   });
 
   it("수집 목록의 영국 회사 묶음(UK_DIVIDEND)과 같은 티커다", () => {
@@ -189,7 +245,10 @@ describe("hasNoSourceTax — 미국에 상장된 영국 회사는 국내 세율(
     assert.ok(block, "UK_DIVIDEND 묶음을 못 찾았다");
     const listed = [...block[1].matchAll(/"([A-Z.]+)":/g)].map((m) => m[1]).sort();
     assert.ok(listed.length >= 10, `UK_DIVIDEND 에서 읽은 티커가 ${listed.length}개뿐이다`);
-    assert.deepEqual([...NO_SOURCE_TAX].filter((t) => t !== "AZN").sort(), listed);
+    const uk = SOURCE_TAX_GROUPS.filter(([home]) => home === HOME_UK).flatMap(([, , list]) => list);
+    assert.deepEqual(uk.filter((t) => t !== "AZN").sort(), listed);
+    // 영국은 배당에 세금을 안 뗀다 — 묶음의 세율이 0 이 아니면 국내 15.4% 가 안 나온다.
+    for (const t of uk) assert.equal(SOURCE_TAX.get(t)?.rate, 0);
   });
 });
 
