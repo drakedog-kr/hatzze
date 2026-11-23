@@ -60,6 +60,14 @@ S&P 500(config/us_sp500.py, 503). 겹치는 걸 빼면 560종목쯤이다. 한�
    (`--sec` 로 강제), 다른 날은 표에 있던 값을 그대로 물려받는다. stockanalysis(지급 건)와 핀허브(시세)는
    매일이다.
 
+## 낡은 줄 정리
+
+SEC 티커 표에서 빠진 종목(인수 · 상장폐지 · 티커 변경)은 "CIK 없음"으로 건너뛰므로 그 종목의 옛 줄이 표에 그대로 남는다.
+2026-11-23 에 넷이 그렇게 남아 화면에 실려 있었다(켄뷰 9일 · 파라마운트 스카이댄스와 워너브러더스 디스커버리 31일 · 쿼보 36일 전 값).
+전체 실행은 저장한 뒤에 PRUNE_AFTER_DAYS 넘게 다시 안 쓰인 줄을 지운다. 하루 이틀 못 받은 종목은 다음 실행이 다시 쓰니
+걸리지 않는다. 한 번에 PRUNE_MAX 보다 많으면 지우지 않고 찍기만 한다 — 대상 목록이나 티커 표가 통째로 어긋난 날이다.
+`--only` 실행은 몇 종목만 쓰므로 정리하지 않는다.
+
 실행:
     cd data-pipeline && source .venv/bin/activate
     python scripts/fetch_us_dividends.py --dry-run --only KO,O,XOM   # 몇 종목만 계산·미리보기
@@ -118,6 +126,11 @@ FAIL_PCT_MAX = 25
 SA_FAIL_PCT_MAX = 30
 # stockanalysis 12개월 합과 SEC 값이 이만큼 갈리면 찍는다(둘 다 있을 때).
 SEC_SA_GAP = 0.10
+# 이만큼 넘게 다시 안 쓰인 줄은 지운다(머리말 '낡은 줄 정리'). 실행은 하루 두 번이고 매번 대상 전부를 다시 쓰므로,
+# 하루 이틀 빠진 종목과 대상에서 사라진 종목이 이 길이로 갈린다.
+PRUNE_AFTER_DAYS = 7
+# 한 번에 이보다 많이 지워야 하면 지우지 않는다 — 종목 몇이 아니라 대상 목록이나 SEC 티커 표가 어긋난 것이다.
+PRUNE_MAX = 15
 
 # 기간 길이(일) → 종류
 DUR = {"month": (25, 35), "quarter": (80, 100), "half": (170, 190), "nine": (255, 285), "year": (350, 380)}
@@ -412,6 +425,37 @@ def apply_payments(r: dict, hist: list[dict], today: date) -> str | None:
     return gap
 
 
+def stale_tickers(table_rows: list[dict], written: set[str], today: date) -> list[str]:
+    """표에 있는데 이번 실행이 안 썼고, 마지막으로 쓴 지 PRUNE_AFTER_DAYS 를 넘긴 티커(가나다순).
+
+    마지막으로 쓴 날(computed_for)을 모르는 줄은 건드리지 않는다 — 언제 것인지 모르면 낡았다고 못 한다.
+    """
+    out: list[str] = []
+    for r in table_rows:
+        t = r.get("ticker")
+        last = r.get("computed_for")
+        if not t or t in written or not last:
+            continue
+        if (today - date.fromisoformat(str(last)[:10])).days > PRUNE_AFTER_DAYS:
+            out.append(t)
+    return sorted(out)
+
+
+def prunable(db, written: set[str], today: date) -> list[str]:
+    """지울 티커. 표를 못 읽었거나 PRUNE_MAX 보다 많으면 빈 목록 — 그날은 지우지 않고 찍기만 한다."""
+    try:
+        table_rows = load_all(db, TABLE, "ticker,computed_for", order_by="ticker")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[정리] 표를 못 읽어 낡은 줄 정리를 건너뜁니다: {type(exc).__name__}")
+        return []
+    stale = stale_tickers(table_rows, written, today)
+    if len(stale) > PRUNE_MAX:
+        print(f"[정리] {PRUNE_AFTER_DAYS}일 넘게 다시 안 쓰인 줄이 {len(stale)}개라 지우지 않습니다(상한 {PRUNE_MAX}) — "
+              f"대상 목록과 SEC 티커 표를 확인하세요: {stale[:10]}")
+        return []
+    return stale
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
@@ -573,12 +617,24 @@ def main() -> None:
         if r:
             print(f"  {t}: ttm ${r['ttm_dps']} ({r['ttm_method']}) · annual {dict(list(r['annual'].items())[-4:])} · 연속 {r['streak_years']} · 줄임 {r['cut_years_5']}")
 
+    # 낡은 줄(머리말 '낡은 줄 정리'). --only 는 몇 종목만 쓰므로 나머지가 전부 '안 쓴 줄'로 보인다 — 전체 실행에서만 고른다.
+    stale = [] if args.only else prunable(db, {r["ticker"] for r in rows}, today)
+
     if args.dry_run:
+        if stale:
+            print(f"[정리] --dry-run: {PRUNE_AFTER_DAYS}일 넘게 다시 안 쓰인 {len(stale)}줄을 지울 차례입니다: {stale}")
         print("[SEC] --dry-run: DB 에 쓰지 않았습니다")
         return
     for i in range(0, len(rows), CHUNK):
         execute_with_retry(db.table(TABLE).upsert(rows[i : i + CHUNK], on_conflict="ticker"))
     print(f"[Supabase] {TABLE} upsert 완료: {len(rows)}행 (기준일 {today})")
+    if stale:
+        # 정리가 실패해도 그날 받은 것은 이미 저장됐다. 줄은 다음 실행이 다시 고른다.
+        try:
+            execute_with_retry(db.table(TABLE).delete().in_("ticker", stale))
+            print(f"[정리] {PRUNE_AFTER_DAYS}일 넘게 다시 안 쓰인 {len(stale)}줄 삭제: {stale}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[정리] 낡은 줄 {len(stale)}개를 못 지웠습니다 — 다음 실행이 다시 지웁니다: {type(exc).__name__}")
     # ⭐ 죽는 자리는 저장 다음이다(fetch_us_analyst.py 와 같은 판단). 앞에서 죽으면 그날 받은 것까지 잃는다.
     if rows and len(sa_fail) / len(rows) * 100 > SA_FAIL_PCT_MAX:
         raise SystemExit(f"[중단] stockanalysis 파싱 실패가 {len(sa_fail)}종목({len(sa_fail) / len(rows) * 100:.0f}%) — 페이지 구조가 바뀐 것 같습니다")
